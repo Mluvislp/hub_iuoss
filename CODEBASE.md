@@ -26,9 +26,11 @@ iuoss_hub/
 │
 ├── CODEBASE.md               ← file này
 ├── docs/
+│   ├── ECOSYSTEM.md          ← mối liên hệ với dashboard.iuoss.com và WordPress (ĐỌC ĐẦU TIÊN)
 │   ├── README.md             ← tổng quan + hướng dẫn dev local
 │   ├── AUTH_FLOW.md          ← luồng xác thực LDAP chi tiết
-│   └── SERVER_SETUP.md       ← triển khai production trên appctsv
+│   ├── SERVER_SETUP.md       ← triển khai production trên appctsv
+│   └── schema.sql            ← SQL tạo bảng hub_*
 │
 ├── config/                   ← Django project config
 │   ├── settings.py           ← toàn bộ cấu hình (đọc từ .env)
@@ -170,6 +172,7 @@ Redirect → home_view() (và các views tiếp theo)
 
 | Muốn hiểu về... | Đọc file |
 |---|---|
+| Quan hệ với dashboard và WordPress | `docs/ECOSYSTEM.md` |
 | Setup môi trường dev local | `docs/README.md` |
 | Luồng LDAP auth chi tiết | `docs/AUTH_FLOW.md` |
 | Triển khai production (appctsv) | `docs/SERVER_SETUP.md` |
