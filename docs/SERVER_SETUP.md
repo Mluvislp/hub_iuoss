@@ -1,6 +1,6 @@
 # IUOSS Hub — Triển khai production (appctsv)
 
-> Server production chung với `dashboard.iuoss.com`. Đọc `SERVER_INFRASTRUCTURE.md` trong repo `iuoss_dashboard` để hiểu tổng quan hạ tầng.
+> Server production chung với `dashboard.iuoss.com`. Đọc `SERVER_INFRASTRUCTURE.md` trong repo `dashboard_iuoss` để hiểu tổng quan hạ tầng.
 
 ---
 

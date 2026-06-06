@@ -3,7 +3,7 @@
 > Tài liệu này mô tả toàn bộ hệ sinh thái gồm 3 ứng dụng do Phòng CTSV quản lý,
 > cách chúng liên kết với nhau qua database chung, LDAP chung và server chung.
 >
-> Bản copy tồn tại ở cả 2 repo: `iuoss_dashboard` và `iuoss_hub`.
+> Bản copy tồn tại ở cả 2 repo: `dashboard_iuoss` và `iuoss_hub`.
 
 ---
 
@@ -30,7 +30,7 @@
              ▼                                        ▼
 ┌─────────────────────────┐         ┌────────────────────────────────┐
 │  dashboard.iuoss.com    │         │   MySQL: iuoss_student_data    │
-│  Django (iuoss_dashboard│◄────────►   (shared database)           │
+│  Django (dashboard_iuoss│◄────────►   (shared database)           │
 │  (staff-facing)         │  R/W    │                                │
 │                         │         │  students, departments,        │
 │  - Nhân viên OSS login  │         │  student_statuses, tickets,    │
@@ -48,7 +48,7 @@
 | Hệ thống | Domain | Repo | Người dùng | Auth |
 |---|---|---|---|---|
 | WordPress | `iuoss.com` | (không có) | Sinh viên | LDAP trường |
-| Dashboard | `dashboard.iuoss.com` | `iuoss_dashboard` | Nhân viên OSS | Django auth (username/password nội bộ) |
+| Dashboard | `dashboard.iuoss.com` | `dashboard_iuoss` | Nhân viên OSS | Django auth (username/password nội bộ) |
 | Hub | `hub.iuoss.com` | `iuoss_hub` | Sinh viên | LDAP trường (custom, không dùng Django auth) |
 
 **Nguyên tắc phân tách:**
@@ -167,7 +167,7 @@ Nginx :80
 | App path | `/var/www/apps/iuoss_app/` | `/var/www/apps/iuoss_hub/` |
 | Deploy command | `bash deploy.sh` | `bash deploy.sh` (tương lai) |
 
-Chi tiết hạ tầng: xem `docs/SERVER_INFRASTRUCTURE.md` trong repo `iuoss_dashboard`.
+Chi tiết hạ tầng: xem `docs/SERVER_INFRASTRUCTURE.md` trong repo `dashboard_iuoss`.
 
 ---
 
@@ -178,7 +178,7 @@ Khi thay đổi **schema DB** (thêm/sửa/xóa cột bảng dùng chung):
 ```
 Thay đổi bảng students/* hoặc tickets/*
     │
-    ├─► iuoss_dashboard: cập nhật model trong students/models.py hoặc tickets/models.py
+    ├─► dashboard_iuoss: cập nhật model trong students/models.py hoặc tickets/models.py
     └─► iuoss_hub:       cập nhật model trong students/models.py (nếu field đó được dùng)
 ```
 

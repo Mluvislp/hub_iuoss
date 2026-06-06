@@ -11,7 +11,7 @@ Student portal tại `hub.iuoss.com` cho sinh viên HCMIU đăng nhập bằng t
 
 ```
 iuoss.com           WordPress  — sinh viên gửi ticket, dùng cùng LDAP
-dashboard.iuoss.com Django     — nhân viên OSS quản lý nội bộ  (repo: iuoss_dashboard)
+dashboard.iuoss.com Django     — nhân viên OSS quản lý nội bộ  (repo: dashboard_iuoss)
 hub.iuoss.com       Django     — sinh viên tự phục vụ          (repo này)
                          └── cùng MySQL DB: iuoss_student_data
 ```
