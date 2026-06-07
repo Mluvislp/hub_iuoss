@@ -1,6 +1,49 @@
 from django.db import models
 
 
+class ConfirmationRequest(models.Model):
+    REQUEST_TYPES = [
+        ("enrollment", "Xác nhận đang học"),
+        ("graduation", "Xác nhận tốt nghiệp"),
+        ("deferment", "Hoãn nghĩa vụ quân sự"),
+        ("other", "Khác"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Chờ xử lý"),
+        ("processing", "Đang xử lý"),
+        ("done", "Hoàn thành"),
+        ("rejected", "Từ chối"),
+    ]
+    STATUS_BADGE = {
+        "pending": "warning",
+        "processing": "info",
+        "done": "success",
+        "rejected": "danger",
+    }
+
+    student_id = models.BigIntegerField()
+    ldap_uid = models.CharField(max_length=64)
+    request_type = models.CharField(max_length=64, choices=REQUEST_TYPES)
+    purpose = models.CharField(max_length=255)
+    note = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    staff_note = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_confirmation_requests"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.ldap_uid} — {self.get_request_type_display()}"
+
+    @property
+    def status_badge(self):
+        return self.STATUS_BADGE.get(self.status, "secondary")
+
+
 class HubStudent(models.Model):
     """
     Lưu thông tin student đã từng đăng nhập hub.

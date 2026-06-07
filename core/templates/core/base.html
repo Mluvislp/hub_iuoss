@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}IUOSS Hub{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --sidebar-w: 240px;
+      --sidebar-bg: #0f172a;
+      --sidebar-hover: rgba(255,255,255,.06);
+      --sidebar-active-bg: #2563eb;
+      --sidebar-text: #94a3b8;
+      --sidebar-text-active: #fff;
+      --main-bg: #f1f5f9;
+      --topbar-h: 56px;
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--main-bg); font-family: 'Inter', system-ui, sans-serif; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: var(--sidebar-w); background: var(--sidebar-bg);
+      display: flex; flex-direction: column;
+      z-index: 1000; transition: transform .25s ease;
+    }
+    .sidebar-brand {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .sidebar-brand .brand-logo {
+      font-size: 1.15rem; font-weight: 800; color: #fff; letter-spacing: -.02em;
+      display: flex; align-items: center; gap: 8px; text-decoration: none;
+    }
+    .sidebar-brand .brand-logo .logo-icon {
+      width: 32px; height: 32px; background: #2563eb; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .9rem; flex-shrink: 0;
+    }
+    .sidebar-brand .brand-sub {
+      font-size: .7rem; color: var(--sidebar-text); margin-top: 2px; padding-left: 40px;
+    }
+
+    .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+
+    .nav-section-label {
+      font-size: .65rem; font-weight: 700; letter-spacing: .1em;
+      color: #475569; text-transform: uppercase;
+      padding: 8px 10px 4px; margin-top: 8px;
+    }
+
+    .sidebar-nav .nav-item { margin-bottom: 2px; }
+
+    .sidebar-nav .nav-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px;
+      color: var(--sidebar-text); font-size: .875rem; font-weight: 500;
+      text-decoration: none; transition: background .15s, color .15s;
+      position: relative;
+    }
+    .sidebar-nav .nav-link:hover {
+      background: var(--sidebar-hover); color: #e2e8f0;
+    }
+    .sidebar-nav .nav-link.active {
+      background: var(--sidebar-active-bg); color: var(--sidebar-text-active);
+    }
+    .sidebar-nav .nav-link i { font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; }
+    .sidebar-nav .nav-link .badge-soon {
+      margin-left: auto; font-size: .6rem; background: #334155;
+      color: #94a3b8; padding: 2px 6px; border-radius: 20px;
+    }
+    .sidebar-nav .nav-link.disabled {
+      opacity: .45; cursor: not-allowed; pointer-events: none;
+    }
+
+    .sidebar-footer {
+      padding: 12px 10px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .sidebar-footer .user-info {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 8px;
+    }
+    .sidebar-footer .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: #2563eb; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; font-weight: 700; flex-shrink: 0;
+    }
+    .sidebar-footer .user-name { font-size: .8rem; color: #e2e8f0; font-weight: 500; line-height: 1.3; }
+    .sidebar-footer .user-uid  { font-size: .7rem; color: var(--sidebar-text); }
+    .sidebar-footer .btn-logout {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 8px; margin-top: 4px;
+      color: #f87171; font-size: .875rem; font-weight: 500;
+      text-decoration: none; transition: background .15s;
+    }
+    .sidebar-footer .btn-logout:hover { background: rgba(239,68,68,.12); }
+    .sidebar-footer .btn-logout i { font-size: 1rem; width: 18px; text-align: center; }
+
+    /* ── Main layout ── */
+    .main-wrapper {
+      margin-left: var(--sidebar-w);
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      height: var(--topbar-h); background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center;
+      padding: 0 24px; gap: 12px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar .btn-sidebar-toggle {
+      display: none; border: none; background: none;
+      color: #64748b; font-size: 1.2rem; padding: 4px; cursor: pointer;
+    }
+    .topbar-title { font-weight: 600; color: #0f172a; font-size: .95rem; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .topbar-badge {
+      font-size: .75rem; background: #f1f5f9; color: #475569;
+      padding: 4px 10px; border-radius: 20px; font-weight: 500;
+    }
+
+    /* ── Content ── */
+    .content-area { padding: 24px; flex: 1; }
+
+    /* ── Cards ── */
+    .hub-card {
+      background: #fff; border-radius: var(--radius);
+      border: 1px solid #e2e8f0;
+    }
+    .hub-card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hub-card-header h6 {
+      margin: 0; font-size: .875rem; font-weight: 700; color: #0f172a;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hub-card-body { padding: 18px; }
+
+    /* ── Stat cards ── */
+    .stat-card {
+      background: #fff; border-radius: var(--radius);
+      border: 1px solid #e2e8f0;
+      padding: 16px 18px;
+    }
+    .stat-card .stat-label { font-size: .7rem; color: #64748b; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    .stat-card .stat-value { font-size: 1rem; font-weight: 700; color: #0f172a; margin-top: 4px; }
+    .stat-card .stat-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; margin-bottom: 10px;
+    }
+
+    /* ── Info rows ── */
+    .info-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 0; border-bottom: 1px solid #f8fafc;
+      font-size: .85rem;
+    }
+    .info-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .info-row .info-label { color: #64748b; }
+    .info-row .info-value { font-weight: 600; color: #1e293b; text-align: right; }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 32px 16px; }
+    .empty-state i { font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px; }
+    .empty-state p { color: #94a3b8; font-size: .85rem; margin: 0; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.show { transform: translateX(0); }
+      .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 999; }
+      .sidebar-overlay.show { display: block; }
+      .main-wrapper { margin-left: 0; }
+      .topbar .btn-sidebar-toggle { display: block; }
+      .content-area { padding: 16px; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <a href="{% url 'core:home' %}" class="brand-logo">
+      <span class="logo-icon"><i class="bi bi-house-heart-fill"></i></span>
+      IUOSS Hub
+    </a>
+    <div class="brand-sub">Cổng thông tin sinh viên</div>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-section-label">Tổng quan</div>
+    <div class="nav-item">
+      <a href="{% url 'core:home' %}"
+         class="nav-link {% block nav_home %}{% endblock %}">
+        <i class="bi bi-grid-fill"></i> Dashboard
+      </a>
+    </div>
+
+    <div class="nav-section-label">Dịch vụ</div>
+    <div class="nav-item">
+      <a href="{% url 'core:confirmation_request_create' %}"
+         class="nav-link {% block nav_requests %}{% endblock %}">
+        <i class="bi bi-file-earmark-text-fill"></i> Yêu cầu giấy tờ
+      </a>
+    </div>
+
+    <div class="nav-section-label">Sắp ra mắt</div>
+    <div class="nav-item">
+      <a class="nav-link disabled">
+        <i class="bi bi-bell-fill"></i> Thông báo
+        <span class="badge-soon">Sắp có</span>
+      </a>
+    </div>
+    <div class="nav-item">
+      <a class="nav-link disabled">
+        <i class="bi bi-calendar3"></i> Lịch học
+        <span class="badge-soon">Sắp có</span>
+      </a>
+    </div>
+    <div class="nav-item">
+      <a class="nav-link disabled">
+        <i class="bi bi-receipt"></i> Học phí
+        <span class="badge-soon">Sắp có</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    {% if student_session %}
+    <div class="user-info">
+      <div class="avatar">{{ student_session.full_name|slice:":1"|upper }}</div>
+      <div>
+        <div class="user-name">{{ student_session.full_name }}</div>
+        <div class="user-uid">{{ student_session.ldap_uid }}</div>
+      </div>
+    </div>
+    {% endif %}
+    <a href="{% url 'core:logout' %}" class="btn-logout">
+      <i class="bi bi-box-arrow-left"></i> Đăng xuất
+    </a>
+  </div>
+</nav>
+
+<!-- Main -->
+<div class="main-wrapper">
+  <header class="topbar">
+    <button class="btn-sidebar-toggle" onclick="toggleSidebar()">
+      <i class="bi bi-list"></i>
+    </button>
+    <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
+    <div class="topbar-right">
+      {% if student_session %}
+        <span class="topbar-badge"><i class="bi bi-mortarboard me-1"></i>{{ student_session.student_code }}</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="content-area">
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="alert alert-{% if msg.tags == 'error' %}danger{% else %}{{ msg.tags }}{% endif %} alert-dismissible fade show py-2 small mb-3" role="alert">
+          {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('show');
+    document.getElementById('sidebarOverlay').classList.toggle('show');
+  }
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

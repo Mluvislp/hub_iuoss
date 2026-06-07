@@ -1,0 +1,86 @@
+{% extends "core/base.html" %}
+
+{% block title %}Tạo yêu cầu giấy xác nhận — IUOSS Hub{% endblock %}
+{% block page_title %}Yêu cầu giấy xác nhận{% endblock %}
+{% block nav_requests %}active{% endblock %}
+
+{% block content %}
+
+<nav aria-label="breadcrumb" class="mb-4">
+  <ol class="breadcrumb small mb-0">
+    <li class="breadcrumb-item"><a href="{% url 'core:home' %}" class="text-decoration-none">Dashboard</a></li>
+    <li class="breadcrumb-item active">Tạo yêu cầu giấy xác nhận</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <!-- Info banner -->
+    <div class="d-flex align-items-start gap-3 p-3 rounded-3 mb-4"
+         style="background:#eff6ff; border:1px solid #bfdbfe;">
+      <i class="bi bi-info-circle-fill text-primary mt-1"></i>
+      <div class="small" style="color:#1e40af;">
+        <strong>Hướng dẫn:</strong> Điền đầy đủ thông tin bên dưới.
+        Phòng CTSV sẽ xem xét và phản hồi trong vòng <strong>3–5 ngày làm việc</strong>.
+        Bạn có thể theo dõi trạng thái tại trang Dashboard.
+      </div>
+    </div>
+
+    <div class="hub-card">
+      <div class="hub-card-header">
+        <h6><i class="bi bi-file-earmark-plus-fill text-success"></i> Thông tin yêu cầu</h6>
+      </div>
+      <div class="hub-card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small" for="request_type">
+              Loại giấy xác nhận <span class="text-danger">*</span>
+            </label>
+            <select class="form-select" id="request_type" name="request_type" required>
+              <option value="">— Chọn loại giấy —</option>
+              {% for value, label in request_types %}
+                <option value="{{ value }}"
+                  {% if form_data.request_type == value %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small" for="purpose">
+              Mục đích sử dụng <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control" id="purpose" name="purpose"
+                   placeholder="VD: Nộp hồ sơ vay vốn ngân hàng, xin cấp visa..."
+                   value="{{ form_data.purpose|default:'' }}" required maxlength="255">
+            <div class="form-text text-muted">Mô tả ngắn gọn mục đích bạn cần giấy xác nhận này.</div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold small" for="note">
+              Ghi chú thêm <span class="text-muted fw-normal">(tuỳ chọn)</span>
+            </label>
+            <textarea class="form-control" id="note" name="note" rows="3"
+                      placeholder="Yêu cầu đặc biệt, số lượng bản cần cấp, hoặc thông tin bổ sung...">{{ form_data.note|default:'' }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success fw-semibold px-4">
+              <i class="bi bi-send-fill me-2"></i>Gửi yêu cầu
+            </button>
+            <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>Huỷ
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

@@ -1,7 +1,10 @@
 """LDAP authentication — hoàn toàn tách biệt với Django auth."""
+import logging
 import ldap3
 import ldap3.core.exceptions
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _ldap_escape(value: str) -> str:
@@ -26,6 +29,8 @@ def verify_ldap(uid: str, password: str) -> dict | None:
     if not uid or not password:
         return None
 
+    logger.debug("LDAP_START        | uid=%-20s", uid)
+
     server = ldap3.Server(
         settings.LDAP_SERVER_URI,
         get_info=ldap3.NONE,
@@ -43,7 +48,9 @@ def verify_ldap(uid: str, password: str) -> dict | None:
             else ldap3.AUTO_BIND_NO_TLS,
             raise_exceptions=True,
         )
-    except ldap3.core.exceptions.LDAPException:
+        logger.debug("LDAP_SVC_BIND_OK  | uid=%-20s", uid)
+    except ldap3.core.exceptions.LDAPException as e:
+        logger.error("LDAP_SVC_BIND_FAIL | uid=%-20s | %s: %s", uid, type(e).__name__, e)
         return None
 
     search_filter = (
@@ -58,11 +65,13 @@ def verify_ldap(uid: str, password: str) -> dict | None:
     )
 
     if not svc_conn.entries:
+        logger.warning("LDAP_USER_NOTFOUND | uid=%-20s | filter=%s", uid, search_filter)
         svc_conn.unbind()
         return None
 
     entry = svc_conn.entries[0]
     user_dn = entry.entry_dn
+    logger.debug("LDAP_USER_FOUND   | uid=%-20s | dn=%s", uid, user_dn)
     user_attrs = {
         "uid": str(entry.uid) if "uid" in entry else uid,
         "mail": str(entry.mail) if "mail" in entry else None,
@@ -84,8 +93,11 @@ def verify_ldap(uid: str, password: str) -> dict | None:
         )
         user_conn.bind()
         user_conn.unbind()
+        logger.info("LDAP_AUTH_OK      | uid=%-20s | dn=%s", uid, user_dn)
         return user_attrs
     except ldap3.core.exceptions.LDAPInvalidCredentialsResult:
+        logger.warning("LDAP_WRONG_PASS   | uid=%-20s", uid)
         return None
-    except ldap3.core.exceptions.LDAPException:
+    except ldap3.core.exceptions.LDAPException as e:
+        logger.error("LDAP_AUTH_FAIL    | uid=%-20s | %s: %s", uid, type(e).__name__, e)
         return None

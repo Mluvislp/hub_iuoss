@@ -112,3 +112,61 @@ MIGRATION_MODULES = {
     "core": None,
     "students": None,
 }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "auth": {
+            "format": "{asctime} | {levelname:<5} | {message}",
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+        "app": {
+            "format": "{asctime} | {levelname:<5} | {name} | {message}",
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "auth",
+        },
+        "auth_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "auth.log",
+            "maxBytes": 5 * 1024 * 1024,  # 5MB
+            "backupCount": 5,
+            "encoding": "utf-8",
+            "formatter": "auth",
+        },
+        "app_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "app.log",
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",
+            "formatter": "app",
+        },
+    },
+    "loggers": {
+        # Auth actions: login, logout, LDAP steps
+        "core.auth": {
+            "handlers": ["auth_file", "console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "core.views": {
+            "handlers": ["auth_file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Django errors
+        "django": {
+            "handlers": ["app_file", "console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
+}

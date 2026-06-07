@@ -69,3 +69,51 @@ class Student(models.Model):
 
     def __str__(self):
         return f"{self.current_student_code} - {self.full_name}"
+
+
+class HealthInsuranceCard(models.Model):
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="health_insurance_cards",
+    )
+    medical_insurance_code = models.CharField(max_length=64)
+    hospital_code = models.CharField(max_length=255)
+    valid_until = models.DateField(null=True, blank=True)
+    is_current = models.BooleanField(default=False)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "student_health_insurance_cards"
+
+    def __str__(self):
+        return self.medical_insurance_code
+
+
+class CivicActivity(models.Model):
+    RESULT_CHOICES = [
+        ("YES", "Đạt"),
+        ("NO", "Không đạt"),
+        ("UNKNOWN", "Chưa có kết quả"),
+    ]
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="civic_activities",
+    )
+    activity_code = models.CharField(max_length=32)
+    attempt_no = models.SmallIntegerField()
+    result_value = models.CharField(max_length=10, choices=RESULT_CHOICES)
+    completed_at = models.DateField(null=True, blank=True)
+    source_column = models.CharField(max_length=80)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "student_civic_activities"
+        ordering = ["activity_code", "attempt_no"]
+
+    def __str__(self):
+        return f"{self.activity_code} - lần {self.attempt_no}"
