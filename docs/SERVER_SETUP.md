@@ -79,9 +79,12 @@ nano .env
 Nội dung production:
 
 ```env
-DEBUG=False
+DJANGO_ENV=production
 SECRET_KEY=<RANDOM_SECRET_KEY>
 ALLOWED_HOSTS=hub.iuoss.com,10.8.20.33,127.0.0.1
+
+# Origin frontend — dùng cho CORS + CSRF (cùng domain qua Nginx)
+FRONTEND_ORIGINS=https://hub.iuoss.com
 
 DB_NAME=iuoss_student_data
 DB_USER=iuoss_app
@@ -97,7 +100,19 @@ LDAP_BIND_DN=cn=ctsv,dc=hcmiu,dc=edu,dc=vn
 LDAP_BIND_PASSWORD=<PLAIN_TEXT_LDAP_PASSWORD>
 LDAP_SEARCH_BASE=dc=hcmiu,dc=edu,dc=vn
 LDAP_USER_ATTR=uid
+
+# HSTS — bật sau khi xác nhận toàn site HTTPS ổn định (tùy chọn):
+# SECURE_HSTS_SECONDS=31536000
+# SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+# SECURE_HSTS_PRELOAD=True
 ```
+
+> `DJANGO_ENV=production` tự đặt `DEBUG=False`. Không cần khai báo `DEBUG` riêng.
+
+> **Frontend build (footgun):** KHÔNG tạo `frontend/.env.local` trên server production.
+> `NEXT_PUBLIC_*` bị đông cứng vào bundle lúc `npm run build`. Để trống → API gọi
+> `/api` (relative) → Nginx định tuyến. `deploy.sh` sẽ chặn build nếu phát hiện
+> `.env.local` còn `NEXT_PUBLIC_API_URL`.
 
 Tạo `SECRET_KEY`:
 ```bash
@@ -182,7 +197,18 @@ pm2 startup   # chạy lệnh mà nó in ra (có dạng: sudo env PATH=... pm2 s
 sudo nano /etc/nginx/sites-available/iuoss_hub
 ```
 
+> ⚠️ **QUAN TRỌNG — X-Forwarded-Proto:** Cloudflare Tunnel forward tới `localhost:80`
+> bằng **HTTP**, nên `$scheme` = `http`. Nếu truyền thẳng `$scheme`, Django (có
+> `SECURE_PROXY_SSL_HEADER`) tưởng request không bảo mật → secure-cookie hỏng / redirect
+> loop. Dùng `map` bên dưới: ưu tiên proto gốc từ cloudflared, mặc định `https`.
+
 ```nginx
+# Ưu tiên X-Forwarded-Proto cloudflared gửi; nếu rỗng → https (site luôn HTTPS ra ngoài).
+map $http_x_forwarded_proto $hub_forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      https;
+}
+
 server {
     listen 80;
     server_name hub.iuoss.com;
@@ -200,7 +226,7 @@ server {
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Proto $hub_forwarded_proto;
         proxy_read_timeout 60;
     }
 
@@ -210,6 +236,7 @@ server {
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $hub_forwarded_proto;
         proxy_set_header   Upgrade           $http_upgrade;
         proxy_set_header   Connection        "upgrade";
         proxy_http_version 1.1;
@@ -305,8 +332,12 @@ pm2 logs iuoss_hub_front
 ```bash
 systemctl is-active iuoss_hub
 pm2 status iuoss_hub_front
-curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/api/
-curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000
+
+# Health check backend — trả {"status":"ok","environment":"production","database":true}
+curl -s http://127.0.0.1:8002/api/health/
+
+# Frontend
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/login
 ```
 
 ### Monitor PM2
@@ -332,6 +363,9 @@ venv/bin/python manage.py clearsessions
 | `502` chỉ ở `/` (không phải `/api/`) | PM2 Next.js chết | `pm2 restart iuoss_hub_front` |
 | Login lỗi "Tài khoản không đúng" | Không kết nối LDAP | `ldapsearch -H ldap://ldap.hcmiu.edu.vn -x -b dc=hcmiu,dc=edu,dc=vn` |
 | `400 Bad Request` | `hub.iuoss.com` chưa trong `ALLOWED_HOSTS` | Thêm vào `backend/.env` → restart |
+| Login OK nhưng bị đá ra liên tục / `ERR_TOO_MANY_REDIRECTS` | Django tưởng request là HTTP (thiếu/sai `X-Forwarded-Proto`) | Kiểm tra Nginx dùng `map $hub_forwarded_proto` (xem Bước 8); xác nhận `curl -s http://127.0.0.1:8002/api/health/` trả 200 |
+| Form login template Django `403 CSRF` | Domain chưa có trong `CSRF_TRUSTED_ORIGINS` | Set `FRONTEND_ORIGINS=https://hub.iuoss.com` → restart |
+| Frontend gọi API ra IP `127.0.0.1:8000` | Build dính `NEXT_PUBLIC_API_URL` dev | Xoá `frontend/.env.local` → `npm run build` lại |
 | Static files không load | Chưa collectstatic | `python manage.py collectstatic --noinput --clear` |
 | Next.js build fail | node_modules cũ | `cd frontend && rm -rf node_modules .next && npm install && npm run build` |
 | PM2 không autostart sau reboot | Chưa `pm2 save` + `pm2 startup` | Chạy lại `pm2 save` và lệnh `pm2 startup` in ra |

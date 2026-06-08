@@ -3,6 +3,9 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 
 urlpatterns = [
+    # Health check (no auth) — cho monitor / load balancer
+    path("health/",              views.HealthView.as_view(),  name="api_health"),
+
     # Auth
     path("auth/login/",          views.LoginView.as_view(),   name="api_login"),
     path("auth/logout/",         views.LogoutView.as_view(),  name="api_logout"),

@@ -1,4 +1,6 @@
 import logging
+from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -25,6 +27,34 @@ def _get_ip(request) -> str:
         .split(",")[0]
         .strip()
     )
+
+
+# ── GET /api/health/ ─────────────────────────────────────────────────────────
+# Endpoint cho systemd / Nginx / Cloudflare / uptime monitor. Không cần auth.
+# Kiểm tra kết nối DB → trả 200 nếu khoẻ, 503 nếu DB lỗi.
+
+class HealthView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        db_ok = True
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        except Exception as exc:  # noqa: BLE001 — health check phải nuốt mọi lỗi DB
+            db_ok = False
+            logger.error("HEALTH_DB_FAIL    | %s: %s", type(exc).__name__, exc)
+
+        return Response(
+            {
+                "status": "ok" if db_ok else "degraded",
+                "environment": settings.DJANGO_ENV,
+                "database": db_ok,
+            },
+            status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
 
 # ── POST /api/auth/login/ ────────────────────────────────────────────────────

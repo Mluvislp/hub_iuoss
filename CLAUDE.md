@@ -141,9 +141,10 @@ frontend/
 ### Backend (`backend/.env`)
 
 ```env
-DEBUG=False
+DJANGO_ENV=production          # local | staging | production — quyết định DEBUG + security
 SECRET_KEY=<random>
 ALLOWED_HOSTS=hub.iuoss.com,127.0.0.1
+FRONTEND_ORIGINS=https://hub.iuoss.com   # dùng cho CORS + CSRF (khai báo 1 nơi)
 
 DB_NAME=iuoss_student_data
 DB_USER=iuoss_app
@@ -158,11 +159,17 @@ LDAP_SEARCH_BASE=dc=hcmiu,dc=edu,dc=vn
 LDAP_USER_ATTR=uid
 ```
 
+> `DJANGO_ENV` là nguồn sự thật: `local` → DEBUG=True; `staging`/`production` → DEBUG=False
+> + bật secure cookie, `SECURE_PROXY_SSL_HEADER`, `CSRF_TRUSTED_ORIGINS` (từ `FRONTEND_ORIGINS`).
+> Xem đầy đủ ở `backend/.env.example`.
+
 ### Frontend (`frontend/.env.local`)
 
 ```env
-# Dev: Django chạy local
-DJANGO_API_URL=http://127.0.0.1:8000
+# CHỈ dùng khi DEV. Browser gọi thẳng Django (CORS đã cấu hình cho localhost:3000).
+# KHÔNG tạo file này trên server production — NEXT_PUBLIC_* bị đông cứng vào bundle
+# lúc build. Để trống → API_BASE='/api' → Nginx định tuyến /api/ → Gunicorn :8002.
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
 ```
 
 ---

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -15,9 +16,22 @@ def env_list(name, default=""):
     return [x.strip() for x in os.getenv(name, default).split(",") if x.strip()]
 
 
+# ── Môi trường ────────────────────────────────────────────────────────────────
+# DJANGO_ENV là nguồn sự thật duy nhất: local | staging | production.
+# DEBUG suy ra từ đây (local → True), nhưng vẫn cho phép .env override tường minh.
+DJANGO_ENV = os.getenv("DJANGO_ENV", "local").strip().lower()
+IS_PRODUCTION = DJANGO_ENV == "production"
+IS_STAGING = DJANGO_ENV == "staging"
+
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-hub-dev-only")
-DEBUG = env_bool("DEBUG", default=True)
+DEBUG = env_bool("DEBUG", default=(DJANGO_ENV == "local"))
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
+
+# Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
+FRONTEND_ORIGINS = env_list(
+    "FRONTEND_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000",
+)
 
 INSTALLED_APPS = [
     # django.contrib.auth — bắt buộc phải có để djangorestframework-simplejwt
@@ -106,11 +120,33 @@ LDAP_USER_ATTR = os.getenv("LDAP_USER_ATTR", "uid")
 # Không dùng Django auth, dùng custom hub login
 HUB_LOGIN_URL = "/login/"
 
+# ── Bảo mật & Reverse proxy ──────────────────────────────────────────────────
+# Django chạy sau Nginx + Cloudflare Tunnel: SSL kết thúc ở tầng trên, Gunicorn
+# nhận HTTP. Header này cho Django biết request gốc là HTTPS → request.is_secure()
+# trả đúng, secure-cookie hoạt động, không bị redirect loop.
+# An toàn vì Gunicorn chỉ bind 127.0.0.1 — duy nhất Nginx (nơi đặt header) tới được.
+# LƯU Ý: Nginx phải set "X-Forwarded-Proto https" (xem docs/SERVER_SETUP.md) —
+# vì Cloudflare Tunnel → localhost:80 là HTTP nên $scheme sẽ là "http".
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+# CSRF cho legacy Django template views (login.html…). API dùng JWT nên không cần,
+# nhưng Django 4+ bắt buộc khai báo scheme + host đầy đủ cho mọi form POST.
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", ",".join(FRONTEND_ORIGINS))
+
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = "DENY"
+    # HSTS — bật khi chắc chắn toàn site chạy HTTPS (Cloudflare đã ép HTTPS).
+    # Để 0 mặc định cho an toàn; set SECURE_HSTS_SECONDS=31536000 khi sẵn sàng.
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
+    # Redirect HTTP→HTTPS để Cloudflare/Nginx lo (tránh double-redirect). Bật nếu cần.
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
 
 # ── Django REST Framework ────────────────────────────────────────────────────
 REST_FRAMEWORK = {
@@ -126,7 +162,6 @@ REST_FRAMEWORK = {
 }
 
 # ── SimpleJWT ────────────────────────────────────────────────────────────────
-from datetime import timedelta
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -138,14 +173,10 @@ SIMPLE_JWT = {
 }
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
-if DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
-else:
-    CORS_ALLOWED_ORIGINS = ["https://hub.iuoss.com"]
-
+# Dev: browser (localhost:3000) gọi thẳng Django → cần CORS.
+# Prod: cùng domain qua Nginx (/api) → về lý thuyết không cần CORS, nhưng vẫn khai
+# báo theo FRONTEND_ORIGINS để an toàn nếu sau này tách domain frontend.
+CORS_ALLOWED_ORIGINS = FRONTEND_ORIGINS
 CORS_ALLOW_CREDENTIALS = True
 CORS_URLS_REGEX = r"^/api/.*$"
 
