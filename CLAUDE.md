@@ -182,6 +182,7 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
 | Tính năng đã implement | `docs/FEATURES.md` |
 | Quan hệ với dashboard + WordPress | `docs/ECOSYSTEM.md` |
 | LDAP flow chi tiết | `docs/AUTH_FLOW.md` |
-| Deploy lên server | `docs/SERVER_SETUP.md` |
+| **Cài trên server appctsv (runbook cho AI thực thi)** | **`docs/DEPLOY_APPCTSV.md`** |
+| Deploy lên server (tham khảo cấu hình) | `docs/SERVER_SETUP.md` |
 | Schema bảng hub_* | `docs/schema.sql` |
 | Setup local | `docs/README.md` |
