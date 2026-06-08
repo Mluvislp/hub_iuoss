@@ -4,7 +4,7 @@ module.exports = {
       name: 'iuoss_hub_front',
       script: 'node_modules/.bin/next',
       args: 'start --port 3000',
-      cwd: '/var/www/apps/iuoss_hub/frontend',
+      cwd: '/var/www/apps/hub_iuoss/frontend',
       instances: 1,
       autorestart: true,
       watch: false,

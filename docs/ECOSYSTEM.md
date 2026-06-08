@@ -3,7 +3,7 @@
 > Tài liệu này mô tả toàn bộ hệ sinh thái gồm 3 ứng dụng do Phòng CTSV quản lý,
 > cách chúng liên kết với nhau qua database chung, LDAP chung và server chung.
 >
-> Bản copy tồn tại ở cả 2 repo: `dashboard_iuoss` và `iuoss_hub`.
+> Bản copy tồn tại ở cả 2 repo: `dashboard_iuoss` và `hub_iuoss`.
 
 ---
 
@@ -49,7 +49,7 @@
 |---|---|---|---|---|
 | WordPress | `iuoss.com` | (không có) | Sinh viên | LDAP trường |
 | Dashboard | `dashboard.iuoss.com` | `dashboard_iuoss` | Nhân viên OSS | Django auth (username/password nội bộ) |
-| Hub | `hub.iuoss.com` | `iuoss_hub` | Sinh viên | LDAP trường (custom, không dùng Django auth) |
+| Hub | `hub.iuoss.com` | `hub_iuoss` | Sinh viên | LDAP trường (custom, không dùng Django auth) |
 
 **Nguyên tắc phân tách:**
 - **WordPress + Hub** — hướng ra ngoài, sinh viên dùng
@@ -178,7 +178,7 @@ Internet (HTTPS) → Cloudflare Edge
 | Frontend | Django templates (monolith) | Next.js :3000 (PM2: `iuoss_hub_front`) |
 | systemd service | `iuoss_app` | `iuoss_hub` |
 | PM2 process | — | `iuoss_hub_front` |
-| App path | `/var/www/apps/iuoss_app/` | `/var/www/apps/iuoss_hub/` |
+| App path | `/var/www/apps/dashboard_iuoss/` | `/var/www/apps/hub_iuoss/` |
 | Deploy command | `bash deploy.sh` | `bash deploy.sh` |
 
 **Port map đầy đủ server:**
@@ -205,12 +205,12 @@ Khi thay đổi **schema DB** (thêm/sửa/xóa cột bảng dùng chung):
 Thay đổi bảng students/* hoặc tickets/*
     │
     ├─► dashboard_iuoss: cập nhật model trong students/models.py hoặc tickets/models.py
-    └─► iuoss_hub:       cập nhật model trong students/models.py (nếu field đó được dùng)
+    └─► hub_iuoss:        cập nhật model trong students/models.py (nếu field đó được dùng)
 ```
 
 Khi thay đổi **bảng hub_*** (chỉ Hub sở hữu):
 ```
-    └─► iuoss_hub: cập nhật core/models.py + docs/schema.sql (chỉ cần sửa 1 repo)
+    └─► hub_iuoss: cập nhật core/models.py + docs/schema.sql (chỉ cần sửa 1 repo)
 ```
 
 ---

@@ -33,16 +33,16 @@ MySQL    :3306   (iuoss_student_data — shared)
 
 | Mục | Path |
 |---|---|
-| Monorepo root | `/var/www/apps/iuoss_hub/` |
-| Backend (Django) | `/var/www/apps/iuoss_hub/backend/` |
-| Frontend (Next.js) | `/var/www/apps/iuoss_hub/frontend/` |
-| Python venv | `/var/www/apps/iuoss_hub/backend/venv/` |
-| Backend .env | `/var/www/apps/iuoss_hub/backend/.env` |
-| Django staticfiles | `/var/www/apps/iuoss_hub/backend/staticfiles/` |
-| App logs | `/var/log/apps/iuoss_hub/` |
+| Monorepo root | `/var/www/apps/hub_iuoss/` |
+| Backend (Django) | `/var/www/apps/hub_iuoss/backend/` |
+| Frontend (Next.js) | `/var/www/apps/hub_iuoss/frontend/` |
+| Python venv | `/var/www/apps/hub_iuoss/backend/venv/` |
+| Backend .env | `/var/www/apps/hub_iuoss/backend/.env` |
+| Django staticfiles | `/var/www/apps/hub_iuoss/backend/staticfiles/` |
+| App logs | `/var/log/apps/hub_iuoss/` |
 | Systemd service | `/etc/systemd/system/iuoss_hub.service` |
 | Nginx config | `/etc/nginx/sites-enabled/iuoss_hub` |
-| PM2 config | `/var/www/apps/iuoss_hub/frontend/ecosystem.config.js` |
+| PM2 config | `/var/www/apps/hub_iuoss/frontend/ecosystem.config.js` |
 
 ---
 
@@ -63,8 +63,8 @@ sudo npm install -g pm2
 
 ```bash
 cd /var/www/apps
-git clone https://github.com/Mluvislp/hub_iuoss.git iuoss_hub
-cd iuoss_hub/backend
+git clone https://github.com/Mluvislp/hub_iuoss.git hub_iuoss
+cd hub_iuoss/backend
 
 python3.12 -m venv venv
 venv/bin/pip install --upgrade pip
@@ -137,8 +137,8 @@ venv/bin/python manage.py collectstatic --noinput
 ### Bước 5 — Tạo thư mục log
 
 ```bash
-sudo mkdir -p /var/log/apps/iuoss_hub
-sudo chown hhdang:hhdang /var/log/apps/iuoss_hub
+sudo mkdir -p /var/log/apps/hub_iuoss
+sudo chown hhdang:hhdang /var/log/apps/hub_iuoss
 ```
 
 ### Bước 6 — Systemd service (Django API)
@@ -156,14 +156,14 @@ Requires=mysql.service
 [Service]
 Type=simple
 User=hhdang
-WorkingDirectory=/var/www/apps/iuoss_hub/backend
-ExecStart=/var/www/apps/iuoss_hub/backend/venv/bin/gunicorn \
+WorkingDirectory=/var/www/apps/hub_iuoss/backend
+ExecStart=/var/www/apps/hub_iuoss/backend/venv/bin/gunicorn \
     config.wsgi:application \
     --bind 127.0.0.1:8002 \
     --workers 3 \
     --timeout 60 \
-    --access-logfile /var/log/apps/iuoss_hub/access.log \
-    --error-logfile /var/log/apps/iuoss_hub/error.log
+    --access-logfile /var/log/apps/hub_iuoss/access.log \
+    --error-logfile /var/log/apps/hub_iuoss/error.log
 Restart=on-failure
 RestartSec=5
 
@@ -181,7 +181,7 @@ sudo systemctl status iuoss_hub
 ### Bước 7 — PM2 (Next.js frontend)
 
 ```bash
-cd /var/www/apps/iuoss_hub/frontend
+cd /var/www/apps/hub_iuoss/frontend
 npm install
 npm run build
 
@@ -217,7 +217,7 @@ server {
 
     # Django static files
     location /static/ {
-        alias /var/www/apps/iuoss_hub/backend/staticfiles/;
+        alias /var/www/apps/hub_iuoss/backend/staticfiles/;
         expires 7d;
         add_header Cache-Control "public";
     }
@@ -280,7 +280,7 @@ sudo systemctl restart cloudflared
 ### Deploy tất cả (khuyến nghị)
 
 ```bash
-cd /var/www/apps/iuoss_hub
+cd /var/www/apps/hub_iuoss
 bash deploy.sh
 ```
 
@@ -295,7 +295,7 @@ bash deploy.sh frontend  # chỉ Next.js
 
 ```bash
 # Backend
-cd /var/www/apps/iuoss_hub
+cd /var/www/apps/hub_iuoss
 git pull origin main
 cd backend
 venv/bin/pip install -r requirements.txt -q
@@ -304,7 +304,7 @@ venv/bin/python manage.py collectstatic --noinput --clear
 sudo systemctl restart iuoss_hub
 
 # Frontend
-cd /var/www/apps/iuoss_hub/frontend
+cd /var/www/apps/hub_iuoss/frontend
 npm install
 npm run build
 pm2 restart iuoss_hub_front
@@ -319,11 +319,11 @@ pm2 restart iuoss_hub_front
 ```bash
 # Gunicorn logs
 sudo journalctl -u iuoss_hub -f
-tail -f /var/log/apps/iuoss_hub/error.log
+tail -f /var/log/apps/hub_iuoss/error.log
 
 # App logs (auth + errors)
-tail -f /var/www/apps/iuoss_hub/backend/logs/auth.log
-tail -f /var/www/apps/iuoss_hub/backend/logs/app.log
+tail -f /var/www/apps/hub_iuoss/backend/logs/auth.log
+tail -f /var/www/apps/hub_iuoss/backend/logs/app.log
 
 # PM2 logs (Next.js)
 pm2 logs iuoss_hub_front
@@ -351,7 +351,7 @@ pm2 monit
 ### Dọn dẹp session cũ
 
 ```bash
-cd /var/www/apps/iuoss_hub/backend
+cd /var/www/apps/hub_iuoss/backend
 venv/bin/python manage.py clearsessions
 ```
 
@@ -378,7 +378,7 @@ venv/bin/python manage.py clearsessions
 
 | | Cũ | Mới |
 |---|---|---|
-| App path | `iuoss_hub/` (root) | `iuoss_hub/backend/` |
+| App path | `hub_iuoss/` (root) | `hub_iuoss/backend/` |
 | Frontend | Django templates | Next.js :3000 (PM2) |
 | Nginx `/` | → Gunicorn | → Next.js |
 | Nginx `/api/` | không có | → Gunicorn |

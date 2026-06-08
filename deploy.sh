@@ -4,7 +4,7 @@
 set -euo pipefail
 
 TARGET=${1:-all}
-APP_ROOT="/var/www/apps/iuoss_hub"
+APP_ROOT="/var/www/apps/hub_iuoss"
 BACKEND_HEALTH="http://127.0.0.1:8002/api/health/"
 FRONTEND_HEALTH="http://127.0.0.1:3000/login"
 
