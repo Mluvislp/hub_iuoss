@@ -20,17 +20,22 @@ DEBUG = env_bool("DEBUG", default=True)
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 
 INSTALLED_APPS = [
-    # Không có django.contrib.auth — student auth tự quản lý
+    # django.contrib.auth — bắt buộc phải có để djangorestframework-simplejwt
+    # import được. KHÔNG dùng để xác thực sinh viên (toàn bộ auth là LDAP custom).
+    "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "widget_tweaks",
+    "rest_framework",
+    "corsheaders",
     "core",
     "students",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -107,7 +112,44 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# Tắt migrations cho tất cả custom apps — schema quản lý thủ công
+# ── Django REST Framework ────────────────────────────────────────────────────
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "core.api.authentication.HubJWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "core.api.authentication.IsHubAuthenticated",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+}
+
+# ── SimpleJWT ────────────────────────────────────────────────────────────────
+from datetime import timedelta
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_CLAIM": "ldap_uid",
+}
+
+# ── CORS ─────────────────────────────────────────────────────────────────────
+if DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = ["https://hub.iuoss.com"]
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = r"^/api/.*$"
+
+# ── Tắt migrations cho tất cả custom apps — schema quản lý thủ công ──────────
 MIGRATION_MODULES = {
     "core": None,
     "students": None,
@@ -158,6 +200,11 @@ LOGGING = {
             "propagate": False,
         },
         "core.views": {
+            "handlers": ["auth_file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "core.api.views": {
             "handlers": ["auth_file", "console"],
             "level": "INFO",
             "propagate": False,
