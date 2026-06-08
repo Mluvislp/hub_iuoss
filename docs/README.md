@@ -1,55 +1,33 @@
-# IUOSS Hub — Tổng quan & Hướng dẫn dev local
+# IUOSS Hub — Setup môi trường dev local
 
-## Dự án là gì
+## Tổng quan
 
-Student portal tại `hub.iuoss.com` cho sinh viên HCMIU đăng nhập bằng tài khoản mạng nội bộ trường (LDAP) để:
-- Theo dõi trạng thái yêu cầu/ticket đã gửi
-- Nhận thông báo từ Phòng CTSV
-- Gửi yêu cầu mới trực tiếp (roadmap)
+Monorepo gồm 2 project:
 
-## Quan hệ với các hệ thống khác
-
-```
-iuoss.com           WordPress  — sinh viên gửi ticket, dùng cùng LDAP
-dashboard.iuoss.com Django     — nhân viên OSS quản lý nội bộ  (repo: dashboard_iuoss)
-hub.iuoss.com       Django     — sinh viên tự phục vụ          (repo này)
-                         └── cùng MySQL DB: iuoss_student_data
-```
-
-## Tính năng hiện có (MVP)
-
-- Đăng nhập / đăng xuất bằng tài khoản LDAP trường (MSSV + mật khẩu mạng IU)
-- Trang chủ hiển thị thông tin cơ bản: tên, MSSV, khoa, trạng thái học vụ
-- Tự động liên kết tài khoản LDAP với hồ sơ sinh viên trong DB
-
-## Stack
-
-| Thành phần | Lựa chọn |
-|---|---|
-| Web framework | Django 5.2 |
-| Database | MySQL 8.4 (shared với dashboard) |
-| LDAP client | ldap3 2.x |
-| WSGI server | Gunicorn |
-| Frontend | Bootstrap 5.3 (CDN) |
+| | Backend | Frontend |
+|---|---|---|
+| Folder | `backend/` | `frontend/` |
+| Stack | Django 5.2 + MySQL | Next.js 14 + TypeScript |
+| Dev port | `:8000` | `:3000` |
+| Cần | Python 3.12+, MySQL | Node.js 20+ |
 
 ---
 
-## Setup môi trường dev local
+## Backend — Django
 
 ### Yêu cầu
 
 - Python 3.11+
-- Quyền truy cập database `iuoss_student_data` (host `127.0.0.1:3306`)
+- Quyền đọc database `iuoss_student_data` (host `127.0.0.1:3306`)
 - Kết nối tới LDAP server `ldap.hcmiu.edu.vn` (cần ở trong mạng trường hoặc VPN)
 
-### Bước 1 — Clone và tạo venv
+### Bước 1 — Tạo venv
 
 ```bash
-git clone https://github.com/Mluvislp/hub_iuoss.git
-cd hub_iuoss
-python3 -m venv .venv
-source .venv/bin/activate          # macOS/Linux
-# .venv\Scripts\activate           # Windows
+cd backend
+python3 -m venv venv
+source venv/bin/activate          # macOS/Linux
+# venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
@@ -57,13 +35,12 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
+nano .env
 ```
-
-Điền các giá trị sau vào `.env`:
 
 ```env
 DEBUG=True
-SECRET_KEY=<chuỗi ngẫu nhiên bất kỳ cho dev>
+SECRET_KEY=any-random-string-for-dev
 ALLOWED_HOSTS=127.0.0.1,localhost
 
 DB_NAME=iuoss_student_data
@@ -79,48 +56,85 @@ LDAP_SEARCH_BASE=dc=hcmiu,dc=edu,dc=vn
 LDAP_USER_ATTR=uid
 ```
 
-> **Lưu ý:** `LDAP_BIND_PASSWORD` là **plain text** password của service account `cn=ctsv` — không phải chuỗi encrypted từ WordPress plugin.
-
-### Bước 3 — Tạo bảng trong DB
-
-Chạy SQL để tạo bảng `hub_students`:
+### Bước 3 — Tạo bảng
 
 ```bash
-mysql -u iuoss_app -p iuoss_student_data < docs/schema.sql
-```
+# Chạy schema hub (lần đầu)
+mysql -u iuoss_app -p iuoss_student_data < ../docs/schema.sql
 
-Chạy Django migrate để tạo bảng `django_session`:
-
-```bash
+# Tạo django_session
 python manage.py migrate
 ```
 
-### Bước 4 — Chạy server dev
+### Bước 4 — Chạy Django dev server
 
 ```bash
 python manage.py runserver 127.0.0.1:8000
 ```
 
-Mở `http://127.0.0.1:8000/login/` và đăng nhập bằng tài khoản LDAP trường.
+Truy cập `http://127.0.0.1:8000/login/` để test Django templates (cũ).  
+API endpoints `/api/*` sẽ có sau khi thêm DRF.
 
 ---
 
-## Cấu trúc URL
+## Frontend — Next.js
 
-| URL | View | Mô tả |
-|---|---|---|
-| `/` | `home_view` | Trang chủ (yêu cầu đăng nhập) |
-| `/login/` | `login_view` | Trang đăng nhập LDAP |
-| `/logout/` | `logout_view` | Đăng xuất, redirect về `/login/` |
+### Yêu cầu
+
+- Node.js 20+
+- Backend Django đang chạy trên `:8000` (để `/api/` hoạt động)
+
+### Bước 1 — Cài dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### Bước 2 — Cấu hình `.env.local`
+
+```bash
+cp .env.example .env.local
+```
+
+Nội dung mặc định cho dev:
+```env
+DJANGO_API_URL=http://127.0.0.1:8000
+```
+
+### Bước 3 — Chạy dev server
+
+```bash
+npm run dev
+```
+
+Mở `http://localhost:3000`. Next.js tự proxy `/api/*` về Django `:8000` qua `next.config.ts`.
+
+---
+
+## Chạy cả 2 cùng lúc
+
+Mở 2 terminal:
+
+```bash
+# Terminal 1 — Backend
+cd backend && source venv/bin/activate && python manage.py runserver
+
+# Terminal 2 — Frontend
+cd frontend && npm run dev
+```
 
 ---
 
 ## Lưu ý quan trọng
 
-- **Không dùng `django.contrib.auth`** — xem `CODEBASE.md` mục 1
-- **Không chạy `makemigrations`** cho app `core` và `students` — schema quản lý thủ công
-- **Không ghi** vào các bảng của `students/` app — chỉ đọc
-- Để test login mà không cần LDAP server: xem `docs/AUTH_FLOW.md` phần "Dev bypass"
+- **Backend:** Không dùng `django.contrib.auth` — xem `CODEBASE.md` mục 1
+- **Backend:** Không chạy `makemigrations` cho `core` và `students`
+- **Backend:** Không ghi vào các bảng của `students/` app — chỉ đọc
+- **Frontend:** API `/api/*` chưa hoạt động hoàn toàn cho đến khi DRF được thêm vào backend
+- **Frontend:** Auth token lưu trong cookie `hub_token` — xem `frontend/lib/auth.ts`
+
+---
 
 ## Production Deployment
 

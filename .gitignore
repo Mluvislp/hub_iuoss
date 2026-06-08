@@ -1,9 +1,33 @@
-.env
-.venv/
+# ── Python / Django ──────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
-staticfiles/
-media/
-*.log
+*.pyd
+*.egg-info/
+.venv/
+venv/
+
+backend/.env
+backend/staticfiles/
+backend/logs/*.log
+backend/media/
 db.sqlite3
+
+# ── Node / Next.js ───────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
+
+# ── Root env ─────────────────────────────────────────────────
+.env
+
+# ── OS / Editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

@@ -1,6 +1,7 @@
 # IUOSS Hub — Triển khai production (appctsv)
 
-> Server production chung với `dashboard.iuoss.com`. Đọc `SERVER_INFRASTRUCTURE.md` trong repo `dashboard_iuoss` để hiểu tổng quan hạ tầng.
+> Server production chung với `dashboard.iuoss.com`.
+> Xem `SERVER_INFRASTRUCTURE.md` trong repo `dashboard_iuoss` để hiểu tổng quan hạ tầng.
 
 ---
 
@@ -14,18 +15,16 @@ cloudflared
   │ HTTP → 127.0.0.1:80
   ▼
 Nginx :80
-  ├─ hub.iuoss.com  →  proxy_pass http://127.0.0.1:8002  (hub)
-  ├─ dashboard.iuoss.com → proxy_pass http://127.0.0.1:8001  (dashboard)
-  └─ /static/*  →  /var/www/apps/iuoss_hub/staticfiles/
-       │
-       ▼
-  Gunicorn :8002  (3 workers)
-       │
-       ▼
-  Django 5.2 (config.wsgi:application)
-       │
-       ▼
-  MySQL 127.0.0.1:3306  (iuoss_student_data — shared với dashboard)
+  ├─ dashboard.iuoss.com   →  :8001  Gunicorn  (dashboard — không đụng)
+  │
+  └─ hub.iuoss.com
+       ├─ /api/            →  :8002  Gunicorn  (Django REST API)
+       ├─ /static/         →  backend/staticfiles/
+       └─ /                →  :3000  PM2        (Next.js)
+
+Gunicorn :8002   (systemd: iuoss_hub)
+PM2      :3000   (iuoss_hub_front)
+MySQL    :3306   (iuoss_student_data — shared)
 ```
 
 ---
@@ -34,30 +33,43 @@ Nginx :80
 
 | Mục | Path |
 |---|---|
-| App code | `/var/www/apps/iuoss_hub/` |
-| Python venv | `/var/www/apps/iuoss_hub/venv/` |
-| File .env | `/var/www/apps/iuoss_hub/.env` |
-| Static files | `/var/www/apps/iuoss_hub/staticfiles/` |
+| Monorepo root | `/var/www/apps/iuoss_hub/` |
+| Backend (Django) | `/var/www/apps/iuoss_hub/backend/` |
+| Frontend (Next.js) | `/var/www/apps/iuoss_hub/frontend/` |
+| Python venv | `/var/www/apps/iuoss_hub/backend/venv/` |
+| Backend .env | `/var/www/apps/iuoss_hub/backend/.env` |
+| Django staticfiles | `/var/www/apps/iuoss_hub/backend/staticfiles/` |
+| App logs | `/var/log/apps/iuoss_hub/` |
 | Systemd service | `/etc/systemd/system/iuoss_hub.service` |
 | Nginx config | `/etc/nginx/sites-enabled/iuoss_hub` |
-| App logs | `/var/log/apps/iuoss_hub/` |
+| PM2 config | `/var/www/apps/iuoss_hub/frontend/ecosystem.config.js` |
 
 ---
 
 ## Cài đặt lần đầu
 
-### Bước 1 — Clone và setup venv
+### Bước 1 — Cài Node.js 20 LTS (nếu chưa có)
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node --version   # phải >= 20.x
+sudo npm install -g pm2
+```
+
+### Bước 2 — Clone repo và setup backend
 
 ```bash
 cd /var/www/apps
 git clone https://github.com/Mluvislp/hub_iuoss.git iuoss_hub
-cd iuoss_hub
+cd iuoss_hub/backend
+
 python3.12 -m venv venv
 venv/bin/pip install --upgrade pip
 venv/bin/pip install -r requirements.txt
 ```
 
-### Bước 2 — Cấu hình `.env`
+### Bước 3 — Cấu hình backend `.env`
 
 ```bash
 cp .env.example .env
@@ -87,26 +99,21 @@ LDAP_SEARCH_BASE=dc=hcmiu,dc=edu,dc=vn
 LDAP_USER_ATTR=uid
 ```
 
-Tạo `SECRET_KEY` ngẫu nhiên:
+Tạo `SECRET_KEY`:
 ```bash
 venv/bin/python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-### Bước 3 — Tạo bảng DB
+### Bước 4 — Tạo bảng DB
 
-Chạy schema hub (chỉ cần làm 1 lần):
 ```bash
-mysql -u iuoss_app -p iuoss_student_data < docs/schema.sql
-```
+# Tạo bảng hub_* (chỉ lần đầu)
+mysql -u iuoss_app -p iuoss_student_data < ../docs/schema.sql
 
-Tạo bảng `django_session`:
-```bash
+# Tạo bảng django_session
 venv/bin/python manage.py migrate
-```
 
-### Bước 4 — Thu thập static files
-
-```bash
+# Thu thập static files
 venv/bin/python manage.py collectstatic --noinput
 ```
 
@@ -117,25 +124,23 @@ sudo mkdir -p /var/log/apps/iuoss_hub
 sudo chown hhdang:hhdang /var/log/apps/iuoss_hub
 ```
 
-### Bước 6 — Systemd service
+### Bước 6 — Systemd service (Django API)
 
 ```bash
 sudo nano /etc/systemd/system/iuoss_hub.service
 ```
 
-Nội dung:
-
 ```ini
 [Unit]
-Description=IUOSS Hub (Gunicorn)
+Description=IUOSS Hub API (Gunicorn)
 After=network.target mysql.service
 Requires=mysql.service
 
 [Service]
 Type=simple
 User=hhdang
-WorkingDirectory=/var/www/apps/iuoss_hub
-ExecStart=/var/www/apps/iuoss_hub/venv/bin/gunicorn \
+WorkingDirectory=/var/www/apps/iuoss_hub/backend
+ExecStart=/var/www/apps/iuoss_hub/backend/venv/bin/gunicorn \
     config.wsgi:application \
     --bind 127.0.0.1:8002 \
     --workers 3 \
@@ -156,31 +161,58 @@ sudo systemctl start iuoss_hub
 sudo systemctl status iuoss_hub
 ```
 
-### Bước 7 — Nginx config
+### Bước 7 — PM2 (Next.js frontend)
+
+```bash
+cd /var/www/apps/iuoss_hub/frontend
+npm install
+npm run build
+
+# Khởi động
+pm2 start ecosystem.config.js
+
+# Đăng ký autostart khi server reboot
+pm2 save
+pm2 startup   # chạy lệnh mà nó in ra (có dạng: sudo env PATH=... pm2 startup ...)
+```
+
+### Bước 8 — Nginx config
 
 ```bash
 sudo nano /etc/nginx/sites-available/iuoss_hub
 ```
-
-Nội dung:
 
 ```nginx
 server {
     listen 80;
     server_name hub.iuoss.com;
 
+    # Django static files
     location /static/ {
-        alias /var/www/apps/iuoss_hub/staticfiles/;
+        alias /var/www/apps/iuoss_hub/backend/staticfiles/;
         expires 7d;
         add_header Cache-Control "public";
     }
 
+    # Django REST API
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8002;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60;
+    }
+
+    # Next.js frontend — tất cả request còn lại
     location / {
-        proxy_pass http://127.0.0.1:8002;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+        proxy_http_version 1.1;
     }
 }
 ```
@@ -191,13 +223,13 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Bước 8 — Cloudflare Tunnel: thêm route cho hub.iuoss.com
+### Bước 9 — Cloudflare Tunnel (giữ nguyên)
 
 ```bash
 cloudflared tunnel route dns <TUNNEL_ID> hub.iuoss.com
 ```
 
-Cập nhật `/etc/cloudflared/config.yml` thêm ingress rule:
+Cập nhật `/etc/cloudflared/config.yml`:
 
 ```yaml
 ingress:
@@ -216,13 +248,37 @@ sudo systemctl restart cloudflared
 
 ## Deploy khi có code mới
 
+### Deploy tất cả (khuyến nghị)
+
 ```bash
 cd /var/www/apps/iuoss_hub
+bash deploy.sh
+```
+
+### Deploy từng phần
+
+```bash
+bash deploy.sh backend   # chỉ Django
+bash deploy.sh frontend  # chỉ Next.js
+```
+
+### Deploy thủ công (nếu cần)
+
+```bash
+# Backend
+cd /var/www/apps/iuoss_hub
 git pull origin main
-venv/bin/pip install -r requirements.txt
+cd backend
+venv/bin/pip install -r requirements.txt -q
 venv/bin/python manage.py migrate
 venv/bin/python manage.py collectstatic --noinput --clear
 sudo systemctl restart iuoss_hub
+
+# Frontend
+cd /var/www/apps/iuoss_hub/frontend
+npm install
+npm run build
+pm2 restart iuoss_hub_front
 ```
 
 ---
@@ -232,21 +288,37 @@ sudo systemctl restart iuoss_hub
 ### Xem log
 
 ```bash
+# Gunicorn logs
 sudo journalctl -u iuoss_hub -f
-# Hoặc
 tail -f /var/log/apps/iuoss_hub/error.log
+
+# App logs (auth + errors)
+tail -f /var/www/apps/iuoss_hub/backend/logs/auth.log
+tail -f /var/www/apps/iuoss_hub/backend/logs/app.log
+
+# PM2 logs (Next.js)
+pm2 logs iuoss_hub_front
 ```
 
-### Kiểm tra service
+### Kiểm tra services
 
 ```bash
 systemctl is-active iuoss_hub
-curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002
+pm2 status iuoss_hub_front
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/api/
+curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000
 ```
 
-### Dọn dẹp session cũ (nên chạy định kỳ)
+### Monitor PM2
 
 ```bash
+pm2 monit
+```
+
+### Dọn dẹp session cũ
+
+```bash
+cd /var/www/apps/iuoss_hub/backend
 venv/bin/python manage.py clearsessions
 ```
 
@@ -256,20 +328,23 @@ venv/bin/python manage.py clearsessions
 
 | Triệu chứng | Nguyên nhân | Fix |
 |---|---|---|
-| 502 Bad Gateway | Gunicorn chết | `sudo systemctl restart iuoss_hub` |
-| Login lỗi "Tài khoản không đúng" dù đúng mật khẩu | Không kết nối được LDAP | Kiểm tra kết nối: `ldapsearch -H ldap://ldap.hcmiu.edu.vn -x -b dc=hcmiu,dc=edu,dc=vn` |
-| 400 Bad Request | `hub.iuoss.com` chưa có trong `ALLOWED_HOSTS` | Thêm vào `.env` rồi `systemctl restart iuoss_hub` |
+| `502 Bad Gateway` trên tất cả | Gunicorn chết | `sudo systemctl restart iuoss_hub` |
+| `502` chỉ ở `/` (không phải `/api/`) | PM2 Next.js chết | `pm2 restart iuoss_hub_front` |
+| Login lỗi "Tài khoản không đúng" | Không kết nối LDAP | `ldapsearch -H ldap://ldap.hcmiu.edu.vn -x -b dc=hcmiu,dc=edu,dc=vn` |
+| `400 Bad Request` | `hub.iuoss.com` chưa trong `ALLOWED_HOSTS` | Thêm vào `backend/.env` → restart |
 | Static files không load | Chưa collectstatic | `python manage.py collectstatic --noinput --clear` |
-| Login thành công nhưng `student_id = NULL` | uid LDAP không khớp `current_student_code` | Kiểm tra format uid trong LDAP vs MSSV trong DB |
+| Next.js build fail | node_modules cũ | `cd frontend && rm -rf node_modules .next && npm install && npm run build` |
+| PM2 không autostart sau reboot | Chưa `pm2 save` + `pm2 startup` | Chạy lại `pm2 save` và lệnh `pm2 startup` in ra |
 
 ---
 
-## Khác biệt với dashboard khi deploy
+## So sánh với setup cũ (Django monolith)
 
-| | dashboard | hub |
+| | Cũ | Mới |
 |---|---|---|
-| Gunicorn port | 8001 | 8002 |
-| Systemd service | `iuoss_app` | `iuoss_hub` |
-| App path | `/var/www/apps/iuoss_app/` | `/var/www/apps/iuoss_hub/` |
-| Venv path | `iuoss_app/venv/` | `iuoss_hub/venv/` |
-| DB user | `iuoss_app` (read+write) | `iuoss_app` (read+write hub tables, read-only students) |
+| App path | `iuoss_hub/` (root) | `iuoss_hub/backend/` |
+| Frontend | Django templates | Next.js :3000 (PM2) |
+| Nginx `/` | → Gunicorn | → Next.js |
+| Nginx `/api/` | không có | → Gunicorn |
+| Node.js | không cần | v20 LTS |
+| Dashboard | không đụng | không đụng |

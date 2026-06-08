@@ -1,4 +1,4 @@
-# IUOSS Hub — Hướng dẫn đọc codebase
+# IUOSS Hub — Hướng dẫn đọc codebase (Monorepo)
 
 > File này dành cho AI assistant và developer mới. Đọc trước khi làm bất kỳ việc gì với project.
 
@@ -6,174 +6,239 @@
 
 ## Dự án là gì
 
-Student portal cho sinh viên Đại học Quốc tế (HCMIU) — nơi sinh viên đăng nhập bằng tài khoản mạng nội bộ trường (LDAP) để theo dõi yêu cầu, xem thông báo và tương tác với Phòng Công tác Sinh viên (CTSV).
+Student portal cho sinh viên Đại học Quốc tế (HCMIU) — đăng nhập bằng tài khoản mạng nội bộ trường (LDAP) để theo dõi yêu cầu, xem hồ sơ và tương tác với Phòng CTSV.
 
 **Production:** `https://hub.iuoss.com`
 
-**Quan hệ với hệ thống khác:**
-- **`iuoss.com`** — WordPress site, nơi sinh viên có thể gửi ticket, dùng cùng LDAP server
-- **`dashboard.iuoss.com`** — Django app nội bộ dành cho nhân viên OSS (repo riêng: `dashboard_iuoss`)
-- **Cùng MySQL database** `iuoss_student_data` với dashboard — không có API trung gian
+**Kiến trúc mới (monorepo):**
 
-**Stack:** Django 5.2 · MySQL 8.4 · LDAP (ldap3) · Gunicorn · Bootstrap 5
+```
+hub_iuoss/
+├── backend/    ← Django 5.2 REST API  (Python)
+├── frontend/   ← Next.js 14 SPA       (TypeScript + Tailwind)
+├── docs/       ← tài liệu chung
+└── deploy.sh   ← script deploy
+```
+
+**Stack:**
+
+| Tầng | Technology |
+|---|---|
+| Backend API | Django 5.2 + Django REST Framework (roadmap) |
+| LDAP auth | ldap3 2.x |
+| WSGI server | Gunicorn :8002 |
+| Frontend | Next.js 14 (App Router) + TypeScript |
+| CSS | Tailwind CSS 3.x |
+| Node server | PM2 :3000 |
+| Database | MySQL 8.4 (shared với dashboard_iuoss) |
+| Reverse proxy | Nginx (Cloudflare Tunnel → Nginx → Gunicorn/Next.js) |
 
 ---
 
-## Cấu trúc thư mục
+## Cấu trúc thư mục đầy đủ
 
 ```
-iuoss_hub/
+hub_iuoss/
 │
-├── CODEBASE.md               ← file này
-├── CLAUDE.md                 ← context nhanh cho AI assistant
+├── backend/                     ← Django project
+│   ├── config/
+│   │   ├── settings.py          ← tất cả cấu hình (DB, LDAP, SESSION, LOGGING)
+│   │   ├── urls.py              ← URL root
+│   │   └── wsgi.py
+│   ├── core/                    ← app chính: auth, session, views, models hub
+│   │   ├── auth.py              ← verify_ldap() — 2-bước bind
+│   │   ├── session.py           ← đọc/ghi hub_student session
+│   │   ├── decorators.py        ← @hub_login_required
+│   │   ├── models.py            ← HubStudent, ConfirmationRequest
+│   │   ├── views.py             ← views hiện tại (Django templates)
+│   │   ├── urls.py              ← routes: /, /login/, /logout/, /requests/new/
+│   │   └── templates/core/      ← Django templates (giai đoạn chuyển tiếp)
+│   ├── students/
+│   │   └── models.py            ← read-only: Student, Dept, Degree, Status, BHYT, CivicActivity
+│   ├── logs/
+│   │   ├── auth.log             ← login/logout/LDAP events (rotate 5MB×5)
+│   │   └── app.log              ← Django errors
+│   ├── manage.py
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── frontend/                    ← Next.js project
+│   ├── app/
+│   │   ├── layout.tsx           ← root layout (Inter font, globals.css)
+│   │   ├── page.tsx             ← redirect → /dashboard
+│   │   ├── globals.css          ← Tailwind directives + custom CSS
+│   │   ├── (auth)/
+│   │   │   └── login/
+│   │   │       └── page.tsx     ← login page split-screen
+│   │   └── (dashboard)/
+│   │       ├── layout.tsx       ← sidebar + topbar layout (client)
+│   │       ├── page.tsx         ← dashboard chính
+│   │       └── requests/
+│   │           └── new/
+│   │               └── page.tsx ← form tạo yêu cầu giấy tờ
+│   ├── components/
+│   │   └── layout/
+│   │       ├── sidebar.tsx      ← sidebar responsive (client component)
+│   │       └── topbar.tsx       ← topbar sticky
+│   ├── lib/
+│   │   ├── api.ts               ← API client (fetch wrapper + JWT bearer)
+│   │   ├── auth.ts              ← quản lý hub_token cookie
+│   │   ├── types.ts             ← TypeScript interfaces đầy đủ
+│   │   └── utils.ts             ← cn(), formatDate(), getInitials()
+│   ├── middleware.ts             ← route protection (kiểm tra hub_token cookie)
+│   ├── next.config.ts           ← rewrite /api/* → DJANGO_API_URL
+│   ├── tailwind.config.ts       ← theme (sidebar colors, font)
+│   ├── tsconfig.json            ← TypeScript config (@/* alias)
+│   ├── package.json
+│   ├── ecosystem.config.js      ← PM2 config (production)
+│   └── .env.example
+│
 ├── docs/
-│   ├── ECOSYSTEM.md          ← mối liên hệ với dashboard.iuoss.com và WordPress (ĐỌC ĐẦU TIÊN)
-│   ├── FEATURES.md           ← mô tả chi tiết tính năng đã implement
-│   ├── README.md             ← tổng quan + hướng dẫn dev local
-│   ├── AUTH_FLOW.md          ← luồng xác thực LDAP chi tiết
-│   ├── SERVER_SETUP.md       ← triển khai production trên appctsv
-│   └── schema.sql            ← SQL tạo tất cả bảng hub_*
+│   ├── ECOSYSTEM.md             ← mối liên hệ với dashboard + WordPress
+│   ├── FEATURES.md              ← tính năng đã implement
+│   ├── AUTH_FLOW.md             ← luồng LDAP auth chi tiết
+│   ├── SERVER_SETUP.md          ← triển khai production (appctsv)
+│   ├── README.md                ← setup local dev
+│   └── schema.sql               ← SQL tạo bảng hub_*
 │
-├── config/                   ← Django project config
-│   ├── settings.py           ← toàn bộ cấu hình (LDAP, DB, SESSION, LOGGING)
-│   ├── urls.py               ← URL root (mount core.urls)
-│   └── wsgi.py
-│
-├── core/                     ← app chính: auth, session, views, models hub
-│   ├── auth.py               ← verify_ldap() — kết nối LDAP trường
-│   ├── session.py            ← đọc/ghi student session (không dùng Django auth)
-│   ├── decorators.py         ← @hub_login_required
-│   ├── models.py             ← HubStudent, ConfirmationRequest
-│   ├── views.py              ← login_view, logout_view, home_view,
-│   │                            confirmation_request_create_view
-│   ├── urls.py               ← routes: /, /login/, /logout/, /requests/new/
-│   └── templates/core/
-│       ├── base.html         ← layout gốc với sidebar (tất cả page extend)
-│       ├── login.html        ← trang đăng nhập (standalone)
-│       ├── home.html         ← dashboard chính
-│       └── confirmation_request_form.html
-│
-├── students/                 ← read-only mirror từ shared DB
-│   └── models.py             ← Student, Department, DegreeLevel, StudentStatus,
-│                                HealthInsuranceCard, CivicActivity (managed=False)
-│
-├── logs/
-│   ├── auth.log              ← login/logout/LDAP (rotate 5MB × 5 bản)
-│   └── app.log               ← Django warnings/errors
-│
-├── .env.example
-└── requirements.txt
+├── deploy.sh                    ← deploy backend / frontend / all
+├── .gitignore                   ← ignore cho cả Python và Node
+├── CLAUDE.md                    ← context nhanh cho AI
+└── CODEBASE.md                  ← file này
 ```
 
 ---
 
 ## Điểm đặc biệt — Đọc kỹ trước khi sửa code
 
-### 1. Không dùng `django.contrib.auth` cho student login
+### 1. Backend: Không dùng `django.contrib.auth`
 
-Đây là điểm **quan trọng nhất** của project. Authentication hoàn toàn tự xây:
+Đây là điểm **quan trọng nhất**. Authentication hoàn toàn tự xây:
 
 | Component | File | Vai trò |
 |---|---|---|
-| Xác thực LDAP | `core/auth.py` | Gọi LDAP server trường, 2-bước bind |
-| Quản lý session | `core/session.py` | Đọc/ghi `request.session["hub_student"]` |
-| Bảo vệ views | `core/decorators.py` | `@hub_login_required` |
-| Lưu login history | `core/models.py` | `HubStudent` model → bảng `hub_students` |
+| Xác thực LDAP | `backend/core/auth.py` | 2-bước bind: service account → user bind |
+| Quản lý session | `backend/core/session.py` | Đọc/ghi `request.session["hub_student"]` |
+| Bảo vệ views | `backend/core/decorators.py` | `@hub_login_required` |
+| Lưu login history | `backend/core/models.py` | `HubStudent` → bảng `hub_students` |
 
-`django.contrib.auth` **không có** trong `INSTALLED_APPS`. Không dùng `request.user`, không dùng `@login_required`, không dùng `django.contrib.auth.login()`.
+**Không** có `django.contrib.auth` trong `INSTALLED_APPS`. Không dùng `request.user`, `@login_required`, `auth.login()`.
 
-**Thay thế:**
 ```python
-# Kiểm tra đã login chưa
 from core.session import current_student
-student_session = current_student(request)  # None nếu chưa login
-
-# Bảo vệ view
 from core.decorators import hub_login_required
-@hub_login_required
-def my_view(request): ...
 
-# Dữ liệu trong session
 student_session = current_student(request)
 # → {"ldap_uid": "BABAWE21603", "student_id": 12345,
 #    "student_code": "BABAWE21603", "full_name": "Nguyễn Văn A"}
 ```
 
-### 2. Quản lý schema DB — thủ công
-
-Tất cả custom app models đều `managed=False`. Migrations bị tắt:
+### 2. Backend: Quản lý schema DB thủ công
 
 ```python
-# config/settings.py
-MIGRATION_MODULES = {
-    "core": None,
-    "students": None,
-}
+# backend/config/settings.py
+MIGRATION_MODULES = {"core": None, "students": None}
 ```
 
-**Ngoại lệ:** `django.contrib.sessions` vẫn dùng migration bình thường — bảng `django_session` được tạo qua `manage.py migrate`.
-
 **Quy tắc:**
-- Không chạy `makemigrations` cho `core` và `students`
-- Thay đổi schema hub → viết SQL → chạy thủ công → cập nhật `docs/schema.sql`
-- SQL tạo bảng hub xem tại `docs/schema.sql`
+- **Không** chạy `makemigrations` cho `core` và `students`
+- Thay đổi schema hub_* → viết SQL → chạy thủ công → cập nhật `docs/schema.sql`
+- `django.contrib.sessions` vẫn dùng migration bình thường (tạo `django_session`)
 
-### 3. `students` app — read-only
+### 3. Backend: `students/` app — read-only
 
-App `students/` chỉ khai báo models để đọc dữ liệu từ shared DB. **Không ghi** vào các bảng này từ hub.
+Chỉ khai báo models để đọc từ shared DB. Không ghi vào:
+`students`, `departments`, `degree_levels`, `student_statuses`, `student_health_insurance_cards`, `student_civic_activities`.
 
-Các bảng đang dùng: `students`, `departments`, `degree_levels`, `student_statuses`, `student_health_insurance_cards`, `student_civic_activities`.
+Thêm field: phải tồn tại trong DB trước (hỏi dashboard team), không cần migration.
 
-Nếu cần thêm trường từ shared DB:
-1. Thêm field vào model trong `students/models.py`
-2. Field phải tồn tại trong DB (kiểm tra với dashboard team)
-3. Không cần migration
+### 4. Backend: Session cookie tách biệt
 
-### 4. Session cookie tách biệt với dashboard
+Cookie `hub_sessionid` (khác `sessionid` mặc định Django) để tránh xung đột với dashboard trên cùng parent domain `.iuoss.com`.
 
-Cookie của hub đặt tên `hub_sessionid` (không phải `sessionid` mặc định của Django) để tránh xung đột nếu cả hai domain cùng parent `.iuoss.com`.
+### 5. Frontend: Auth dùng cookie `hub_token` (JWT)
 
-### 5. LDAP — 2-bước bind
+Middleware `frontend/middleware.ts` đọc cookie `hub_token`. Nếu thiếu → redirect về `/login`.
 
-`verify_ldap()` trong `core/auth.py` thực hiện 2 bước:
-1. Bind bằng **service account** (`cn=ctsv`) để tìm DN của user
-2. Bind lại bằng **DN của user + password** để xác minh
+`lib/auth.ts` quản lý cookie lifecycle. `lib/api.ts` tự động thêm `Authorization: Bearer <token>` header.
 
-Không bao giờ gửi password qua search filter. `_ldap_escape()` escape ký tự đặc biệt tránh LDAP injection.
+### 6. Frontend: API chưa kết nối — Django chưa có REST endpoints
+
+`lib/api.ts` có cấu trúc đầy đủ nhưng Django chưa expose `/api/*`. Khi dev frontend, cần mock data hoặc dùng JSON fixture. Sau khi DRF được thêm vào backend thì kết nối ngay.
+
+### 7. Frontend: Next.js rewrite `/api/` → Django
+
+`next.config.ts` cấu hình rewrite:
+```
+/api/* (Next.js nhận) → http://127.0.0.1:8002/api/* (Django xử lý)
+```
+Trong production, Nginx cũng proxy `/api/` về Gunicorn :8002 (hai tầng, redundant nhưng an toàn).
 
 ---
 
-## Luồng nghiệp vụ tóm tắt
+## Luồng auth tổng thể
+
+### Backend (hiện tại — Django session)
 
 ```
 Sinh viên nhập uid + password
-    │
-    ▼ core/auth.py → verify_ldap()
-LDAP Server (ldap.hcmiu.edu.vn)
-    │  OK → trả uid, mail, display_name
-    │  FAIL → báo lỗi
-    ▼
-core/views.py → login_view()
-    │  Tìm Student trong shared DB theo uid = current_student_code
-    │  Tạo/cập nhật HubStudent (hub_students table)
-    │  Set session: hub_student = {ldap_uid, student_id, student_code, full_name}
-    ▼
-Redirect → home_view() (và các views tiếp theo)
+  → core/auth.py::verify_ldap() → LDAP server
+  → login_view() → tìm Student trong DB
+  → set_student_session() → request.session["hub_student"]
+  → redirect về home_view()
+```
+
+### Frontend → Backend (roadmap — JWT)
+
+```
+Sinh viên nhập uid + password
+  → POST /api/auth/login/  (Next.js → Django API)
+  → Django: verify_ldap() → trả { access, refresh, student_session }
+  → Next.js: set cookie hub_token = access
+  → middleware.ts kiểm tra cookie trước mọi /dashboard/* request
+  → lib/api.ts gửi Authorization: Bearer <token>
 ```
 
 ---
 
-## Biến môi trường quan trọng
+## Server trên appctsv (production)
 
-| Biến | Mô tả |
-|---|---|
-| `SECRET_KEY` | Django secret key — phải đổi trong production |
-| `DEBUG` | `False` trong production |
-| `ALLOWED_HOSTS` | Bao gồm `hub.iuoss.com` và IP LAN |
-| `DB_*` | Kết nối MySQL — **cùng DB với dashboard** |
-| `LDAP_SERVER_URI` | `ldap://ldap.hcmiu.edu.vn:389` |
-| `LDAP_BIND_DN` | `cn=ctsv,dc=hcmiu,dc=edu,dc=vn` |
-| `LDAP_BIND_PASSWORD` | Password plain text của service account CTSV |
+```
+Internet :443
+  ↓ Cloudflare Tunnel
+cloudflared
+  ↓
+Nginx :80
+  ├─ hub.iuoss.com/api/   → proxy :8002  (Django Gunicorn)
+  ├─ hub.iuoss.com/static/ → backend/staticfiles/
+  └─ hub.iuoss.com/        → proxy :3000  (Next.js PM2)
+
+Gunicorn :8002  (systemd: iuoss_hub)       ← backend/
+PM2      :3000  (iuoss_hub_front)          ← frontend/
+MySQL    :3306  (iuoss_student_data)
+```
+
+---
+
+## Workflow phát triển tính năng mới
+
+### Tính năng chỉ ở frontend (UI-only)
+
+1. Tạo page trong `frontend/app/(dashboard)/`
+2. Thêm nav item vào `frontend/components/layout/sidebar.tsx`
+3. Thêm title vào `PAGE_TITLES` trong `frontend/app/(dashboard)/layout.tsx`
+
+### Tính năng cần API mới
+
+1. **Backend:** Thêm model (nếu cần bảng mới), thêm DRF serializer + view + URL
+2. **Frontend:** Thêm type trong `lib/types.ts`, thêm hàm trong `lib/api.ts`, tạo page/component
+
+### Tính năng cần bảng DB mới
+
+1. Viết SQL → thêm vào `docs/schema.sql`
+2. Chạy SQL thủ công trên server
+3. Thêm model `managed=False` trong `backend/core/models.py`
+4. **Không** chạy `makemigrations`
 
 ---
 
@@ -183,13 +248,13 @@ Redirect → home_view() (và các views tiếp theo)
 |---|---|
 | Tính năng đã implement | `docs/FEATURES.md` |
 | Quan hệ với dashboard và WordPress | `docs/ECOSYSTEM.md` |
-| Setup môi trường dev local | `docs/README.md` |
-| Luồng LDAP auth chi tiết | `docs/AUTH_FLOW.md` |
-| Triển khai production (appctsv) | `docs/SERVER_SETUP.md` |
-| Schema các bảng hub | `docs/schema.sql` |
-| Cấu hình Django | `config/settings.py` |
-| Logic xác thực LDAP | `core/auth.py` |
-| Quản lý session | `core/session.py` + `core/decorators.py` |
-| Views và URL routing | `core/views.py` + `core/urls.py` |
-| Models shared DB | `students/models.py` |
-| Models hub | `core/models.py` |
+| LDAP auth chi tiết | `docs/AUTH_FLOW.md` |
+| Setup dev local | `docs/README.md` |
+| Deploy production | `docs/SERVER_SETUP.md` |
+| Schema bảng hub | `docs/schema.sql` |
+| Config Django | `backend/config/settings.py` |
+| LDAP logic | `backend/core/auth.py` |
+| Session management | `backend/core/session.py` |
+| API client (frontend) | `frontend/lib/api.ts` |
+| TypeScript types | `frontend/lib/types.ts` |
+| Route protection | `frontend/middleware.ts` |
