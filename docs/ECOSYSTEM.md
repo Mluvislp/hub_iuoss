@@ -18,12 +18,12 @@
                     ▼                                   ▼
 ┌─────────────────────────┐              ┌──────────────────────────┐
 │     iuoss.com           │              │     hub.iuoss.com        │
-│     WordPress           │              │     Django (iuoss_hub)   │
+│     WordPress           │              │  Django API + Next.js    │
 │     (student-facing)    │              │     (student-facing)     │
 │                         │              │                          │
 │  - Sinh viên login      │              │  - Sinh viên login LDAP  │
 │  - Gửi ticket/yêu cầu  │              │  - Xem hồ sơ cá nhân     │
-│  - Xem thông báo        │              │  - Theo dõi ticket       │
+│  - Xem thông báo        │              │  - Theo dõi yêu cầu      │
 └────────────┬────────────┘              └──────────────────────────┘
              │ REST API sync                           │
              │ (theo ngày)                             │ read-only
@@ -36,9 +36,9 @@
 │  - Nhân viên OSS login  │         │  student_statuses, tickets,    │
 │  - Quản lý hồ sơ SV     │         │  ticket_*, imports_*,          │
 │  - Xử lý ticket         │         │  hub_students,                 │
-│  - Import Excel          │         │  django_session (×2)          │
-│  - Xuất báo cáo          │         └────────────────────────────────┘
-└─────────────────────────┘
+│  - Import Excel          │         │  hub_confirmation_requests,   │
+│  - Xuất báo cáo          │         │  django_session (×2)          │
+└─────────────────────────┘         └────────────────────────────────┘
 ```
 
 ---
@@ -72,6 +72,7 @@ Cả Dashboard và Hub đều kết nối vào **cùng một MySQL database**: `
 | `student_import_batches`, `student_import_rows`, `student_import_row_errors` | Dashboard | — |
 | `audit_auditlog` | Dashboard | — |
 | `hub_students` | Hub | — |
+| `hub_confirmation_requests` | Hub | — |
 | `django_session` (×2) | Dashboard (session riêng) + Hub (session riêng, tên cookie khác) | — |
 | `majors` | Dashboard (seed command) | Hub (read-only, tương lai) |
 
@@ -90,7 +91,7 @@ Cả hai Django app đều dùng DB sessions nhưng **cookie name khác nhau**:
 | Dashboard | `sessionid` (mặc định Django) | `django_session` (DB của dashboard) |
 | Hub | `hub_sessionid` | `django_session` (cùng DB, nhưng session khác) |
 
-Nếu sau này hai app chạy trên cùng parent domain `.iuoss.com`, tên cookie khác nhau đảm bảo không xung đột.
+Hai app chạy trên cùng parent domain `.iuoss.com`, tên cookie khác nhau đảm bảo không xung đột.
 
 ---
 
@@ -102,7 +103,7 @@ Cả WordPress và Hub đều xác thực qua cùng LDAP server của trường:
 |---|---|
 | Server | `ldap://ldap.hcmiu.edu.vn:389` |
 | Service account | `cn=ctsv,dc=hcmiu,dc=edu,dc=vn` |
-| Username attribute | `uid` (thường = MSSV, vd `BABAWE21603`) |
+| Username attribute | `uid` (thường = MSSV, vd `ITCSIU24092`) |
 
 **Dashboard KHÔNG dùng LDAP** — nhân viên OSS đăng nhập bằng Django auth (username/password được tạo qua `manage.py createsuperuser` hoặc trang quản lý User).
 
@@ -153,21 +154,46 @@ File Excel (.xlsx)
 Cả hai Django app chạy trên cùng server `appctsv` (Ubuntu 24.04, IP LAN `10.8.20.33`):
 
 ```
-Nginx :80
-  ├─ dashboard.iuoss.com  →  Gunicorn :8001  (iuoss_app)
-  └─ hub.iuoss.com        →  Gunicorn :8002  (iuoss_hub)
-           │
-           └── MySQL 127.0.0.1:3306  (iuoss_student_data)
+Internet (HTTPS) → Cloudflare Edge
+                     │ Cloudflare Tunnel e0dcace8 (QUIC/TLS)
+                     ▼
+              cloudflared (appctsv)
+                     │ HTTP → 127.0.0.1:80
+                     ▼
+              Nginx :80  ── định tuyến theo server_name ──┐
+                     │                                    │
+        dashboard.iuoss.com                       hub.iuoss.com
+          /static/ → staticfiles/                  /static/ → backend/staticfiles/
+          /        → :8001 Gunicorn                /api/    → :8002 Gunicorn
+                     (systemd: iuoss_app)          /        → :3000 Next.js PM2
+                                                             (pm2: iuoss_hub_front)
+                     │                                    │
+                     └──── MySQL :3306 (iuoss_student_data) ────┘
 ```
 
 | | Dashboard | Hub |
 |---|---|---|
+| Domain | `dashboard.iuoss.com` | `hub.iuoss.com` |
 | Gunicorn port | 8001 | 8002 |
+| Frontend | Django templates (monolith) | Next.js :3000 (PM2: `iuoss_hub_front`) |
 | systemd service | `iuoss_app` | `iuoss_hub` |
+| PM2 process | — | `iuoss_hub_front` |
 | App path | `/var/www/apps/iuoss_app/` | `/var/www/apps/iuoss_hub/` |
-| Deploy command | `bash deploy.sh` | `bash deploy.sh` (tương lai) |
+| Deploy command | `bash deploy.sh` | `bash deploy.sh` |
 
-Chi tiết hạ tầng: xem `docs/SERVER_INFRASTRUCTURE.md` trong repo `dashboard_iuoss`.
+**Port map đầy đủ server:**
+
+| Port | Bind | Dịch vụ |
+|---|---|---|
+| 80 | 0.0.0.0 | Nginx (router cả 2 app) |
+| 8001 | 127.0.0.1 | Gunicorn `iuoss_app` |
+| 8002 | 127.0.0.1 | Gunicorn `iuoss_hub` |
+| 3000 | 127.0.0.1 | Next.js PM2 `iuoss_hub_front` |
+| 3306 | 127.0.0.1 | MySQL 8.4.9 |
+| 8888 | 0.0.0.0 | phpMyAdmin (LAN only) |
+| 9090 | 0.0.0.0 | Cockpit (LAN only) |
+
+Chi tiết vận hành: `docs/SERVER_INFRASTRUCTURE.md` (dashboard repo) · `docs/SERVER_SETUP.md` (hub repo).
 
 ---
 

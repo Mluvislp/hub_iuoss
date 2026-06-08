@@ -48,7 +48,9 @@ MySQL    :3306   (iuoss_student_data — shared)
 
 ## Cài đặt lần đầu
 
-### Bước 1 — Cài Node.js 20 LTS (nếu chưa có)
+### Bước 1 — Cài Node.js 20 LTS trở lên (nếu chưa có)
+
+Server appctsv hiện đang chạy Node.js v24. Phiên bản v20 LTS trở lên đều được.
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -260,11 +262,11 @@ Cập nhật `/etc/cloudflared/config.yml`:
 
 ```yaml
 ingress:
-  - hostname: hub.iuoss.com
-    service: http://localhost:80
-  - hostname: dashboard.iuoss.com
-    service: http://localhost:80
-  - service: http_status:404
+  - hostname: dashboard.iuoss.com      # GIỮ NGUYÊN
+    service: http://127.0.0.1:80
+  - hostname: hub.iuoss.com            # THÊM DÒNG NÀY
+    service: http://127.0.0.1:80
+  - service: http_status:404           # PHẢI là rule cuối cùng
 ```
 
 ```bash

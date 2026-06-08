@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, GraduationCap, Loader2, ArrowRight } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { setToken, getToken } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') || '/dashboard';
@@ -255,5 +255,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
