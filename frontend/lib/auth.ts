@@ -1,7 +1,16 @@
 'use client';
 
 const TOKEN_KEY = 'hub_token';
-const SESSION_KEY = 'hub_session';
+
+function isHttps(): boolean {
+  return typeof window !== 'undefined' && window.location.protocol === 'https:';
+}
+
+function buildCookie(name: string, value: string, extra: string[]): string {
+  return [`${name}=${value}`, 'path=/', 'SameSite=Lax', ...extra].join('; ');
+}
+
+// ── Token (cookie) ────────────────────────────────────────────────────────────
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -10,30 +19,34 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string, expiresInSeconds = 28800): void {
-  const expires = new Date(Date.now() + expiresInSeconds * 1000);
-  document.cookie = [
-    `${TOKEN_KEY}=${encodeURIComponent(token)}`,
-    `path=/`,
-    `expires=${expires.toUTCString()}`,
-    `SameSite=Lax`,
-  ].join('; ');
+  const expires = new Date(Date.now() + expiresInSeconds * 1000).toUTCString();
+  document.cookie = buildCookie(
+    TOKEN_KEY,
+    encodeURIComponent(token),
+    [`expires=${expires}`, ...(isHttps() ? ['Secure'] : [])],
+  );
 }
 
 export function clearAuth(): void {
-  document.cookie = `${TOKEN_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-  sessionStorage.removeItem(SESSION_KEY);
+  document.cookie = buildCookie(
+    TOKEN_KEY,
+    '',
+    ['expires=Thu, 01 Jan 1970 00:00:00 GMT', ...(isHttps() ? ['Secure'] : [])],
+  );
 }
 
-export function getSession() {
-  if (typeof window === 'undefined') return null;
+// ── Session — decode từ JWT, không dùng sessionStorage ───────────────────────
+// Ưu điểm: sống qua page refresh, tab mới, không cần lưu riêng.
+
+export function getSession(): Record<string, unknown> | null {
+  const token = getToken();
+  if (!token) return null;
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    // JWT payload là phần giữa, base64url-encoded
+    const b64 = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
+    if (!b64) return null;
+    return JSON.parse(atob(b64));
   } catch {
     return null;
   }
-}
-
-export function setSession(session: object): void {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }

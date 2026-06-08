@@ -6,7 +6,9 @@ import type {
   RequestType,
 } from './types';
 
-const API_BASE = '/api';
+// Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
+// Prod: không set env → '/api' → Nginx định tuyến /api/ → Gunicorn :8002
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 class ApiError extends Error {
   constructor(

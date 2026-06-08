@@ -10,7 +10,9 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'production',
-        DJANGO_API_URL: 'http://127.0.0.1:8002',
+        // NEXT_PUBLIC_API_URL không set ở đây
+        // → API_BASE = '/api' → Nginx định tuyến /api/ → Gunicorn :8002
+        // Xem frontend/.env.example để biết chi tiết.
       },
     },
   ],

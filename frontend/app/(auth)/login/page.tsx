@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, GraduationCap, Loader2, ArrowRight } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { setToken, setSession, getToken } from '@/lib/auth';
+import { setToken, getToken } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
@@ -34,8 +34,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await api.auth.login(uid.trim(), password);
-      setToken(res.access);
-      setSession(res.student_session);
+      setToken(res.access);  // session tự decode từ JWT qua getSession()
       router.replace(next.startsWith('/') ? next : '/dashboard');
     } catch (err) {
       if (err instanceof ApiError) {
