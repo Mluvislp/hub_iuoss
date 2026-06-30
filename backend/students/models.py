@@ -49,7 +49,7 @@ class Student(models.Model):
     full_name = models.CharField(max_length=255)
     date_of_birth = models.DateField(null=True, blank=True)
     academic_entry_year = models.PositiveSmallIntegerField(null=True, blank=True)
-    class_code = models.CharField(max_length=64, null=True, blank=True)
+    # class_code đã bỏ khỏi bảng students — mã lớp giờ ở student_academic_enrollments.
     current_department = models.ForeignKey(
         Department, on_delete=models.SET_NULL,
         null=True, blank=True, db_column="current_department_id",

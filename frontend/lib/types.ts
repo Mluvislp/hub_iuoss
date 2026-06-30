@@ -30,7 +30,6 @@ export interface Student {
   full_name: string;
   date_of_birth: string | null;
   academic_entry_year: number | null;
-  class_code: string | null;
   current_department: Department | null;
   current_degree_level: DegreeLevel | null;
   current_status: StudentStatus | null;

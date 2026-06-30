@@ -37,7 +37,6 @@ class StudentSerializer(serializers.ModelSerializer):
             "full_name",
             "date_of_birth",
             "academic_entry_year",
-            "class_code",
             "current_department",
             "current_degree_level",
             "current_status",
