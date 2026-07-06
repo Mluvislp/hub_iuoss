@@ -106,7 +106,6 @@ class CivicActivity(models.Model):
     attempt_no = models.SmallIntegerField()
     result_value = models.CharField(max_length=10, choices=RESULT_CHOICES)
     completed_at = models.DateField(null=True, blank=True)
-    source_column = models.CharField(max_length=80)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
 

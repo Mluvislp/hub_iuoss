@@ -54,7 +54,7 @@ class CivicActivitySerializer(serializers.ModelSerializer):
         model = CivicActivity
         fields = [
             "id", "activity_code", "attempt_no",
-            "result_value", "completed_at", "source_column",
+            "result_value", "completed_at",
         ]
 
 

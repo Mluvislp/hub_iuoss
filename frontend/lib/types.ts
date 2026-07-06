@@ -48,7 +48,6 @@ export interface CivicActivity {
   attempt_no: number;
   result_value: 'YES' | 'NO' | 'UNKNOWN';
   completed_at: string | null;
-  source_column: string;
 }
 
 export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'other';
