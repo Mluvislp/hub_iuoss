@@ -13,5 +13,6 @@ urlpatterns = [
 
     # Data
     path("dashboard/",  views.DashboardView.as_view(),  name="api_dashboard"),
-    path("requests/",   views.RequestsView.as_view(),   name="api_requests"),
+    path("requests/",             views.RequestsView.as_view(),          name="api_requests"),
+    path("requests/other/form/",  views.OtherRequestFormView.as_view(),  name="api_other_request_form"),
 ]

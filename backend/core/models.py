@@ -26,6 +26,7 @@ class ConfirmationRequest(models.Model):
     request_type = models.CharField(max_length=64, choices=REQUEST_TYPES)
     purpose = models.CharField(max_length=255)
     note = models.TextField(null=True, blank=True)
+    payload = models.JSONField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
     staff_note = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -46,18 +46,27 @@ Kết quả: `YES` (Đạt) / `NO` (Không đạt) / `UNKNOWN` (Chưa có kết 
 
 ## 3. Yêu cầu giấy xác nhận
 
-**URL:** `/requests/new/`  
-**Files:** `core/views.py` → `confirmation_request_create_view()`, `core/templates/core/confirmation_request_form.html`  
-**Model:** `core.ConfirmationRequest` → bảng `hub_confirmation_requests`
+**Kênh chuẩn (Next.js + DRF API):**
+- `GET /api/requests/other/form/` → `core/api/views.py::OtherRequestFormView` (prefill + purpose choices)
+- `POST /api/requests/` (`request_type="other"`) → `RequestsView._create_other` (dựng `payload` snapshot)
+- Frontend: `app/(dashboard)/dashboard/requests/other/page.tsx`, `lib/api.ts` (`otherForm`/`createOther`)
+- Registry loại giấy: `core/documents.py`; prefill niên khóa/đào tạo: `students/timeline.py`
+
+**Kênh legacy (Django render):** `/requests/new/` → `core/views.py::confirmation_request_create_view` — KHÔNG dựng `payload`, chỉ dùng cho các loại chưa chuyển sang form động.
+
+**Model:** `core.ConfirmationRequest` → bảng `hub_confirmation_requests` (có cột `payload` JSON).
 
 ### Loại giấy hỗ trợ
 
-| Giá trị | Nhãn hiển thị |
-|---|---|
-| `enrollment` | Xác nhận đang học |
-| `graduation` | Xác nhận tốt nghiệp |
-| `deferment` | Hoãn nghĩa vụ quân sự |
-| `other` | Khác |
+| Giá trị | Nhãn hiển thị | Form động (payload) |
+|---|---|---|
+| `enrollment` | Xác nhận đang học | (legacy) |
+| `graduation` | Xác nhận tốt nghiệp | (legacy) |
+| `deferment` | Hoãn nghĩa vụ quân sự | (legacy) |
+| `other` | Xác nhận (lý do khác) | ✅ đã có (10 mục đích cố định) |
+
+> Loại `other` prefill từ hồ sơ (view-only) + cho sửa DOB/CCCD (staff duyệt). Chi
+> tiết contract `payload` + phía Dashboard: xem `dashboard_iuoss/docs/DOCUMENT_REQUESTS.md`.
 
 ### Trạng thái yêu cầu
 
@@ -72,17 +81,17 @@ Kết quả: `YES` (Đạt) / `NO` (Không đạt) / `UNKNOWN` (Chưa có kết 
 
 ```
 Sinh viên tạo yêu cầu (Hub)
-    │  POST /requests/new/
+    │  POST /api/requests/  (payload snapshot cho loại 'other')
     │  Ghi vào hub_confirmation_requests (status = 'pending')
     ▼
-Nhân viên CTSV (Dashboard — tương lai)
-    │  Xem danh sách hub_confirmation_requests
-    │  Cập nhật status + staff_note
+Nhân viên CTSV (Dashboard — app `documents`)
+    │  Xem/duyệt yêu cầu, duyệt sửa DOB/CCCD (ghi đè hồ sơ gốc)
+    │  Cập nhật status + staff_note, sinh DOCX/PDF
     ▼
 Sinh viên theo dõi trạng thái trên Dashboard (Hub)
 ```
 
-**Lưu ý:** Dashboard chưa tích hợp đọc bảng `hub_confirmation_requests`. Đây là bước roadmap tiếp theo.
+**Đã tích hợp:** Dashboard app `documents` đọc + duyệt + sinh giấy từ bảng này (loại `other`). Các loại còn lại theo khung registry.
 
 ### Schema bảng
 
@@ -94,6 +103,7 @@ CREATE TABLE hub_confirmation_requests (
   request_type VARCHAR(64)   NOT NULL,
   purpose      VARCHAR(255)  NOT NULL,
   note         TEXT          NULL,
+  payload      JSON          NULL,       -- dữ liệu theo từng loại giấy (snapshot + field SV sửa)
   status       VARCHAR(16)   NOT NULL DEFAULT 'pending',
   staff_note   TEXT          NULL,       -- phản hồi từ nhân viên CTSV
   created_at   DATETIME(6)   NOT NULL,

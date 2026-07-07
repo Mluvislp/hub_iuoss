@@ -44,6 +44,19 @@ class StudentStatus(models.Model):
         return self.name_vi
 
 
+class AcademicTerm(models.Model):
+    term_code = models.CharField(max_length=5)
+    academic_year = models.PositiveSmallIntegerField()
+    semester = models.PositiveSmallIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "academic_terms"
+
+    def __str__(self):
+        return self.term_code
+
+
 class Student(models.Model):
     current_student_code = models.CharField(max_length=64)
     full_name = models.CharField(max_length=255)
@@ -61,6 +74,10 @@ class Student(models.Model):
     current_status = models.ForeignKey(
         StudentStatus, on_delete=models.SET_NULL,
         null=True, blank=True, db_column="current_status_id",
+    )
+    admission_term = models.ForeignKey(
+        AcademicTerm, on_delete=models.SET_NULL,
+        null=True, blank=True, db_column="admission_term_id",
     )
 
     class Meta:
@@ -116,3 +133,53 @@ class CivicActivity(models.Model):
 
     def __str__(self):
         return f"{self.activity_code} - lần {self.attempt_no}"
+
+
+class Major(models.Model):
+    code = models.CharField(max_length=32)
+    name_vi = models.CharField(max_length=255)
+    department_code = models.CharField(max_length=8, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "majors"
+
+    def __str__(self):
+        return f"{self.code} — {self.name_vi}"
+
+
+class MajorTrainingDuration(models.Model):
+    """Thời gian đào tạo (tháng) của một ngành theo khóa nhập học."""
+    major_code = models.CharField(max_length=32)
+    effective_from_year = models.PositiveSmallIntegerField()
+    training_months = models.PositiveSmallIntegerField()
+    max_training_months = models.PositiveSmallIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "major_training_durations"
+
+    def __str__(self):
+        return f"{self.major_code} (≥{self.effective_from_year})"
+
+
+class StudentIdentityDocument(models.Model):
+    TYPE_CCCD = "CCCD"
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="identity_documents",
+    )
+    document_type = models.CharField(max_length=16)
+    document_number = models.CharField(max_length=50)
+    issue_date = models.DateField(null=True, blank=True)
+    issue_place = models.CharField(max_length=255, null=True, blank=True)
+    is_current = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_identity_documents"
+
+    def __str__(self):
+        return f"{self.document_type}: {self.document_number}"

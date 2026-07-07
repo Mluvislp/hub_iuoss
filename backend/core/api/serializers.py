@@ -62,7 +62,7 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConfirmationRequest
         fields = [
-            "id", "request_type", "purpose", "note",
+            "id", "request_type", "purpose", "note", "payload",
             "status", "staff_note", "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "status", "staff_note", "created_at", "updated_at"]
+        read_only_fields = ["id", "status", "staff_note", "payload", "created_at", "updated_at"]

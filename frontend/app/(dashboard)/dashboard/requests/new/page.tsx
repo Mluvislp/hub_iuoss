@@ -193,6 +193,22 @@ export default function NewRequestPage() {
             </div>
           </div>
 
+          {requestType === 'other' ? (
+            <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 space-y-3">
+              <p className="text-sm text-blue-700 leading-relaxed">
+                Giấy xác nhận (lý do khác) cần thêm thông tin từ hồ sơ của bạn.
+                Nhấn tiếp tục để điền biểu mẫu chi tiết.
+              </p>
+              <Link
+                href="/dashboard/requests/other"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm
+                           font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+              >
+                Tiếp tục
+              </Link>
+            </div>
+          ) : (
+          <>
           {/* Purpose */}
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-slate-700">
@@ -282,6 +298,8 @@ export default function NewRequestPage() {
               {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
             </button>
           </div>
+          </>
+          )}
         </form>
       </div>
 

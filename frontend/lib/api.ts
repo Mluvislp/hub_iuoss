@@ -4,6 +4,7 @@ import type {
   DashboardData,
   ConfirmationRequest,
   RequestType,
+  OtherRequestFormData,
 } from './types';
 
 // Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
@@ -84,6 +85,21 @@ export const api = {
       return request('/requests/', {
         method: 'POST',
         body: JSON.stringify(data),
+      });
+    },
+    otherForm(): Promise<OtherRequestFormData> {
+      return request('/requests/other/form/');
+    },
+    createOther(data: {
+      purpose_code: string;
+      program_name?: string;
+      dob: string;
+      citizen_id: string;
+      note?: string;
+    }): Promise<ConfirmationRequest> {
+      return request('/requests/', {
+        method: 'POST',
+        body: JSON.stringify({ request_type: 'other', ...data }),
       });
     },
   },

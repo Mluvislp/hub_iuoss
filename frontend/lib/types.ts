@@ -58,10 +58,33 @@ export interface ConfirmationRequest {
   request_type: RequestType;
   purpose: string;
   note: string | null;
+  payload: Record<string, unknown> | null;
   status: RequestStatus;
   staff_note: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PurposeChoice {
+  code: string;
+  label: string;
+}
+
+export interface OtherRequestPrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  cur_status_vi: string;
+  course_year: string;
+  max_year: string;
+  dob: string;
+  citizen_id: string;
+}
+
+export interface OtherRequestFormData {
+  purpose_choices: PurposeChoice[];
+  program_purpose_code: string;
+  prefill: OtherRequestPrefill;
 }
 
 export interface DashboardData {

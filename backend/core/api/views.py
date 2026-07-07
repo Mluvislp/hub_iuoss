@@ -8,6 +8,12 @@ from rest_framework import status
 
 from core.auth import verify_ldap
 from core.models import HubStudent, ConfirmationRequest
+from core.documents import (
+    OTHER_PURPOSE_CHOICES,
+    PROGRAM_PURPOSE_CODE,
+    build_other_payload,
+    build_other_prefill,
+)
 from students.models import Student, HealthInsuranceCard, CivicActivity
 from .authentication import IsHubAuthenticated
 from .tokens import HubRefreshToken
@@ -201,6 +207,9 @@ class RequestsView(APIView):
 
     def post(self, request):
         request_type = request.data.get("request_type", "").strip()
+        if request_type == "other":
+            return self._create_other(request)
+
         purpose = request.data.get("purpose", "").strip()
         note = request.data.get("note", "").strip()
 
@@ -230,3 +239,83 @@ class RequestsView(APIView):
             ConfirmationRequestSerializer(req).data,
             status=status.HTTP_201_CREATED,
         )
+
+    def _resolve_student(self, request):
+        if not request.user.student_id:
+            return None
+        return (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+        )
+
+    def _create_other(self, request):
+        """GXN 'Lý do khác' — dựng payload snapshot + ghi nhận SV sửa DOB/CCCD."""
+        student = self._resolve_student(request)
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        note = (request.data.get("note") or "").strip()
+        if len(note) > 1000:
+            return Response(
+                {"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            payload, purpose_label = build_other_payload(
+                student,
+                purpose_code=(request.data.get("purpose_code") or "").strip(),
+                program_name=request.data.get("program_name"),
+                dob=request.data.get("dob"),
+                citizen_id=request.data.get("citizen_id"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        req = ConfirmationRequest.objects.create(
+            student_id=student.pk,
+            ldap_uid=request.user.ldap_uid,
+            request_type="other",
+            purpose=purpose_label,
+            note=note or None,
+            payload=payload,
+        )
+
+        logger.info(
+            "CONFIRMATION_REQUEST | uid=%-20s | type=other | purpose=%s",
+            request.user.ldap_uid, purpose_label,
+        )
+
+        return Response(
+            ConfirmationRequestSerializer(req).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+# ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
+
+class OtherRequestFormView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student = (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({
+            "purpose_choices": OTHER_PURPOSE_CHOICES,
+            "program_purpose_code": PROGRAM_PURPOSE_CODE,
+            "prefill": build_other_prefill(student),
+        })
