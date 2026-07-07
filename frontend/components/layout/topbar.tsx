@@ -11,31 +11,27 @@ interface TopbarProps {
 
 export default function Topbar({ title, session, onMenuClick }: TopbarProps) {
   return (
-    <header
-      className="sticky top-0 z-30 h-14 flex items-center gap-3 px-5
-                 bg-white/80 backdrop-blur-md
-                 border-b border-slate-200/80"
-    >
+    <header className="sticky top-0 z-30 h-[56px] flex items-center gap-3 px-5
+                       bg-white border-b border-line">
       <button
         onClick={onMenuClick}
-        className="lg:hidden p-1.5 rounded-lg text-slate-500
-                   hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        className="lg:hidden -ml-1 p-1.5 rounded-md text-muted hover:text-ink hover:bg-slate-100"
+        aria-label="Mở menu"
       >
         <Menu size={20} />
       </button>
 
-      <span className="font-semibold text-slate-800 text-[0.925rem]">{title}</span>
+      <h1 className="text-[0.95rem] font-semibold text-ink">{title}</h1>
 
-      <div className="ml-auto flex items-center gap-2">
-        {session && (
-          <span className="flex items-center gap-1.5 text-xs font-medium
-                           bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full
-                           border border-slate-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+      {session && (
+        <div className="ml-auto flex items-center gap-2 text-sm">
+          <span className="text-muted hidden sm:inline">Mã số sinh viên</span>
+          <span className="font-medium text-ink bg-slate-100 border border-slate-300 rounded-md
+                           px-2.5 py-1 font-mono text-[0.8rem]">
             {session.student_code}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </header>
   );
 }

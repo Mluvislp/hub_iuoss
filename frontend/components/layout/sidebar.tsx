@@ -8,10 +8,8 @@ import {
   Bell,
   Calendar,
   CreditCard,
-  GraduationCap,
   LogOut,
   X,
-  ChevronRight,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { clearAuth } from '@/lib/auth';
@@ -34,22 +32,18 @@ interface NavItem {
 const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Tổng quan',
-    items: [
-      { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    ],
+    items: [{ href: '/dashboard', icon: LayoutDashboard, label: 'Bảng thông tin' }],
   },
   {
-    label: 'Dịch vụ',
-    items: [
-      { href: '/dashboard/requests/new', icon: FileText, label: 'Yêu cầu giấy tờ' },
-    ],
+    label: 'Dịch vụ sinh viên',
+    items: [{ href: '/dashboard/requests/new', icon: FileText, label: 'Yêu cầu giấy tờ' }],
   },
   {
     label: 'Sắp ra mắt',
     items: [
-      { icon: Bell,       label: 'Thông báo',  disabled: true, soon: true },
-      { icon: Calendar,   label: 'Lịch học',   disabled: true, soon: true },
-      { icon: CreditCard, label: 'Học phí',    disabled: true, soon: true },
+      { icon: Bell, label: 'Thông báo', disabled: true, soon: true },
+      { icon: Calendar, label: 'Lịch học', disabled: true, soon: true },
+      { icon: CreditCard, label: 'Học phí', disabled: true, soon: true },
     ],
   },
 ];
@@ -58,7 +52,7 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
-  async function handleLogout() {
+  function handleLogout() {
     clearAuth();
     router.replace('/login');
   }
@@ -67,69 +61,65 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
     <>
       {/* Mobile overlay */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden" onClick={onClose} />
       )}
 
-      {/* Sidebar panel */}
       <aside
         className={cn(
-          'fixed top-0 left-0 bottom-0 z-50 w-[240px]',
-          'bg-[#0a0f1e] flex flex-col',
-          'sidebar-transition',
-          'lg:translate-x-0',
+          'fixed top-0 left-0 bottom-0 z-50 w-[260px]',
+          'bg-sidebar border-r border-line flex flex-col',
+          'sidebar-transition lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        {/* Brand */}
-        <div className="flex items-center justify-between px-5 py-5
-                        border-b border-white/[0.06]">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center
-                            shadow-lg shadow-blue-600/30 group-hover:shadow-blue-600/50
-                            transition-shadow">
-              <GraduationCap size={16} className="text-white" />
+        {/* Dải accent thương hiệu */}
+        <div className="h-1 bg-primary" />
+
+        {/* Brand — identity IU/HCMIU */}
+        <div className="flex items-center justify-between h-[55px] px-5 bg-white border-b border-line">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-md bg-primary text-white flex items-center justify-center
+                            text-[0.82rem] font-bold tracking-tight shadow-sm shadow-primary/25">
+              IU
             </div>
-            <div>
-              <div className="text-white font-bold text-[0.9rem] leading-none">IUOSS Hub</div>
-              <div className="text-slate-500 text-[0.65rem] mt-0.5">Cổng thông tin SV</div>
+            <div className="leading-tight">
+              <div className="text-ink font-semibold text-[0.9rem]">IUOSS Hub</div>
+              <div className="text-muted text-[0.68rem]">Cổng dịch vụ sinh viên</div>
             </div>
           </Link>
           <button
             onClick={onClose}
-            className="lg:hidden text-slate-500 hover:text-slate-300 transition-colors p-1"
+            className="lg:hidden p-1.5 -mr-1.5 text-muted hover:text-ink"
+            aria-label="Đóng menu"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto sidebar-scroll space-y-5">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label}>
-              <p className="px-3 mb-1.5 text-[0.62rem] font-semibold tracking-widest
-                            uppercase text-slate-600">
+        <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
+          {NAV_SECTIONS.map((section, i) => (
+            <div key={section.label} className={cn('px-3', i > 0 && 'mt-5 pt-5 border-t border-line2')}>
+              <p className="px-2.5 mb-2 text-[0.68rem] font-semibold text-slate-400">
                 {section.label}
               </p>
               <div className="space-y-0.5">
                 {section.items.map((item) => {
-                  const isActive = item.href ? pathname === item.href : false;
                   const Icon = item.icon;
+                  const isActive = item.href ? pathname === item.href : false;
 
                   if (item.disabled) {
                     return (
                       <div
                         key={item.label}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg
-                                   text-slate-600 text-sm cursor-not-allowed select-none"
+                        className="flex items-center gap-3 px-2.5 h-10 rounded-md
+                                   text-slate-400 text-sm cursor-not-allowed select-none"
                       >
-                        <Icon size={16} className="flex-shrink-0" />
+                        <Icon size={17} className="flex-shrink-0" />
                         <span className="flex-1">{item.label}</span>
                         {item.soon && (
-                          <span className="text-[0.6rem] font-medium bg-slate-800
-                                           text-slate-500 px-1.5 py-0.5 rounded-full">
+                          <span className="text-[0.62rem] font-medium text-slate-400
+                                           border border-line rounded px-1.5 py-0.5">
                             Sắp có
                           </span>
                         )}
@@ -143,18 +133,14 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
                       href={item.href!}
                       onClick={onClose}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm',
-                        'transition-all duration-150 group',
+                        'flex items-center gap-3 px-2.5 h-10 rounded-md text-sm transition-colors border-l-[3px]',
                         isActive
-                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                          : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.05]',
+                          ? 'bg-primary-soft border-primary text-primary-text font-semibold'
+                          : 'border-transparent text-slate-600 hover:text-ink hover:bg-slate-100',
                       )}
                     >
-                      <Icon size={16} className="flex-shrink-0" />
+                      <Icon size={17} className="flex-shrink-0" />
                       <span className="flex-1">{item.label}</span>
-                      {isActive && (
-                        <ChevronRight size={14} className="opacity-70" />
-                      )}
                     </Link>
                   );
                 })}
@@ -163,29 +149,26 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        {/* User info + Logout */}
-        <div className="p-3 border-t border-white/[0.06] space-y-1">
+        {/* User block */}
+        <div className="border-t border-line p-3">
           {session && (
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center
-                              text-white text-sm font-bold flex-shrink-0 shadow shadow-blue-600/30">
+            <div className="flex items-center gap-3 px-2 py-2">
+              <div className="w-8 h-8 rounded-md bg-slate-100 border border-line text-ink
+                              flex items-center justify-center text-sm font-semibold flex-shrink-0">
                 {getInitials(session.full_name)}
               </div>
-              <div className="min-w-0">
-                <div className="text-slate-200 text-sm font-medium truncate leading-tight">
+              <div className="min-w-0 flex-1">
+                <div className="text-ink text-sm font-medium truncate leading-tight">
                   {session.full_name}
                 </div>
-                <div className="text-slate-500 text-xs truncate mt-0.5">
-                  {session.ldap_uid}
-                </div>
+                <div className="text-muted text-xs truncate mt-0.5">{session.student_code}</div>
               </div>
             </div>
           )}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm
-                       text-red-400 hover:text-red-300 hover:bg-red-500/[0.08]
-                       transition-all duration-150"
+            className="mt-1 w-full flex items-center gap-2.5 px-2.5 h-9 rounded-md text-sm
+                       text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <LogOut size={16} />
             Đăng xuất

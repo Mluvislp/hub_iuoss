@@ -120,9 +120,10 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   rejected: 'Từ chối',
 };
 
+// Màu trạng thái theo hệ thống (semantic tokens, dùng với `badge.base`)
 export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
-  pending:    'bg-amber-50 text-amber-700 ring-amber-200',
-  processing: 'bg-blue-50 text-blue-700 ring-blue-200',
-  done:       'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  rejected:   'bg-red-50 text-red-700 ring-red-200',
+  pending:    'bg-warning-soft text-warning-text border-warning-line',
+  processing: 'bg-primary-soft text-primary-text border-primary-line',
+  done:       'bg-success-soft text-success-text border-success-line',
+  rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };
