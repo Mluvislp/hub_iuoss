@@ -18,6 +18,7 @@ urlpatterns = [
     path("requests/deferment/form/",   views.DefermentRequestFormView.as_view(),   name="api_deferment_request_form"),
     path("requests/thuong-binh/form/", views.ThuongBinhRequestFormView.as_view(),  name="api_thuongbinh_request_form"),
     path("requests/bank-loan/form/",   views.BankLoanRequestFormView.as_view(),    name="api_bankloan_request_form"),
+    path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

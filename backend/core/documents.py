@@ -550,3 +550,82 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
         },
     }
     return payload, purpose_label
+
+
+# ── GXN tiếng Anh (english_form) ──────────────────────────────────────────────
+
+ENGLISH_PURPOSE_CHOICES = [
+    {"code": "internship",       "label": "Apply for internship"},
+    {"code": "visa",             "label": "Apply for visa"},
+    {"code": "job",              "label": "Apply for job"},
+    {"code": "scholarship",      "label": "Apply for scholarship"},
+    {"code": "higher_education", "label": "Apply for higher education"},
+    {"code": "study_abroad",     "label": "Apply for studying abroad"},
+    {"code": "program",          "label": "Apply for [Tên chương trình]"},
+]
+ENGLISH_PURPOSE_MAP = {c["code"]: c["label"] for c in ENGLISH_PURPOSE_CHOICES}
+ENGLISH_PROGRAM_CODE = "program"
+ENGLISH_STATUS = {
+    "ACTIVE": "Currently studying",
+    "SUSPENDED": "Temporary leave",
+    "WITHDRAWN": "Dropped out",
+    "GRADUATED": "Graduated",
+}
+
+
+def resolve_english_purpose(purpose_code, program_name):
+    if purpose_code not in ENGLISH_PURPOSE_MAP:
+        raise ValueError("Mục đích không hợp lệ.")
+    if purpose_code == ENGLISH_PROGRAM_CODE:
+        program_name = (program_name or "").strip()
+        if not program_name:
+            raise ValueError("Vui lòng nhập tên chương trình.")
+        if len(program_name) > PROGRAM_NAME_MAX:
+            raise ValueError(f"Tên chương trình quá dài (tối đa {PROGRAM_NAME_MAX} ký tự).")
+        return f"Apply for {program_name}", program_name
+    return ENGLISH_PURPOSE_MAP[purpose_code], None
+
+
+def _english_academic_unit(department):
+    """School (Khoa) / Department (Bộ môn) theo tên khoa tiếng Việt."""
+    name = ((department.name_vi if department else "") or "").strip()
+    return "Department" if name.startswith("Bộ môn") else "School"
+
+
+def _english_snapshot(student):
+    labels = build_timeline_labels(student)
+    return {
+        "student_name": _strip_accents(student.full_name or ""),   # bỏ dấu, giữ hoa/thường
+        "student_id": student.current_student_code or "",
+        "cur_status_group": student.current_status.status_group if student.current_status else "",
+        "academic_unit_label": _english_academic_unit(student.current_department),
+        "start_label": labels["start_label"],
+        "graduation_label": labels["graduation_label"],
+    }
+
+
+def build_english_prefill(student):
+    snap = _english_snapshot(student)
+    return {
+        "student_name": snap["student_name"],
+        "student_id": snap["student_id"],
+        "cur_status_en": ENGLISH_STATUS.get(snap["cur_status_group"], ""),
+        "academic_unit_label": snap["academic_unit_label"],
+        "start_label": snap["start_label"],
+        "graduation_label": snap["graduation_label"],
+        "dob": format_student_birth_date(student),
+    }
+
+
+def build_english_payload(student, *, dob, purpose_code, program_name):
+    purpose_label, program_name = resolve_english_purpose(purpose_code, program_name)
+    dob_field = _editable_field(format_student_birth_date(student), dob)
+    if dob_field["changed"]:
+        validate_dob(dob_field["proposed"])
+    payload = {
+        "doc_type": "english_form",
+        "purpose": {"code": purpose_code, "label": purpose_label, "program_name": program_name},
+        "snapshot": _english_snapshot(student),
+        "editable": {"dob": dob_field},
+    }
+    return payload, purpose_label

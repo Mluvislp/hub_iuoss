@@ -17,6 +17,7 @@ const TYPE_HINTS: Record<RequestType, string> = {
   deferment: 'Xác nhận để làm thủ tục tạm hoãn nghĩa vụ quân sự.',
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
   bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
+  english_form: 'Giấy xác nhận bằng tiếng Anh (du học, xin việc, visa…).',
   other: 'Các mục đích khác (du học, xin việc, visa…).',
 };
 
@@ -36,6 +37,7 @@ export default function NewRequestPage() {
     deferment: '/dashboard/requests/deferment',
     thuong_binh: '/dashboard/requests/thuong-binh',
     bank_loan: '/dashboard/requests/bank-loan',
+    english_form: '/dashboard/requests/english',
   };
   const dedicatedHref = requestType ? DEDICATED_FORMS[requestType] : undefined;
 

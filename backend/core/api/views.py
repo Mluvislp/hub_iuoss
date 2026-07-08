@@ -19,6 +19,10 @@ from core.documents import (
     build_thuongbinh_prefill,
     build_bankloan_payload,
     build_bankloan_prefill,
+    build_english_payload,
+    build_english_prefill,
+    ENGLISH_PURPOSE_CHOICES,
+    ENGLISH_PROGRAM_CODE,
 )
 from students.models import Student, HealthInsuranceCard, CivicActivity, VnProvince, VnWard
 from .authentication import IsHubAuthenticated
@@ -221,6 +225,8 @@ class RequestsView(APIView):
             return self._create_thuongbinh(request)
         if request_type == "bank_loan":
             return self._create_bankloan(request)
+        if request_type == "english_form":
+            return self._create_english(request)
 
         purpose = request.data.get("purpose", "").strip()
         note = request.data.get("note", "").strip()
@@ -418,6 +424,42 @@ class RequestsView(APIView):
         )
         return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 
+    def _create_english(self, request):
+        """GXN tiếng Anh — snapshot (tên không dấu, School/Department…) + DOB + purpose."""
+        student = self._resolve_student(request)
+        if student is None:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        note = (request.data.get("note") or "").strip()
+        if len(note) > 1000:
+            return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload, purpose_label = build_english_payload(
+                student,
+                dob=request.data.get("dob"),
+                purpose_code=(request.data.get("purpose_code") or "").strip(),
+                program_name=request.data.get("program_name"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        req = ConfirmationRequest.objects.create(
+            student_id=student.pk,
+            ldap_uid=request.user.ldap_uid,
+            request_type="english_form",
+            purpose=purpose_label,
+            note=note or None,
+            payload=payload,
+        )
+        logger.info(
+            "CONFIRMATION_REQUEST | uid=%-20s | type=english_form | purpose=%s",
+            request.user.ldap_uid, purpose_label,
+        )
+        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
 
@@ -505,6 +547,31 @@ class BankLoanRequestFormView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"prefill": build_bankloan_prefill(student)})
+
+
+# ── GET /api/requests/english/form/ — prefill cho form tiếng Anh ──────────────
+
+class EnglishRequestFormView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student = (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({
+            "purpose_choices": ENGLISH_PURPOSE_CHOICES,
+            "program_purpose_code": ENGLISH_PROGRAM_CODE,
+            "prefill": build_english_prefill(student),
+        })
 
 
 # ── Danh mục đơn vị hành chính (cơ cấu 2025) ─────────────────────────────────

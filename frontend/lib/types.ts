@@ -50,7 +50,7 @@ export interface CivicActivity {
   completed_at: string | null;
 }
 
-export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'other';
+export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'other';
 export type RequestStatus = 'pending' | 'processing' | 'done' | 'rejected';
 
 export interface ConfirmationRequest {
@@ -154,6 +154,22 @@ export interface BankLoanFormData {
   prefill: BankLoanPrefill;
 }
 
+export interface EnglishPrefill {
+  student_name: string;
+  student_id: string;
+  cur_status_en: string;
+  academic_unit_label: string;
+  start_label: string;
+  graduation_label: string;
+  dob: string;
+}
+
+export interface EnglishFormData {
+  purpose_choices: PurposeChoice[];
+  program_purpose_code: string;
+  prefill: EnglishPrefill;
+}
+
 // Đơn vị hành chính (cơ cấu 2025)
 export interface Province {
   code: string;
@@ -192,6 +208,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   deferment: 'Hoãn nghĩa vụ quân sự',
   thuong_binh: 'Ưu đãi giáo dục (thương binh)',
   bank_loan: 'Vay vốn ngân hàng',
+  english_form: 'Xác nhận (mẫu tiếng Anh)',
   other: 'Khác',
 };
 
