@@ -4,6 +4,8 @@ Tính niên khóa / thời gian đào tạo cho sinh viên.
 Port các hàm thuần từ Dashboard (students/views.py) sang Hub để prefill giá trị
 view-only khi SV tạo request giấy xác nhận. Chỉ đọc DB (managed=False models).
 """
+from datetime import date
+
 from .models import Major, MajorTrainingDuration
 
 
@@ -112,6 +114,56 @@ def build_timeline_labels(student):
         "start_label": _mm_yyyy(start_year, start_month),
         "graduation_label": _mm_yyyy(grad_y, grad_m),
         "max_label": _mm_yyyy(max_y, max_m),
+    }
+
+
+def current_academic_year(today=None):
+    """(năm bắt đầu, 'yyyy-yyyy'). Năm học tính từ tháng 9."""
+    today = today or date.today()
+    start = today.year if today.month >= 9 else today.year - 1
+    return start, f"{start}-{start + 1}"
+
+
+def current_semester(today=None):
+    """Học kỳ hiện tại: HK1=T9–T1, HK2=T2–T6, HK3(hè)=T7–T8."""
+    m = (today or date.today()).month
+    if m in (9, 10, 11, 12, 1):
+        return 1
+    if m in (2, 3, 4, 5, 6):
+        return 2
+    return 3
+
+
+def build_academic_progress(student):
+    """study_year (năm thứ mấy), current_semester, current_academic_year (theo hôm nay)."""
+    start_year, _ = admission_start_year_month(student)
+    cur_start, cur_ay = current_academic_year()
+    sem = current_semester()
+    study_year = ""
+    if start_year:
+        sy = cur_start - start_year + 1
+        study_year = str(sy if sy >= 1 else 1)
+    return {
+        "study_year": study_year,
+        "current_semester": str(sem),
+        "current_academic_year": cur_ay,
+    }
+
+
+def build_course_numbers(student):
+    """Số năm đào tạo / tối đa (từ số tháng, làm tròn)."""
+    major = infer_major_for_student(student)
+    start_year, _ = admission_start_year_month(student)
+    training_months = max_training_months = None
+    if major and start_year:
+        training_months, max_training_months = resolve_training_duration(major.code, start_year)
+
+    def years(months):
+        return str(round(months / 12)) if months else ""
+
+    return {
+        "course_year_number": years(training_months),
+        "max_year_number": years(max_training_months),
     }
 
 

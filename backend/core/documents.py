@@ -14,6 +14,8 @@ from students.timeline import (
     max_year_label,
     format_student_birth_date,
     build_timeline_labels,
+    build_academic_progress,
+    build_course_numbers,
 )
 
 # Mục đích cố định cho "Lý do khác". Mục "program" yêu cầu nhập thêm tên chương trình.
@@ -382,6 +384,90 @@ def build_deferment_payload(student, *, dob, province_code, ward_code, street):
         "editable": {
             "dob": dob_field,
             "permanent_address": addr_field,
+        },
+    }
+    return payload, purpose_label
+
+
+# ── GXN thương binh (ưu đãi giáo dục) ─────────────────────────────────────────
+
+def get_current_cccd_doc(student):
+    """Trả (số CCCD, ngày cấp dd/mm/yyyy) từ record CCCD hiện hành."""
+    doc = (
+        StudentIdentityDocument.objects
+        .filter(student=student, document_type=StudentIdentityDocument.TYPE_CCCD)
+        .order_by("-is_current", "-id")
+        .first()
+    )
+    if not doc:
+        return "", ""
+    issue = doc.issue_date.strftime("%d/%m/%Y") if doc.issue_date else ""
+    return (doc.document_number or ""), issue
+
+
+def validate_issue_date(value):
+    value = (value or "").strip()
+    if not value:
+        raise ValueError("Vui lòng nhập ngày cấp CCCD.")
+    try:
+        d = datetime.strptime(value, "%d/%m/%Y").date()
+    except ValueError:
+        raise ValueError("Ngày cấp CCCD phải theo định dạng dd/mm/yyyy.")
+    if d > date.today():
+        raise ValueError("Ngày cấp CCCD không được ở tương lai.")
+
+
+def _thuongbinh_snapshot(student):
+    prog = build_academic_progress(student)
+    nums = build_course_numbers(student)
+    return {
+        "student_name": student.full_name or "",
+        "student_id": student.current_student_code or "",
+        "department": student.current_department.name_vi if student.current_department else "",
+        "study_year": prog["study_year"],
+        "current_semester": prog["current_semester"],
+        "current_academic_year": prog["current_academic_year"],
+        "course_year": course_year_label(student),
+        "course_year_number": nums["course_year_number"],
+        "max_year_number": nums["max_year_number"],
+    }
+
+
+def build_thuongbinh_prefill(student):
+    """Prefill form thương binh. CCCD/ngày cấp chỉ cho sửa khi chưa có CCCD 12 số."""
+    num, issue = get_current_cccd_doc(student)
+    snap = _thuongbinh_snapshot(student)
+    snap.update({
+        "cccd_locked": bool(CCCD_RE.match(num)),   # đã có CCCD 12 số → khóa
+        "citizen_id": num,
+        "citizen_id_issue_date": issue,
+    })
+    return snap
+
+
+def build_thuongbinh_payload(student, *, citizen_id, citizen_id_issue_date):
+    """Dựng payload thương binh. Trả (payload, purpose_label)."""
+    num, issue = get_current_cccd_doc(student)
+    if CCCD_RE.match(num):
+        # Đã có CCCD 12 số → khóa, dùng thẳng
+        cid_field = {"original": num, "proposed": num, "changed": False, "review": None}
+        issue_field = {"original": issue, "proposed": issue, "changed": False, "review": None}
+    else:
+        cid_val = (citizen_id or "").strip()
+        validate_citizen_id(cid_val, num)          # buộc 12 số
+        issue_val = (citizen_id_issue_date or "").strip()
+        validate_issue_date(issue_val)
+        cid_field = {"original": num, "proposed": cid_val, "changed": True, "review": "pending"}
+        issue_field = {"original": issue, "proposed": issue_val, "changed": True, "review": "pending"}
+
+    purpose_label = "Xác nhận ưu đãi giáo dục (thương binh)"
+    payload = {
+        "doc_type": "thuong_binh",
+        "purpose": {"code": "thuong_binh", "label": purpose_label, "program_name": None},
+        "snapshot": _thuongbinh_snapshot(student),
+        "editable": {
+            "citizen_id": cid_field,
+            "citizen_id_issue_date": issue_field,
         },
     }
     return payload, purpose_label

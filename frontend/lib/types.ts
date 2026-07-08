@@ -50,7 +50,7 @@ export interface CivicActivity {
   completed_at: string | null;
 }
 
-export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'other';
+export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'other';
 export type RequestStatus = 'pending' | 'processing' | 'done' | 'rejected';
 
 export interface ConfirmationRequest {
@@ -109,6 +109,26 @@ export interface DefermentFormData {
   prefill: DefermentPrefill;
 }
 
+export interface ThuongBinhPrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  study_year: string;
+  current_semester: string;
+  current_academic_year: string;
+  course_year: string;
+  course_year_number: string;
+  max_year_number: string;
+  // CCCD chỉ cho sửa khi chưa có CCCD 12 số
+  cccd_locked: boolean;
+  citizen_id: string;
+  citizen_id_issue_date: string;
+}
+
+export interface ThuongBinhFormData {
+  prefill: ThuongBinhPrefill;
+}
+
 // Đơn vị hành chính (cơ cấu 2025)
 export interface Province {
   code: string;
@@ -145,6 +165,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   enrollment: 'Xác nhận đang học',
   graduation: 'Xác nhận tốt nghiệp',
   deferment: 'Hoãn nghĩa vụ quân sự',
+  thuong_binh: 'Ưu đãi giáo dục (thương binh)',
   other: 'Khác',
 };
 

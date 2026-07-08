@@ -6,6 +6,7 @@ import type {
   RequestType,
   OtherRequestFormData,
   DefermentFormData,
+  ThuongBinhFormData,
   Province,
   Ward,
 } from './types';
@@ -118,6 +119,19 @@ export const api = {
       return request('/requests/', {
         method: 'POST',
         body: JSON.stringify({ request_type: 'deferment', ...data }),
+      });
+    },
+    thuongbinhForm(): Promise<ThuongBinhFormData> {
+      return request('/requests/thuong-binh/form/');
+    },
+    createThuongBinh(data: {
+      citizen_id: string;
+      citizen_id_issue_date: string;
+      note?: string;
+    }): Promise<ConfirmationRequest> {
+      return request('/requests/', {
+        method: 'POST',
+        body: JSON.stringify({ request_type: 'thuong_binh', ...data }),
       });
     },
   },

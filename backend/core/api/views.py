@@ -15,6 +15,8 @@ from core.documents import (
     build_other_prefill,
     build_deferment_payload,
     build_deferment_prefill,
+    build_thuongbinh_payload,
+    build_thuongbinh_prefill,
 )
 from students.models import Student, HealthInsuranceCard, CivicActivity, VnProvince, VnWard
 from .authentication import IsHubAuthenticated
@@ -213,6 +215,8 @@ class RequestsView(APIView):
             return self._create_other(request)
         if request_type == "deferment":
             return self._create_deferment(request)
+        if request_type == "thuong_binh":
+            return self._create_thuongbinh(request)
 
         purpose = request.data.get("purpose", "").strip()
         note = request.data.get("note", "").strip()
@@ -338,6 +342,41 @@ class RequestsView(APIView):
         )
         return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 
+    def _create_thuongbinh(self, request):
+        """GXN thương binh (ưu đãi giáo dục) — snapshot + CCCD/ngày cấp (nếu chưa có)."""
+        student = self._resolve_student(request)
+        if student is None:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        note = (request.data.get("note") or "").strip()
+        if len(note) > 1000:
+            return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload, purpose_label = build_thuongbinh_payload(
+                student,
+                citizen_id=request.data.get("citizen_id"),
+                citizen_id_issue_date=request.data.get("citizen_id_issue_date"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        req = ConfirmationRequest.objects.create(
+            student_id=student.pk,
+            ldap_uid=request.user.ldap_uid,
+            request_type="thuong_binh",
+            purpose=purpose_label,
+            note=note or None,
+            payload=payload,
+        )
+        logger.info(
+            "CONFIRMATION_REQUEST | uid=%-20s | type=thuong_binh | purpose=%s",
+            request.user.ldap_uid, purpose_label,
+        )
+        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
 
@@ -383,6 +422,27 @@ class DefermentRequestFormView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"prefill": build_deferment_prefill(student)})
+
+
+# ── GET /api/requests/thuong-binh/form/ — prefill cho form thương binh ────────
+
+class ThuongBinhRequestFormView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student = (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"prefill": build_thuongbinh_prefill(student)})
 
 
 # ── Danh mục đơn vị hành chính (cơ cấu 2025) ─────────────────────────────────
