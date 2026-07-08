@@ -45,6 +45,21 @@ def _get_ip(request) -> str:
     )
 
 
+def _get_str(data, key) -> str:
+    """Lấy field dạng chuỗi an toàn từ request.data.
+
+    Client JSON có thể gửi list/dict/bool cho một field → `.strip()` sẽ ném
+    AttributeError (không phải ValueError) và biến thành HTTP 500. Hàm này chuẩn
+    hóa: chuỗi → strip; số → str(số); mọi kiểu khác (list/dict/bool/None) → ''.
+    """
+    v = data.get(key)
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return str(v)
+    return ""
+
+
 # ── GET /api/health/ ─────────────────────────────────────────────────────────
 # Endpoint cho systemd / Nginx / Cloudflare / uptime monitor. Không cần auth.
 # Kiểm tra kết nối DB → trả 200 nếu khoẻ, 503 nếu DB lỗi.
@@ -216,7 +231,7 @@ class RequestsView(APIView):
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
-        request_type = request.data.get("request_type", "").strip()
+        request_type = _get_str(request.data, "request_type")
         if request_type == "other":
             return self._create_other(request)
         if request_type == "deferment":
@@ -228,8 +243,8 @@ class RequestsView(APIView):
         if request_type == "english_form":
             return self._create_english(request)
 
-        purpose = request.data.get("purpose", "").strip()
-        note = request.data.get("note", "").strip()
+        purpose = _get_str(request.data, "purpose")
+        note = _get_str(request.data, "note")
 
         valid_types = dict(ConfirmationRequest.REQUEST_TYPES)
         errors = {}
@@ -237,6 +252,10 @@ class RequestsView(APIView):
             errors["request_type"] = "Vui lòng chọn loại giấy xác nhận hợp lệ."
         if not purpose:
             errors["purpose"] = "Vui lòng nhập mục đích yêu cầu."
+        elif len(purpose) > 255:
+            errors["purpose"] = "Mục đích quá dài (tối đa 255 ký tự)."
+        if len(note) > 1000:
+            errors["note"] = "Ghi chú quá dài (tối đa 1000 ký tự)."
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -277,7 +296,7 @@ class RequestsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        note = (request.data.get("note") or "").strip()
+        note = _get_str(request.data, "note")
         if len(note) > 1000:
             return Response(
                 {"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
@@ -287,10 +306,10 @@ class RequestsView(APIView):
         try:
             payload, purpose_label = build_other_payload(
                 student,
-                purpose_code=(request.data.get("purpose_code") or "").strip(),
-                program_name=request.data.get("program_name"),
-                dob=request.data.get("dob"),
-                citizen_id=request.data.get("citizen_id"),
+                purpose_code=_get_str(request.data, "purpose_code"),
+                program_name=_get_str(request.data, "program_name"),
+                dob=_get_str(request.data, "dob"),
+                citizen_id=_get_str(request.data, "citizen_id"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -322,7 +341,7 @@ class RequestsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        note = (request.data.get("note") or "").strip()
+        note = _get_str(request.data, "note")
         if len(note) > 1000:
             return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -330,10 +349,10 @@ class RequestsView(APIView):
         try:
             payload, purpose_label = build_deferment_payload(
                 student,
-                dob=request.data.get("dob"),
-                province_code=request.data.get("province_code"),
-                ward_code=request.data.get("ward_code"),
-                street=request.data.get("street"),
+                dob=_get_str(request.data, "dob"),
+                province_code=_get_str(request.data, "province_code"),
+                ward_code=_get_str(request.data, "ward_code"),
+                street=_get_str(request.data, "street"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -359,7 +378,7 @@ class RequestsView(APIView):
             return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        note = (request.data.get("note") or "").strip()
+        note = _get_str(request.data, "note")
         if len(note) > 1000:
             return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -367,8 +386,8 @@ class RequestsView(APIView):
         try:
             payload, purpose_label = build_thuongbinh_payload(
                 student,
-                citizen_id=request.data.get("citizen_id"),
-                citizen_id_issue_date=request.data.get("citizen_id_issue_date"),
+                citizen_id=_get_str(request.data, "citizen_id"),
+                citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -394,7 +413,7 @@ class RequestsView(APIView):
             return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        note = (request.data.get("note") or "").strip()
+        note = _get_str(request.data, "note")
         if len(note) > 1000:
             return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -402,10 +421,10 @@ class RequestsView(APIView):
         try:
             payload, purpose_label = build_bankloan_payload(
                 student,
-                dob=request.data.get("dob"),
-                citizen_id=request.data.get("citizen_id"),
-                citizen_id_issue_date=request.data.get("citizen_id_issue_date"),
-                class_code=request.data.get("class_code"),
+                dob=_get_str(request.data, "dob"),
+                citizen_id=_get_str(request.data, "citizen_id"),
+                citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
+                class_code=_get_str(request.data, "class_code"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -431,7 +450,7 @@ class RequestsView(APIView):
             return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        note = (request.data.get("note") or "").strip()
+        note = _get_str(request.data, "note")
         if len(note) > 1000:
             return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -439,9 +458,9 @@ class RequestsView(APIView):
         try:
             payload, purpose_label = build_english_payload(
                 student,
-                dob=request.data.get("dob"),
-                purpose_code=(request.data.get("purpose_code") or "").strip(),
-                program_name=request.data.get("program_name"),
+                dob=_get_str(request.data, "dob"),
+                purpose_code=_get_str(request.data, "purpose_code"),
+                program_name=_get_str(request.data, "program_name"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
