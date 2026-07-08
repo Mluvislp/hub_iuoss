@@ -14,5 +14,10 @@ urlpatterns = [
     # Data
     path("dashboard/",  views.DashboardView.as_view(),  name="api_dashboard"),
     path("requests/",             views.RequestsView.as_view(),          name="api_requests"),
-    path("requests/other/form/",  views.OtherRequestFormView.as_view(),  name="api_other_request_form"),
+    path("requests/other/form/",      views.OtherRequestFormView.as_view(),      name="api_other_request_form"),
+    path("requests/deferment/form/",  views.DefermentRequestFormView.as_view(),  name="api_deferment_request_form"),
+
+    # Danh mục đơn vị hành chính (2025)
+    path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),
+    path("locations/wards/",      views.WardListView.as_view(),      name="api_wards"),
 ]

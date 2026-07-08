@@ -5,13 +5,15 @@ Mỗi loại (doc_type) định nghĩa: purpose cố định + hàm dựng paylo
 Contract payload dùng chung với Dashboard (nơi sinh giấy). Hiện có "other".
 """
 import re
+import unicodedata
 from datetime import date, datetime
 
-from students.models import StudentIdentityDocument
+from students.models import StudentIdentityDocument, StudentAddress, VnProvince, VnWard
 from students.timeline import (
     course_year_label,
     max_year_label,
     format_student_birth_date,
+    build_timeline_labels,
 )
 
 # Mục đích cố định cho "Lý do khác". Mục "program" yêu cầu nhập thêm tên chương trình.
@@ -152,6 +154,234 @@ def build_other_payload(student, *, purpose_code, program_name, dob, citizen_id)
         "editable": {
             "dob": dob_field,
             "citizen_id": cccd_field,
+        },
+    }
+    return payload, purpose_label
+
+
+# ── GXN hoãn nghĩa vụ quân sự (deferment) ─────────────────────────────────────
+
+STREET_MAX = 255
+
+
+def get_current_address_raw(student):
+    """Địa chỉ thường trú đang lưu (address_type=CURRENT), ghép thô để tham chiếu."""
+    addr = (
+        StudentAddress.objects
+        .filter(student=student, address_type=StudentAddress.TYPE_CURRENT)
+        .order_by("-is_current", "-id")
+        .first()
+    )
+    if not addr:
+        return ""
+    parts = [addr.full_address, addr.ward, addr.district, addr.province]
+    return ", ".join(p.strip() for p in parts if p and p.strip())
+
+
+def build_address_proposed(province_code, ward_code, street):
+    """Chuẩn hóa địa chỉ mới từ Tỉnh + Phường/xã (bảng chuẩn 2025) + số nhà/đường.
+
+    Raise ValueError nếu thiếu/không hợp lệ. Trả dict
+    {street, ward_code, ward_name, province_code, province_name, full}.
+    """
+    street = (street or "").strip()
+    if not street:
+        raise ValueError("Vui lòng nhập số nhà, tên đường.")
+    if len(street) > STREET_MAX:
+        raise ValueError(f"Số nhà/đường quá dài (tối đa {STREET_MAX} ký tự).")
+
+    province = VnProvince.objects.filter(code=(province_code or "").strip(), is_active=True).first()
+    if not province:
+        raise ValueError("Vui lòng chọn tỉnh/thành hợp lệ.")
+    ward = VnWard.objects.filter(
+        code=(ward_code or "").strip(), province_code=province.code, is_active=True
+    ).first()
+    if not ward:
+        raise ValueError("Vui lòng chọn phường/xã hợp lệ (thuộc tỉnh đã chọn).")
+
+    return {
+        "street": street,
+        "ward_code": ward.code,
+        "ward_name": ward.name,
+        "province_code": province.code,
+        "province_name": province.name,
+        "full": f"{street}, {ward.name}, {province.name}",
+    }
+
+
+def _strip_accents(s):
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
+
+_ADMIN_PREFIXES = (
+    "thanh pho ", "tp. ", "tp ", "tinh ", "phuong ", "xa ", "quan ",
+    "huyen ", "thi xa ", "thi tran ", "dac khu ",
+)
+# Từ khóa cho biết full_address chứa cả đơn vị hành chính (không chỉ địa chỉ chi tiết)
+_ADMIN_KEYWORDS = (
+    "phường", "xã", "quận", "huyện", "tỉnh", "thành phố", "tp.", "tp ",
+    "thị xã", "thị trấn", "đặc khu",
+)
+
+
+def _norm_admin(s):
+    """Chuẩn hóa tên đơn vị: bỏ dấu, thường hóa, bỏ tiền tố loại đơn vị."""
+    s = _strip_accents((s or "").strip().lower())
+    for pre in _ADMIN_PREFIXES:
+        if s.startswith(pre):
+            return s[len(pre):].strip()
+    return s.strip()
+
+
+def _match_province(name):
+    n = _norm_admin(name)
+    if not n:
+        return None
+    for pv in VnProvince.objects.filter(is_active=True):
+        if _norm_admin(pv.name) == n:
+            return pv
+    return None
+
+
+def _match_ward(name, province_code):
+    n = _norm_admin(name)
+    if not n:
+        return None
+    for w in VnWard.objects.filter(province_code=province_code, is_active=True):
+        if _norm_admin(w.name) == n:
+            return w
+    return None
+
+
+def get_current_std(student):
+    """Địa chỉ thường trú đã chuẩn hóa (CURRENT_STD) — trả dict hoặc None."""
+    row = (
+        StudentAddress.objects
+        .filter(student=student, address_type=StudentAddress.TYPE_CURRENT_STD)
+        .order_by("-is_current", "-id")
+        .first()
+    )
+    if not row:
+        return None
+    street = (row.full_address or "").strip()
+    ward_name = (row.ward or "").strip()
+    province_name = (row.province or "").strip()
+    return {
+        "street": street,
+        "ward_code": (row.ward_code or "").strip(),
+        "ward_name": ward_name,
+        "province_code": (row.province_code or "").strip(),
+        "province_name": province_name,
+        "full": ", ".join(x for x in [street, ward_name, province_name] if x),
+    }
+
+
+def resolve_address_prefill(student):
+    """Prefill địa chỉ: ưu tiên bản đã chuẩn hóa (CURRENT_STD) → dùng mã trực tiếp.
+
+    Nếu chưa có, đoán từ dữ liệu CURRENT cũ; street chỉ đổ khi full_address chỉ
+    chứa địa chỉ chi tiết (không lẫn phường/tỉnh)."""
+    std = get_current_std(student)
+    if std and std["province_code"] and std["ward_code"]:
+        return {
+            "province_code": std["province_code"],
+            "ward_code": std["ward_code"],
+            "street": std["street"],
+        }
+
+    addr = (
+        StudentAddress.objects
+        .filter(student=student, address_type=StudentAddress.TYPE_CURRENT)
+        .order_by("-is_current", "-id")
+        .first()
+    )
+    if not addr:
+        return {"province_code": "", "ward_code": "", "street": ""}
+
+    province = _match_province(addr.province)
+    ward = _match_ward(addr.ward, province.code) if province else None
+
+    full = (addr.full_address or "").strip()
+    low = full.lower()
+    street = "" if any(k in low for k in _ADMIN_KEYWORDS) else full
+
+    return {
+        "province_code": province.code if province else "",
+        "ward_code": ward.code if ward else "",
+        "street": street,
+    }
+
+
+def build_deferment_prefill(student):
+    """Prefill form 'Hoãn nghĩa vụ quân sự'.
+
+    Nếu đã có địa chỉ chuẩn hóa 2 cấp (CURRENT_STD) → khóa, không cho sửa nữa.
+    """
+    labels = build_timeline_labels(student)
+    std = get_current_std(student)
+    addr = resolve_address_prefill(student)
+    return {
+        "student_name": student.full_name or "",
+        "student_id": student.current_student_code or "",
+        "department": student.current_department.name_vi if student.current_department else "",
+        "cur_status_vi": student.current_status.name_vi if student.current_status else "",
+        "start_label": labels["start_label"],
+        "graduation_label": labels["graduation_label"],
+        "max_label": labels["max_label"],
+        "dob": format_student_birth_date(student),
+        "address_locked": std is not None,
+        "address_display": std["full"] if std else "",
+        "province_code": addr["province_code"],
+        "ward_code": addr["ward_code"],
+        "street": addr["street"],
+    }
+
+
+def build_deferment_payload(student, *, dob, province_code, ward_code, street):
+    """Dựng payload snapshot cho GXN hoãn NVQS. Trả (payload, purpose_label).
+
+    Địa chỉ thường trú buộc chọn theo cơ cấu 2025 (tỉnh + phường/xã) + số nhà/đường.
+    """
+    dob_field = _editable_field(format_student_birth_date(student), dob)
+    if dob_field["changed"]:
+        validate_dob(dob_field["proposed"])
+
+    baseline = get_current_std(student)
+    if baseline:
+        # Địa chỉ đã ở dạng 2 cấp (CURRENT_STD) → KHÓA, dùng thẳng, bỏ qua input client
+        addr_field = {
+            "original": baseline,
+            "proposed": baseline,
+            "changed": False,
+            "review": None,
+        }
+    else:
+        # Lần đầu chuẩn hóa → dựng từ input SV, cần duyệt
+        proposed_addr = build_address_proposed(province_code, ward_code, street)
+        addr_field = {
+            "original": get_current_address_raw(student),
+            "proposed": proposed_addr,
+            "changed": True,
+            "review": "pending",
+        }
+
+    labels = build_timeline_labels(student)
+    purpose_label = "Hoãn nghĩa vụ quân sự"
+    payload = {
+        "doc_type": "deferment",
+        "purpose": {"code": "deferment", "label": purpose_label, "program_name": None},
+        "snapshot": {
+            "student_name": student.full_name or "",
+            "student_id": student.current_student_code or "",
+            "department": student.current_department.name_vi if student.current_department else "",
+            "cur_status_vi": student.current_status.name_vi if student.current_status else "",
+            "start_label": labels["start_label"],
+            "graduation_label": labels["graduation_label"],
+            "max_label": labels["max_label"],
+        },
+        "editable": {
+            "dob": dob_field,
+            "permanent_address": addr_field,
         },
     }
     return payload, purpose_label

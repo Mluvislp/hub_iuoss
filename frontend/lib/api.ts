@@ -5,6 +5,9 @@ import type {
   ConfirmationRequest,
   RequestType,
   OtherRequestFormData,
+  DefermentFormData,
+  Province,
+  Ward,
 } from './types';
 
 // Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
@@ -101,6 +104,30 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'other', ...data }),
       });
+    },
+    defermentForm(): Promise<DefermentFormData> {
+      return request('/requests/deferment/form/');
+    },
+    createDeferment(data: {
+      dob: string;
+      province_code: string;
+      ward_code: string;
+      street: string;
+      note?: string;
+    }): Promise<ConfirmationRequest> {
+      return request('/requests/', {
+        method: 'POST',
+        body: JSON.stringify({ request_type: 'deferment', ...data }),
+      });
+    },
+  },
+
+  locations: {
+    provinces(): Promise<Province[]> {
+      return request('/locations/provinces/');
+    },
+    wards(provinceCode: string): Promise<Ward[]> {
+      return request(`/locations/wards/?province=${encodeURIComponent(provinceCode)}`);
     },
   },
 };

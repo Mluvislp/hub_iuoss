@@ -11,6 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Bảng thông tin',
   '/dashboard/requests/new': 'Yêu cầu giấy tờ',
   '/dashboard/requests/other': 'Yêu cầu giấy tờ',
+  '/dashboard/requests/deferment': 'Yêu cầu giấy tờ',
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

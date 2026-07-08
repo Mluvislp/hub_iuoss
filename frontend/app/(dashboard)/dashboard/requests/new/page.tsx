@@ -28,7 +28,12 @@ export default function NewRequestPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  const isOther = requestType === 'other';
+  // Loại giấy có biểu mẫu chi tiết riêng (prefill từ hồ sơ) → điều hướng sang trang riêng.
+  const DEDICATED_FORMS: Partial<Record<RequestType, string>> = {
+    other: '/dashboard/requests/other',
+    deferment: '/dashboard/requests/deferment',
+  };
+  const dedicatedHref = requestType ? DEDICATED_FORMS[requestType] : undefined;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -148,16 +153,16 @@ export default function NewRequestPage() {
             </div>
           </div>
 
-          {isOther ? (
-            /* Loại "Lý do khác" cần biểu mẫu chi tiết → điều hướng */
+          {dedicatedHref ? (
+            /* Loại giấy có biểu mẫu chi tiết → điều hướng sang trang riêng */
             <div className="flex items-start gap-3 px-4 py-3.5 rounded-lg bg-primary-soft border border-primary-line">
               <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-ink">
-                  Giấy xác nhận (lý do khác) cần thêm thông tin từ hồ sơ của bạn.
+                  Loại giấy này cần thêm thông tin từ hồ sơ của bạn để lập giấy chính xác.
                 </p>
                 <Link
-                  href="/dashboard/requests/other"
+                  href={dedicatedHref}
                   className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
                 >
                   Tiếp tục điền biểu mẫu

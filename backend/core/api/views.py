@@ -13,8 +13,10 @@ from core.documents import (
     PROGRAM_PURPOSE_CODE,
     build_other_payload,
     build_other_prefill,
+    build_deferment_payload,
+    build_deferment_prefill,
 )
-from students.models import Student, HealthInsuranceCard, CivicActivity
+from students.models import Student, HealthInsuranceCard, CivicActivity, VnProvince, VnWard
 from .authentication import IsHubAuthenticated
 from .tokens import HubRefreshToken
 from .serializers import (
@@ -209,6 +211,8 @@ class RequestsView(APIView):
         request_type = request.data.get("request_type", "").strip()
         if request_type == "other":
             return self._create_other(request)
+        if request_type == "deferment":
+            return self._create_deferment(request)
 
         purpose = request.data.get("purpose", "").strip()
         note = request.data.get("note", "").strip()
@@ -295,6 +299,45 @@ class RequestsView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+    def _create_deferment(self, request):
+        """GXN hoãn nghĩa vụ quân sự — snapshot + ghi nhận SV sửa DOB/địa chỉ."""
+        student = self._resolve_student(request)
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        note = (request.data.get("note") or "").strip()
+        if len(note) > 1000:
+            return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload, purpose_label = build_deferment_payload(
+                student,
+                dob=request.data.get("dob"),
+                province_code=request.data.get("province_code"),
+                ward_code=request.data.get("ward_code"),
+                street=request.data.get("street"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        req = ConfirmationRequest.objects.create(
+            student_id=student.pk,
+            ldap_uid=request.user.ldap_uid,
+            request_type="deferment",
+            purpose=purpose_label,
+            note=note or None,
+            payload=payload,
+        )
+        logger.info(
+            "CONFIRMATION_REQUEST | uid=%-20s | type=deferment | purpose=%s",
+            request.user.ldap_uid, purpose_label,
+        )
+        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
 
@@ -319,3 +362,51 @@ class OtherRequestFormView(APIView):
             "program_purpose_code": PROGRAM_PURPOSE_CODE,
             "prefill": build_other_prefill(student),
         })
+
+
+# ── GET /api/requests/deferment/form/ — prefill cho form hoãn NVQS ────────────
+
+class DefermentRequestFormView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student = (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"prefill": build_deferment_prefill(student)})
+
+
+# ── Danh mục đơn vị hành chính (cơ cấu 2025) ─────────────────────────────────
+
+class ProvinceListView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        rows = (
+            VnProvince.objects.filter(is_active=True)
+            .order_by("name").values("code", "name", "unit_type")
+        )
+        return Response(list(rows))
+
+
+class WardListView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        province = (request.GET.get("province") or "").strip()
+        if not province:
+            return Response({"detail": "Thiếu tham số province."}, status=status.HTTP_400_BAD_REQUEST)
+        rows = (
+            VnWard.objects.filter(province_code=province, is_active=True)
+            .order_by("name").values("code", "name", "unit_type")
+        )
+        return Response(list(rows))

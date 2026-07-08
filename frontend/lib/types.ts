@@ -87,6 +87,41 @@ export interface OtherRequestFormData {
   prefill: OtherRequestPrefill;
 }
 
+export interface DefermentPrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  cur_status_vi: string;
+  start_label: string;
+  graduation_label: string;
+  max_label: string;
+  dob: string;
+  // Địa chỉ đã ở dạng 2 cấp (CURRENT_STD) → khóa, không cho sửa
+  address_locked: boolean;
+  address_display: string;
+  // Prefill địa chỉ (khi chưa khóa): match sẵn nếu khớp bảng chuẩn, ngược lại rỗng
+  province_code: string;
+  ward_code: string;
+  street: string;
+}
+
+export interface DefermentFormData {
+  prefill: DefermentPrefill;
+}
+
+// Đơn vị hành chính (cơ cấu 2025)
+export interface Province {
+  code: string;
+  name: string;
+  unit_type: string;
+}
+
+export interface Ward {
+  code: string;
+  name: string;
+  unit_type: string;
+}
+
 export interface DashboardData {
   student: Student | null;
   health_insurance: HealthInsuranceCard | null;

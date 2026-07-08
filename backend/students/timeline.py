@@ -93,6 +93,28 @@ def max_year_label(student):
     return str(tl["max_year"]) if tl["max_year"] else ""
 
 
+def _mm_yyyy(year, month):
+    return f"{month:02d}/{year}" if year and month else ""
+
+
+def build_timeline_labels(student):
+    """Nhãn mm/yyyy: nhập học, tốt nghiệp đúng tiến độ, đào tạo tối đa."""
+    major = infer_major_for_student(student)
+    start_year, start_month = admission_start_year_month(student)
+
+    grad_y = grad_m = max_y = max_m = None
+    if major and start_year:
+        training_months, max_training_months = resolve_training_duration(major.code, start_year)
+        grad_y, grad_m = add_training_duration(start_year, start_month, training_months)
+        max_y, max_m = add_training_duration(start_year, start_month, max_training_months)
+
+    return {
+        "start_label": _mm_yyyy(start_year, start_month),
+        "graduation_label": _mm_yyyy(grad_y, grad_m),
+        "max_label": _mm_yyyy(max_y, max_m),
+    }
+
+
 def format_student_birth_date(student):
     """DOB định dạng dd/mm/yyyy từ students.date_of_birth."""
     if student.date_of_birth:

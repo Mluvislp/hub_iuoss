@@ -183,3 +183,66 @@ class StudentIdentityDocument(models.Model):
 
     def __str__(self):
         return f"{self.document_type}: {self.document_number}"
+
+
+class StudentAddress(models.Model):
+    TYPE_CURRENT = "CURRENT"          # thường trú (dữ liệu cũ, có thể chưa chuẩn)
+    TYPE_TEMPORARY = "TEMPORARY"
+    TYPE_PERMANENT = "PERMANENT"
+    TYPE_OTHER = "OTHER"
+    TYPE_CURRENT_STD = "CURRENT_STD"  # thường trú đã chuẩn hóa theo cơ cấu 2025
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="addresses",
+    )
+    address_type = models.CharField(max_length=16)
+    full_address = models.TextField(null=True, blank=True)
+    ward = models.CharField(max_length=255, null=True, blank=True)
+    district = models.CharField(max_length=255, null=True, blank=True)
+    province = models.CharField(max_length=255, null=True, blank=True)
+    province_code = models.CharField(max_length=2, null=True, blank=True)
+    ward_code = models.CharField(max_length=5, null=True, blank=True)
+    is_current = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_addresses"
+
+    def __str__(self):
+        return f"{self.address_type}: {self.full_address}"
+
+
+class VnProvince(models.Model):
+    """Tỉnh/thành theo cơ cấu hành chính 2025 (managed=False)."""
+    code = models.CharField(max_length=2, unique=True)
+    name = models.CharField(max_length=255)
+    name_en = models.CharField(max_length=255, null=True, blank=True)
+    unit_type = models.CharField(max_length=50)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "vn_provinces"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class VnWard(models.Model):
+    """Phường/xã/đặc khu (cấp trực thuộc tỉnh, cơ cấu 2025). managed=False."""
+    code = models.CharField(max_length=5, unique=True)
+    name = models.CharField(max_length=255)
+    name_en = models.CharField(max_length=255, null=True, blank=True)
+    unit_type = models.CharField(max_length=50)
+    province_code = models.CharField(max_length=2)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "vn_wards"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
