@@ -5,9 +5,6 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   FileText,
-  Bell,
-  Calendar,
-  CreditCard,
   LogOut,
   X,
 } from 'lucide-react';
@@ -22,11 +19,9 @@ interface SidebarProps {
 }
 
 interface NavItem {
-  href?: string;
+  href: string;
   icon: React.ElementType;
   label: string;
-  disabled?: boolean;
-  soon?: boolean;
 }
 
 const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -37,14 +32,6 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Dịch vụ sinh viên',
     items: [{ href: '/dashboard/requests/new', icon: FileText, label: 'Yêu cầu giấy tờ' }],
-  },
-  {
-    label: 'Sắp ra mắt',
-    items: [
-      { icon: Bell, label: 'Thông báo', disabled: true, soon: true },
-      { icon: Calendar, label: 'Lịch học', disabled: true, soon: true },
-      { icon: CreditCard, label: 'Học phí', disabled: true, soon: true },
-    ],
   },
 ];
 
@@ -106,31 +93,12 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive = item.href ? pathname === item.href : false;
-
-                  if (item.disabled) {
-                    return (
-                      <div
-                        key={item.label}
-                        className="flex items-center gap-3 px-2.5 h-10 rounded-md
-                                   text-slate-400 text-sm cursor-not-allowed select-none"
-                      >
-                        <Icon size={17} className="flex-shrink-0" />
-                        <span className="flex-1">{item.label}</span>
-                        {item.soon && (
-                          <span className="text-[0.62rem] font-medium text-slate-400
-                                           border border-line rounded px-1.5 py-0.5">
-                            Sắp có
-                          </span>
-                        )}
-                      </div>
-                    );
-                  }
+                  const isActive = pathname === item.href;
 
                   return (
                     <Link
                       key={item.href}
-                      href={item.href!}
+                      href={item.href}
                       onClick={onClose}
                       className={cn(
                         'flex items-center gap-3 px-2.5 h-10 rounded-md text-sm transition-colors border-l-[3px]',
