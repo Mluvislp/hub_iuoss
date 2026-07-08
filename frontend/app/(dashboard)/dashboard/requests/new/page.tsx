@@ -1,15 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, ArrowRight, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { ChevronRight, ArrowRight, Info, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import { REQUEST_TYPE_LABELS, type RequestType } from '@/lib/types';
 
-const REQUEST_TYPES = Object.entries(REQUEST_TYPE_LABELS) as [RequestType, string][];
+// Các loại giấy chưa hỗ trợ tạo online (ẩn khỏi danh sách chọn)
+const HIDDEN_TYPES: RequestType[] = ['enrollment', 'graduation'];
+
+// Mỗi loại giấy có một biểu mẫu chi tiết riêng (prefill từ hồ sơ).
+const DEDICATED_FORMS: Record<string, string> = {
+  deferment: '/dashboard/requests/deferment',
+  thuong_binh: '/dashboard/requests/thuong-binh',
+  bank_loan: '/dashboard/requests/bank-loan',
+  english_form: '/dashboard/requests/english',
+  other: '/dashboard/requests/other',
+};
+
+// Chỉ hiển thị loại đã có biểu mẫu (và không nằm trong danh sách ẩn).
+const REQUEST_TYPES = (Object.entries(REQUEST_TYPE_LABELS) as [RequestType, string][])
+  .filter(([value]) => !HIDDEN_TYPES.includes(value) && DEDICATED_FORMS[value]);
 
 const TYPE_HINTS: Record<RequestType, string> = {
   enrollment: 'Xác nhận sinh viên đang theo học tại trường.',
@@ -22,74 +34,10 @@ const TYPE_HINTS: Record<RequestType, string> = {
 };
 
 export default function NewRequestPage() {
-  const router = useRouter();
-
   const [requestType, setRequestType] = useState<RequestType | ''>('');
-  const [purpose, setPurpose] = useState('');
-  const [note, setNote] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-
-  // Loại giấy có biểu mẫu chi tiết riêng (prefill từ hồ sơ) → điều hướng sang trang riêng.
-  const DEDICATED_FORMS: Partial<Record<RequestType, string>> = {
-    other: '/dashboard/requests/other',
-    deferment: '/dashboard/requests/deferment',
-    thuong_binh: '/dashboard/requests/thuong-binh',
-    bank_loan: '/dashboard/requests/bank-loan',
-    english_form: '/dashboard/requests/english',
-  };
   const dedicatedHref = requestType ? DEDICATED_FORMS[requestType] : undefined;
+  const selectedLabel = requestType ? REQUEST_TYPE_LABELS[requestType] : '';
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!requestType) { setError('Vui lòng chọn loại giấy tờ.'); return; }
-    if (!purpose.trim()) { setError('Vui lòng nhập mục đích yêu cầu.'); return; }
-    setError('');
-    setLoading(true);
-    try {
-      await api.requests.create({
-        request_type: requestType,
-        purpose: purpose.trim(),
-        note: note.trim() || undefined,
-      });
-      setSuccess(true);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ── Success ───────────────────────────────────────────────
-  if (success) {
-    return (
-      <div className="max-w-[720px]">
-        <div className={cn(ui.card, 'p-8 text-center')}>
-          <div className="w-11 h-11 rounded-full bg-green-50 border border-green-200
-                          flex items-center justify-center mx-auto mb-4">
-            <Check size={22} className="text-green-700" />
-          </div>
-          <h2 className="text-lg font-semibold text-ink">Đã gửi yêu cầu</h2>
-          <p className="text-sm text-muted mt-2 leading-relaxed">
-            Phòng CTSV sẽ phản hồi trong thời gian sớm nhất. Bạn có thể theo dõi trạng thái
-            xử lý tại Bảng thông tin.
-          </p>
-          <div className="flex gap-3 justify-center mt-6">
-            <Link href="/dashboard" className={ui.btnOutline}>Về Bảng thông tin</Link>
-            <button
-              onClick={() => { setSuccess(false); setRequestType(''); setPurpose(''); setNote(''); }}
-              className={ui.btnPrimary}
-            >
-              Tạo yêu cầu khác
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Form ──────────────────────────────────────────────────
   return (
     <div className="max-w-[720px] space-y-4">
 
@@ -108,19 +56,12 @@ export default function NewRequestPage() {
             Tạo yêu cầu giấy tờ
           </h1>
           <p className="text-sm text-muted mt-1">
-            Chọn loại giấy tờ và nêu rõ mục đích. Phòng CTSV sẽ xử lý và phản hồi trên hệ thống.
+            Chọn loại giấy tờ bạn cần. Mỗi loại có biểu mẫu riêng để điền thông tin chính xác;
+            Phòng CTSV sẽ xử lý và phản hồi trên hệ thống.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
-          {error && (
-            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg
-                            bg-red-50 border border-red-200 text-red-800 text-sm">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-              {error}
-            </div>
-          )}
-
+        <div className="px-6 py-5 space-y-6">
           {/* Loại giấy tờ — tiles */}
           <div>
             <label className={ui.fieldLabel}>
@@ -144,7 +85,7 @@ export default function NewRequestPage() {
                       name="request_type"
                       value={value}
                       checked={selected}
-                      onChange={() => { setRequestType(value); setPurpose(''); setError(''); }}
+                      onChange={() => setRequestType(value)}
                       className="mt-0.5 accent-primary"
                     />
                     <span>
@@ -159,74 +100,35 @@ export default function NewRequestPage() {
             </div>
           </div>
 
+          {/* CTA mở biểu mẫu chi tiết của loại đã chọn */}
           {dedicatedHref ? (
-            /* Loại giấy có biểu mẫu chi tiết → điều hướng sang trang riêng */
-            <div className="flex items-start gap-3 px-4 py-3.5 rounded-lg bg-primary-soft border border-primary-line">
-              <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-ink">
-                  Loại giấy này cần thêm thông tin từ hồ sơ của bạn để lập giấy chính xác.
+            <div className="px-4 py-4 rounded-lg bg-primary-soft border border-primary-line">
+              <div className="flex items-start gap-3">
+                <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-ink flex-1">
+                  Giấy <strong className="font-semibold">“{selectedLabel}”</strong> cần thêm một số thông tin
+                  từ hồ sơ (ngày sinh, CCCD, địa chỉ…) để lập giấy chính xác.
+                  Nhấn nút bên dưới để mở biểu mẫu và điền thông tin.
                 </p>
-                <Link
-                  href={dedicatedHref}
-                  className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
-                >
-                  Tiếp tục điền biểu mẫu
-                  <ArrowRight size={15} />
-                </Link>
               </div>
+              <Link href={dedicatedHref} className={cn(ui.btnPrimary, 'mt-3.5 w-full justify-center')}>
+                Mở biểu mẫu “{selectedLabel}”
+                <ArrowRight size={15} />
+              </Link>
             </div>
           ) : (
-            <>
-              {/* Mục đích */}
-              <div>
-                <label className={ui.fieldLabel}>
-                  Mục đích <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="Ví dụ: Bổ sung hồ sơ du học, xác nhận đang học…"
-                  maxLength={255}
-                  className={ui.input}
-                />
-                <p className="mt-1 text-[0.75rem] text-muted text-right">{purpose.length}/255</p>
-              </div>
-
-              {/* Ghi chú */}
-              <div>
-                <label className={ui.fieldLabel}>
-                  Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span>
-                </label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={3}
-                  maxLength={1000}
-                  placeholder="Số bản in, ngôn ngữ, yêu cầu đặc biệt…"
-                  className={ui.textarea}
-                />
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
-                <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>
-                <button type="submit" disabled={loading} className={ui.btnPrimary}>
-                  {loading && <Loader2 size={15} className="animate-spin" />}
-                  {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
-                </button>
-              </div>
-            </>
+            <p className="text-[0.85rem] text-muted px-1">
+              Chọn một loại giấy tờ ở trên để tiếp tục.
+            </p>
           )}
-        </form>
+        </div>
       </div>
 
       {/* Alert note */}
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Sau khi gửi, bạn có thể theo dõi trạng thái xử lý tại{' '}
+          Sau khi gửi biểu mẫu, bạn có thể theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
           Thời gian xử lý thông thường: <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
         </p>
