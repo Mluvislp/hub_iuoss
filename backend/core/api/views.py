@@ -93,7 +93,9 @@ class HealthView(APIView):
 class LoginView(APIView):
     authentication_classes = []
     permission_classes = []
-    throttle_scope = "login"   # giới hạn số lần thử đăng nhập/IP (chống brute-force)
+    # Rate-limit đăng nhập tạm TẮT theo yêu cầu — mở lại chỉ cần bỏ comment dòng dưới
+    # (ngưỡng cấu hình sẵn ở settings.DEFAULT_THROTTLE_RATES["login"]).
+    # throttle_scope = "login"   # giới hạn số lần thử đăng nhập/IP (chống brute-force)
 
     def post(self, request):
         uid = request.data.get("uid", "").strip()
