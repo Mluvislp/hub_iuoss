@@ -159,7 +159,23 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    # Chống brute-force/spam. ScopedRateThrottle chỉ kích hoạt ở view có khai báo
+    # `throttle_scope` (LoginView, RequestsView.POST) → các view khác không bị ảnh hưởng.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Nới rộng để tránh chặn nhầm khi nhiều SV dùng chung IP (NAT ký túc xá/wifi trường)
+        "login": os.getenv("THROTTLE_LOGIN", "30/min"),
+        "create_request": os.getenv("THROTTLE_CREATE_REQUEST", "60/hour"),
+    },
 }
+
+# Số lớp proxy tin cậy phía trước (Nginx=1, có thêm Cloudflare=2). Để DRF throttle
+# lấy đúng IP client thật từ X-Forwarded-For thay vì IP của proxy (nếu không mọi
+# người sẽ chung một "xô" đếm → chặn nhầm hàng loạt). Local không proxy → vẫn đúng
+# vì không có X-Forwarded-For thì DRF dùng REMOTE_ADDR.
+NUM_PROXIES = int(os.getenv("NUM_PROXIES", "1"))
 
 # ── SimpleJWT ────────────────────────────────────────────────────────────────
 SIMPLE_JWT = {

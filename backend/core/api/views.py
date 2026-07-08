@@ -93,6 +93,7 @@ class HealthView(APIView):
 class LoginView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_scope = "login"   # giới hạn số lần thử đăng nhập/IP (chống brute-force)
 
     def post(self, request):
         uid = request.data.get("uid", "").strip()
@@ -225,6 +226,13 @@ class DashboardView(APIView):
 
 class RequestsView(APIView):
     permission_classes = [IsHubAuthenticated]
+
+    def get_throttles(self):
+        # Chỉ giới hạn thao tác TẠO (POST) để chống spam; GET danh sách không giới hạn.
+        if self.request.method == "POST":
+            self.throttle_scope = "create_request"
+            return super().get_throttles()
+        return []
 
     def get(self, request):
         qs = ConfirmationRequest.objects.filter(ldap_uid=request.user.ldap_uid)
