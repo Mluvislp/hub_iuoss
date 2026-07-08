@@ -16,6 +16,7 @@ from students.timeline import (
     build_timeline_labels,
     build_academic_progress,
     build_course_numbers,
+    infer_major_for_student,
 )
 
 # Mục đích cố định cho "Lý do khác". Mục "program" yêu cầu nhập thêm tên chương trình.
@@ -466,6 +467,84 @@ def build_thuongbinh_payload(student, *, citizen_id, citizen_id_issue_date):
         "purpose": {"code": "thuong_binh", "label": purpose_label, "program_name": None},
         "snapshot": _thuongbinh_snapshot(student),
         "editable": {
+            "citizen_id": cid_field,
+            "citizen_id_issue_date": issue_field,
+        },
+    }
+    return payload, purpose_label
+
+
+# ── GXN vay vốn ngân hàng (bank_loan) ─────────────────────────────────────────
+
+def _bankloan_snapshot(student, class_code):
+    labels = build_timeline_labels(student)
+    prog = build_academic_progress(student)
+    nums = build_course_numbers(student)
+    major = infer_major_for_student(student)
+    return {
+        "student_name": student.full_name or "",
+        "student_id": student.current_student_code or "",
+        "sex": student.sex or "",
+        "department": student.current_department.name_vi if student.current_department else "",
+        "major_code": major.code if major else "",
+        "cur_status_vi": student.current_status.name_vi if student.current_status else "",
+        "course_year": course_year_label(student),
+        "current_semester": prog["current_semester"],
+        "start_label": labels["start_label"],
+        "graduation_label": labels["graduation_label"],
+        "course_year_number": nums["course_year_number"],
+        "course_month_number": nums["course_month_number"],
+        "max_year_number": nums["max_year_number"],
+        "max_month_number": nums["max_month_number"],
+        "class_code": class_code,     # SV tự điền
+    }
+
+
+def build_bankloan_prefill(student):
+    """Prefill form vay vốn. CCCD/ngày cấp khóa khi đã có CCCD 12 số; mã lớp SV tự điền."""
+    num, issue = get_current_cccd_doc(student)
+    snap = _bankloan_snapshot(student, "")
+    snap.pop("class_code", None)
+    snap.update({
+        "dob": format_student_birth_date(student),
+        "cccd_locked": bool(CCCD_RE.match(num)),
+        "citizen_id": num,
+        "citizen_id_issue_date": issue,
+    })
+    return snap
+
+
+def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code):
+    """Dựng payload vay vốn. Trả (payload, purpose_label)."""
+    class_code = (class_code or "").strip()
+    if not class_code:
+        raise ValueError("Vui lòng nhập mã lớp.")
+    if len(class_code) > 64:
+        raise ValueError("Mã lớp quá dài (tối đa 64 ký tự).")
+
+    dob_field = _editable_field(format_student_birth_date(student), dob)
+    if dob_field["changed"]:
+        validate_dob(dob_field["proposed"])
+
+    num, issue = get_current_cccd_doc(student)
+    if CCCD_RE.match(num):
+        cid_field = {"original": num, "proposed": num, "changed": False, "review": None}
+        issue_field = {"original": issue, "proposed": issue, "changed": False, "review": None}
+    else:
+        cid_val = (citizen_id or "").strip()
+        validate_citizen_id(cid_val, num)
+        issue_val = (citizen_id_issue_date or "").strip()
+        validate_issue_date(issue_val)
+        cid_field = {"original": num, "proposed": cid_val, "changed": True, "review": "pending"}
+        issue_field = {"original": issue, "proposed": issue_val, "changed": True, "review": "pending"}
+
+    purpose_label = "Xác nhận vay vốn ngân hàng"
+    payload = {
+        "doc_type": "bank_loan",
+        "purpose": {"code": "bank_loan", "label": purpose_label, "program_name": None},
+        "snapshot": _bankloan_snapshot(student, class_code),
+        "editable": {
+            "dob": dob_field,
             "citizen_id": cid_field,
             "citizen_id_issue_date": issue_field,
         },

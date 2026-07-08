@@ -16,7 +16,8 @@ const TYPE_HINTS: Record<RequestType, string> = {
   graduation: 'Xác nhận đã hoàn thành chương trình / tốt nghiệp.',
   deferment: 'Xác nhận để làm thủ tục tạm hoãn nghĩa vụ quân sự.',
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
-  other: 'Các mục đích khác (du học, vay vốn, xin việc, visa…).',
+  bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
+  other: 'Các mục đích khác (du học, xin việc, visa…).',
 };
 
 export default function NewRequestPage() {
@@ -34,6 +35,7 @@ export default function NewRequestPage() {
     other: '/dashboard/requests/other',
     deferment: '/dashboard/requests/deferment',
     thuong_binh: '/dashboard/requests/thuong-binh',
+    bank_loan: '/dashboard/requests/bank-loan',
   };
   const dedicatedHref = requestType ? DEDICATED_FORMS[requestType] : undefined;
 

@@ -60,6 +60,7 @@ class AcademicTerm(models.Model):
 class Student(models.Model):
     current_student_code = models.CharField(max_length=64)
     full_name = models.CharField(max_length=255)
+    sex = models.CharField(max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     academic_entry_year = models.PositiveSmallIntegerField(null=True, blank=True)
     # class_code đã bỏ khỏi bảng students — mã lớp giờ ở student_academic_enrollments.

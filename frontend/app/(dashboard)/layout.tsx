@@ -13,6 +13,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/requests/other': 'Yêu cầu giấy tờ',
   '/dashboard/requests/deferment': 'Yêu cầu giấy tờ',
   '/dashboard/requests/thuong-binh': 'Yêu cầu giấy tờ',
+  '/dashboard/requests/bank-loan': 'Yêu cầu giấy tờ',
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

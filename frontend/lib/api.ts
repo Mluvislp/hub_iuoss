@@ -7,6 +7,7 @@ import type {
   OtherRequestFormData,
   DefermentFormData,
   ThuongBinhFormData,
+  BankLoanFormData,
   Province,
   Ward,
 } from './types';
@@ -132,6 +133,21 @@ export const api = {
       return request('/requests/', {
         method: 'POST',
         body: JSON.stringify({ request_type: 'thuong_binh', ...data }),
+      });
+    },
+    bankloanForm(): Promise<BankLoanFormData> {
+      return request('/requests/bank-loan/form/');
+    },
+    createBankLoan(data: {
+      dob: string;
+      citizen_id: string;
+      citizen_id_issue_date: string;
+      class_code: string;
+      note?: string;
+    }): Promise<ConfirmationRequest> {
+      return request('/requests/', {
+        method: 'POST',
+        body: JSON.stringify({ request_type: 'bank_loan', ...data }),
       });
     },
   },

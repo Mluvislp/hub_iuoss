@@ -161,9 +161,14 @@ def build_course_numbers(student):
     def years(months):
         return str(round(months / 12)) if months else ""
 
+    def months_(months):
+        return str(months) if months else ""
+
     return {
         "course_year_number": years(training_months),
+        "course_month_number": months_(training_months),
         "max_year_number": years(max_training_months),
+        "max_month_number": months_(max_training_months),
     }
 
 
