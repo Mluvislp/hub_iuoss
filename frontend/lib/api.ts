@@ -30,7 +30,18 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+interface RequestOptions {
+  // Bỏ qua cơ chế auto-redirect về /login khi gặp 401.
+  // Dùng cho chính request đăng nhập: 401 lúc đó = "sai mật khẩu",
+  // không phải "hết phiên" — để trang login tự hiển thị lỗi.
+  skipAuthRedirect?: boolean;
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  opts: RequestOptions = {},
+): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -40,7 +51,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !opts.skipAuthRedirect) {
     clearAuth();
     window.location.href = '/login';
     throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
@@ -57,10 +68,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   auth: {
     login(uid: string, password: string): Promise<LoginResponse> {
-      return request('/auth/login/', {
-        method: 'POST',
-        body: JSON.stringify({ uid, password }),
-      });
+      return request(
+        '/auth/login/',
+        {
+          method: 'POST',
+          body: JSON.stringify({ uid, password }),
+        },
+        { skipAuthRedirect: true },
+      );
     },
     logout(): Promise<void> {
       return request('/auth/logout/', { method: 'POST' });
