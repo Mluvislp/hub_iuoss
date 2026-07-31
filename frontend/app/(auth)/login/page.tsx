@@ -99,6 +99,7 @@ function LoginForm() {
             </p>
           </div>
 
+          {/* Tạm ẩn feature list theo yêu cầu — bật lại khi cần
           <ul className="space-y-3">
             {[
               'Xem hồ sơ sinh viên & bảo hiểm y tế',
@@ -117,6 +118,7 @@ function LoginForm() {
               </li>
             ))}
           </ul>
+          */}
         </div>
 
         {/* Footer */}
