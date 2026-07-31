@@ -55,6 +55,21 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// ── BHYT validity badge ──────────────────────────────────────────────────────
+// Hiệu lực thẻ tính theo valid_until so với ngày hiện tại (KHÔNG dựa vào is_current).
+// So sánh dạng chuỗi 'YYYY-MM-DD' (lexicographic = chronological), tránh lệch timezone.
+function HealthValidityBadge({ validUntil }: { validUntil: string | null }) {
+  if (!validUntil) {
+    return <span className={cn(badge.base, badge.neutral)}>Chưa có thông tin hạn</span>;
+  }
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const validStr = validUntil.slice(0, 10);
+  return validStr < todayStr
+    ? <span className={cn(badge.base, badge.danger)}>Hết hạn</span>
+    : <span className={cn(badge.base, badge.success)}>Còn hiệu lực</span>;
+}
+
 // ── Civic result badge ───────────────────────────────────────────────────────
 function CivicResult({ value }: { value: string }) {
   if (value === 'YES') return <span className={cn(badge.base, badge.success)}>Đạt</span>;
@@ -163,7 +178,7 @@ export default function DashboardPage() {
             icon={ShieldCheck}
             accent="success"
             action={
-              health_insurance && <span className={cn(badge.base, badge.success)}>Còn hiệu lực</span>
+              health_insurance && <HealthValidityBadge validUntil={health_insurance.valid_until} />
             }
           >
             {health_insurance ? (

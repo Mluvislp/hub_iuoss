@@ -33,8 +33,18 @@ Hiển thị dạng stat cards: MSSV, Khoa, Bậc đào tạo, Trạng thái h�
 ### Bảo hiểm y tế
 
 **Model:** `students.HealthInsuranceCard` → bảng `student_health_insurance_cards`  
-Chỉ lấy bản ghi `is_current=True` của sinh viên.  
-Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ.
+Chỉ lấy bản ghi `is_current=True` của sinh viên (đây là **thẻ đang dùng**, không phải "thẻ còn hạn").  
+Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ (`valid_until`).
+
+**Quy tắc "còn hiệu lực":** trạng thái còn hiệu lực hay đã hết hạn **được tính ở phía Hub dựa trên `valid_until` so với ngày hiện tại** — KHÔNG suy ra từ `is_current`:
+
+- `valid_until` là NULL → không xác định được hạn → coi là "Chưa có thông tin hạn" (không khẳng định còn hiệu lực).
+- `valid_until >= hôm nay` → **Còn hiệu lực**.
+- `valid_until < hôm nay` → **Hết hạn**.
+
+> Lý do: `is_current` chỉ đánh dấu đâu là thẻ hiện hành đang dùng, không phản ánh việc thẻ đó còn hạn. Xem thêm quy ước cột `is_current` ở `dashboard_iuoss/docs/STUDENT_DATA_FLOW.md`.
+
+**Triển khai:** helper `HealthValidityBadge` trong `app/(dashboard)/dashboard/page.tsx` render badge động: neutral "Chưa có thông tin hạn" / success "Còn hiệu lực" / danger "Hết hạn". So sánh chuỗi `YYYY-MM-DD` (lexicographic = chronological) nên không lệch múi giờ.
 
 ### Sinh hoạt công dân
 
