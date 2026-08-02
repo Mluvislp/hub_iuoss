@@ -66,10 +66,9 @@ Cả Dashboard và Hub đều kết nối vào **cùng một MySQL database**: `
 
 | Nhóm bảng | Chủ sở hữu (ghi) | Người đọc |
 |---|---|---|
-| `students`, `departments`, `degree_levels`, `joint_programs`, `academic_terms`, `student_statuses` | Dashboard (qua import Excel) | Hub (read-only) |
+| `students`, `departments`, `degree_levels`, `joint_programs`, `academic_terms`, `student_statuses` | Dashboard (form sửa tay + sync trạng thái) | Hub (read-only) |
 | `student_*` (12 bảng con) | Dashboard | Hub (read-only, tương lai) |
 | `tickets`, `ticket_*` | Dashboard (sync từ WordPress) | Hub (tương lai) |
-| `student_import_batches`, `student_import_rows`, `student_import_row_errors` | Dashboard | — |
 | `audit_auditlog` | Dashboard | — |
 | `hub_students` | Hub | — |
 | `hub_confirmation_requests` | Hub | — |
