@@ -183,6 +183,68 @@ export interface Ward {
   unit_type: string;
 }
 
+// ── Khai báo thông tin ngoại trú ────────────────────────────────────────────
+
+/** EMPTY = chưa có gì · LEGACY = dữ liệu cũ trước 2025 · STANDARD = đã khai lại */
+export type AddressState = 'EMPTY' | 'LEGACY' | 'STANDARD';
+
+export interface OffCampusAddressBlock {
+  state: AddressState;
+  display: string;
+  legacy_display: string;
+  declared_on: string | null;
+  prefill: { province_code: string; ward_code: string; street: string };
+}
+
+export interface OffCampusField {
+  label: string;
+  value: string;
+  editable: boolean;
+  /** Khác null = đang có yêu cầu chờ duyệt, không cho gửi tiếp */
+  pending_value: string | null;
+}
+
+export interface OffCampusForm {
+  /** Đã khai rồi và chưa được phòng CTSV mở lại → form chỉ xem */
+  locked: boolean;
+  declared_on: string | null;
+  /** Đang có vé mở lại → khai được thêm một lần */
+  reopened: boolean;
+  student: {
+    full_name: string;
+    student_code: string;
+    department: string;
+    university_email: string;
+  };
+  fields: Record<string, OffCampusField>;
+  permanent: OffCampusAddressBlock;
+  temporary: OffCampusAddressBlock;
+  temporary_in_hcmc: boolean | null;
+  hcmc_province_code: string;
+}
+
+export interface OffCampusAddressInput {
+  province_code?: string;
+  ward_code: string;
+  street: string;
+}
+
+export interface OffCampusSubmit {
+  citizen_id?: string;
+  personal_email?: string;
+  mobile_phone?: string;
+  permanent: OffCampusAddressInput;
+  temporary_in_hcmc: boolean | null;
+  temporary: OffCampusAddressInput;
+}
+
+export interface OffCampusResult {
+  ok: boolean;
+  group_key: string;
+  fields: Record<string, 'applied' | 'pending'>;
+  warnings: Record<string, string[]>;
+}
+
 export interface DashboardData {
   student: Student | null;
   health_insurance: HealthInsuranceCard | null;

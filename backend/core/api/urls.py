@@ -20,6 +20,9 @@ urlpatterns = [
     path("requests/bank-loan/form/",   views.BankLoanRequestFormView.as_view(),    name="api_bankloan_request_form"),
     path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
 
+    # Khai báo thông tin ngoại trú
+    path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
+
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),
     path("locations/wards/",      views.WardListView.as_view(),      name="api_wards"),

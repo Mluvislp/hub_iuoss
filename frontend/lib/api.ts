@@ -11,6 +11,9 @@ import type {
   EnglishFormData,
   Province,
   Ward,
+  OffCampusForm,
+  OffCampusSubmit,
+  OffCampusResult,
 } from './types';
 
 // Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
@@ -179,6 +182,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'english_form', ...data }),
       });
+    },
+  },
+
+  offcampus: {
+    form(): Promise<OffCampusForm> {
+      return request('/offcampus/');
+    },
+    submit(data: OffCampusSubmit): Promise<OffCampusResult> {
+      return request('/offcampus/', { method: 'POST', body: JSON.stringify(data) });
     },
   },
 

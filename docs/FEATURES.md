@@ -127,6 +127,34 @@ CREATE TABLE hub_confirmation_requests (
 
 ---
 
+## 3b. Khai báo thông tin ngoại trú
+
+`/dashboard/khai-bao-ngoai-tru` — SV tự khai địa chỉ **thường trú + tạm trú** theo
+danh mục hành chính 2025 (2 cấp: Tỉnh → Phường/Xã, **bỏ cấp quận/huyện**), đồng
+thời đề xuất sửa CCCD / email cá nhân / SĐT.
+
+| Thành phần | File |
+|---|---|
+| API `GET/POST /api/offcampus/` | `core/api/views.py::OffCampusDeclarationView` |
+| Nghiệp vụ | `core/offcampus.py` |
+| Ghi địa chỉ | `core/address_service.py` + `core/address_validators.py` |
+| Đề xuất sửa hồ sơ | `core/profile_changes.py` → bảng `hub_profile_change_requests` |
+| Giao diện | `frontend/app/(dashboard)/dashboard/khai-bao-ngoai-tru/` |
+
+Điểm cần nhớ:
+
+- **Địa chỉ ghi thẳng**, không cần duyệt. Riêng CCCD/email/SĐT: hồ sơ trống thì
+  ghi thẳng, đã có giá trị thì vào hàng chờ duyệt bên Dashboard.
+- Nhánh "tạm trú tại TP.HCM" → **server tự ép `province_code='79'`**, không tin
+  giá trị client gửi lên.
+- `address_service.py` và `address_validators.py` **có bản sao ở Dashboard**
+  (`dashboard_iuoss/students/`). Sửa một bên phải sửa bên kia — chúng lệch đúng
+  một dòng lọc `VnWard` vì hai repo khai model khác nhau.
+- **Tài liệu đầy đủ (mô hình địa chỉ, rule validate, bẫy):**
+  `dashboard_iuoss/docs/OFFCAMPUS_DECLARATION.md` — đọc file đó trước khi sửa.
+
+---
+
 ## 4. Logging
 
 **Files:** `config/settings.py` (LOGGING config), `core/auth.py`, `core/views.py`

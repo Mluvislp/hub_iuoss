@@ -198,6 +198,7 @@ class StudentAddress(models.Model):
         db_column="student_id", related_name="addresses",
     )
     address_type = models.CharField(max_length=16)
+    sequence_no = models.SmallIntegerField(default=1)
     full_address = models.TextField(null=True, blank=True)
     ward = models.CharField(max_length=255, null=True, blank=True)
     district = models.CharField(max_length=255, null=True, blank=True)
@@ -205,6 +206,13 @@ class StudentAddress(models.Model):
     province_code = models.CharField(max_length=2, null=True, blank=True)
     ward_code = models.CharField(max_length=5, null=True, blank=True)
     is_current = models.BooleanField(default=True)
+    # effective_from = ngày sinh viên khai; effective_to = ngày dòng này bị thay
+    # thế. Dùng 2 cột này thay vì updated_at vì updated_at có ON UPDATE
+    # CURRENT_TIMESTAMP nên bị ghi đè đúng lúc dòng bị hạ xuống lịch sử.
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
@@ -212,6 +220,71 @@ class StudentAddress(models.Model):
 
     def __str__(self):
         return f"{self.address_type}: {self.full_address}"
+
+
+class StudentContactPoint(models.Model):
+    TYPE_PERSONAL_EMAIL = "PERSONAL_EMAIL"
+    TYPE_UNIVERSITY_EMAIL = "UNIVERSITY_EMAIL"
+    TYPE_MOBILE_PHONE = "MOBILE_PHONE"
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="contact_points",
+    )
+    contact_type = models.CharField(max_length=32)
+    contact_value = models.CharField(max_length=255)
+    normalized_contact_value = models.CharField(max_length=255)
+    is_primary = models.BooleanField(default=False)
+    is_current = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_contact_points"
+
+    def __str__(self):
+        return f"{self.contact_type}: {self.contact_value}"
+
+
+class ProfileChangeRequest(models.Model):
+    """Đề xuất sửa hồ sơ do SV gửi từ Hub, chờ nhân viên duyệt bên Dashboard.
+
+    ⚠️ Model này khai ở CẢ HAI repo (bản Dashboard nằm ở students/models.py).
+    Sửa một bên thì sửa luôn bên kia.
+    """
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CANCELLED = "cancelled"
+
+    SOURCE_OFFCAMPUS = "ngoai_tru"
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="profile_change_requests",
+    )
+    target = models.CharField(max_length=64)
+    target_id = models.BigIntegerField(null=True, blank=True)
+    old_value = models.TextField(null=True, blank=True)
+    new_value = models.TextField()
+    source = models.CharField(max_length=32)
+    group_key = models.CharField(max_length=32, null=True, blank=True)
+    status = models.CharField(max_length=16, default=STATUS_PENDING)
+    review_note = models.CharField(max_length=255, null=True, blank=True)
+    reviewed_by_id = models.IntegerField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_profile_change_requests"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.target} #{self.pk} — {self.status}"
 
 
 class VnProvince(models.Model):

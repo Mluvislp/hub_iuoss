@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   FileText,
+  Home,
   LogOut,
   X,
 } from 'lucide-react';
@@ -31,7 +32,10 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Dịch vụ sinh viên',
-    items: [{ href: '/dashboard/requests/new', icon: FileText, label: 'Yêu cầu giấy tờ' }],
+    items: [
+      { href: '/dashboard/requests/new', icon: FileText, label: 'Yêu cầu giấy tờ' },
+      { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
+    ],
   },
 ];
 

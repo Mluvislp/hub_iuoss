@@ -24,6 +24,7 @@ from core.documents import (
     ENGLISH_PURPOSE_CHOICES,
     ENGLISH_PROGRAM_CODE,
 )
+from core import offcampus
 from students.models import Student, HealthInsuranceCard, CivicActivity, VnProvince, VnWard
 from .authentication import IsHubAuthenticated
 from .tokens import HubRefreshToken
@@ -604,6 +605,65 @@ class EnglishRequestFormView(APIView):
 
 
 # ── Danh mục đơn vị hành chính (cơ cấu 2025) ─────────────────────────────────
+
+# ── Khai báo thông tin ngoại trú ─────────────────────────────────────────────
+
+class OffCampusDeclarationView(APIView):
+    """GET  — dữ liệu dựng form (thông tin cá nhân + 2 địa chỉ + gợi ý prefill)
+    POST — ghi khai báo. Địa chỉ ghi thẳng; CCCD/email/SĐT thì ghi thẳng nếu hồ
+           sơ đang trống, còn lại vào hàng chờ duyệt bên Dashboard.
+    """
+
+    permission_classes = [IsHubAuthenticated]
+
+    def _student(self, request):
+        if not request.user.student_id:
+            return None
+        return (
+            Student.objects
+            .select_related("current_department", "current_status")
+            .filter(pk=request.user.student_id)
+            .first()
+        )
+
+    def get(self, request):
+        student = self._student(request)
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(offcampus.build_prefill(student))
+
+    def post(self, request):
+        student = self._student(request)
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            result = offcampus.submit(student, data)
+        except offcampus.DeclarationLocked as exc:
+            return Response({"detail": str(exc), "locked": True},
+                            status=status.HTTP_409_CONFLICT)
+        except offcampus.DeclarationError as exc:
+            # Trả lỗi theo từng ô để frontend tô đúng chỗ, không chỉ một câu chung.
+            return Response(
+                {"detail": "Vui lòng kiểm tra lại thông tin.", "errors": exc.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(
+            "OFFCAMPUS_DECLARED | uid=%s | student_id=%s | fields=%s",
+            request.user.ldap_uid, student.pk, result.get("fields"),
+        )
+        return Response(result)
+
 
 class ProvinceListView(APIView):
     permission_classes = [IsHubAuthenticated]
