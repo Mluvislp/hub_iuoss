@@ -22,6 +22,8 @@ urlpatterns = [
 
     # Khai báo thông tin ngoại trú
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
+    path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
+         name="api_offcampus_request_reopen"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

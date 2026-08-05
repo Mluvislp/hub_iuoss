@@ -4,11 +4,13 @@ Nghiệp vụ "Khai báo thông tin ngoại trú".
 Sinh viên khai lại địa chỉ thường trú + tạm trú theo danh mục hành chính 2025,
 đồng thời được đề xuất sửa CCCD / email cá nhân / số điện thoại.
 
-Địa chỉ ghi thẳng (đó là mục đích của tính năng: SV tự sửa dữ liệu cho dễ).
-Thông tin cá nhân thì tùy: đang trống → ghi thẳng, đã có → chờ duyệt.
+Tất cả ghi thẳng, không qua duyệt — đó là mục đích của tính năng (SV tự sửa
+dữ liệu cho dễ). Mỗi lần sửa thông tin cá nhân ghi một dòng nhật ký `cũ → mới`
+vào hub_profile_change_requests.
 """
 
 from django.db import transaction
+from django.utils import timezone
 
 from students.models import ProfileChangeRequest, StudentAddress
 
@@ -101,11 +103,15 @@ def build_prefill(student):
 
     locked, declared_on = lock_state(student)
     reopen = pc.active_reopen(student)
+    asked = pc.active_reopen_request(student)
 
     return {
         "locked": locked,
         "declared_on": declared_on.isoformat() if declared_on else None,
         "reopened": reopen is not None,
+        "reopen_requested": asked is not None,
+        "reopen_requested_at": timezone.localtime(asked.created_at).strftime("%d/%m/%Y")
+        if asked else None,
         "student": {
             "full_name": student.full_name or "",
             "student_code": student.current_student_code or "",
@@ -132,6 +138,19 @@ class DeclarationLocked(ValueError):
     """Đã khai rồi và chưa được nhân viên mở lại."""
 
 
+def request_reopen(student, reason=""):
+    """SV xin mở lại biểu mẫu. Chỉ có ý nghĩa khi form đang khóa."""
+    locked, _ = lock_state(student)
+    if not locked:
+        raise ValueError("Biểu mẫu của bạn đang mở, có thể khai lại ngay.")
+    request, created = pc.request_reopen(student, reason)
+    return {
+        "ok": True,
+        "created": created,
+        "requested_at": timezone.localtime(request.created_at).strftime("%d/%m/%Y"),
+    }
+
+
 @transaction.atomic
 def submit(student, data):
     """Ghi một lần khai báo. Trả về dict tóm tắt kết quả.
@@ -154,12 +173,27 @@ def submit(student, data):
 
     # ── 1. Thông tin cá nhân (chỉ xử lý ô nào SV thực sự gửi lên) ────────────
     field_results = {}
-    for target, key in (
-        ("student.citizen_id", "citizen_id"),
-        ("contact.personal_email", "personal_email"),
-        ("contact.mobile_phone", "mobile_phone"),
+    # CCCD gồm 3 phần đi cùng một dòng hồ sơ nên gom thành một giá trị.
+    citizen = data.get("citizen_id")
+    if isinstance(citizen, str):
+        citizen = {"number": citizen}
+    citizen = citizen or {}
+    if (citizen.get("number") or "").strip():
+        citizen = {
+            "number": citizen.get("number") or "",
+            "issue_place": citizen.get("issue_place") or "",
+            "issue_date": citizen.get("issue_date") or "",
+        }
+    else:
+        citizen = None
+
+    for target, key, raw in (
+        ("student.citizen_id", "citizen_id", citizen),
+        ("contact.personal_email", "personal_email",
+         (data.get("personal_email") or "").strip()),
+        ("contact.mobile_phone", "mobile_phone",
+         (data.get("mobile_phone") or "").strip()),
     ):
-        raw = (data.get(key) or "").strip()
         if not raw:
             continue
         try:

@@ -143,8 +143,14 @@ thời đề xuất sửa CCCD / email cá nhân / SĐT.
 
 Điểm cần nhớ:
 
-- **Địa chỉ ghi thẳng**, không cần duyệt. Riêng CCCD/email/SĐT: hồ sơ trống thì
-  ghi thẳng, đã có giá trị thì vào hàng chờ duyệt bên Dashboard.
+- **Tất cả ghi thẳng, không cần duyệt** — địa chỉ lẫn CCCD/email/SĐT. Mỗi lần sửa
+  ghi một dòng nhật ký `cũ → mới` vào `hub_profile_change_requests` (Hub không ghi
+  AuditLog nên đó là dấu vết duy nhất).
+- **CCCD gồm 3 phần** (số thẻ + nơi cấp + ngày cấp) đi cùng nhau; đổi CCCD ghi
+  **dòng mới** trong `student_identity_documents`, dòng cũ hạ `is_current=0`.
+- **Mỗi SV chỉ khai một lần.** Khai xong form khóa; màn hình xem lại có nút
+  *"Yêu cầu chỉnh sửa lại"* (`POST /api/offcampus/request-reopen/`) để xin phòng
+  CTSV mở lại. Nhân viên mở lại từng người hoặc cho toàn bộ trên Dashboard.
 - Nhánh "tạm trú tại TP.HCM" → **server tự ép `province_code='79'`**, không tin
   giá trị client gửi lên.
 - `address_service.py` và `address_validators.py` **có bản sao ở Dashboard**

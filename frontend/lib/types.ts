@@ -196,12 +196,19 @@ export interface OffCampusAddressBlock {
   prefill: { province_code: string; ward_code: string; street: string };
 }
 
+/** CCCD gồm 3 phần nằm chung một dòng hồ sơ nên đi cùng nhau */
+export interface CccdValue {
+  number: string;
+  issue_place: string;
+  issue_date: string;
+}
+
 export interface OffCampusField {
   label: string;
-  value: string;
+  shape: 'scalar' | 'json';
+  value: string | CccdValue;
   editable: boolean;
-  /** Khác null = đang có yêu cầu chờ duyệt, không cho gửi tiếp */
-  pending_value: string | null;
+  pending_value: string | CccdValue | null;
 }
 
 export interface OffCampusForm {
@@ -210,6 +217,9 @@ export interface OffCampusForm {
   declared_on: string | null;
   /** Đang có vé mở lại → khai được thêm một lần */
   reopened: boolean;
+  /** SV đã bấm "yêu cầu chỉnh sửa lại", đang chờ CTSV xử lý */
+  reopen_requested: boolean;
+  reopen_requested_at: string | null;
   student: {
     full_name: string;
     student_code: string;
@@ -230,7 +240,7 @@ export interface OffCampusAddressInput {
 }
 
 export interface OffCampusSubmit {
-  citizen_id?: string;
+  citizen_id?: CccdValue;
   personal_email?: string;
   mobile_phone?: string;
   permanent: OffCampusAddressInput;

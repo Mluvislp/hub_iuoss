@@ -610,8 +610,8 @@ class EnglishRequestFormView(APIView):
 
 class OffCampusDeclarationView(APIView):
     """GET  — dữ liệu dựng form (thông tin cá nhân + 2 địa chỉ + gợi ý prefill)
-    POST — ghi khai báo. Địa chỉ ghi thẳng; CCCD/email/SĐT thì ghi thẳng nếu hồ
-           sơ đang trống, còn lại vào hàng chờ duyệt bên Dashboard.
+    POST — ghi khai báo. Địa chỉ lẫn CCCD/email/SĐT đều ghi thẳng, không qua
+           duyệt; mỗi thay đổi để lại một dòng nhật ký.
     """
 
     permission_classes = [IsHubAuthenticated]
@@ -662,6 +662,30 @@ class OffCampusDeclarationView(APIView):
             "OFFCAMPUS_DECLARED | uid=%s | student_id=%s | fields=%s",
             request.user.ldap_uid, student.pk, result.get("fields"),
         )
+        return Response(result)
+
+
+class OffCampusReopenRequestView(APIView):
+    """POST — sinh viên xin phòng CTSV mở lại biểu mẫu đã khai."""
+
+    permission_classes = [IsHubAuthenticated]
+
+    def post(self, request):
+        student = (
+            Student.objects.filter(pk=request.user.student_id).first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            result = offcampus.request_reopen(student, (data.get("reason") or "").strip())
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info("OFFCAMPUS_REOPEN_REQUEST | uid=%s | student_id=%s | new=%s",
+                    request.user.ldap_uid, student.pk, result["created"])
         return Response(result)
 
 

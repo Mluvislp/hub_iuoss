@@ -4,15 +4,18 @@ Registry field hồ sơ mà sinh viên được đề xuất sửa từ Hub — 
 Phần duyệt (approve/reject) nằm ở Dashboard: `students/profile_changes.py`.
 Bản này cố ý chỉ có chiều gửi, Hub không được tự duyệt bất cứ thứ gì.
 
-Quy tắc "nhập lần đầu thì ghi thẳng": hồ sơ đang trống → ghi luôn và lưu một bản
-ghi status=approved để có lịch sử (Hub không ghi AuditLog nên đây là dấu vết duy
-nhất). Hồ sơ đã có giá trị → tạo bản ghi pending chờ nhân viên duyệt.
+Ba field hiện tại (CCCD, email cá nhân, SĐT) KHÔNG cần duyệt: SV sửa là ghi thẳng.
+Bản ghi trong hub_profile_change_requests khi đó đóng vai trò NHẬT KÝ — lưu
+old_value → new_value cho mọi lần sửa, vì Hub không ghi AuditLog nên đó là dấu
+vết duy nhất. Cơ chế duyệt (approval=True) vẫn còn cho field thêm sau này.
 
 ⚠️ Luật validate phải khớp bản Dashboard. Sửa một bên thì sửa luôn bên kia.
 """
 
+import json
 import re
 import uuid
+from datetime import date, datetime
 
 from django.db import transaction
 from django.utils import timezone
@@ -34,14 +37,41 @@ class ChangeError(ValueError):
 
 # ── Đọc giá trị hiện tại ──────────────────────────────────────────────────────
 
-def _current_cccd(student):
-    doc = (
+def _cccd_row(student):
+    return (
         StudentIdentityDocument.objects
         .filter(student=student, document_type=StudentIdentityDocument.TYPE_CCCD,
                 is_current=True)
         .order_by("-id").first()
     )
-    return (doc.document_number or "").strip() if doc else ""
+
+
+def _fmt_date(value):
+    return value.strftime("%d/%m/%Y") if value else ""
+
+
+def _parse_date(text, label):
+    text = (text or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%d/%m/%Y").date()
+    except ValueError:
+        raise ChangeError(f"{label} phải theo dạng dd/mm/yyyy.")
+
+
+def _current_cccd(student):
+    """CCCD là target CÓ CẤU TRÚC: số thẻ + nơi cấp + ngày cấp nằm chung một
+    dòng nên phải đi cùng nhau, tách thành 3 target riêng sẽ sinh 3 dòng lịch sử
+    cho một lần sửa."""
+    doc = _cccd_row(student)
+    if doc is None:
+        return {"number": "", "issue_place": "", "issue_date": ""}
+    return {
+        "number": (doc.document_number or "").strip(),
+        "issue_place": (doc.issue_place or "").strip(),
+        "issue_date": _fmt_date(doc.issue_date),
+    }
 
 
 def _current_contact(student, contact_type):
@@ -61,7 +91,11 @@ def current_university_email(student):
 # ── Chuẩn hóa + kiểm tra ──────────────────────────────────────────────────────
 
 def _clean_cccd(value, student):
-    text = re.sub(r"[\s.\-]", "", (value or "").strip())
+    """value là dict {number, issue_place, issue_date} — trả về dict đã chuẩn hóa."""
+    if not isinstance(value, dict):
+        value = {"number": value}
+
+    text = re.sub(r"[\s.\-]", "", (value.get("number") or "").strip())
     if not CCCD_RE.match(text):
         raise ChangeError("Số CCCD phải gồm đúng 12 chữ số.")
     clash = (
@@ -75,7 +109,19 @@ def _clean_cccd(value, student):
             "Số CCCD này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại "
             "hoặc liên hệ phòng CTSV."
         )
-    return text
+
+    place = " ".join((value.get("issue_place") or "").split())
+    if len(place) > 255:
+        raise ChangeError("Nơi cấp quá dài (tối đa 255 ký tự).")
+
+    issued = _parse_date(value.get("issue_date"), "Ngày cấp")
+    # Cùng luật với validate_issue_date của luồng giấy xác nhận.
+    if issued and issued > date.today():
+        raise ChangeError("Ngày cấp CCCD không được ở tương lai.")
+    if issued and issued.year < 1990:
+        raise ChangeError("Ngày cấp CCCD không hợp lệ.")
+
+    return {"number": text, "issue_place": place, "issue_date": _fmt_date(issued)}
 
 
 def _clean_personal_email(value, student):
@@ -108,20 +154,29 @@ def _clean_phone(value, student):
 # ── Ghi vào hồ sơ gốc (chỉ dùng cho trường hợp ghi thẳng) ─────────────────────
 
 def _apply_cccd(student, value):
-    doc = (
+    """CCCD đổi thì GHI DÒNG MỚI và hạ dòng cũ xuống is_current=False.
+
+    Không sửa đè: số CCCD cũ là giấy tờ đã từng dùng để cấp giấy xác nhận, phải
+    tra lại được. Cùng quy ước con trỏ is_current của địa chỉ và thẻ BHYT.
+    ⚠️ Logic này khai ở CẢ HAI repo — sửa một bên phải sửa bên kia.
+    """
+    olds = list(
         StudentIdentityDocument.objects
+        .select_for_update()
         .filter(student=student, document_type=StudentIdentityDocument.TYPE_CCCD,
                 is_current=True)
-        .order_by("-id").first()
+        .order_by("-id")
     )
-    if doc:
-        doc.document_number = value
-        doc.save(update_fields=["document_number"])
-        return doc
+    for row in olds:
+        row.is_current = False
+        row.save(update_fields=["is_current"])
+
     return StudentIdentityDocument.objects.create(
         student=student,
         document_type=StudentIdentityDocument.TYPE_CCCD,
-        document_number=value,
+        document_number=value["number"],
+        issue_place=value.get("issue_place") or None,
+        issue_date=_parse_date(value.get("issue_date"), "Ngày cấp"),
         is_current=True,
     )
 
@@ -146,18 +201,24 @@ def _apply_contact(student, contact_type, value):
     )
 
 
+# `approval` = True thì phải chờ nhân viên duyệt; False thì ghi thẳng và bản ghi
+# chỉ còn vai trò NHẬT KÝ. Ba field hiện tại đều không cần duyệt (chốt
+# 2026-08-04); cơ chế duyệt giữ nguyên cho field thêm sau này.
 CHANGE_TARGETS = {
     "student.citizen_id": {
         "label": "Số CCCD",
+        "approval": False,
+        "shape": "json",       # {number, issue_place, issue_date}
         "read": _current_cccd,
         "clean": _clean_cccd,
         "apply": _apply_cccd,
         # CMND 9 số cũ cũng tính là "chưa có CCCD" — cùng cách hiểu với
         # validate_citizen_id trong core/documents.py.
-        "is_blank": lambda current: not CCCD_RE.match(current or ""),
+        "is_blank": lambda current: not CCCD_RE.match((current or {}).get("number") or ""),
     },
     "contact.personal_email": {
         "label": "Email cá nhân",
+        "approval": False,
         "read": lambda s: _current_contact(s, StudentContactPoint.TYPE_PERSONAL_EMAIL),
         "clean": _clean_personal_email,
         "apply": lambda s, v: _apply_contact(s, StudentContactPoint.TYPE_PERSONAL_EMAIL, v),
@@ -165,6 +226,7 @@ CHANGE_TARGETS = {
     },
     "contact.mobile_phone": {
         "label": "Số điện thoại",
+        "approval": False,
         "read": lambda s: _current_contact(s, StudentContactPoint.TYPE_MOBILE_PHONE),
         "clean": _clean_phone,
         "apply": lambda s, v: _apply_contact(s, StudentContactPoint.TYPE_MOBILE_PHONE, v),
@@ -210,6 +272,29 @@ def new_group_key():
     return uuid.uuid4().hex
 
 
+def dump_value(conf, value):
+    """Giá trị -> TEXT để lưu. Target có cấu trúc thì serialize JSON; đây là lý
+    do cột old_value/new_value là TEXT chứ không phải VARCHAR."""
+    if conf.get("shape") == "json":
+        return json.dumps(value, ensure_ascii=False)
+    return value
+
+
+def load_value(conf, raw):
+    """TEXT trong DB -> giá trị. Dùng khi đọc lại nhật ký để hiển thị."""
+    if conf.get("shape") != "json":
+        return raw or ""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        # Dòng nhật ký ghi trước khi target chuyển sang dạng có cấu trúc:
+        # giá trị là chuỗi trần. Coi như chỉ có số thẻ, đừng để mất dữ liệu cũ.
+        return {"number": raw}
+    return parsed if isinstance(parsed, dict) else {"number": raw}
+
+
 @transaction.atomic
 def submit_change(student, target, value, *, source, group_key=None):
     """Trả về (ProfileChangeRequest, applied_ngay) hoặc (None, False) nếu không đổi."""
@@ -220,11 +305,14 @@ def submit_change(student, target, value, *, source, group_key=None):
     if cleaned == current:
         return None, False
 
-    if conf["is_blank"](current):
+    old_raw = dump_value(conf, current) if current else None
+    new_raw = dump_value(conf, cleaned)
+
+    if not conf.get("approval", True) or conf["is_blank"](current):
         conf["apply"](student, cleaned)
         return ProfileChangeRequest.objects.create(
-            student=student, target=target, old_value=current or None,
-            new_value=cleaned, source=source, group_key=group_key,
+            student=student, target=target, old_value=old_raw,
+            new_value=new_raw, source=source, group_key=group_key,
             status=ProfileChangeRequest.STATUS_APPROVED,
             reviewed_at=timezone.now(),   # reviewed_by_id để trống = hệ thống tự duyệt
         ), True
@@ -239,15 +327,15 @@ def submit_change(student, target, value, *, source, group_key=None):
         .order_by("-id").first()
     )
     if pending:
-        pending.new_value = cleaned
-        pending.old_value = current or None
+        pending.new_value = new_raw
+        pending.old_value = old_raw
         pending.group_key = group_key or pending.group_key
         pending.save(update_fields=["new_value", "old_value", "group_key", "updated_at"])
         return pending, False
 
     return ProfileChangeRequest.objects.create(
-        student=student, target=target, old_value=current or None,
-        new_value=cleaned, source=source, group_key=group_key,
+        student=student, target=target, old_value=old_raw,
+        new_value=new_raw, source=source, group_key=group_key,
         status=ProfileChangeRequest.STATUS_PENDING,
     ), False
 
@@ -260,15 +348,55 @@ def pending_map(student):
 
 
 def read_profile(student):
-    """Giá trị hiện tại + yêu cầu đang chờ, cho phần 'thông tin cá nhân'."""
+    """Giá trị hiện tại + yêu cầu đang chờ, cho phần 'thông tin cá nhân'.
+
+    `value` của target vô hướng là chuỗi; của target có cấu trúc là dict —
+    frontend đọc theo `shape`.
+    """
     pending = pending_map(student)
     out = {}
     for target, conf in CHANGE_TARGETS.items():
         req = pending.get(target)
         out[target] = {
             "label": conf["label"],
+            "shape": conf.get("shape", "scalar"),
             "value": conf["read"](student),
             "editable": True,
-            "pending_value": req.new_value if req else None,
+            "pending_value": load_value(conf, req.new_value) if req else None,
         }
     return out
+
+
+# ── Sinh viên xin mở lại form ────────────────────────────────────────────────
+# Khác TARGET_REOPEN (vé do nhân viên cấp): đây là ĐỀ NGHỊ do SV gửi, nằm chờ ở
+# trạng thái pending cho tới khi nhân viên mở lại hoặc từ chối.
+TARGET_REOPEN_REQUEST = "declaration.reopen_request"
+
+
+def active_reopen_request(student):
+    return (
+        ProfileChangeRequest.objects
+        .filter(student=student, target=TARGET_REOPEN_REQUEST,
+                status=ProfileChangeRequest.STATUS_PENDING)
+        .order_by("-id").first()
+    )
+
+
+@transaction.atomic
+def request_reopen(student, reason=""):
+    """SV bấm "Yêu cầu chỉnh sửa lại". Idempotent: đã gửi rồi thì cập nhật lý do."""
+    existing = active_reopen_request(student)
+    if existing:
+        if reason:
+            existing.review_note = reason.strip()[:255]
+            existing.save(update_fields=["review_note", "updated_at"])
+        return existing, False
+    return ProfileChangeRequest.objects.create(
+        student=student,
+        target=TARGET_REOPEN_REQUEST,
+        old_value=None,
+        new_value="request",
+        source=ProfileChangeRequest.SOURCE_OFFCAMPUS,
+        status=ProfileChangeRequest.STATUS_PENDING,
+        review_note=(reason or "").strip()[:255] or None,
+    ), True

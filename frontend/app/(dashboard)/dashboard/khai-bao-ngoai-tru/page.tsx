@@ -3,16 +3,28 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle, Check, ChevronRight, Home, Loader2, Lock, MapPin, ShieldCheck, User,
+  AlertCircle, Check, ChevronRight, Home, Loader2, Lock, MapPin, PencilLine, ShieldCheck, User,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, accentIcon } from '@/lib/ui';
 import { cn } from '@/lib/utils';
-import type { OffCampusForm, Province } from '@/lib/types';
+import type { CccdValue, OffCampusForm, Province } from '@/lib/types';
 import AddressFields, { AddressValue } from './AddressFields';
 import PersonalField from './PersonalField';
 
 const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: '' };
+
+/* API dùng dd/mm/yyyy (thống nhất với các form giấy tờ khác), còn
+   <input type="date"> chỉ nhận yyyy-mm-dd — đổi qua lại ở đúng biên này. */
+const toISODate = (vn: string) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((vn || '').trim());
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+};
+const toVNDate = (iso: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso || '').trim());
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+};
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
 /** Ô thông tin cá nhân chỉ xem, không có nút sửa (họ tên, email trường). */
 function ReadonlyField({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -73,6 +85,10 @@ export default function OffCampusDeclarationPage() {
   const [success, setSuccess] = useState(false);
 
   const [drafts, setDrafts] = useState<Record<string, string | undefined>>({});
+  // CCCD gồm 3 phần; `drafts['student.citizen_id']` giữ số thẻ, 2 phần còn lại ở đây.
+  const [cccdExtra, setCccdExtra] = useState({ issue_place: '', issue_date: '' });
+  const [asking, setAsking] = useState(false);
+  const [askReason, setAskReason] = useState('');
   const [permanent, setPermanent] = useState<AddressValue>(EMPTY_ADDRESS);
   const [temporary, setTemporary] = useState<AddressValue>(EMPTY_ADDRESS);
   const [inHcmc, setInHcmc] = useState<boolean | null>(null);
@@ -94,9 +110,16 @@ export default function OffCampusDeclarationPage() {
         });
         setInHcmc(data.temporary_in_hcmc);
         // Trường đang trống thì mở sẵn ô nhập — không bắt bấm "Bổ sung" mới nhập được.
+        const cccd = (data.fields['student.citizen_id']?.value ?? {}) as CccdValue;
+        setCccdExtra({
+          issue_place: cccd.issue_place || '',
+          issue_date: toISODate(cccd.issue_date || ''),
+        });
         const open: Record<string, string | undefined> = {};
         Object.entries(data.fields).forEach(([key, f]) => {
-          if (!f.value && !f.pending_value) open[key] = '';
+          const shown = key === 'student.citizen_id'
+            ? (f.value as CccdValue)?.number : (f.value as string);
+          if (!shown) open[key] = '';
         });
         setDrafts(open);
       })
@@ -130,8 +153,8 @@ export default function OffCampusDeclarationPage() {
           </div>
           <h2 className="text-lg font-semibold text-ink">Đã ghi nhận khai báo</h2>
           <p className="text-sm text-muted mt-2">
-            Địa chỉ đã được cập nhật ngay. Nếu bạn có yêu cầu chỉnh sửa thông tin cá nhân,
-            phòng CTSV sẽ duyệt trong thời gian sớm nhất.
+            Thông tin của bạn đã được cập nhật vào hồ sơ. Cần sửa lại thì gửi yêu cầu
+            chỉnh sửa ở màn hình xem lại.
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
             <Link href="/dashboard" className={ui.btnPrimary}>Về Bảng thông tin</Link>
@@ -171,10 +194,10 @@ export default function OffCampusDeclarationPage() {
             </h1>
             <p className="text-sm text-muted mt-1">
               {form.declared_on
-                ? `Khai ngày ${new Date(form.declared_on).toLocaleDateString('vi-VN')}. `
+                ? `Bạn đã gửi khai báo ngày ${new Date(form.declared_on).toLocaleDateString('vi-VN')}. `
                 : ''}
-              Mỗi sinh viên chỉ khai <b>một lần</b>. Nếu thông tin có thay đổi, vui lòng
-              liên hệ phòng CTSV để được mở lại biểu mẫu.
+              Thông tin bên dưới đang được dùng làm hồ sơ chính thức. Nếu có thay đổi,
+              hãy gửi yêu cầu chỉnh sửa để phòng CTSV mở lại biểu mẫu cho bạn.
             </p>
           </div>
 
@@ -187,7 +210,16 @@ export default function OffCampusDeclarationPage() {
                 {row('Họ và tên', form.student.full_name)}
                 {row('Mã số sinh viên', form.student.student_code)}
                 {row('Email trường cấp', form.student.university_email)}
-                {Object.values(form.fields).map((f) => row(f.label, f.value))}
+                {Object.entries(form.fields).map(([key, f]) => row(
+                  f.label,
+                  key === 'student.citizen_id'
+                    ? [(f.value as CccdValue).number,
+                       (f.value as CccdValue).issue_place,
+                       (f.value as CccdValue).issue_date
+                         ? 'cấp ngày ' + (f.value as CccdValue).issue_date : '']
+                        .filter(Boolean).join(' · ')
+                    : (f.value as string),
+                ))}
               </div>
             </section>
 
@@ -202,14 +234,63 @@ export default function OffCampusDeclarationPage() {
               </div>
             </section>
 
-            <div className="flex justify-end">
+            {!form.reopen_requested && (
+              <div>
+                <label className="block text-[0.78rem] text-muted mb-1">
+                  Lý do cần chỉnh sửa <span className="text-slate-400">(không bắt buộc)</span>
+                </label>
+                <input
+                  type="text" value={askReason} maxLength={255}
+                  placeholder="Ví dụ: đã chuyển chỗ trọ, sai số nhà…"
+                  onChange={(e) => setAskReason(e.target.value)}
+                  className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                />
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              {form.reopen_requested ? (
+                <span className={cn(badge.base, badge.warning)}>
+                  Đã gửi yêu cầu chỉnh sửa
+                  {form.reopen_requested_at ? ` ngày ${form.reopen_requested_at}` : ''} — chờ phòng CTSV xử lý
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className={ui.btnOutline}
+                  disabled={asking}
+                  onClick={async () => {
+                    setAsking(true);
+                    setError('');
+                    try {
+                      await api.offcampus.requestReopen(askReason.trim());
+                      const fresh = await api.offcampus.form();
+                      setForm(fresh);
+                    } catch (e) {
+                      setError(e instanceof ApiError ? e.message : 'Không gửi được yêu cầu.');
+                    } finally {
+                      setAsking(false);
+                    }
+                  }}
+                >
+                  {asking ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
+                          : <><PencilLine size={15} /> Yêu cầu chỉnh sửa lại</>}
+                </button>
+              )}
               <Link href="/dashboard" className={ui.btnPrimary}>Về Bảng thông tin</Link>
             </div>
+            {error && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
+                <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />{error}
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
   }
+
+  const cccdCurrent = (form.fields['student.citizen_id']?.value ?? {}) as CccdValue;
 
   const setDraft = (key: string, value: string | undefined) =>
     setDrafts((d) => ({ ...d, [key]: value }));
@@ -243,7 +324,13 @@ export default function OffCampusDeclarationPage() {
     setSaving(true);
     try {
       await api.offcampus.submit({
-        citizen_id: drafts['student.citizen_id']?.trim() || undefined,
+        citizen_id: drafts['student.citizen_id']?.trim()
+          ? {
+              number: drafts['student.citizen_id']!.trim(),
+              issue_place: cccdExtra.issue_place.trim(),
+              issue_date: toVNDate(cccdExtra.issue_date),
+            }
+          : undefined,
         personal_email: drafts['contact.personal_email']?.trim() || undefined,
         mobile_phone: drafts['contact.mobile_phone']?.trim() || undefined,
         permanent: {
@@ -271,11 +358,6 @@ export default function OffCampusDeclarationPage() {
     }
   }
 
-  const legacyHint = (block: typeof form.permanent) =>
-    block.state === 'LEGACY' && block.legacy_display
-      ? `Địa chỉ đang lưu (theo đơn vị hành chính trước 2025): ${block.legacy_display}`
-      : undefined;
-
   return (
     <div className="max-w-[820px] space-y-4">
       <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
@@ -294,17 +376,9 @@ export default function OffCampusDeclarationPage() {
             Cập nhật địa chỉ thường trú và tạm trú theo đơn vị hành chính mới (áp dụng từ 2025 —
             bỏ cấp quận/huyện, chỉ còn Tỉnh/Thành phố và Phường/Xã).
           </p>
-          {form.reopened ? (
-            <p className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-warning-soft border border-warning-line text-[0.78rem] text-warning-text">
-              <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-              Phòng CTSV đã mở lại biểu mẫu cho bạn. Đây là <b>lần khai cuối</b> —
-              gửi xong biểu mẫu sẽ khóa lại.
-            </p>
-          ) : (
-            <p className="mt-2 text-[0.78rem] text-muted">
-              Mỗi sinh viên chỉ khai <b>một lần</b>. Kiểm tra kỹ trước khi gửi.
-            </p>
-          )}
+          <p className="mt-2 text-[0.78rem] text-muted">
+            Kiểm tra kỹ thông tin trước khi gửi.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-7">
@@ -333,29 +407,54 @@ export default function OffCampusDeclarationPage() {
                 note="Do trường cấp, không tự sửa được."
               />
               <PersonalField
-                field={form.fields['student.citizen_id']}
+                field={{ ...form.fields['student.citizen_id'], value: cccdCurrent.number }}
                 draft={drafts['student.citizen_id']}
                 placeholder="12 chữ số"
-                onUnlock={() => setDraft('student.citizen_id', form.fields['student.citizen_id'].value)}
+                onUnlock={() => setDraft('student.citizen_id', cccdCurrent.number)}
                 onCancel={() => setDraft('student.citizen_id', undefined)}
                 onChange={(v) => { setDraft('student.citizen_id', v); clearError('citizen_id'); }}
                 error={fieldErrors.citizen_id}
+                extra={
+                  <div className="grid sm:grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <label className="block text-[0.75rem] text-muted mb-1">Nơi cấp</label>
+                      <input
+                        type="text" value={cccdExtra.issue_place} maxLength={255}
+                        placeholder="Cục Cảnh sát QLHC về TTXH"
+                        onChange={(e) => setCccdExtra((s) => ({ ...s, issue_place: e.target.value }))}
+                        className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[0.75rem] text-muted mb-1">Ngày cấp</label>
+                      <input
+                        type="date"
+                        value={cccdExtra.issue_date}
+                        max={TODAY_ISO}
+                        onChange={(e) => setCccdExtra((s) => ({ ...s, issue_date: e.target.value }))}
+                        className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                      />
+                    </div>
+                  </div>
+                }
               />
               <PersonalField
-                field={form.fields['contact.personal_email']}
+                field={{ ...form.fields['contact.personal_email'],
+                         value: form.fields['contact.personal_email'].value as string }}
                 draft={drafts['contact.personal_email']}
                 placeholder="vidu@gmail.com"
-                onUnlock={() => setDraft('contact.personal_email', form.fields['contact.personal_email'].value)}
+                onUnlock={() => setDraft('contact.personal_email', form.fields['contact.personal_email'].value as string)}
                 onCancel={() => setDraft('contact.personal_email', undefined)}
                 onChange={(v) => { setDraft('contact.personal_email', v); clearError('personal_email'); }}
                 error={fieldErrors.personal_email}
                 hint="Không dùng email do trường cấp."
               />
               <PersonalField
-                field={form.fields['contact.mobile_phone']}
+                field={{ ...form.fields['contact.mobile_phone'],
+                         value: form.fields['contact.mobile_phone'].value as string }}
                 draft={drafts['contact.mobile_phone']}
                 placeholder="0912345678"
-                onUnlock={() => setDraft('contact.mobile_phone', form.fields['contact.mobile_phone'].value)}
+                onUnlock={() => setDraft('contact.mobile_phone', form.fields['contact.mobile_phone'].value as string)}
                 onCancel={() => setDraft('contact.mobile_phone', undefined)}
                 onChange={(v) => { setDraft('contact.mobile_phone', v); clearError('mobile_phone'); }}
                 error={fieldErrors.mobile_phone}
@@ -378,7 +477,6 @@ export default function OffCampusDeclarationPage() {
                   .forEach(clearError);
               }}
               provinces={provinces}
-              hint={legacyHint(form.permanent)}
               errors={{
                 province: fieldErrors.permanent_province || fieldErrors.permanent_location,
                 ward: fieldErrors.permanent_ward,
@@ -435,7 +533,6 @@ export default function OffCampusDeclarationPage() {
                   }}
                   provinces={provinces}
                   lockedProvinceCode={inHcmc ? form.hcmc_province_code : undefined}
-                  hint={legacyHint(form.temporary)}
                   errors={{
                     province: fieldErrors.temporary_province || fieldErrors.temporary_location,
                     ward: fieldErrors.temporary_ward,

@@ -1,12 +1,13 @@
 'use client';
 
-import { Lock, PencilLine, Clock } from 'lucide-react';
-import { ui, badge } from '@/lib/ui';
+import { Lock, PencilLine } from 'lucide-react';
+import { ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { OffCampusField } from '@/lib/types';
 
 interface Props {
-  field: OffCampusField;
+  /** `value` luôn là chuỗi để hiển thị — target có cấu trúc thì page rút gọn trước. */
+  field: Omit<OffCampusField, 'value' | 'pending_value'> & { value: string };
   /** Giá trị đang nhập; undefined = đang khóa */
   draft?: string;
   onUnlock: () => void;
@@ -14,14 +15,14 @@ interface Props {
   onCancel: () => void;
   error?: string;
   placeholder?: string;
-  /** Trường đang trống thì mở sẵn, không cần bấm "Yêu cầu chỉnh sửa" */
   hint?: string;
+  /** Ô phụ hiện thêm khi mở khóa (CCCD có nơi cấp + ngày hết hạn) */
+  extra?: React.ReactNode;
 }
 
 export default function PersonalField({
-  field, draft, onUnlock, onChange, onCancel, error, placeholder, hint,
+  field, draft, onUnlock, onChange, onCancel, error, placeholder, hint, extra,
 }: Props) {
-  const pending = field.pending_value;
   const unlocked = draft !== undefined;
   const blank = !field.value;
 
@@ -30,11 +31,7 @@ export default function PersonalField({
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <label className="text-[0.82rem] font-medium text-ink">{field.label}</label>
 
-        {pending ? (
-          <span className={cn(badge.base, badge.warning)}>
-            <Clock size={11} /> Chờ duyệt
-          </span>
-        ) : unlocked ? (
+        {unlocked ? (
           <button type="button" onClick={onCancel}
                   className="text-[0.75rem] font-medium text-muted hover:text-ink">
             Hủy sửa
@@ -58,11 +55,7 @@ export default function PersonalField({
             className={cn(ui.input, error ? 'border-danger-line' : 'border-warning-line')}
             autoFocus
           />
-          {!error && !blank && (
-            <p className="mt-1 inline-flex items-center gap-1 text-[0.75rem] text-warning-text">
-              <PencilLine size={10} /> Thay đổi sẽ được gửi cho phòng CTSV duyệt.
-            </p>
-          )}
+          {extra}
         </>
       ) : (
         <div className={cn(
@@ -74,12 +67,6 @@ export default function PersonalField({
         </div>
       )}
 
-      {pending && (
-        <p className="mt-1 text-[0.75rem] text-muted">
-          Đã gửi: <span className="font-medium text-ink">{pending}</span> — đang chờ duyệt,
-          chưa gửi thêm được.
-        </p>
-      )}
       {error && <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
       {hint && !error && !unlocked && (
         <p className="mt-1 text-[0.75rem] text-muted">{hint}</p>

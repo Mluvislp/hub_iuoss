@@ -192,6 +192,11 @@ export const api = {
     submit(data: OffCampusSubmit): Promise<OffCampusResult> {
       return request('/offcampus/', { method: 'POST', body: JSON.stringify(data) });
     },
+    requestReopen(reason: string): Promise<{ ok: boolean; created: boolean; requested_at: string }> {
+      return request('/offcampus/request-reopen/', {
+        method: 'POST', body: JSON.stringify({ reason }),
+      });
+    },
   },
 
   locations: {
