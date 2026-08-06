@@ -372,13 +372,6 @@ export default function OffCampusDeclarationPage() {
             <Home size={17} className="text-primary" />
             Khai báo thông tin ngoại trú
           </h1>
-          <p className="text-sm text-muted mt-1">
-            Cập nhật địa chỉ thường trú và tạm trú theo đơn vị hành chính mới (áp dụng từ 2025 —
-            bỏ cấp quận/huyện, chỉ còn Tỉnh/Thành phố và Phường/Xã).
-          </p>
-          <p className="mt-2 text-[0.78rem] text-muted">
-            Kiểm tra kỹ thông tin trước khi gửi.
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-7">
