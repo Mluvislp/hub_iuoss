@@ -112,21 +112,48 @@ request.session["hub_student"] = {
 
 ## Bảng `hub_students`
 
-Tự động tạo/cập nhật khi login thành công lần đầu:
+Nhật ký đăng nhập, **một dòng cho mỗi sinh viên** (không phải mỗi lần đăng nhập). Tự động tạo/cập nhật mỗi lần login thành công.
 
 ```sql
 CREATE TABLE hub_students (
-    id             BIGINT      AUTO_INCREMENT PRIMARY KEY,
-    ldap_uid       VARCHAR(64) NOT NULL UNIQUE,   -- uid từ LDAP
-    student_id     BIGINT      NULL,              -- soft ref → students.id
-    last_login_at  DATETIME(6) NULL,
-    login_count    INT         NOT NULL DEFAULT 0,
-    created_at     DATETIME(6) NOT NULL
+    id                  BIGINT      AUTO_INCREMENT PRIMARY KEY,
+    ldap_uid            VARCHAR(64) NOT NULL UNIQUE,   -- xem cảnh báo tên cột bên dưới
+    student_id          BIGINT      NULL,              -- soft ref → students.id
+    last_login_at       DATETIME(6) NULL,              -- lần cuối, kênh nào cũng tính
+    last_login_ldap_at  DATETIME(6) NULL,              -- lần cuối qua LDAP
+    last_login_ms_at    DATETIME(6) NULL,              -- lần cuối qua Microsoft
+    login_count         INT         NOT NULL DEFAULT 0,
+    created_at          DATETIME(6) NOT NULL
 );
 ```
 
-- `student_id` là **soft reference** (không có FK constraint) — vì hai bảng có thể ở schema khác nhau và để tránh lỗi nếu sinh viên bị xóa khỏi `students`
-- Trường hợp uid LDAP không khớp với `current_student_code` nào → `student_id = NULL`, sinh viên vẫn đăng nhập được nhưng không xem được thông tin hồ sơ
+> ⚠️ **Tên `ldap_uid` là di sản.** Từ 2026-08-09 nó lưu **MSSV hiện tại**, không phải chuỗi người dùng gõ và không riêng gì LDAP — đăng nhập bằng Microsoft cũng ghi vào đây (MSSV lấy từ tiền tố email, mã cũ đã ánh xạ sang mã mới). Không đổi tên vì model `managed=False`: đổi cột buộc phải ALTER prod trước rồi mới deploy, đắt hơn giá trị thu được.
+
+- Đường ghi **duy nhất** là `HubStudent.record_login()`. Bảng ánh xạ kênh → cột nằm ở `HubStudent._CHANNEL_FIELD`; thêm kênh đăng nhập thứ ba = thêm 1 dòng ở đó + 1 cột.
+- `student_id` là **soft reference** (không FK) — hai bảng có thể ở schema khác nhau, và tránh lỗi nếu sinh viên bị xoá khỏi `students`.
+- `student_id = NULL` giờ **chỉ còn ở dòng cũ**. Từ khi có `check_login()`, đăng nhập được nghĩa là chắc chắn có hồ sơ sinh viên.
+- Có thể tồn tại **dòng mồ côi** từ trước: ai từng đăng nhập bằng MSSV cũ sẽ có một dòng theo mã cũ, và một dòng nữa theo mã mới. Nên khi thống kê hãy đếm `COUNT(DISTINCT student_id)`.
+
+### Câu truy vấn hay dùng
+
+Xem một sinh viên vào lần cuối bằng đường nào:
+
+```sql
+SELECT h.ldap_uid, s.full_name, h.last_login_ldap_at, h.last_login_ms_at, h.login_count
+FROM hub_students h
+LEFT JOIN students s ON s.id = h.student_id
+ORDER BY h.last_login_at DESC;
+```
+
+Mức độ chuyển sang Microsoft (để biết bao giờ tắt được LDAP):
+
+```sql
+SELECT COUNT(*)                                                        AS tong,
+       SUM(last_login_ldap_at IS NOT NULL)                             AS tung_dung_ldap,
+       SUM(last_login_ms_at   IS NOT NULL)                             AS tung_dung_microsoft,
+       SUM(last_login_ms_at IS NOT NULL AND last_login_ldap_at IS NULL) AS chi_dung_microsoft
+FROM hub_students;
+```
 
 ---
 

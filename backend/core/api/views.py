@@ -1,7 +1,6 @@
 import logging
 from django.conf import settings
 from django.db import connection
-from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -90,11 +89,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
     """
     uid = student.current_student_code
 
-    hub_student, _ = HubStudent.objects.get_or_create(ldap_uid=uid)
-    hub_student.last_login_at = timezone.now()
-    hub_student.login_count = (hub_student.login_count or 0) + 1
-    hub_student.student_id = student.pk
-    hub_student.save(update_fields=["last_login_at", "login_count", "student_id"])
+    HubStudent.record_login(student_code=uid, student_id=student.pk, channel=channel)
 
     token = HubRefreshToken.for_student(
         ldap_uid=uid,
@@ -225,7 +220,7 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        return issue_session(decision.student, ip=ip, channel="LDAP")
+        return issue_session(decision.student, ip=ip, channel=HubStudent.CHANNEL_LDAP)
 
 
 # ── Đăng nhập bằng tài khoản Microsoft ───────────────────────────────────────
@@ -301,7 +296,7 @@ class MicrosoftCallbackView(MicrosoftLoginRequiredMixin, APIView):
                 decision.remapped_from, decision.student.current_student_code,
             )
 
-        return issue_session(decision.student, ip=ip, channel="Microsoft")
+        return issue_session(decision.student, ip=ip, channel=HubStudent.CHANNEL_MICROSOFT)
 
 
 # ── POST /api/auth/token/refresh/ ────────────────────────────────────────────

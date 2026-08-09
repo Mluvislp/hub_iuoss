@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class ConfirmationRequest(models.Model):
@@ -64,9 +65,28 @@ class HubStudent(models.Model):
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     """
 
+    # ⚠️ Tên cột là di sản: từ 2026-08-09 nó lưu **MSSV hiện tại**, không phải
+    # chuỗi người dùng gõ và cũng không riêng gì LDAP — đăng nhập bằng Microsoft
+    # cũng ghi vào đây (MSSV lấy từ tiền tố email, mã cũ đã được ánh xạ sang mã
+    # mới). Không đổi tên vì model managed=False: đổi cột phải ALTER trên prod
+    # TRƯỚC rồi mới deploy, đắt hơn giá trị thu được. Xem docs/AUTH_FLOW.md.
+    CHANNEL_LDAP = "LDAP"
+    CHANNEL_MICROSOFT = "Microsoft"
+
+    # Kênh đăng nhập → cột giữ mốc thời gian của kênh đó. Bảng ánh xạ này là nơi
+    # DUY NHẤT biết chuyện đó; thêm kênh thứ ba = thêm 1 dòng ở đây + 1 cột.
+    _CHANNEL_FIELD = {
+        CHANNEL_LDAP: "last_login_ldap_at",
+        CHANNEL_MICROSOFT: "last_login_ms_at",
+    }
+
     ldap_uid = models.CharField(max_length=64, unique=True)
+    # NULL chỉ còn ở các dòng cũ: từ khi có login_policy, đăng nhập được nghĩa là
+    # chắc chắn có hồ sơ sinh viên.
     student_id = models.BigIntegerField(null=True, blank=True)  # soft ref → students.id
-    last_login_at = models.DateTimeField(null=True, blank=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)   # lần cuối, kênh nào cũng tính
+    last_login_ldap_at = models.DateTimeField(null=True, blank=True)
+    last_login_ms_at = models.DateTimeField(null=True, blank=True)
     login_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -76,3 +96,21 @@ class HubStudent(models.Model):
 
     def __str__(self):
         return self.ldap_uid
+
+    @classmethod
+    def record_login(cls, *, student_code: str, student_id: int, channel: str) -> "HubStudent":
+        """Ghi nhận một lần đăng nhập thành công. Đường DUY NHẤT chạm vào bảng này.
+
+        `student_code` phải là MSSV HIỆN TẠI (xem ghi chú ở `ldap_uid`), không phải
+        chuỗi người dùng gõ hay tiền tố email.
+        """
+        field = cls._CHANNEL_FIELD[channel]  # kênh lạ = lỗi lập trình, để nó nổ
+        now = timezone.now()
+
+        row, _ = cls.objects.get_or_create(ldap_uid=student_code)
+        row.student_id = student_id
+        row.last_login_at = now
+        setattr(row, field, now)
+        row.login_count = (row.login_count or 0) + 1
+        row.save(update_fields=["student_id", "last_login_at", field, "login_count"])
+        return row

@@ -3,7 +3,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import redirect, render
-from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from students.models import Student, HealthInsuranceCard, CivicActivity
@@ -55,13 +54,13 @@ def login_view(request):
         return render(request, "core/login.html", {"uid": uid, "next": next_url})
 
     student = decision.student
+    # Luôn khoá theo MSSV HIỆN TẠI, không phải chuỗi người dùng gõ — giống hệt
+    # `issue_session()` bên API, để hai đường đăng nhập không lưu hai kiểu.
+    uid = student.current_student_code
 
-    # Tạo/cập nhật hub_students
-    hub_student, _ = HubStudent.objects.get_or_create(ldap_uid=uid)
-    hub_student.last_login_at = timezone.now()
-    hub_student.login_count = (hub_student.login_count or 0) + 1
-    hub_student.student_id = student.pk
-    hub_student.save(update_fields=["last_login_at", "login_count", "student_id"])
+    HubStudent.record_login(
+        student_code=uid, student_id=student.pk, channel=HubStudent.CHANNEL_LDAP,
+    )
 
     set_student_session(
         request,
