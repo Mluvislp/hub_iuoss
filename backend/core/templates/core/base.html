@@ -214,6 +214,7 @@
       </a>
     </div>
 
+    {% if feature_document_requests %}
     <div class="nav-section-label">Dịch vụ</div>
     <div class="nav-item">
       <a href="{% url 'core:confirmation_request_create' %}"
@@ -221,6 +222,7 @@
         <i class="bi bi-file-earmark-text-fill"></i> Yêu cầu giấy tờ
       </a>
     </div>
+    {% endif %}
 
     <div class="nav-section-label">Sắp ra mắt</div>
     <div class="nav-item">

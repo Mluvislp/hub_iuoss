@@ -4,6 +4,68 @@
 
 ---
 
+## 0. Cờ tính năng — "đang phát triển"
+
+Cơ chế dùng chung cho mọi tính năng **chưa mở cho sinh viên**. Cờ tắt **không
+ẩn mục khỏi menu**: mục vẫn hiện (kèm một chấm nhỏ), bấm vào ra **trang chờ**
+`<ComingSoon />` với thông báo "Chức năng đang phát triển và sẽ sớm hoàn thiện…".
+
+Mặc định: **production → tắt (hiện trang chờ)**, **local/staging → bật (chạy đầy đủ)**.
+
+| Cờ | Chi phối |
+|---|---|
+| `FEATURE_DOCUMENT_REQUESTS` | Route `/dashboard/requests/*`, nút CTA ở hero + bảng "Yêu cầu giấy tờ gần đây" ở trang chủ, và toàn bộ `/api/requests/*` (404 khi tắt) |
+| `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
+
+**Nguồn sự thật là backend** — `config/settings.py`, mặc định `not IS_PRODUCTION`
+(suy từ `DJANGO_ENV`). Không phải flag phía frontend, nên sửa `sessionStorage`
+hay gọi thẳng API đều không lách được: view đã tắt **404 ngay ở `initial()`**, và
+dữ liệu chưa mở thì **không truy vấn**, không chỉ giấu ở giao diện.
+
+Frontend đọc qua `GET /api/features/` (không cần auth, chỉ trả true/false):
+- **Next.js** — hook `lib/features.ts::useFeatures()`, cache ở `sessionStorage`.
+  Chưa biết cờ thì coi như **TẮT** (hiện spinner rồi ra trang chờ), để prod không
+  chớp hiện tính năng chưa mở. Việc chặn nằm ở **một chỗ duy nhất**:
+  `(dashboard)/layout.tsx` tra `featureForRoute(pathname)` rồi thay nội dung bằng
+  `<ComingSoon />` — từng page KHÔNG tự kiểm tra.
+- **Bản Django-render cũ** — context processor `core/context_processors.py`
+  đưa `feature_document_requests` / `feature_civic_activities` vào mọi template;
+  ở đây thì ẩn hẳn (bản cũ không có trang chờ).
+
+### Thêm một tính năng đang chờ phát triển
+
+1. Backend: thêm `FEATURE_X = env_bool("FEATURE_X", default=not IS_PRODUCTION)` vào
+   `settings.py`, thêm khoá vào `core/api/views.py::feature_flags()`.
+2. Frontend: thêm khoá vào `FeatureFlags` (`lib/types.ts`), rồi 1 dòng vào
+   `FEATURE_META` + `FEATURE_ROUTES` trong `lib/features.ts`.
+3. Xong — menu, chấm báo, trang chờ, tiêu đề topbar tự có. Không sửa gì thêm.
+
+### Bật một tính năng trên prod
+
+Thêm vào `backend/.env` rồi `sudo systemctl restart iuoss_hub`:
+
+```bash
+FEATURE_DOCUMENT_REQUESTS=True
+FEATURE_CIVIC_ACTIVITIES=True
+```
+
+**Không cần build lại frontend** — cờ đọc lúc chạy qua API chứ không nhúng vào
+bundle. Lưu ý: `useFeatures()` cache trong `sessionStorage`, nên SV đang mở sẵn
+tab chỉ thấy thay đổi sau khi đóng tab, đăng xuất, hoặc mở tab mới.
+
+### Xem thử trang chờ ở local
+
+Local mặc định bật hết nên không thấy trang chờ. Muốn xem thì chạy backend với
+biến môi trường tạm (không sửa `.env`):
+
+```bash
+cd backend
+FEATURE_DOCUMENT_REQUESTS=False FEATURE_CIVIC_ACTIVITIES=False \
+  ../.venv/Scripts/python.exe manage.py runserver 127.0.0.1:8002 --noreload
+```
+
+---
+
 ## 1. Authentication (LDAP)
 
 **URL:** `/login/`, `/logout/`  
@@ -44,7 +106,58 @@ Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ (`valid_until`).
 
 > Lý do: `is_current` chỉ đánh dấu đâu là thẻ hiện hành đang dùng, không phản ánh việc thẻ đó còn hạn. Xem thêm quy ước cột `is_current` ở `dashboard_iuoss/docs/STUDENT_DATA_FLOW.md`.
 
-**Triển khai:** helper `HealthValidityBadge` trong `app/(dashboard)/dashboard/page.tsx` render badge động: neutral "Chưa có thông tin hạn" / success "Còn hiệu lực" / danger "Hết hạn". So sánh chuỗi `YYYY-MM-DD` (lexicographic = chronological) nên không lệch múi giờ.
+**Triển khai:** `components/health-insurance.tsx` — `validityState()` / `daysLeft()` /
+`<HealthValidityBadge>`, dùng CHUNG cho trang chủ và trang BHYT. Badge: neutral
+"Chưa có thông tin hạn" / success "Còn hiệu lực" / danger "Hết hạn". So sánh chuỗi
+`YYYY-MM-DD` (lexicographic = chronological) nên không lệch múi giờ.
+
+### Trang Bảo hiểm y tế (chi tiết)
+
+**URL:** `/dashboard/bao-hiem-y-te` · **API:** `GET /api/health-insurance/` →
+`{ current, history[] }` (`core/api/views.py::HealthInsuranceView`).
+Không bị cờ tính năng chi phối — luôn bật, kể cả production.
+
+Bố cục: panel "Thẻ bảo hiểm y tế" (badge hiệu lực ở header) → khối tint nổi bật
+**Mã thẻ BHYT** + khoảng "Giá trị sử dụng" → dòng nhắc khi còn ≤60 ngày → 3 dòng
+Mã số BHXH / Nơi đăng ký KCB / Diện đăng ký. Dưới là panel "Các thẻ trước đây"
+(chỉ hiện khi có thẻ `is_current=0`). Trang chủ có link "Xem chi tiết" trỏ sang.
+
+**Cột/bảng DB mà trang này ĐỌC** — `social_insurance_code`, `registration_type_id`,
+`valid_from` (ngoài các cột cũ), cộng 2 bảng danh mục
+`student_health_insurance_registration_types` và `hospitals`. Model `managed=False`
+nên các cột này vào MỌI câu SELECT thẻ BHYT: **thiếu một cột/bảng trên prod là
+hỏng cả trang chủ Hub**, không riêng trang BHYT. Kiểm tra trước khi deploy:
+
+```sql
+SHOW COLUMNS FROM student_health_insurance_cards
+  LIKE 'social_insurance_code';           -- phải có 1 dòng
+SHOW COLUMNS FROM student_health_insurance_cards
+  LIKE 'registration_type_id';            -- phải có 1 dòng
+SHOW COLUMNS FROM student_health_insurance_cards LIKE 'valid_from';
+SELECT COUNT(*) FROM student_health_insurance_registration_types;  -- phải > 0
+SELECT COUNT(*) FROM hospitals;                                    -- phải > 0
+-- Bao nhiêu thẻ tra được TÊN cơ sở KCB (local: 12.120 khớp / 0 lệch):
+SELECT SUM(h.code IS NOT NULL) khop, SUM(c.hospital_code<>'' AND h.code IS NULL) lech
+FROM student_health_insurance_cards c
+LEFT JOIN hospitals h ON h.code = c.hospital_code
+WHERE c.hospital_code IS NOT NULL AND c.hospital_code <> '';
+```
+
+**Nơi đăng ký KCB hiển thị TÊN cơ sở, mã xuống dòng phụ.** Tên tra từ danh mục
+`hospitals` — **không có FK**, nối ở tầng hiển thị: view gom `{code: name}` bằng
+MỘT truy vấn rồi truyền qua serializer context (`hospital_names`), tránh N+1.
+Mã không có trong danh mục → `hospital_name = null` → frontend hiển thị **mã
+thô**, tuyệt đối không bịa tên. **Không bao giờ thêm dòng vào `hospitals`** để
+"cứu" mã lệch — đó là dữ liệu tham chiếu từ nguồn ngoài, xem `dashboard_iuoss/docs/CATALOGS.md`.
+
+**Độ phủ dữ liệu (đo trên local 2026-08-09, 21.428 thẻ)** — trang phải chịu được
+nhiều ô trống: thiếu mã số BHXH 74,7% · thiếu diện đăng ký 67,6% · thiếu
+`valid_from` 73,8% · thiếu nơi KCB 43,4% · thiếu `valid_until` 41,3%. Mã thẻ chỉ
+thiếu 2,3% nên khối tint phía trên gần như luôn có nội dung. Trong 56,6% thẻ CÓ
+mã nơi KCB thì **100% tra được tên** (12.120 khớp / 0 lệch) — nên nhánh "chỉ hiện
+mã thô" hiện chưa xảy ra ở local, vẫn giữ để phòng dữ liệu prod khác. Hiện **0
+thẻ `is_current=0`** → panel lịch sử chưa bao giờ hiện, nhưng import BHYT của
+Dashboard có sinh dòng đó nên vẫn giữ.
 
 ### Sinh hoạt công dân
 
@@ -52,9 +165,15 @@ Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ (`valid_until`).
 Hiển thị tất cả hoạt động của sinh viên theo `activity_code` + `attempt_no`.  
 Kết quả: `YES` (Đạt) / `NO` (Không đạt) / `UNKNOWN` (Chưa có kết quả).
 
+> ⚠️ **Trên production đang hiện trang "đang phát triển"** — xem §0
+> (`FEATURE_CIVIC_ACTIVITIES`). Trang riêng: `/dashboard/sinh-hoat-cong-dan`.
+
 ---
 
 ## 3. Yêu cầu giấy xác nhận
+
+> ⚠️ **Trên production đang hiện trang "đang phát triển"** — xem §0. Toàn bộ mục
+> này chỉ chạy khi `FEATURE_DOCUMENT_REQUESTS` bật (local/staging bật, prod tắt).
 
 **Kênh chuẩn (Next.js + DRF API):**
 - `GET /api/requests/other/form/` → `core/api/views.py::OtherRequestFormView` (prefill + purpose choices)
@@ -234,4 +353,6 @@ sidebar (fixed, 240px)        main-wrapper
 | `/` | `home_view` | ✅ Required | Dashboard chính |
 | `/login/` | `login_view` | ❌ Public | Trang đăng nhập |
 | `/logout/` | `logout_view` | ❌ Public | Đăng xuất |
-| `/requests/new/` | `confirmation_request_create_view` | ✅ Required | Tạo yêu cầu giấy xác nhận |
+| `/requests/new/` | `confirmation_request_create_view` | ✅ Required | Tạo yêu cầu giấy xác nhận — 404 khi `FEATURE_DOCUMENT_REQUESTS` tắt |
+| `/api/features/` | `FeaturesView` | ❌ Public | Cờ tính năng cho frontend (xem §0) |
+| `/api/health-insurance/` | `HealthInsuranceView` | ✅ Required | Thẻ BHYT hiện hành + lịch sử (§2) |

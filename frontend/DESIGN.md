@@ -32,6 +32,7 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
 - **Hero/greeting**: panel tint `bg-[#f5f9ff]` + `border-primary-line`, tiêu đề + subtitle + CTA primary bên phải. Không emoji, không gradient đậm.
 - **Sidebar**: nền `bg-sidebar` (#f8fafc), dải accent `h-1 bg-primary` trên đỉnh, brand IU. Active = `bg-primary-soft text-primary-text` + `border-l-[3px] border-primary`. Không sidebar navy full.
 - **Form**: card viền (+ accent trên), header chữ + mô tả, breadcrumb nhỏ, option = tile (`border`, active `border-primary bg-primary-soft ring-primary-line`), `*` bắt buộc tinh tế, counter dưới input, footer căn phải, alert note `border-l-2 border-primary`.
+- **Trang chờ / tính năng chưa mở** (`components/coming-soon.tsx`): card căn giữa `max-w-[560px]`, ô icon 56px `bg-primary-soft` + `border-primary-line`, tên tính năng, badge `badge.info` "Đang phát triển", một câu giải thích, divider `border-line2`, nút `btnSecondary` quay lại. Không minh hoạ lớn, không đồng hồ đếm ngược, không hứa mốc thời gian cụ thể. Ở sidebar, mục chưa mở chỉ mang **một chấm 6px** `bg-warning-line` + `title` — đánh dấu cái bất thường, không dán nhãn dài lên mọi mục.
 
 ## Tuyệt đối tránh
 Gradient đậm · glassmorphism (`backdrop-blur`) · shadow dày · icon nền pastel nhiều màu · nhiều card metric kiểu SaaS · sidebar navy đậm full · emoji trong UI chính · copywriting kiểu marketing · phủ màu diện rộng · bo góc quá mức.

@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Plus, AlertCircle, Loader2, UserRound, ShieldCheck, ClipboardList, FileText,
+  Plus, AlertCircle, Loader2, UserRound, ShieldCheck, ClipboardList, FileText, ChevronRight,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { getSession } from '@/lib/auth';
+import { useFeatures } from '@/lib/features';
 import { formatDate, formatDateTime, cn } from '@/lib/utils';
 import { ui, badge, accentIcon } from '@/lib/ui';
+import { CivicActivitiesTable } from '@/components/civic-activities';
+import { HealthValidityBadge } from '@/components/health-insurance';
 import type { DashboardData, StudentSession } from '@/lib/types';
 import {
   REQUEST_TYPE_LABELS as TYPE_LABELS,
@@ -55,33 +58,12 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-// ── BHYT validity badge ──────────────────────────────────────────────────────
-// Hiệu lực thẻ tính theo valid_until so với ngày hiện tại (KHÔNG dựa vào is_current).
-// So sánh dạng chuỗi 'YYYY-MM-DD' (lexicographic = chronological), tránh lệch timezone.
-function HealthValidityBadge({ validUntil }: { validUntil: string | null }) {
-  if (!validUntil) {
-    return <span className={cn(badge.base, badge.neutral)}>Chưa có thông tin hạn</span>;
-  }
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const validStr = validUntil.slice(0, 10);
-  return validStr < todayStr
-    ? <span className={cn(badge.base, badge.danger)}>Hết hạn</span>
-    : <span className={cn(badge.base, badge.success)}>Còn hiệu lực</span>;
-}
-
-// ── Civic result badge ───────────────────────────────────────────────────────
-function CivicResult({ value }: { value: string }) {
-  if (value === 'YES') return <span className={cn(badge.base, badge.success)}>Đạt</span>;
-  if (value === 'NO') return <span className={cn(badge.base, badge.danger)}>Không đạt</span>;
-  return <span className={cn(badge.base, badge.neutral)}>Chưa có kết quả</span>;
-}
-
 export default function DashboardPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { features } = useFeatures();
 
   useEffect(() => {
     setSession(getSession() as StudentSession | null);
@@ -116,10 +98,12 @@ export default function DashboardPage() {
               Cổng dịch vụ sinh viên — Trường Đại học Quốc tế, ĐHQG-HCM
             </p>
           </div>
-          <Link href="/dashboard/requests/new" className={ui.btnPrimary}>
-            <Plus size={16} />
-            Tạo yêu cầu giấy tờ
-          </Link>
+          {features.document_requests && (
+            <Link href="/dashboard/requests/new" className={ui.btnPrimary}>
+              <Plus size={16} />
+              Tạo yêu cầu giấy tờ
+            </Link>
+          )}
         </div>
       </section>
 
@@ -171,8 +155,9 @@ export default function DashboardPage() {
       )}
 
       {/* ── BHYT + Sinh hoạt công dân ─────────────────────── */}
-      <div className="grid lg:grid-cols-5 gap-5">
-        <div className="lg:col-span-2">
+      {/* Ẩn Sinh hoạt công dân (cờ tắt) → BHYT chiếm trọn chiều ngang. */}
+      <div className={cn('grid gap-5', features.civic_activities && 'lg:grid-cols-5')}>
+        <div className={features.civic_activities ? 'lg:col-span-2' : undefined}>
           <Panel
             title="Bảo hiểm y tế"
             icon={ShieldCheck}
@@ -182,20 +167,34 @@ export default function DashboardPage() {
             }
           >
             {health_insurance ? (
-              <dl>
-                <DefRow
-                  label="Mã thẻ BHYT"
-                  value={<span className="font-mono text-[0.82rem]">{health_insurance.medical_insurance_code}</span>}
-                />
-                <DefRow label="Nơi đăng ký KCB" value={health_insurance.hospital_code || null} />
-                <DefRow label="Giá trị đến" value={formatDate(health_insurance.valid_until)} />
-              </dl>
+              <>
+                <dl>
+                  <DefRow
+                    label="Mã thẻ BHYT"
+                    value={<span className="font-mono text-[0.82rem]">{health_insurance.medical_insurance_code}</span>}
+                  />
+                  {/* Ưu tiên tên cơ sở; mã lạ (không có trong danh mục) thì hiện mã. */}
+                  <DefRow
+                    label="Nơi đăng ký KCB"
+                    value={health_insurance.hospital_name || health_insurance.hospital_code || null}
+                  />
+                  <DefRow label="Giá trị đến" value={formatDate(health_insurance.valid_until)} />
+                </dl>
+                <Link
+                  href="/dashboard/bao-hiem-y-te"
+                  className="mt-3 inline-flex items-center gap-1 text-[0.82rem] font-medium text-primary-text hover:underline"
+                >
+                  Xem chi tiết
+                  <ChevronRight size={14} />
+                </Link>
+              </>
             ) : (
               <p className="py-6 text-center text-sm text-muted">Chưa có thông tin bảo hiểm y tế.</p>
             )}
           </Panel>
         </div>
 
+        {features.civic_activities && (
         <div className="lg:col-span-3">
           <Panel
             title="Sinh hoạt công dân"
@@ -204,40 +203,14 @@ export default function DashboardPage() {
             action={civic_activities?.length ? <span className="text-xs text-muted">{civic_activities.length} mục</span> : undefined}
             bodyClassName={civic_activities?.length ? 'p-0' : 'px-5 py-4'}
           >
-            {civic_activities?.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
-                      <th className="text-left font-medium px-5 py-2.5">Hoạt động</th>
-                      <th className="text-center font-medium px-3 py-2.5">Lần</th>
-                      <th className="text-left font-medium px-3 py-2.5">Kết quả</th>
-                      <th className="text-left font-medium px-5 py-2.5">Ngày hoàn thành</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {civic_activities.map((act) => (
-                      <tr
-                        key={`${act.activity_code}-${act.attempt_no}`}
-                        className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
-                      >
-                        <td className="px-5 py-3 font-medium text-ink">{act.activity_code}</td>
-                        <td className="px-3 py-3 text-center text-muted">{act.attempt_no}</td>
-                        <td className="px-3 py-3"><CivicResult value={act.result_value} /></td>
-                        <td className="px-5 py-3 text-muted text-[0.82rem]">{formatDate(act.completed_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="py-6 text-center text-sm text-muted">Chưa có thông tin sinh hoạt công dân.</p>
-            )}
+            <CivicActivitiesTable items={civic_activities ?? []} />
           </Panel>
         </div>
+        )}
       </div>
 
       {/* ── Yêu cầu giấy tờ gần đây ────────────────────────── */}
+      {features.document_requests && (
       <Panel
         title="Yêu cầu giấy tờ gần đây"
         icon={FileText}
@@ -302,6 +275,7 @@ export default function DashboardPage() {
           </div>
         )}
       </Panel>
+      )}
     </div>
   );
 }

@@ -4,17 +4,19 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard,
-  FileText,
   Home,
   LogOut,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { clearAuth } from '@/lib/auth';
-import type { StudentSession } from '@/lib/types';
+import { clearFeatureCache, FEATURE_META, type FeatureKey } from '@/lib/features';
+import type { FeatureFlags, StudentSession } from '@/lib/types';
 
 interface SidebarProps {
   session: StudentSession | null;
+  features: FeatureFlags;
   open: boolean;
   onClose: () => void;
 }
@@ -23,6 +25,16 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   label: string;
+  /**
+   * Tính năng chi phối mục này. Cờ tắt thì mục VẪN hiện (kèm dấu "Sắp ra mắt"),
+   * bấm vào ra trang chờ — xem lib/features.ts.
+   */
+  feature?: FeatureKey;
+}
+
+function featureItem(key: FeatureKey): NavItem {
+  const meta = FEATURE_META[key];
+  return { href: meta.href, icon: meta.icon, label: meta.label, feature: key };
 }
 
 const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -31,20 +43,29 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [{ href: '/dashboard', icon: LayoutDashboard, label: 'Bảng thông tin' }],
   },
   {
+    // Trang chỉ để XEM thông tin cá nhân — tách khỏi nhóm dịch vụ (nơi SV phải nộp gì đó).
+    label: 'Hồ sơ của tôi',
+    items: [
+      { href: '/dashboard/bao-hiem-y-te', icon: ShieldCheck, label: 'Bảo hiểm y tế' },
+      featureItem('civic_activities'),
+    ],
+  },
+  {
     label: 'Dịch vụ sinh viên',
     items: [
-      { href: '/dashboard/requests/new', icon: FileText, label: 'Yêu cầu giấy tờ' },
+      featureItem('document_requests'),
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
     ],
   },
 ];
 
-export default function Sidebar({ session, open, onClose }: SidebarProps) {
+export default function Sidebar({ session, features, open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
   function handleLogout() {
     clearAuth();
+    clearFeatureCache();
     router.replace('/login');
   }
 
@@ -98,6 +119,8 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
+                  // Chỉ đánh dấu cái BẤT THƯỜNG: tính năng chưa mở mới có chấm.
+                  const pending = !!item.feature && !features[item.feature];
 
                   return (
                     <Link
@@ -111,8 +134,17 @@ export default function Sidebar({ session, open, onClose }: SidebarProps) {
                           : 'border-transparent text-slate-600 hover:text-ink hover:bg-slate-100',
                       )}
                     >
-                      <Icon size={17} className="flex-shrink-0" />
-                      <span className="flex-1">{item.label}</span>
+                      <Icon size={17} className={cn('flex-shrink-0', pending && 'text-slate-400')} />
+                      <span className={cn('flex-1', pending && !isActive && 'text-slate-500')}>
+                        {item.label}
+                      </span>
+                      {pending && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-warning-line flex-shrink-0"
+                          title="Đang phát triển"
+                          aria-label="Đang phát triển"
+                        />
+                      )}
                     </Link>
                   );
                 })}

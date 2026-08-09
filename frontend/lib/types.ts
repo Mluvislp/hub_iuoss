@@ -36,10 +36,25 @@ export interface Student {
 }
 
 export interface HealthInsuranceCard {
-  medical_insurance_code: string;
-  hospital_code: string;
+  id: number;
+  /** Mã số BHXH (10 chữ số chuẩn, dữ liệu thật còn ngoại lệ). */
+  social_insurance_code: string | null;
+  medical_insurance_code: string | null;
+  /** Mã nơi đăng ký KCB. */
+  hospital_code: string | null;
+  /** Tên cơ sở KCB tra từ danh mục `hospitals`; null nếu mã không có trong danh mục. */
+  hospital_name: string | null;
+  /** Tên diện đăng ký (đã phẳng hoá từ danh mục). */
+  registration_type: string | null;
+  valid_from: string | null;
   valid_until: string | null;
+  /** "Thẻ đang dùng" — KHÔNG phải "còn hiệu lực". */
   is_current: boolean;
+}
+
+export interface HealthInsuranceData {
+  current: HealthInsuranceCard | null;
+  history: HealthInsuranceCard[];
 }
 
 export interface CivicActivity {
@@ -255,11 +270,19 @@ export interface OffCampusResult {
   warnings: Record<string, string[]>;
 }
 
+// Cờ bật/tắt tính năng — backend quyết định (settings.FEATURE_*), mặc định tắt
+// trên production. Xem lib/features.ts.
+export interface FeatureFlags {
+  document_requests: boolean;
+  civic_activities: boolean;
+}
+
 export interface DashboardData {
   student: Student | null;
   health_insurance: HealthInsuranceCard | null;
   civic_activities: CivicActivity[];
   confirmation_requests: ConfirmationRequest[];
+  features: FeatureFlags;
 }
 
 export interface LoginResponse {

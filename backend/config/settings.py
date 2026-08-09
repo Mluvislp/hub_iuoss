@@ -27,6 +27,13 @@ SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-hub-dev-only")
 DEBUG = env_bool("DEBUG", default=(DJANGO_ENV == "local"))
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 
+# ── Feature flags (tạm ẩn tính năng trên môi trường live) ─────────────────────
+# Mặc định: TẮT trên production, BẬT ở local/staging. Muốn bật lại trên prod thì
+# set biến env tương ứng = True rồi restart backend — KHÔNG cần sửa code.
+# Backend là nguồn sự thật duy nhất; frontend đọc qua GET /api/features/.
+FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS_PRODUCTION)
+FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
+
 # Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
 FRONTEND_ORIGINS = env_list(
     "FRONTEND_ORIGINS",
@@ -69,6 +76,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.feature_flags",
             ],
         },
     },

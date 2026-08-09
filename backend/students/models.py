@@ -89,14 +89,70 @@ class Student(models.Model):
         return f"{self.current_student_code} - {self.full_name}"
 
 
+class Hospital(models.Model):
+    """Danh mục cơ sở khám chữa bệnh (mã BHXH) — Dashboard sở hữu, Hub CHỈ ĐỌC.
+
+    KHÔNG có FK từ `student_health_insurance_cards.hospital_code` sang đây; tra
+    tên ở tầng hiển thị. Mã không có trong danh mục thì để nguyên mã, TUYỆT ĐỐI
+    không thêm dòng vào bảng này (dữ liệu tham chiếu từ nguồn ngoài).
+    """
+
+    province_code = models.CharField(max_length=2)
+    code = models.CharField(max_length=16, unique=True)
+    name = models.CharField(max_length=500)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "hospitals"
+        ordering = ["province_code", "code"]
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+
+class HealthInsuranceRegistrationType(models.Model):
+    """Diện/nơi đăng ký thẻ BHYT — danh mục do Dashboard quản lý, Hub chỉ đọc."""
+
+    code = models.CharField(max_length=32, unique=True)
+    name = models.CharField(max_length=255)
+    sort_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "student_health_insurance_registration_types"
+        ordering = ["sort_order", "code"]
+
+    def __str__(self):
+        return self.name
+
+
 class HealthInsuranceCard(models.Model):
+    # Tên field giữ khớp Dashboard (students/models.py::StudentHealthInsuranceCard).
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,
         db_column="student_id", related_name="health_insurance_cards",
     )
-    medical_insurance_code = models.CharField(max_length=64)
-    hospital_code = models.CharField(max_length=255)
+    social_insurance_code = models.CharField(max_length=15, null=True, blank=True)
+    medical_insurance_code = models.CharField(max_length=64, null=True, blank=True)
+    # Mã nơi đăng ký KCB — dữ liệu thô, còn nhiều biến thể ("79-036", "79036 Bệnh
+    # viện…"). Hub chỉ hiển thị nguyên văn, KHÔNG tra tên bệnh viện: bảng
+    # `hospitals` là danh mục của Dashboard và ~91 mã không khớp được.
+    hospital_code = models.CharField(max_length=16, null=True, blank=True)
+    registration_type = models.ForeignKey(
+        HealthInsuranceRegistrationType, on_delete=models.DO_NOTHING,
+        db_column="registration_type_id", related_name="cards",
+        null=True, blank=True,
+    )
+    valid_from = models.DateField(null=True, blank=True)
     valid_until = models.DateField(null=True, blank=True)
+    # ⚠️ is_current = "thẻ đang dùng", KHÔNG phải "còn hiệu lực".
+    # Hiệu lực tính riêng theo valid_until so với hôm nay.
     is_current = models.BooleanField(default=False)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
@@ -104,9 +160,10 @@ class HealthInsuranceCard(models.Model):
     class Meta:
         managed = False
         db_table = "student_health_insurance_cards"
+        ordering = ["-is_current", "-valid_until", "-id"]
 
     def __str__(self):
-        return self.medical_insurance_code
+        return self.medical_insurance_code or f"card#{self.pk}"
 
 
 class CivicActivity(models.Model):

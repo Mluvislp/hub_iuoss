@@ -1,5 +1,7 @@
 import logging
+from django.conf import settings
 from django.contrib import messages
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -99,14 +101,15 @@ def home_view(request):
             health_insurance = HealthInsuranceCard.objects.filter(
                 student=student, is_current=True
             ).first()
-            civic_activities = list(
-                CivicActivity.objects.filter(student=student)
-            )
+            # Cờ tắt (mặc định trên production) → không truy vấn, không hiển thị.
+            if settings.FEATURE_CIVIC_ACTIVITIES:
+                civic_activities = list(
+                    CivicActivity.objects.filter(student=student)
+                )
 
-    confirmation_requests = list(
-        ConfirmationRequest.objects.filter(
-            ldap_uid=student_session["ldap_uid"]
-        )[:10]
+    confirmation_requests = (
+        list(ConfirmationRequest.objects.filter(ldap_uid=student_session["ldap_uid"])[:10])
+        if settings.FEATURE_DOCUMENT_REQUESTS else []
     )
 
     return render(request, "core/home.html", {
@@ -121,6 +124,9 @@ def home_view(request):
 @hub_login_required
 @require_http_methods(["GET", "POST"])
 def confirmation_request_create_view(request):
+    if not settings.FEATURE_DOCUMENT_REQUESTS:
+        raise Http404("Chức năng yêu cầu giấy tờ đang tạm ngưng.")
+
     student_session = current_student(request)
 
     if request.method == "GET":

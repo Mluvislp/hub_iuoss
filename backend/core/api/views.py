@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 
 from core.auth import verify_ldap
 from core.models import HubStudent, ConfirmationRequest
@@ -25,7 +26,9 @@ from core.documents import (
     ENGLISH_PROGRAM_CODE,
 )
 from core import offcampus
-from students.models import Student, HealthInsuranceCard, CivicActivity, VnProvince, VnWard
+from students.models import (
+    Student, HealthInsuranceCard, CivicActivity, Hospital, VnProvince, VnWard,
+)
 from .authentication import IsHubAuthenticated
 from .tokens import HubRefreshToken
 from .serializers import (
@@ -36,6 +39,39 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def feature_flags() -> dict:
+    """Cờ bật/tắt tính năng — xem settings.FEATURE_*. Mặc định tắt trên production."""
+    return {
+        "document_requests": settings.FEATURE_DOCUMENT_REQUESTS,
+        "civic_activities": settings.FEATURE_CIVIC_ACTIVITIES,
+    }
+
+
+def hospital_names(cards) -> dict:
+    """Map {hospital_code: name} cho một nhóm thẻ BHYT — MỘT truy vấn, tránh N+1.
+
+    `hospital_code` không có FK sang `hospitals`; mã lạ đơn giản là không có mặt
+    trong map và frontend hiển thị mã thô.
+    """
+    codes = {c.hospital_code for c in cards if c and c.hospital_code}
+    if not codes:
+        return {}
+    return dict(Hospital.objects.filter(code__in=codes).values_list("code", "name"))
+
+
+class DocumentRequestsRequiredMixin:
+    """Trả 404 cho mọi method khi FEATURE_DOCUMENT_REQUESTS tắt.
+
+    Đặt ở `initial()` nên chạy sau xác thực và áp cho cả GET lẫn POST — tính năng
+    bị ẩn thì endpoint phải biến mất, không chỉ ẩn nút ở giao diện.
+    """
+
+    def initial(self, request, *args, **kwargs):
+        if not settings.FEATURE_DOCUMENT_REQUESTS:
+            raise NotFound("Chức năng yêu cầu giấy tờ đang tạm ngưng.")
+        super().initial(request, *args, **kwargs)
 
 
 def _get_ip(request) -> str:
@@ -87,6 +123,19 @@ class HealthView(APIView):
             },
             status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
         )
+
+
+# ── GET /api/features/ ───────────────────────────────────────────────────────
+# Cờ tính năng cho frontend (ẩn menu/nút tương ứng). Không cần auth: frontend
+# phải biết cờ TRƯỚC cả màn đăng nhập, và nội dung chỉ là true/false, không lộ
+# dữ liệu gì. Backend vẫn tự chặn endpoint riêng — đây chỉ để giao diện khớp.
+
+class FeaturesView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        return Response(feature_flags())
 
 
 # ── POST /api/auth/login/ ────────────────────────────────────────────────────
@@ -203,31 +252,69 @@ class DashboardView(APIView):
                 .first()
             )
             if student:
-                health_insurance = HealthInsuranceCard.objects.filter(
-                    student=student, is_current=True
-                ).first()
-                civic_activities = list(CivicActivity.objects.filter(student=student))
+                health_insurance = (
+                    HealthInsuranceCard.objects
+                    .select_related("registration_type")
+                    .filter(student=student, is_current=True)
+                    .first()
+                )
+                # Tính năng tắt → không truy vấn, không trả dữ liệu (ẩn thật, không
+                # chỉ ẩn ở giao diện).
+                if settings.FEATURE_CIVIC_ACTIVITIES:
+                    civic_activities = list(CivicActivity.objects.filter(student=student))
 
-        confirmation_requests = list(
-            ConfirmationRequest.objects.filter(ldap_uid=ldap_uid)[:10]
+        confirmation_requests = (
+            list(ConfirmationRequest.objects.filter(ldap_uid=ldap_uid)[:10])
+            if settings.FEATURE_DOCUMENT_REQUESTS else []
         )
 
         return Response({
             "student": StudentSerializer(student).data if student else None,
             "health_insurance": (
-                HealthInsuranceCardSerializer(health_insurance).data
+                HealthInsuranceCardSerializer(
+                    health_insurance,
+                    context={"hospital_names": hospital_names([health_insurance])},
+                ).data
                 if health_insurance else None
             ),
             "civic_activities": CivicActivitySerializer(civic_activities, many=True).data,
             "confirmation_requests": ConfirmationRequestSerializer(
                 confirmation_requests, many=True
             ).data,
+            "features": feature_flags(),
+        })
+
+
+# ── GET /api/health-insurance/ ───────────────────────────────────────────────
+# Trang BHYT riêng: thẻ đang dùng + lịch sử các thẻ cũ.
+
+class HealthInsuranceView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student_id = request.user.student_id
+        if not student_id:
+            return Response({"current": None, "history": []})
+
+        cards = list(
+            HealthInsuranceCard.objects
+            .filter(student_id=student_id)
+            .select_related("registration_type")
+        )
+        # is_current = thẻ đang dùng (KHÔNG phải "còn hiệu lực") — xem model.
+        current = next((c for c in cards if c.is_current), None)
+        history = [c for c in cards if c is not current]
+
+        ctx = {"hospital_names": hospital_names(cards)}
+        return Response({
+            "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
+            "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
         })
 
 
 # ── GET + POST /api/requests/ ────────────────────────────────────────────────
 
-class RequestsView(APIView):
+class RequestsView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
     def get_throttles(self):
@@ -493,7 +580,7 @@ class RequestsView(APIView):
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
 
-class OtherRequestFormView(APIView):
+class OtherRequestFormView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
     def get(self, request):
@@ -518,7 +605,7 @@ class OtherRequestFormView(APIView):
 
 # ── GET /api/requests/deferment/form/ — prefill cho form hoãn NVQS ────────────
 
-class DefermentRequestFormView(APIView):
+class DefermentRequestFormView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
     def get(self, request):
@@ -539,7 +626,7 @@ class DefermentRequestFormView(APIView):
 
 # ── GET /api/requests/thuong-binh/form/ — prefill cho form thương binh ────────
 
-class ThuongBinhRequestFormView(APIView):
+class ThuongBinhRequestFormView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
     def get(self, request):
@@ -560,7 +647,7 @@ class ThuongBinhRequestFormView(APIView):
 
 # ── GET /api/requests/bank-loan/form/ — prefill cho form vay vốn ──────────────
 
-class BankLoanRequestFormView(APIView):
+class BankLoanRequestFormView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
     def get(self, request):
@@ -581,7 +668,7 @@ class BankLoanRequestFormView(APIView):
 
 # ── GET /api/requests/english/form/ — prefill cho form tiếng Anh ──────────────
 
-class EnglishRequestFormView(APIView):
+class EnglishRequestFormView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
     def get(self, request):

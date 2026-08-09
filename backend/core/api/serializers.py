@@ -44,9 +44,35 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class HealthInsuranceCardSerializer(serializers.ModelSerializer):
+    # Phẳng hoá diện đăng ký: SV chỉ cần cái tên, không cần cả object danh mục.
+    registration_type = serializers.CharField(
+        source="registration_type.name", read_only=True, default=None,
+    )
+    hospital_name = serializers.SerializerMethodField()
+
     class Meta:
         model = HealthInsuranceCard
-        fields = ["medical_insurance_code", "hospital_code", "valid_until", "is_current"]
+        fields = [
+            "id",
+            "social_insurance_code",
+            "medical_insurance_code",
+            "hospital_code",
+            "hospital_name",
+            "registration_type",
+            "valid_from",
+            "valid_until",
+            "is_current",
+        ]
+
+    def get_hospital_name(self, obj):
+        """Tên cơ sở KCB tra từ danh mục `hospitals` (không FK).
+
+        View nạp sẵn map {code: name} vào context để tránh N+1. Thiếu context
+        hoặc mã không có trong danh mục → None; frontend hiển thị mã thô.
+        """
+        if not obj.hospital_code:
+            return None
+        return (self.context.get("hospital_names") or {}).get(obj.hospital_code)
 
 
 class CivicActivitySerializer(serializers.ModelSerializer):

@@ -1,7 +1,9 @@
 import { getToken, clearAuth } from './auth';
 import type {
+  FeatureFlags,
   LoginResponse,
   DashboardData,
+  HealthInsuranceData,
   ConfirmationRequest,
   RequestType,
   OtherRequestFormData,
@@ -91,9 +93,21 @@ export const api = {
     },
   },
 
+  features: {
+    get(): Promise<FeatureFlags> {
+      return request('/features/');
+    },
+  },
+
   dashboard: {
     get(): Promise<DashboardData> {
       return request('/dashboard/');
+    },
+  },
+
+  healthInsurance: {
+    get(): Promise<HealthInsuranceData> {
+      return request('/health-insurance/');
     },
   },
 
