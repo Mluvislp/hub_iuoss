@@ -7,6 +7,18 @@ import { api, ApiError } from '@/lib/api';
 import { setToken, getToken } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
+/** Logo 4 ô của Microsoft — inline để không phải tải ảnh ngoài. */
+function MicrosoftLogo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  );
+}
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -17,10 +29,42 @@ function LoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [msEnabled, setMsEnabled] = useState(false);
+  const [msLoading, setMsLoading] = useState(false);
 
   useEffect(() => {
     if (getToken()) router.replace('/dashboard');
   }, [router]);
+
+  // Chỉ hiện nút Microsoft khi backend đã cấu hình app registration — tránh dẫn
+  // người dùng tới một endpoint trả 404.
+  useEffect(() => {
+    let alive = true;
+    api.features
+      .get()
+      .then((f) => alive && setMsEnabled(f.microsoft_login === true))
+      .catch(() => {
+        /* không gọi được /features/ → ẩn nút, form LDAP vẫn dùng được */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function handleMicrosoft() {
+    setError('');
+    setMsLoading(true);
+    try {
+      const { authorize_url } = await api.auth.microsoftStart();
+      // Nhớ 'next' để sau khi quay về còn biết đưa sinh viên tới đâu. Không nhét
+      // vào state gửi đi Microsoft: state là gói đã ký của backend, không sửa được.
+      sessionStorage.setItem('hub_ms_next', next);
+      window.location.href = authorize_url;
+    } catch {
+      setError('Chưa mở được trang đăng nhập Microsoft. Vui lòng thử lại.');
+      setMsLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -241,6 +285,44 @@ function LoginForm() {
               )}
             </button>
           </form>
+
+          {/* ── Đăng nhập bằng tài khoản Microsoft ── */}
+          {msEnabled && (
+            <>
+              <div className="flex items-center gap-3 my-5">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs text-slate-400">hoặc</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleMicrosoft}
+                disabled={msLoading || loading}
+                className={cn(
+                  'w-full flex items-center justify-center gap-2.5',
+                  'px-4 py-2.5 rounded-lg text-sm font-semibold',
+                  'bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50',
+                  'text-slate-700',
+                  'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                  'transition-all duration-150',
+                  'disabled:opacity-70 disabled:cursor-not-allowed',
+                )}
+              >
+                {msLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <>
+                    <MicrosoftLogo />
+                    Đăng nhập bằng tài khoản Microsoft
+                  </>
+                )}
+              </button>
+              <p className="mt-2 text-center text-xs text-slate-400">
+                Dùng email sinh viên @student.hcmiu.edu.vn
+              </p>
+            </>
+          )}
 
           {/* Forgot password */}
           <p className="mt-5 text-center text-sm text-slate-500">

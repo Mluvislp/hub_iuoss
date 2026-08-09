@@ -125,6 +125,21 @@ LDAP_BIND_PASSWORD = os.getenv("LDAP_BIND_PASSWORD", "")
 LDAP_SEARCH_BASE = os.getenv("LDAP_SEARCH_BASE", "dc=hcmiu,dc=edu,dc=vn")
 LDAP_USER_ATTR = os.getenv("LDAP_USER_ATTR", "uid")
 
+# ── Đăng nhập bằng tài khoản Microsoft (Entra ID) ────────────────────────────
+# App registration của trường, kiểu "Web" + single tenant. Client secret nằm ở
+# server, KHÔNG bao giờ gửi xuống trình duyệt. Thiếu client id/secret thì tính
+# năng tự tắt (cờ MS_LOGIN_ENABLED) và frontend ẩn nút — LDAP vẫn chạy bình thường.
+MS_TENANT_ID = os.getenv("MS_TENANT_ID", "")
+MS_CLIENT_ID = os.getenv("MS_CLIENT_ID", "")
+MS_CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET", "")
+MS_REDIRECT_URI = os.getenv(
+    "MS_REDIRECT_URI", "http://localhost:3000/auth/microsoft/callback"
+)
+# Chỉ chấp nhận email sinh viên. Tên miền nhân viên (hcmiu.edu.vn) nằm CÙNG một
+# tenant nên kiểm `tid` không phân biệt được — bắt buộc lọc theo hậu tố này.
+MS_ALLOWED_EMAIL_DOMAIN = os.getenv("MS_ALLOWED_EMAIL_DOMAIN", "student.hcmiu.edu.vn")
+MS_LOGIN_ENABLED = bool(MS_TENANT_ID and MS_CLIENT_ID and MS_CLIENT_SECRET)
+
 # Không dùng Django auth, dùng custom hub login
 HUB_LOGIN_URL = "/login/"
 

@@ -32,17 +32,29 @@ class LoginDecision:
     student: Student | None = None
     reason: str | None = None
     message: str = ""
+    # Khác None khi vào bằng mã cũ và đã được tự ánh xạ sang mã hiện tại (chỉ xảy
+    # ra với follow_old_code=True). Dùng để ghi log, không hiện cho sinh viên.
+    remapped_from: str | None = None
 
     @property
     def allowed(self) -> bool:
         return self.student is not None and self.reason is None
 
 
-def check_login(uid: str) -> LoginDecision:
-    """Xét một uid ĐÃ qua xác thực LDAP có được vào cổng không.
+def check_login(uid: str, *, follow_old_code: bool = False) -> LoginDecision:
+    """Xét một uid ĐÃ qua xác thực danh tính có được vào cổng không.
 
-    Gọi SAU khi `verify_ldap()` thành công: thông báo ở đây có tiết lộ mã số hiện
-    tại của sinh viên, nên chỉ được trả về cho người đã chứng minh danh tính.
+    Gọi SAU khi `verify_ldap()` (hoặc sau khi xác minh id_token của Microsoft)
+    thành công: thông báo ở đây có tiết lộ mã số hiện tại của sinh viên, nên chỉ
+    được trả về cho người đã chứng minh danh tính.
+
+    `follow_old_code` quyết định cách xử lý mã cũ, và khác nhau theo đường đăng nhập:
+
+    - **LDAP → False.** Sinh viên tự gõ MSSV, nên sửa được: chặn và bảo gõ mã mới.
+    - **Microsoft → True.** MSSV lấy từ tiền tố email do trường cấp, sinh viên
+      KHÔNG đổi được. Chặn ở đây là khoá họ ra ngoài vĩnh viễn — đo trên dữ liệu
+      thật: 893 sinh viên đang giữ email mang mã cũ (37 người đang học). Nên tự
+      ánh xạ sang mã hiện tại rồi cho vào.
     """
     student = (
         Student.objects
@@ -50,10 +62,13 @@ def check_login(uid: str) -> LoginDecision:
         .filter(current_student_code__iexact=uid)
         .first()
     )
+    remapped_from = None
 
     if student is None:
         moved = _find_by_old_code(uid)
-        if moved is not None:
+        if moved is not None and follow_old_code:
+            student, remapped_from = moved, uid
+        elif moved is not None:
             return LoginDecision(
                 reason=REASON_OLD_CODE,
                 message=(
@@ -62,6 +77,8 @@ def check_login(uid: str) -> LoginDecision:
                     f"Vui lòng đăng nhập bằng mã số sinh viên hiện tại."
                 ),
             )
+
+    if student is None:
         return LoginDecision(
             reason=REASON_NO_PROFILE,
             message=(
@@ -86,14 +103,14 @@ def check_login(uid: str) -> LoginDecision:
             ),
         )
 
-    return LoginDecision(student=student)
+    return LoginDecision(student=student, remapped_from=remapped_from)
 
 
 def _find_by_old_code(uid: str) -> Student | None:
     """Tra sinh viên theo mã cũ. None nếu uid không phải mã cũ của ai."""
     row = (
         StudentCodeHistory.objects
-        .select_related("student")
+        .select_related("student__current_status")
         .filter(student_code__iexact=uid)
         .first()
     )

@@ -9,6 +9,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from core import microsoft_auth
 from core.auth import verify_ldap
 from core.login_policy import check_login
 from core.models import HubStudent, ConfirmationRequest
@@ -49,6 +50,9 @@ def feature_flags() -> dict:
     return {
         "document_requests": settings.FEATURE_DOCUMENT_REQUESTS,
         "civic_activities": settings.FEATURE_CIVIC_ACTIVITIES,
+        # Không phải cờ FEATURE_* bật/tắt bằng tay: tự suy ra từ việc đã cấu hình
+        # app registration hay chưa, để không bao giờ hiện nút dẫn tới endpoint chết.
+        "microsoft_login": settings.MS_LOGIN_ENABLED,
     }
 
 
@@ -75,6 +79,45 @@ class DocumentRequestsRequiredMixin:
         if not settings.FEATURE_DOCUMENT_REQUESTS:
             raise NotFound("Chức năng yêu cầu giấy tờ đang tạm ngưng.")
         super().initial(request, *args, **kwargs)
+
+
+def issue_session(student, *, ip: str, channel: str) -> Response:
+    """Ghi nhận lần đăng nhập rồi cấp cặp token — dùng chung cho LDAP và Microsoft.
+
+    `ldap_uid` luôn là MSSV HIỆN TẠI, kể cả khi vào bằng mã cũ qua email Microsoft.
+    Nhờ vậy `hub_students` và các bản ghi tra theo uid không bị tách đôi khi sinh
+    viên đổi mã.
+    """
+    uid = student.current_student_code
+
+    hub_student, _ = HubStudent.objects.get_or_create(ldap_uid=uid)
+    hub_student.last_login_at = timezone.now()
+    hub_student.login_count = (hub_student.login_count or 0) + 1
+    hub_student.student_id = student.pk
+    hub_student.save(update_fields=["last_login_at", "login_count", "student_id"])
+
+    token = HubRefreshToken.for_student(
+        ldap_uid=uid,
+        student_id=student.pk,
+        student_code=uid,
+        full_name=student.full_name,
+    )
+
+    logger.info(
+        "LOGIN_SUCCESS     | uid=%-20s | student_id=%-6s | qua=%-9s | ip=%s",
+        uid, student.pk, channel, ip,
+    )
+
+    return Response({
+        "access": str(token.access_token),
+        "refresh": str(token),
+        "student_session": {
+            "ldap_uid": uid,
+            "student_id": student.pk,
+            "student_code": uid,
+            "full_name": student.full_name,
+        },
+    })
 
 
 def _get_ip(request) -> str:
@@ -182,36 +225,83 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        student = decision.student
+        return issue_session(decision.student, ip=ip, channel="LDAP")
 
-        hub_student, _ = HubStudent.objects.get_or_create(ldap_uid=uid)
-        hub_student.last_login_at = timezone.now()
-        hub_student.login_count = (hub_student.login_count or 0) + 1
-        hub_student.student_id = student.pk
-        hub_student.save(update_fields=["last_login_at", "login_count", "student_id"])
 
-        token = HubRefreshToken.for_student(
-            ldap_uid=uid,
-            student_id=student.pk,
-            student_code=student.current_student_code,
-            full_name=student.full_name,
-        )
+# ── Đăng nhập bằng tài khoản Microsoft ───────────────────────────────────────
 
-        logger.info(
-            "LOGIN_SUCCESS     | uid=%-20s | student_id=%-6s | ip=%s",
-            uid, student.pk, ip,
-        )
+class MicrosoftLoginRequiredMixin:
+    """404 khi chưa cấu hình app registration — endpoint biến mất thay vì lỗi 500."""
 
-        return Response({
-            "access": str(token.access_token),
-            "refresh": str(token),
-            "student_session": {
-                "ldap_uid": uid,
-                "student_id": student.pk,
-                "student_code": student.current_student_code,
-                "full_name": student.full_name,
-            },
-        })
+    def initial(self, request, *args, **kwargs):
+        if not settings.MS_LOGIN_ENABLED:
+            raise NotFound("Đăng nhập bằng tài khoản Microsoft chưa được bật.")
+        super().initial(request, *args, **kwargs)
+
+
+class MicrosoftStartView(MicrosoftLoginRequiredMixin, APIView):
+    """GET /api/auth/microsoft/start/ — trả URL để frontend chuyển hướng sang Microsoft.
+
+    Trả URL thay vì tự 302: frontend gọi bằng fetch nên redirect sẽ bị chính fetch
+    nuốt mất, phải để trình duyệt tự đi bằng `window.location`.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        return Response({"authorize_url": microsoft_auth.build_authorize_url()})
+
+
+class MicrosoftCallbackView(MicrosoftLoginRequiredMixin, APIView):
+    """POST /api/auth/microsoft/callback/ — đổi `code` lấy phiên của Hub.
+
+    Trang callback bên Next.js chỉ chuyển tiếp `code` + `state`; toàn bộ việc đổi
+    token với Microsoft xảy ra ở đây, nơi giữ client secret.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        ip = _get_ip(request)
+        code = (request.data.get("code") or "").strip()
+        state = (request.data.get("state") or "").strip()
+
+        if not code or not state:
+            return Response(
+                {"detail": "Thiếu thông tin trả về từ Microsoft. Vui lòng đăng nhập lại."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            claims = microsoft_auth.exchange_code(code, state)
+            uid = microsoft_auth.extract_student_code(claims)
+        except microsoft_auth.MicrosoftAuthError as exc:
+            logger.warning("MS_LOGIN_FAIL     | %s | ip=%s", exc, ip)
+            return Response({"detail": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        logger.info("MS_LOGIN_ATTEMPT  | uid=%-20s | oid=%s | ip=%s",
+                    uid, claims.get("oid"), ip)
+
+        # follow_old_code=True: email do trường cấp, sinh viên không sửa được mã
+        # trong đó — xem giải thích ở core/login_policy.py.
+        decision = check_login(uid, follow_old_code=True)
+        if not decision.allowed:
+            logger.warning(
+                "LOGIN_DENIED      | uid=%-20s | reason=%-18s | qua=Microsoft | ip=%s",
+                uid, decision.reason, ip,
+            )
+            return Response({"detail": decision.message},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        if decision.remapped_from:
+            logger.info(
+                "MS_CODE_REMAPPED  | email=%-20s -> MSSV hien tai=%s",
+                decision.remapped_from, decision.student.current_student_code,
+            )
+
+        return issue_session(decision.student, ip=ip, channel="Microsoft")
 
 
 # ── POST /api/auth/token/refresh/ ────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { getToken, clearAuth } from './auth';
 import type {
-  FeatureFlags,
+  FeaturesResponse,
   LoginResponse,
   DashboardData,
   HealthInsuranceData,
@@ -91,10 +91,22 @@ export const api = {
         body: JSON.stringify({ refresh: refreshToken }),
       });
     },
+    /** Lấy URL đăng nhập Microsoft để chuyển hướng trình duyệt sang đó. */
+    microsoftStart(): Promise<{ authorize_url: string }> {
+      return request('/auth/microsoft/start/', {}, { skipAuthRedirect: true });
+    },
+    /** Đổi code Microsoft trả về lấy phiên của Hub. */
+    microsoftCallback(code: string, state: string): Promise<LoginResponse> {
+      return request(
+        '/auth/microsoft/callback/',
+        { method: 'POST', body: JSON.stringify({ code, state }) },
+        { skipAuthRedirect: true },
+      );
+    },
   },
 
   features: {
-    get(): Promise<FeatureFlags> {
+    get(): Promise<FeaturesResponse> {
       return request('/features/');
     },
   },

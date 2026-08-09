@@ -3,6 +3,12 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = ['/login'];
 
+// Trang nhận kết quả từ Microsoft: luôn cho qua, KHÔNG xét hub_token.
+// - chưa có token (trường hợp thường) → chặn là đá về /login ngay trước bước đổi code
+// - đã có token cũ → vẫn phải chạy tiếp, vì sinh viên có thể đang cố đăng nhập
+//   bằng tài khoản khác; đá sang /dashboard sẽ giữ nguyên phiên cũ một cách khó hiểu
+const ALWAYS_ALLOW = ['/auth/microsoft/callback'];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -10,6 +16,8 @@ export function middleware(request: NextRequest) {
   // Trong dev, Next.js rewrite sẽ proxy sang Django SAU khi middleware chạy,
   // nên phải để pass-through ở đây tránh redirect loop khi gọi login endpoint.
   if (pathname.startsWith('/api/')) return NextResponse.next();
+
+  if (ALWAYS_ALLOW.includes(pathname)) return NextResponse.next();
 
   const token = request.cookies.get('hub_token')?.value;
 

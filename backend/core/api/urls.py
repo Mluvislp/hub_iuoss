@@ -11,6 +11,10 @@ urlpatterns = [
     # Auth
     path("auth/login/",          views.LoginView.as_view(),   name="api_login"),
     path("auth/logout/",         views.LogoutView.as_view(),  name="api_logout"),
+    path("auth/microsoft/start/",    views.MicrosoftStartView.as_view(),
+         name="api_microsoft_start"),
+    path("auth/microsoft/callback/", views.MicrosoftCallbackView.as_view(),
+         name="api_microsoft_callback"),
     path("auth/token/refresh/",  views.HubTokenRefreshView.as_view(), name="api_token_refresh"),
 
     # Data

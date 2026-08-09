@@ -277,6 +277,17 @@ export interface FeatureFlags {
   civic_activities: boolean;
 }
 
+/**
+ * Toàn bộ payload của `GET /api/features/`: cờ menu (FeatureFlags) + cờ hạ tầng
+ * không lên menu. Tách ra vì `FeatureKey = keyof FeatureFlags` điều khiển
+ * FEATURE_META — thêm thẳng vào FeatureFlags sẽ bắt khai báo một mục menu không
+ * hề tồn tại.
+ */
+export interface FeaturesResponse extends FeatureFlags {
+  /** Backend đã cấu hình app registration Microsoft chưa (suy ra, không bật tay). */
+  microsoft_login: boolean;
+}
+
 export interface DashboardData {
   student: Student | null;
   health_insurance: HealthInsuranceCard | null;
