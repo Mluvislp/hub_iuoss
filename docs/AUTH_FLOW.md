@@ -34,8 +34,14 @@ login_view (core/views.py)
     │  → OK: trả {uid, mail, display_name}
     │  → Fail: trả None → hiện lỗi, dừng
     │
-    ▼ (LDAP OK)
-    │  Tìm Student trong DB: students.current_student_code = uid
+    ▼ (LDAP OK — mới chỉ là "đúng người, đúng mật khẩu")
+    │
+    ▼ check_login(uid)  ← core/login_policy.py
+    │  Xét có được vào cổng không (xem mục "Điều kiện được phép vào cổng")
+    │  → Bị chặn: API trả 403 + câu giải thích, view Django hiện messages.error
+    │             KHÔNG tạo session, KHÔNG đụng hub_students
+    │
+    ▼ (được phép)
     │  Tạo/update HubStudent: hub_students (ldap_uid, student_id, last_login_at, login_count)
     │
     ▼ set_student_session(request, ...)  ← core/session.py
@@ -130,13 +136,41 @@ Matching hiện tại: `students.current_student_code__iexact = ldap_uid`
 
 Giả định: `uid` trong LDAP = MSSV của sinh viên (vd: `BABAWE21603`).
 
-Nếu sau này cần matching phức tạp hơn (vd: email, hay MSSV định dạng khác), sửa trong `login_view` tại `core/views.py`:
+Việc tra cứu này nằm trong `check_login()` ở `core/login_policy.py` — **một chỗ duy nhất**, dùng chung cho cả API lẫn view Django cũ. Cần đổi cách matching thì sửa ở đó, đừng sửa trong từng view.
+
+---
+
+## Điều kiện được phép vào cổng
+
+LDAP chỉ trả lời "đúng người, đúng mật khẩu". Việc người đó có được dùng cổng hay không do `core/login_policy.py::check_login()` quyết định, gọi **sau** khi `verify_ldap()` thành công.
+
+Xét theo đúng thứ tự sau:
+
+| # | Trường hợp | `reason` | Kết quả |
+|---|---|---|---|
+| 1 | uid khớp `students.current_student_code` | — | đi tiếp bước 3 |
+| 2 | uid không khớp mã hiện tại nhưng có trong `student_code_history` | `old_code` | **Chặn** — báo mã số đã đổi thành mã nào |
+| 3 | không tìm thấy hồ sơ sinh viên nào | `no_profile` | **Chặn** — báo liên hệ Phòng CTSV |
+| 4 | tìm thấy nhưng `status_group` ∉ `ALLOWED_STATUS_GROUPS` | `status_not_allowed` | **Chặn** — báo kèm tên trạng thái hiện tại |
+| 5 | còn lại | — | Cho vào |
 
 ```python
-student = Student.objects.filter(
-    current_student_code__iexact=uid
-).first()
+ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "GRADUATED"})
 ```
+
+Chỉ **đang học** và **đã tốt nghiệp** được vào (quyết định của Phòng CTSV, 2026-08-09). Bị chặn: `WITHDRAWN` (đã nghỉ học / rút hồ sơ), `SUSPENDED` (tạm dừng / tạm nghỉ), `UNKNOWN` (chưa xác định), và cả hồ sơ không có trạng thái. Đổi chính sách = sửa đúng hằng số này.
+
+**Vì sao bước 2 phải nằm sau LDAP:** thông báo có nêu mã số hiện tại của sinh viên, nên chỉ được trả về cho người đã chứng minh danh tính bằng mật khẩu. Hệ quả: nếu tài khoản LDAP mang mã cũ đã bị xóa thì sinh viên vẫn chỉ thấy "Tài khoản hoặc mật khẩu không đúng" — thông báo "mã đã đổi" không xuất hiện. Muốn hiện cả trong trường hợp đó thì phải tra `student_code_history` ngay cả khi LDAP thất bại, và **không** được nêu mã mới.
+
+`student_code` là UNIQUE trên toàn bảng `student_code_history` nên tra ngược từ mã cũ luôn ra đúng một sinh viên — đã đo trên dữ liệu thật: 0 trường hợp mã cũ trùng mã hiện tại của sinh viên khác.
+
+**Bị chặn thì không để lại dấu vết:** không tạo/cập nhật `hub_students`, không phát token, không tạo session. Chỉ ghi một dòng `LOGIN_DENIED` kèm `reason` vào `logs/auth.log`.
+
+### Gia hạn phiên cũng bị xét lại
+
+`POST /api/auth/token/refresh/` (`HubTokenRefreshView`) gọi lại `check_login()` trước khi cấp cặp token mới. Không có bước này thì refresh token sống 7 ngày sẽ cho sinh viên vừa bị khóa dùng tiếp gần một tuần.
+
+> View này **không** dùng `TokenRefreshView` của SimpleJWT. Serializer của nó tra `get_user_model().objects.get(id=<claim>)`, mà Hub đặt `USER_ID_CLAIM = "ldap_uid"` và không dùng `django.contrib.auth` — nên bản cũ ném `ValueError: Field 'id' expected a number` với **mọi** refresh token hợp lệ. Lỗi này không lộ ra vì frontend chưa bao giờ gọi endpoint đó (access token 8 giờ, hết hạn thì đăng nhập lại).
 
 ---
 

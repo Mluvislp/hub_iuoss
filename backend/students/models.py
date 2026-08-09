@@ -89,6 +89,31 @@ class Student(models.Model):
         return f"{self.current_student_code} - {self.full_name}"
 
 
+class StudentCodeHistory(models.Model):
+    """Lịch sử mã số sinh viên — Dashboard sở hữu, Hub CHỈ ĐỌC.
+
+    Sinh viên chuyển ngành/chương trình được cấp mã mới, mã cũ lưu lại ở đây với
+    `code_role='OLD'`. Hub dùng bảng này để nhận ra người đăng nhập bằng mã cũ và
+    chỉ họ sang mã hiện tại. `student_code` UNIQUE trên toàn bảng nên tra ngược
+    luôn ra đúng một sinh viên — đã đo: 0 trường hợp mã cũ trùng mã hiện tại của
+    sinh viên khác.
+    """
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="code_history",
+    )
+    student_code = models.CharField(max_length=64, unique=True)
+    code_role = models.CharField(max_length=16)
+
+    class Meta:
+        managed = False
+        db_table = "student_code_history"
+
+    def __str__(self):
+        return f"{self.student_code} ({self.code_role})"
+
+
 class Hospital(models.Model):
     """Danh mục cơ sở khám chữa bệnh (mã BHXH) — Dashboard sở hữu, Hub CHỈ ĐỌC.
 

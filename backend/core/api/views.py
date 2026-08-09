@@ -6,8 +6,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.auth import verify_ldap
+from core.login_policy import check_login
 from core.models import HubStudent, ConfirmationRequest
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
@@ -160,45 +163,43 @@ class LoginView(APIView):
 
         logger.info("LOGIN_ATTEMPT     | uid=%-20s | ip=%s", uid, ip)
 
-        ldap_info = verify_ldap(uid, password)
-        if ldap_info is None:
+        if verify_ldap(uid, password) is None:
             logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
             return Response(
                 {"detail": "Tài khoản hoặc mật khẩu không đúng."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        student = Student.objects.filter(
-            current_student_code__iexact=uid
-        ).first()
+        # Mật khẩu đúng nhưng chưa chắc được vào — xem core/login_policy.py.
+        decision = check_login(uid)
+        if not decision.allowed:
+            logger.warning(
+                "LOGIN_DENIED      | uid=%-20s | reason=%-18s | ip=%s",
+                uid, decision.reason, ip,
+            )
+            return Response(
+                {"detail": decision.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        student = decision.student
 
         hub_student, _ = HubStudent.objects.get_or_create(ldap_uid=uid)
         hub_student.last_login_at = timezone.now()
         hub_student.login_count = (hub_student.login_count or 0) + 1
-        if student:
-            hub_student.student_id = student.pk
+        hub_student.student_id = student.pk
         hub_student.save(update_fields=["last_login_at", "login_count", "student_id"])
-
-        student_id = student.pk if student else None
-        student_code = student.current_student_code if student else uid
-        full_name = (
-            student.full_name if student
-            else ldap_info.get("display_name", uid)
-        )
 
         token = HubRefreshToken.for_student(
             ldap_uid=uid,
-            student_id=student_id,
-            student_code=student_code,
-            full_name=full_name,
+            student_id=student.pk,
+            student_code=student.current_student_code,
+            full_name=student.full_name,
         )
 
         logger.info(
-            "LOGIN_SUCCESS     | uid=%-20s | student_id=%-6s | linked=%s | ip=%s",
-            uid,
-            student_id or "None",
-            "yes" if student else "no",
-            ip,
+            "LOGIN_SUCCESS     | uid=%-20s | student_id=%-6s | ip=%s",
+            uid, student.pk, ip,
         )
 
         return Response({
@@ -206,11 +207,64 @@ class LoginView(APIView):
             "refresh": str(token),
             "student_session": {
                 "ldap_uid": uid,
-                "student_id": student_id,
-                "student_code": student_code,
-                "full_name": full_name,
+                "student_id": student.pk,
+                "student_code": student.current_student_code,
+                "full_name": student.full_name,
             },
         })
+
+
+# ── POST /api/auth/token/refresh/ ────────────────────────────────────────────
+
+class HubTokenRefreshView(APIView):
+    """Gia hạn phiên bằng refresh token, có xét LẠI điều kiện vào cổng.
+
+    KHÔNG dùng `TokenRefreshView` của SimpleJWT: serializer của nó tra
+    `get_user_model().objects.get(id=<claim>)`, mà Hub đặt `USER_ID_CLAIM` là
+    `ldap_uid` (MSSV) và không dùng django.contrib.auth — nên endpoint cũ ném
+    `ValueError: Field 'id' expected a number` với MỌI refresh token hợp lệ.
+    Ở đây tự dựng lại cặp token từ hồ sơ sinh viên hiện tại.
+
+    Xét lại điều kiện là bắt buộc: refresh token sống 7 ngày, nếu chỉ chặn ở màn
+    đăng nhập thì sinh viên vừa bị đổi trạng thái vẫn dùng tiếp được gần một tuần.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        expired = Response(
+            {"detail": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+        try:
+            uid = RefreshToken(request.data.get("refresh") or "").payload.get("ldap_uid")
+        except TokenError:
+            return expired
+        if not uid:
+            return expired
+
+        decision = check_login(uid)
+        if not decision.allowed:
+            logger.warning(
+                "REFRESH_DENIED    | uid=%-20s | reason=%-18s | ip=%s",
+                uid, decision.reason, _get_ip(request),
+            )
+            return Response(
+                {"detail": decision.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Dựng lại từ hồ sơ hiện tại → tên/mã đổi thì phiên mới cũng cập nhật theo.
+        student = decision.student
+        token = HubRefreshToken.for_student(
+            ldap_uid=uid,
+            student_id=student.pk,
+            student_code=student.current_student_code,
+            full_name=student.full_name,
+        )
+        return Response({"access": str(token.access_token), "refresh": str(token)})
 
 
 # ── POST /api/auth/logout/ ───────────────────────────────────────────────────
