@@ -314,6 +314,20 @@ Django warnings và errors (500, DB lỗi, template lỗi, v.v.).
 
 ## 5. Layout & UI
 
+### Ô hỗ trợ kỹ thuật (nổi, mọi trang)
+
+`frontend/components/support-widget.tsx`, mount ở `app/layout.tsx` → có mặt trên
+**mọi trang, kể cả màn hình đăng nhập**. Nút tròn góc dưới-phải, bấm mới mở panel
+chứa thông tin liên hệ chuyên viên (điện thoại/Zalo + email, có nút chép).
+
+Sửa nội dung liên hệ: hằng `SUPPORT` ở đầu file đó (đổi số thì sửa cả `phone`
+hiển thị lẫn `phoneRaw` dùng cho link `tel:`/`zalo.me`).
+
+Ràng buộc UX cố ý — đừng "cải tiến" ngược lại: không tự bật, không đếm ngược,
+không nhắc lại; `z-30` để nằm DƯỚI overlay (z-40) và sidebar (z-50) nên menu
+mobile mở ra là nó bị che, không tranh chỗ. Số điện thoại chỉ render sau khi bấm
+nên không nằm trong HTML tĩnh.
+
 **File:** `core/templates/core/base.html`
 
 Tất cả trang (trừ login) extend từ `base.html`. Cấu trúc:
