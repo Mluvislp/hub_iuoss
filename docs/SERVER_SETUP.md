@@ -366,7 +366,7 @@ venv/bin/python manage.py clearsessions
 | Login lỗi "Tài khoản không đúng" | Không kết nối LDAP | `ldapsearch -H ldap://ldap.hcmiu.edu.vn -x -b dc=hcmiu,dc=edu,dc=vn` |
 | `400 Bad Request` | `hub.iuoss.com` chưa trong `ALLOWED_HOSTS` | Thêm vào `backend/.env` → restart |
 | Login OK nhưng bị đá ra liên tục / `ERR_TOO_MANY_REDIRECTS` | Django tưởng request là HTTP (thiếu/sai `X-Forwarded-Proto`) | Kiểm tra Nginx dùng `map $hub_forwarded_proto` (xem Bước 8); xác nhận `curl -s http://127.0.0.1:8002/api/health/` trả 200 |
-| Form login template Django `403 CSRF` | Domain chưa có trong `CSRF_TRUSTED_ORIGINS` | Set `FRONTEND_ORIGINS=https://hub.iuoss.com` → restart |
+| Mở `:8002/` hoặc `:8002/login/` ra **404** | Đúng như thiết kế — Django chỉ phục vụ `/api/`, giao diện ở Next.js `:3000` | Mở `:3000/login` (local) hoặc `hub.iuoss.com` (prod) |
 | Frontend gọi API ra IP `127.0.0.1:8000` | Build dính `NEXT_PUBLIC_API_URL` dev | Xoá `frontend/.env.local` → `npm run build` lại |
 | Static files không load | Chưa collectstatic | `python manage.py collectstatic --noinput --clear` |
 | Next.js build fail | node_modules cũ | `cd frontend && rm -rf node_modules .next && npm install && npm run build` |

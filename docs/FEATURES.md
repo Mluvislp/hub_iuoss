@@ -28,9 +28,6 @@ Frontend đọc qua `GET /api/features/` (không cần auth, chỉ trả true/fa
   chớp hiện tính năng chưa mở. Việc chặn nằm ở **một chỗ duy nhất**:
   `(dashboard)/layout.tsx` tra `featureForRoute(pathname)` rồi thay nội dung bằng
   `<ComingSoon />` — từng page KHÔNG tự kiểm tra.
-- **Bản Django-render cũ** — context processor `core/context_processors.py`
-  đưa `feature_document_requests` / `feature_civic_activities` vào mọi template;
-  ở đây thì ẩn hẳn (bản cũ không có trang chờ).
 
 ### Thêm một tính năng đang chờ phát triển
 
@@ -68,8 +65,8 @@ FEATURE_DOCUMENT_REQUESTS=False FEATURE_CIVIC_ACTIVITIES=False \
 
 ## 1. Authentication (LDAP)
 
-**URL:** `/login/`, `/logout/`  
-**Files:** `core/auth.py`, `core/views.py`, `core/session.py`, `core/decorators.py`
+**URL:** `POST /api/auth/login/`, `POST /api/auth/microsoft/*`  
+**Files:** `core/auth.py`, `core/login_policy.py`, `core/api/views.py`
 
 Sinh viên đăng nhập bằng tài khoản mạng nội bộ trường (MSSV + mật khẩu IU).  
 Chi tiết luồng xác thực xem tại `docs/AUTH_FLOW.md`.
@@ -84,8 +81,8 @@ Chi tiết luồng xác thực xem tại `docs/AUTH_FLOW.md`.
 
 ## 2. Dashboard (Trang chủ)
 
-**URL:** `/`  
-**Files:** `core/views.py` → `home_view()`, `core/templates/core/home.html`
+**URL:** `/dashboard` (Next.js) ← `GET /api/me/`  
+**Files:** `core/api/views.py`, `frontend/app/(dashboard)/dashboard/page.tsx`
 
 ### Thông tin sinh viên
 
@@ -180,8 +177,6 @@ Kết quả: `YES` (Đạt) / `NO` (Không đạt) / `UNKNOWN` (Chưa có kết 
 - `POST /api/requests/` (`request_type="other"`) → `RequestsView._create_other` (dựng `payload` snapshot)
 - Frontend: `app/(dashboard)/dashboard/requests/other/page.tsx`, `lib/api.ts` (`otherForm`/`createOther`)
 - Registry loại giấy: `core/documents.py`; prefill niên khóa/đào tạo: `students/timeline.py`
-
-**Kênh legacy (Django render):** `/requests/new/` → `core/views.py::confirmation_request_create_view` — KHÔNG dựng `payload`, chỉ dùng cho các loại chưa chuyển sang form động.
 
 **Model:** `core.ConfirmationRequest` → bảng `hub_confirmation_requests` (có cột `payload` JSON).
 
@@ -282,7 +277,7 @@ thời đề xuất sửa CCCD / email cá nhân / SĐT.
 
 ## 4. Logging
 
-**Files:** `config/settings.py` (LOGGING config), `core/auth.py`, `core/views.py`
+**Files:** `config/settings.py` (LOGGING config), `core/auth.py`, `core/api/views.py`
 
 Hai file log riêng biệt, tự rotate khi đạt 5MB (giữ 5 bản backup):
 
@@ -328,35 +323,15 @@ không nhắc lại; `z-30` để nằm DƯỚI overlay (z-40) và sidebar (z-50
 mobile mở ra là nó bị che, không tranh chỗ. Số điện thoại chỉ render sau khi bấm
 nên không nằm trong HTML tĩnh.
 
-**File:** `core/templates/core/base.html`
+### Khung trang
 
-Tất cả trang (trừ login) extend từ `base.html`. Cấu trúc:
+Layout do Next.js dựng: `frontend/app/(dashboard)/layout.tsx` (sidebar + topbar +
+chặn theo cờ tính năng). Quy ước trình bày và design token xem
+[`frontend/DESIGN.md`](../frontend/DESIGN.md).
 
-```
-sidebar (fixed, 240px)        main-wrapper
-  ├─ Brand logo                 ├─ topbar (sticky, 56px)
-  ├─ Nav sections               │    breadcrumb title + MSSV badge
-  │   ├─ Tổng quan              └─ content-area (padding 24px)
-  │   ├─ Dịch vụ                     {% block content %}
-  │   └─ Sắp ra mắt (disabled)
-  └─ User info + Logout
-```
-
-**Thêm trang mới:**
-1. Tạo template mới `core/templates/core/my_page.html`
-2. Extend `base.html`, set `{% block nav_xxx %}active{% endblock %}`
-3. Thêm nav item vào `base.html` sidebar
-4. Thêm view + URL vào `core/views.py` + `core/urls.py`
-
-**Thêm nav item vào sidebar** (trong `base.html`):
-```html
-<div class="nav-item">
-  <a href="{% url 'core:my_url_name' %}"
-     class="nav-link {% block nav_xxx %}{% endblock %}">
-    <i class="bi bi-icon-name"></i> Tên chức năng
-  </a>
-</div>
-```
+**Thêm trang mới:** tạo `app/(dashboard)/dashboard/<slug>/page.tsx`, thêm mục vào
+sidebar trong `layout.tsx`, và khai cờ trong `featureForRoute()` nếu tính năng
+chưa mở.
 
 ---
 
@@ -364,9 +339,8 @@ sidebar (fixed, 240px)        main-wrapper
 
 | URL | View | Auth | Mô tả |
 |---|---|---|---|
-| `/` | `home_view` | ✅ Required | Dashboard chính |
-| `/login/` | `login_view` | ❌ Public | Trang đăng nhập |
-| `/logout/` | `logout_view` | ❌ Public | Đăng xuất |
-| `/requests/new/` | `confirmation_request_create_view` | ✅ Required | Tạo yêu cầu giấy xác nhận — 404 khi `FEATURE_DOCUMENT_REQUESTS` tắt |
+> Django **chỉ phục vụ `/api/`**. Mọi URL giao diện (`/`, `/login`, `/dashboard/…`)
+> do Next.js đảm nhiệm; gọi thẳng vào Gunicorn `:8002` ở các đường đó sẽ trả **404**.
+
 | `/api/features/` | `FeaturesView` | ❌ Public | Cờ tính năng cho frontend (xem §0) |
 | `/api/health-insurance/` | `HealthInsuranceView` | ✅ Required | Thẻ BHYT hiện hành + lịch sử (§2) |
