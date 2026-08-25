@@ -242,15 +242,6 @@ function InsuranceRegistrationForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <fieldset disabled={isLocked} className="space-y-6">
-          {isLocked && (
-            <div className="bg-amber-50 text-amber-800 p-4 rounded-lg border border-amber-200">
-              <h3 className="font-bold flex items-center gap-2">
-                <FileText size={18} />
-                Chế độ xem trước hồ sơ
-              </h3>
-              <p className="text-sm mt-1">Đợt đăng ký này đã đóng hoặc bạn đã có hồ sơ đăng ký. Vui lòng liên hệ phòng CTSV nếu cần thay đổi.</p>
-            </div>
-          )}
           
         <div className={ui.card}>
           <div className={ui.cardHeader}>
@@ -319,6 +310,8 @@ function InsuranceRegistrationForm() {
 
           </div>
         </div>
+        </fieldset>
+        {/* Các phần dưới đây luôn mở */}
 
         <div className={ui.card}>
           <div className={ui.cardHeader}>
@@ -350,7 +343,6 @@ function InsuranceRegistrationForm() {
         </div>
 
         {/* Thanh toán & Hồ sơ - Chỉ hiển thị khi không khoá */}
-        {!isLocked && (
           <div className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}><CreditCard size={16} className="text-primary" /> Thanh toán & Hồ sơ</h2>
@@ -425,9 +417,7 @@ function InsuranceRegistrationForm() {
             </div>
           </div>
         </div>
-        )}
 
-        {!isLocked && (
           <div className={ui.card}>
             <div className="p-5">
             <label className="flex items-start gap-3 cursor-pointer">
@@ -439,9 +429,7 @@ function InsuranceRegistrationForm() {
             </label>
           </div>
         </div>
-        )}
 
-        </fieldset>
         <div className="flex justify-end gap-3">
           <Link href="/dashboard/bao-hiem-y-te" className={ui.btnGhost}>Hủy</Link>
           <button type="submit" disabled={saving || isLocked} className={ui.btnPrimary}>

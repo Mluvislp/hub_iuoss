@@ -87,6 +87,7 @@ export interface HealthInsuranceData {
   current: HealthInsuranceCard | null;
   history: HealthInsuranceCard[];
   registrations: HealthInsuranceRegistration[];
+  is_eligible: boolean;
 }
 
 export interface CivicActivity {

@@ -265,6 +265,31 @@ export default function HealthInsurancePage() {
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
                       {isOpen ? 'Đang mở' : `Sẽ mở từ ${formatDate(p.startDate.toISOString())}`}
+                    <div className="mt-4">
+                      {isOpen ? (
+                        <Link
+                          href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
+                          className={cn(ui.btnPrimary, "w-full text-center")}
+                          onClick={(e) => {
+                            if (!data?.is_eligible || data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))) {
+                              e.preventDefault();
+                            }
+                          }}
+                          aria-disabled={!data?.is_eligible || data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))}
+                          style={(!data?.is_eligible || data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))) ? { pointerEvents: 'none', opacity: 0.5 } : {}}
+                        >
+                          {(() => {
+                            if (!data?.is_eligible) return "Không đủ điều kiện";
+                            if (data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))) return "Đã đăng ký";
+                            return "Đăng ký ngay";
+                          })()}
+                        </Link>
+                      ) : (
+                        <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
+                          Chưa mở
+                        </button>
+                      )}
+                    </div>
                     </p>
                   </div>
                   <div className="mt-4">

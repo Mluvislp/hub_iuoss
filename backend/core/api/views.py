@@ -443,7 +443,7 @@ class HealthInsuranceView(APIView):
     def get(self, request):
         student_id = request.user.student_id
         if not student_id:
-            return Response({"current": None, "history": [], "registrations": []})
+            return Response({"is_eligible": False, "current": None, "history": [], "registrations": []})
 
         cards = list(
             HealthInsuranceCard.objects
@@ -470,14 +470,82 @@ class HealthInsuranceView(APIView):
                 "rejection_reason": getattr(r, 'rejection_reason', None),
             })
 
+        # --- Kiểm tra điều kiện đăng ký BHYT (Eligibility Rules) ---
+        # Sinh viên ĐƯỢC đăng ký nếu:
+        # 1. Không có thẻ BHYT hiện tại (current is None)
+        # 2. Hoặc thẻ BHYT hiện tại sắp hết hạn (<= 60 ngày tính từ hôm nay)
+        import datetime
+        from django.utils import timezone
+        
+        is_eligible = False
+        if not current:
+            is_eligible = True
+        elif current.valid_until:
+            today = timezone.localdate()
+            if (current.valid_until - today).days <= 60:
+                is_eligible = True
+
         ctx = {"hospital_names": hospital_names(cards)}
         return Response({
+            "is_eligible": is_eligible,
             "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
             "registrations": reg_data,
         })
 
 
+    def get(self, request):
+        student_id = request.user.student_id
+        if not student_id:
+            return Response({"is_eligible": False, "current": None, "history": [], "registrations": []})
+
+        cards = list(
+            HealthInsuranceCard.objects
+            .filter(student_id=student_id)
+            .select_related("registration_type")
+        )
+        current = next((c for c in cards if c.is_current), None)
+        history = [c for c in cards if c is not current]
+        
+        regs = list(
+            HealthInsuranceRegistration.objects
+            .filter(student_id=student_id)
+            .order_by("-created_at")
+        )
+        
+        reg_data = []
+        for r in regs:
+            reg_data.append({
+                "id": r.id,
+                "registration_year": r.registration_year,
+                "registration_period": r.registration_period,
+                "created_at": r.created_at,
+                "status": r.status,
+                "rejection_reason": getattr(r, 'rejection_reason', None),
+            })
+
+        # --- Kiểm tra điều kiện đăng ký BHYT (Eligibility Rules) ---
+        # Sinh viên ĐƯỢC đăng ký nếu:
+        # 1. Không có thẻ BHYT hiện tại (current is None)
+        # 2. Hoặc thẻ BHYT hiện tại sắp hết hạn (<= 60 ngày tính từ hôm nay)
+        import datetime
+        from django.utils import timezone
+        
+        is_eligible = False
+        if not current:
+            is_eligible = True
+        elif current.valid_until:
+            today = timezone.localdate()
+            if (current.valid_until - today).days <= 60:
+                is_eligible = True
+
+        ctx = {"hospital_names": hospital_names(cards)}
+        return Response({
+            "is_eligible": is_eligible,
+            "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
+            "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
+            "registrations": reg_data,
+        })
 
 from rest_framework.parsers import MultiPartParser, FormParser
 
@@ -524,8 +592,7 @@ class InsuranceRegistrationView(APIView):
         return Student.objects.filter(pk=request.user.student_id).first()
 
     def get(self, request):
-        from core.profile_changes import _current_contact, _cccd_row
-        from students.models import StudentContactPoint, StudentAddress
+        from students.models import StudentContactPoint, StudentAddress, StudentIdentityDocument
         student = self._student(request)
         if not student:
             return Response({"detail": "Không tìm thấy hồ sơ sinh viên."}, status=status.HTTP_400_BAD_REQUEST)
@@ -533,14 +600,140 @@ class InsuranceRegistrationView(APIView):
         prefill = {
             "full_name": student.full_name,
             "student_code": student.current_student_code,
+        # Không dùng _current_contact, lấy trực tiếp từ bảng liên lạc / địa chỉ.
+        phone_row = StudentContactPoint.objects.filter(
+            student_id=student.id, 
+            contact_type=StudentContactPoint.TYPE_MOBILE_PHONE, 
+            is_current=True
+        ).first()
+        phone = phone_row.contact_value if phone_row else ""
+        
+        cccd_row = StudentIdentityDocument.objects.filter(
+            student_id=student.id, 
+            document_type=StudentIdentityDocument.TYPE_CCCD, 
+            is_current=True
+        ).first()
+        cccd = cccd_row.document_number if cccd_row else ""
+        
+        addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
+        perm = addresses.get(StudentAddress.TYPE_CURRENT)
+        
+        card = student.health_insurance_cards.filter(is_current=True).first()
+        
+        return Response({
+            "full_name": student.full_name,
+            "student_code": student.current_student_code,
+            "gender": student.gender_label,
+            "dob": student.date_of_birth.strftime("%Y-%m-%d") if student.date_of_birth else "",
+            "ethnicity": getattr(student, "ethnicity", ""),
+            "phone_number": phone,
+            "social_insurance_number": card.social_insurance_code if card else "",
+            "citizen_id": cccd,
+            "permanent": {
+                "provinceCode": perm.province_code if perm else "",
+                "wardCode": perm.ward_code if perm else "",
+                "street": perm.full_address if perm else ""
+            },
+        })
             "gender": student.sex,
             "dob": student.date_of_birth,
         }
+    def post(self, request):
+        student = self._student(request)
+        if not student:
+            return Response({"detail": "Không tìm thấy thông tin sinh viên."}, status=status.HTTP_404_NOT_FOUND)
+            
+        data = request.data
+        period_id = data.get("period_id")
+        year = data.get("year")
+        
+        # --- Kiểm tra trùng lặp (Conflict Check) ---
+        # Không cho phép tạo mới nếu đã có đăng ký pending/processing cho cùng kỳ/năm
+        exists = HealthInsuranceRegistration.objects.filter(
+            student_id=student.id,
+            registration_year=year,
+            registration_period=period_id,
+            status__in=['pending', 'processing', 'done']
+        ).exists()
+        
+        if exists:
+            return Response({"detail": "Bạn đã đăng ký BHYT cho đợt này rồi."}, status=status.HTTP_409_CONFLICT)
+            
+        # --- Theo dõi thay đổi thông tin cá nhân (Change Log) ---
+        # So sánh dữ liệu gửi lên với ORM hiện tại. Chỉ ghi nhận nếu có khác biệt.
+        change_log = {}
+        
+        if data.get("full_name") and data["full_name"] != student.full_name:
+            change_log["full_name"] = {"from": student.full_name, "to": data["full_name"]}
+            
+        if data.get("gender") and data["gender"] != student.gender_label:
+            change_log["gender"] = {"from": student.gender_label, "to": data["gender"]}
+            
+        student_dob_str = student.date_of_birth.strftime("%Y-%m-%d") if student.date_of_birth else ""
+        data_dob_str = str(data["dob"]) if data.get("dob") else ""
+        if data.get("dob") and data_dob_str != student_dob_str:
+            change_log["dob"] = {"from": student_dob_str, "to": data_dob_str}
+            
+        old_ethnicity = getattr(student, "ethnicity", "")
+        if data.get("ethnicity") and data["ethnicity"] != old_ethnicity:
+            change_log["ethnicity"] = {"from": old_ethnicity, "to": data["ethnicity"]}
+        
+        phone_row = StudentContactPoint.objects.filter(
+            student_id=student.id, 
+            contact_type=StudentContactPoint.TYPE_MOBILE_PHONE, 
+            is_current=True
+        ).first()
+        old_phone = phone_row.contact_value if phone_row else ""
+        if data.get("phone_number") and data["phone_number"] != old_phone:
+            change_log["phone_number"] = {"from": old_phone, "to": data["phone_number"]}
 
-        phone_row = _current_contact(student, StudentContactPoint.TYPE_MOBILE_PHONE)
+        cccd_row = StudentIdentityDocument.objects.filter(
+            student_id=student.id, 
+            document_type=StudentIdentityDocument.TYPE_CCCD, 
+            is_current=True
+        ).first()
+        old_cccd = cccd_row.document_number if cccd_row else ""
+        if data.get("citizen_id") and data["citizen_id"] != old_cccd:
+            change_log["citizen_id"] = {"from": old_cccd, "to": data["citizen_id"]}
+
+        card = student.health_insurance_cards.filter(is_current=True).first()
+        old_bhxh = card.social_insurance_code if card else ""
+        if data.get("social_insurance_number", "") != old_bhxh:
+            change_log["social_insurance_number"] = {"from": old_bhxh, "to": data.get("social_insurance_number", "")}
+
+        addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
+        
+        perm = addresses.get(StudentAddress.TYPE_CURRENT)
+        old_perm_prov = perm.province_code if perm else ""
+        old_perm_ward = perm.ward_code if perm else ""
+        old_perm_street = perm.full_address if perm else ""
+        
+        new_perm_prov = data.get("permanent_province", "")
+        new_perm_ward = data.get("permanent_ward", "")
+        new_perm_street = data.get("permanent_street", "")
+        
+        if (new_perm_prov != old_perm_prov or 
+            new_perm_ward != old_perm_ward or 
+            new_perm_street != old_perm_street):
+            change_log["permanent_address"] = {
+                "from": {"province": old_perm_prov, "ward": old_perm_ward, "street": old_perm_street},
+                "to": {"province": new_perm_prov, "ward": new_perm_ward, "street": new_perm_street}
+            }
+
+
+        # Truy vấn trực tiếp bằng ORM thay vì hàm nội bộ
+        phone_row = StudentContactPoint.objects.filter(
+            student_id=student.id, 
+            contact_type=StudentContactPoint.TYPE_MOBILE_PHONE, 
+            is_current=True
+        ).first()
         prefill["phone_number"] = phone_row.contact_value if phone_row else ""
 
-        cccd_row = _cccd_row(student)
+        cccd_row = StudentIdentityDocument.objects.filter(
+            student_id=student.id, 
+            document_type=StudentIdentityDocument.TYPE_CCCD, 
+            is_current=True
+        ).first()
         prefill["citizen_id"] = cccd_row.document_number if cccd_row else ""
 
         addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
@@ -573,19 +766,64 @@ class InsuranceRegistrationView(APIView):
 
         data = serializer.validated_data
 
-        from core.profile_changes import _current_contact, _cccd_row
-        from students.models import StudentContactPoint, StudentAddress
+        # --- Chống Spam (Spam Check) ---
+        # Kiểm tra nếu sinh viên đã có một đơn đăng ký trong cùng năm và đợt này đang ở trạng thái pending/processing.
+        existing_reg = HealthInsuranceRegistration.objects.filter(
+            student_id=student.id,
+            registration_year=data["registration_year"],
+            registration_period=data["registration_period"],
+            status__in=["pending", "processing"]
+        ).first()
+
+        if existing_reg:
+            return Response(
+                {"detail": "Bạn đã gửi một yêu cầu đăng ký trong đợt này và đang được xử lý."},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        from students.models import StudentContactPoint, StudentAddress, StudentIdentityDocument
         
+        # --- Lưu lịch sử thay đổi thông tin (Comprehensive Change Log) ---
         change_log = {}
         
+        # So sánh full_name
+        if data.get("full_name") and data["full_name"] != student.full_name:
+            change_log["full_name"] = {"from": student.full_name, "to": data["full_name"]}
+            
+        # So sánh gender
+        if data.get("gender") and data["gender"] != student.sex:
+            change_log["gender"] = {"from": student.sex, "to": data["gender"]}
+            
+        # So sánh dob
+        # dob from student is DateField, from data is str or Date object
+        student_dob_str = str(student.date_of_birth) if student.date_of_birth else ""
+        data_dob_str = str(data["dob"]) if data.get("dob") else ""
+        if data.get("dob") and data_dob_str != student_dob_str:
+            change_log["dob"] = {"from": student_dob_str, "to": data_dob_str}
+            
+        # So sánh ethnicity
+        old_ethnicity = getattr(student, "ethnicity", "")
+        if data.get("ethnicity") and data["ethnicity"] != old_ethnicity:
+            change_log["ethnicity"] = {"from": old_ethnicity, "to": data["ethnicity"]}
+        
         phone_row = _current_contact(student, StudentContactPoint.TYPE_MOBILE_PHONE)
+        # Truy vấn trực tiếp bằng ORM thay vì hàm nội bộ
+        phone_row = StudentContactPoint.objects.filter(
+            student_id=student.id, 
+            contact_type=StudentContactPoint.TYPE_MOBILE_PHONE, 
+            is_current=True
+        ).first()
         old_phone = phone_row.contact_value if phone_row else ""
-        if data["phone_number"] != old_phone:
+        if data.get("phone_number") and data["phone_number"] != old_phone:
             change_log["phone_number"] = {"from": old_phone, "to": data["phone_number"]}
 
-        cccd_row = _cccd_row(student)
+        cccd_row = StudentIdentityDocument.objects.filter(
+            student_id=student.id, 
+            document_type=StudentIdentityDocument.TYPE_CCCD, 
+            is_current=True
+        ).first()
         old_cccd = cccd_row.document_number if cccd_row else ""
-        if data["citizen_id"] != old_cccd:
+        if data.get("citizen_id") and data["citizen_id"] != old_cccd:
             change_log["citizen_id"] = {"from": old_cccd, "to": data["citizen_id"]}
 
         card = student.health_insurance_cards.filter(is_current=True).first()
@@ -600,12 +838,16 @@ class InsuranceRegistrationView(APIView):
         old_perm_ward = perm.ward_code if perm else ""
         old_perm_street = perm.full_address if perm else ""
         
-        if (data["permanent_province"] != old_perm_prov or 
-            data["permanent_ward"] != old_perm_ward or 
-            data["permanent_street"] != old_perm_street):
+        new_perm_prov = data.get("permanent_province", "")
+        new_perm_ward = data.get("permanent_ward", "")
+        new_perm_street = data.get("permanent_street", "")
+        
+        if (new_perm_prov != old_perm_prov or 
+            new_perm_ward != old_perm_ward or 
+            new_perm_street != old_perm_street):
             change_log["permanent_address"] = {
                 "from": {"province": old_perm_prov, "ward": old_perm_ward, "street": old_perm_street},
-                "to": {"province": data["permanent_province"], "ward": data["permanent_ward"], "street": data["permanent_street"]}
+                "to": {"province": new_perm_prov, "ward": new_perm_ward, "street": new_perm_street}
             }
 
         temp = addresses.get(StudentAddress.TYPE_TEMPORARY)
@@ -613,12 +855,16 @@ class InsuranceRegistrationView(APIView):
         old_temp_ward = temp.ward_code if temp else ""
         old_temp_street = temp.full_address if temp else ""
         
-        if (data["temporary_province"] != old_temp_prov or 
-            data["temporary_ward"] != old_temp_ward or 
-            data["temporary_street"] != old_temp_street):
+        new_temp_prov = data.get("temporary_province", "")
+        new_temp_ward = data.get("temporary_ward", "")
+        new_temp_street = data.get("temporary_street", "")
+        
+        if (new_temp_prov != old_temp_prov or 
+            new_temp_ward != old_temp_ward or 
+            new_temp_street != old_temp_street):
             change_log["temporary_address"] = {
                 "from": {"province": old_temp_prov, "ward": old_temp_ward, "street": old_temp_street},
-                "to": {"province": data["temporary_province"], "ward": data["temporary_ward"], "street": data["temporary_street"]}
+                "to": {"province": new_temp_prov, "ward": new_temp_ward, "street": new_temp_street}
             }
 
         reg = HealthInsuranceRegistration(
