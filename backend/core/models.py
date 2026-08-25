@@ -114,3 +114,62 @@ class HubStudent(models.Model):
         row.login_count = (row.login_count or 0) + 1
         row.save(update_fields=["student_id", "last_login_at", field, "login_count"])
         return row
+
+
+class HealthInsuranceRegistration(models.Model):
+    PERIOD_CHOICES = [
+        ("MAIN", "Đợt chính (Tháng 9)"),
+        ("Q2", "Đợt phụ Quý 2"),
+        ("Q3", "Đợt phụ Quý 3"),
+        ("Q4", "Đợt phụ Quý 4"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Chờ xử lý"),
+        ("processing", "Đang xử lý"),
+        ("done", "Hoàn thành"),
+        ("rejected", "Từ chối"),
+    ]
+
+    student = models.ForeignKey(
+        "students.Student", on_delete=models.DO_NOTHING,
+        db_column="student_id"
+    )
+    
+    registration_year = models.IntegerField()
+    registration_period = models.CharField(max_length=32, choices=PERIOD_CHOICES)
+
+    hospital_code = models.CharField(max_length=16)
+
+    cccd_image = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
+    bhyt_image = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
+    payment_receipt_image = models.FileField(upload_to="insurance_data/%Y/%m/")
+
+    change_log = models.JSONField(blank=True, null=True)
+    
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    rejection_reason = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_insurance_registrations"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Student {self.student_id} — {self.get_registration_period_display()} {self.registration_year} ({self.status})"
+
+class HealthInsuranceConfig(models.Model):
+    description = models.TextField(blank=True, null=True)
+    bank_name = models.CharField(max_length=255)
+    bank_account_number = models.CharField(max_length=64)
+    bank_account_name = models.CharField(max_length=255)
+    insurance_fee = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_insurance_configs"
+

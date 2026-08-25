@@ -402,3 +402,18 @@ class VnWard(models.Model):
 
     def __str__(self):
         return self.name
+
+
+
+class VnEthnicity(models.Model):
+    code = models.CharField(max_length=2, unique=True)
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "vn_ethnicities"
+        ordering = ["code"]
+
+    def __str__(self):
+        return self.name

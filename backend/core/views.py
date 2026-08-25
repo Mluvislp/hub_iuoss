@@ -38,12 +38,19 @@ def login_view(request):
     ip = _get_ip(request)
     logger.info("LOGIN_ATTEMPT     | uid=%-20s | ip=%s", uid, ip)
 
-    if verify_ldap(uid, password) is None:
-        logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
-        messages.error(request, "Tài khoản hoặc mật khẩu không đúng.")
-        return render(request, "core/login.html", {"uid": uid, "next": next_url})
+    # ── DEBUG bypass: bỏ qua LDAP, chỉ tra DB ────────────────────────────
+    # Khi chạy local (DEBUG=True / DJANGO_ENV=local) không có LDAP server,
+    # nên bỏ qua bước xác thực mật khẩu và để check_login() tra thẳng DB.
+    # Production BẮT BUỘC phải qua LDAP trước.
+    if not settings.DEBUG:
+        if verify_ldap(uid, password) is None:
+            logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
+            messages.error(request, "Tài khoản hoặc mật khẩu không đúng.")
+            return render(request, "core/login.html", {"uid": uid, "next": next_url})
+    else:
+        logger.info("LOGIN_DEBUG_BYPASS | uid=%-20s | ip=%s | LDAP skipped", uid, ip)
 
-    # Mật khẩu đúng nhưng chưa chắc được vào — xem core/login_policy.py.
+    # Mật khẩu đúng (hoặc đã bypass) nhưng chưa chắc được vào — xem core/login_policy.py.
     decision = check_login(uid)
     if not decision.allowed:
         logger.warning(

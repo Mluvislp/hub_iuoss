@@ -30,7 +30,7 @@ from core.documents import (
 )
 from core import offcampus
 from students.models import (
-    Student, HealthInsuranceCard, CivicActivity, Hospital, VnProvince, VnWard,
+    Student, HealthInsuranceCard, CivicActivity, Hospital, VnProvince, VnWard, VnEthnicity,
 )
 from .authentication import IsHubAuthenticated
 from .tokens import HubRefreshToken
@@ -39,7 +39,10 @@ from .serializers import (
     HealthInsuranceCardSerializer,
     CivicActivitySerializer,
     ConfirmationRequestSerializer,
+    InsuranceRegistrationSerializer,
 )
+from core.models import HealthInsuranceRegistration
+
 
 logger = logging.getLogger(__name__)
 
@@ -201,14 +204,21 @@ class LoginView(APIView):
 
         logger.info("LOGIN_ATTEMPT     | uid=%-20s | ip=%s", uid, ip)
 
-        if verify_ldap(uid, password) is None:
-            logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
-            return Response(
-                {"detail": "Tài khoản hoặc mật khẩu không đúng."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+        # ── DEBUG bypass: bỏ qua LDAP, chỉ tra DB ────────────────────────
+        # Khi chạy local (DEBUG=True / DJANGO_ENV=local) không có LDAP server,
+        # nên bỏ qua bước xác thực mật khẩu và để check_login() tra thẳng DB.
+        # Production BẮT BUỘC phải qua LDAP trước.
+        if not settings.DEBUG:
+            if verify_ldap(uid, password) is None:
+                logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
+                return Response(
+                    {"detail": "Tài khoản hoặc mật khẩu không đúng."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+        else:
+            logger.info("LOGIN_DEBUG_BYPASS | uid=%-20s | ip=%s | LDAP skipped", uid, ip)
 
-        # Mật khẩu đúng nhưng chưa chắc được vào — xem core/login_policy.py.
+        # Mật khẩu đúng (hoặc đã bypass) nhưng chưa chắc được vào — xem core/login_policy.py.
         decision = check_login(uid)
         if not decision.allowed:
             logger.warning(
@@ -433,22 +443,202 @@ class HealthInsuranceView(APIView):
     def get(self, request):
         student_id = request.user.student_id
         if not student_id:
-            return Response({"current": None, "history": []})
+            return Response({"current": None, "history": [], "registrations": []})
 
         cards = list(
             HealthInsuranceCard.objects
             .filter(student_id=student_id)
             .select_related("registration_type")
         )
-        # is_current = thẻ đang dùng (KHÔNG phải "còn hiệu lực") — xem model.
         current = next((c for c in cards if c.is_current), None)
         history = [c for c in cards if c is not current]
+        
+        regs = list(
+            HealthInsuranceRegistration.objects
+            .filter(student_id=student_id)
+            .order_by("-created_at")
+        )
+        
+        reg_data = []
+        for r in regs:
+            reg_data.append({
+                "id": r.id,
+                "registration_year": r.registration_year,
+                "registration_period": r.registration_period,
+                "created_at": r.created_at,
+                "status": r.status,
+                "rejection_reason": getattr(r, 'rejection_reason', None),
+            })
 
         ctx = {"hospital_names": hospital_names(cards)}
         return Response({
             "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
+            "registrations": reg_data,
         })
+
+
+
+from rest_framework.parsers import MultiPartParser, FormParser
+
+class HospitalListView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        province_code = request.GET.get("province", "").strip()
+        search = request.GET.get("q", "").strip()
+        qs = Hospital.objects.filter(is_active=True)
+        if province_code:
+            qs = qs.filter(province_code=province_code)
+        if search:
+            qs = qs.filter(name__icontains=search)
+        
+        # Limit to 50 results to avoid massive payload
+        results = qs.values("code", "name")[:50]
+        return Response(list(results))
+
+class EthnicityListView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        qs = VnEthnicity.objects.filter(is_active=True).values("code", "name")
+        return Response(list(qs))
+
+from rest_framework.parsers import MultiPartParser, FormParser
+from core.models import HealthInsuranceRegistration, HealthInsuranceConfig
+from students.models import Student, StudentContactPoint, StudentIdentityDocument, StudentAddress, HealthInsuranceCard
+
+class InsuranceRegistrationView(APIView):
+    permission_classes = [IsHubAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_throttles(self):
+        if self.request.method == "POST":
+            self.throttle_scope = "create_request"
+            return super().get_throttles()
+        return []
+
+    def _student(self, request):
+        if not request.user.student_id:
+            return None
+        return Student.objects.filter(pk=request.user.student_id).first()
+
+    def get(self, request):
+        from core.profile_changes import _current_contact, _cccd_row
+        from students.models import StudentContactPoint, StudentAddress
+        student = self._student(request)
+        if not student:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."}, status=status.HTTP_400_BAD_REQUEST)
+
+        prefill = {
+            "full_name": student.full_name,
+            "student_code": student.current_student_code,
+            "gender": student.sex,
+            "dob": student.date_of_birth,
+        }
+
+        phone_row = _current_contact(student, StudentContactPoint.TYPE_MOBILE_PHONE)
+        prefill["phone_number"] = phone_row.contact_value if phone_row else ""
+
+        cccd_row = _cccd_row(student)
+        prefill["citizen_id"] = cccd_row.document_number if cccd_row else ""
+
+        addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
+        
+        permanent = addresses.get(StudentAddress.TYPE_CURRENT)
+        if permanent:
+            prefill["permanent_province"] = permanent.province_code or ""
+            prefill["permanent_ward"] = permanent.ward_code or ""
+            prefill["permanent_street"] = permanent.full_address or ""
+
+        temporary = addresses.get(StudentAddress.TYPE_TEMPORARY)
+        if temporary:
+            prefill["temporary_province"] = temporary.province_code or ""
+            prefill["temporary_ward"] = temporary.ward_code or ""
+            prefill["temporary_street"] = temporary.full_address or ""
+
+        card = student.health_insurance_cards.filter(is_current=True).first()
+        prefill["social_insurance_number"] = card.social_insurance_code if card else ""
+
+        return Response({"prefill": prefill})
+
+    def post(self, request):
+        student = self._student(request)
+        if not student:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = InsuranceRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+
+        from core.profile_changes import _current_contact, _cccd_row
+        from students.models import StudentContactPoint, StudentAddress
+        
+        change_log = {}
+        
+        phone_row = _current_contact(student, StudentContactPoint.TYPE_MOBILE_PHONE)
+        old_phone = phone_row.contact_value if phone_row else ""
+        if data["phone_number"] != old_phone:
+            change_log["phone_number"] = {"from": old_phone, "to": data["phone_number"]}
+
+        cccd_row = _cccd_row(student)
+        old_cccd = cccd_row.document_number if cccd_row else ""
+        if data["citizen_id"] != old_cccd:
+            change_log["citizen_id"] = {"from": old_cccd, "to": data["citizen_id"]}
+
+        card = student.health_insurance_cards.filter(is_current=True).first()
+        old_bhxh = card.social_insurance_code if card else ""
+        if data.get("social_insurance_number", "") != old_bhxh:
+            change_log["social_insurance_number"] = {"from": old_bhxh, "to": data.get("social_insurance_number", "")}
+
+        addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
+        
+        perm = addresses.get(StudentAddress.TYPE_CURRENT)
+        old_perm_prov = perm.province_code if perm else ""
+        old_perm_ward = perm.ward_code if perm else ""
+        old_perm_street = perm.full_address if perm else ""
+        
+        if (data["permanent_province"] != old_perm_prov or 
+            data["permanent_ward"] != old_perm_ward or 
+            data["permanent_street"] != old_perm_street):
+            change_log["permanent_address"] = {
+                "from": {"province": old_perm_prov, "ward": old_perm_ward, "street": old_perm_street},
+                "to": {"province": data["permanent_province"], "ward": data["permanent_ward"], "street": data["permanent_street"]}
+            }
+
+        temp = addresses.get(StudentAddress.TYPE_TEMPORARY)
+        old_temp_prov = temp.province_code if temp else ""
+        old_temp_ward = temp.ward_code if temp else ""
+        old_temp_street = temp.full_address if temp else ""
+        
+        if (data["temporary_province"] != old_temp_prov or 
+            data["temporary_ward"] != old_temp_ward or 
+            data["temporary_street"] != old_temp_street):
+            change_log["temporary_address"] = {
+                "from": {"province": old_temp_prov, "ward": old_temp_ward, "street": old_temp_street},
+                "to": {"province": data["temporary_province"], "ward": data["temporary_ward"], "street": data["temporary_street"]}
+            }
+
+        reg = HealthInsuranceRegistration(
+            student_id=request.user.student_id,
+            registration_year=data["registration_year"],
+            registration_period=data["registration_period"],
+            hospital_code=data["hospital_code"],
+            change_log=change_log,
+            status="pending"
+        )
+
+        if data.get("cccd_image"):
+            reg.cccd_image = data["cccd_image"]
+        if data.get("bhyt_image"):
+            reg.bhyt_image = data["bhyt_image"]
+        if data.get("payment_receipt_image"):
+            reg.payment_receipt_image = data["payment_receipt_image"]
+
+        reg.save()
+        return Response({"id": reg.id, "status": "pending"}, status=status.HTTP_201_CREATED)
 
 
 # ── GET + POST /api/requests/ ────────────────────────────────────────────────

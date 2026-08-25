@@ -16,6 +16,7 @@ import type {
   OffCampusForm,
   OffCampusSubmit,
   OffCampusResult,
+  InsuranceRegistrationPrefill,
 } from './types';
 
 // Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
@@ -55,6 +56,37 @@ async function request<T>(
   };
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+
+  if (res.status === 401 && !opts.skipAuthRedirect) {
+    clearAuth();
+    window.location.href = '/login';
+    throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
+  }
+
+  const data = res.headers.get('Content-Type')?.includes('application/json')
+    ? await res.json()
+    : {};
+
+  if (!res.ok) throw new ApiError(res.status, data as Record<string, unknown>);
+  return data as T;
+}
+
+/** POST multipart/form-data (cho file upload). Browser tự đặt Content-Type + boundary. */
+async function requestMultipart<T>(
+  path: string,
+  formData: FormData,
+  opts: RequestOptions = {},
+): Promise<T> {
+  const token = getToken();
+  const headers: HeadersInit = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
 
   if (res.status === 401 && !opts.skipAuthRedirect) {
     clearAuth();
@@ -231,6 +263,27 @@ export const api = {
     },
     wards(provinceCode: string): Promise<Ward[]> {
       return request(`/locations/wards/?province=${encodeURIComponent(provinceCode)}`);
+    },
+    ethnicities(): Promise<{ code: string; name: string }[]> {
+      return request('/locations/ethnicities/');
+    },
+  },
+
+  hospitals: {
+    search(provinceCode: string, q: string): Promise<{ code: string; name: string }[]> {
+      const params = new URLSearchParams();
+      if (provinceCode) params.set('province', provinceCode);
+      if (q) params.set('q', q);
+      return request(`/hospitals/?${params.toString()}`);
+    },
+  },
+
+  insuranceRegistration: {
+    prefill(): Promise<{ prefill: InsuranceRegistrationPrefill; config: { description: string; bank_name: string; bank_account_number: string; bank_account_name: string; insurance_fee: number; }; }> {
+      return request('/health-insurance/registrations/');
+    },
+    submit(formData: FormData): Promise<{ id: number; status: string }> {
+      return requestMultipart('/health-insurance/registrations/', formData);
     },
   },
 };

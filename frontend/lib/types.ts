@@ -52,9 +52,41 @@ export interface HealthInsuranceCard {
   is_current: boolean;
 }
 
+export interface HealthInsuranceRegistration {
+  id: number;
+  registration_year: number;
+  registration_period: string;
+  created_at: string;
+  status: 'pending' | 'processing' | 'done' | 'rejected';
+  rejection_reason: string | null;
+}
+
+export interface InsuranceRegistrationPrefill {
+  full_name: string;
+  student_code: string;
+  gender: string;
+  dob: string;
+  phone_number: string;
+  social_insurance_number: string;
+  citizen_id: string;
+  permanent_province: string;
+  permanent_ward: string;
+  permanent_street: string;
+  config: {
+    description: string;
+    insurance_fee: number;
+    bank_name: string;
+    bank_account_number: string;
+    bank_account_name: string;
+  };
+  is_eligible: boolean;
+  existing_registration_id: number | null;
+}
+
 export interface HealthInsuranceData {
   current: HealthInsuranceCard | null;
   history: HealthInsuranceCard[];
+  registrations: HealthInsuranceRegistration[];
 }
 
 export interface CivicActivity {
