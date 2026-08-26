@@ -13,6 +13,14 @@ import type { HealthInsuranceCard, HealthInsuranceData } from '@/lib/types';
 /** Ngưỡng nhắc gia hạn — dưới mức này thì hiện dòng lưu ý. */
 const EXPIRING_SOON_DAYS = 60;
 
+/** Mã đợt lưu trong DB → tên hiển thị. */
+const PERIOD_LABELS: Record<string, string> = {
+  MAIN: 'Đợt chính (Tháng 9)',
+  Q2: 'Đợt phụ Quý 2',
+  Q3: 'Đợt phụ Quý 3',
+  Q4: 'Đợt phụ Quý 4',
+};
+
 function Empty() {
   return <span className="italic font-normal text-slate-400">Chưa cập nhật</span>;
 }
@@ -227,7 +235,7 @@ export default function HealthInsurancePage() {
                 {data.registrations.map(reg => (
                   <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3 font-medium text-[0.85rem] text-ink">
-                      {reg.registration_period} - {reg.registration_year}
+                      {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} {reg.registration_year}
                     </td>
                     <td className="px-5 py-3 text-[0.82rem] text-slate-600">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3">
@@ -259,46 +267,30 @@ export default function HealthInsurancePage() {
               if (p.status === 'expired') return null;
               
               const isOpen = p.status === 'open';
+              // Mã đợt trong DB viết hoa ('MAIN'/'Q2'…), ở đây viết thường — so sánh cùng dạng.
+              const registered = !!data?.registrations?.some(
+                (r) => r.registration_period?.toUpperCase() === p.id.toUpperCase()
+                  && ['pending', 'processing', 'done'].includes(r.status),
+              );
+              const blocked = !data?.is_eligible || registered;
               return (
                 <div key={p.id} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
                       {isOpen ? 'Đang mở' : `Sẽ mở từ ${formatDate(p.startDate.toISOString())}`}
-                    <div className="mt-4">
-                      {isOpen ? (
-                        <Link
-                          href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
-                          className={cn(ui.btnPrimary, "w-full text-center")}
-                          onClick={(e) => {
-                            if (!data?.is_eligible || data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))) {
-                              e.preventDefault();
-                            }
-                          }}
-                          aria-disabled={!data?.is_eligible || data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))}
-                          style={(!data?.is_eligible || data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))) ? { pointerEvents: 'none', opacity: 0.5 } : {}}
-                        >
-                          {(() => {
-                            if (!data?.is_eligible) return "Không đủ điều kiện";
-                            if (data?.registrations?.some(r => r.registration_period === p.id && ['pending', 'processing', 'done'].includes(r.status))) return "Đã đăng ký";
-                            return "Đăng ký ngay";
-                          })()}
-                        </Link>
-                      ) : (
-                        <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
-                          Chưa mở
-                        </button>
-                      )}
-                    </div>
                     </p>
                   </div>
                   <div className="mt-4">
                     {isOpen ? (
                       <Link
                         href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
-                        className={ui.btnPrimary + " w-full"}
+                        className={cn(ui.btnPrimary, "w-full text-center")}
+                        onClick={(e) => { if (blocked) e.preventDefault(); }}
+                        aria-disabled={blocked}
+                        style={blocked ? { pointerEvents: 'none', opacity: 0.5 } : {}}
                       >
-                        Đăng ký ngay
+                        {!data?.is_eligible ? "Không đủ điều kiện" : registered ? "Đã đăng ký" : "Đăng ký ngay"}
                       </Link>
                     ) : (
                       <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>

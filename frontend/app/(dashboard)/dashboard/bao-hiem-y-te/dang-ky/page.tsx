@@ -8,16 +8,34 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
   ChevronRight, Home, Loader2, User, ShieldPlus, FileText,
-  Lock, Unlock, Plus, CreditCard, CheckSquare
+  Pencil, Plus, CreditCard, CheckSquare, Copy, Check
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import type { Province } from "@/lib/types";
+import type { Province, InsuranceRegistrationPrefill } from "@/lib/types";
 import AddressFields from "../../khai-bao-ngoai-tru/AddressFields";
+import SearchableSelect from "@/components/searchable-select";
+import QRCode from "react-qr-code";
+import { buildVietQrPayload, findBank, toAscii } from "@/lib/vietqr";
+import { readCccdQr, looksLikeCccdQr } from "@/lib/cccd-qr";
 import { getInsurancePeriods } from "@/lib/insurance-periods";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+/**
+ * Mã đợt → cách gọi đợt trong NỘI DUNG CHUYỂN KHOẢN.
+ *
+ * ⚠️ Không trùng với mã đợt: ba đợt phụ được Phòng CTSV đánh số 1/2/3 theo quý,
+ * riêng đợt tháng 9 gọi là "đợt chính". Ghi sai số đợt thì nhân viên đối soát
+ * nhầm kỳ thu, nên sửa ở đây phải hỏi lại Phòng CTSV.
+ */
+const PERIOD_IN_NOTE: Record<string, string> = {
+  Q2: "dot 1",
+  Q3: "dot 2",
+  Q4: "dot 3",
+  MAIN: "dot chinh",
+};
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
 const fileSchema = z
@@ -46,6 +64,7 @@ const schema = z.object({
   hospital_code: z.string().min(1, "Vui lòng chọn KCB ban đầu"),
   note: z.string().optional(),
   cccd_image: fileSchema,
+  cccd_image_back: fileSchema,
   bhyt_image: z.any().optional(),
   payment_receipt_image: fileSchema,
   confirm_declaration: z.boolean().refine((val) => val === true, {
@@ -54,6 +73,28 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
+
+/** Nút chép nhanh cho số tài khoản và nội dung chuyển khoản. */
+function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setDone(true);
+          setTimeout(() => setDone(false), 1500);
+        } catch {
+          // Trình duyệt chặn clipboard (http, quyền bị tắt) — người dùng bôi đen chép tay.
+        }
+      }}
+      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+    >
+      {done ? <><Check size={12} /> Đã chép</> : <><Copy size={12} /> Chép</>}
+    </button>
+  );
+}
 
 export default function InsuranceRegistrationPage() {
   return (
@@ -73,12 +114,22 @@ function InsuranceRegistrationForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [isLocked, setIsLocked] = useState(true);
+
+  // Hồ sơ gốc do API trả về. Quy tắc: trường nào ĐÃ ghi nhận thì khóa, trường
+  // nào còn trống thì mở sẵn ô nhập. Riêng Số sổ BHXH và Thường trú có nút
+  // "Chỉnh sửa" để mở lại.
+  const [prefill, setPrefill] = useState<InsuranceRegistrationPrefill | null>(null);
+  const [bhxhEditable, setBhxhEditable] = useState(false);
+
+  // Chuỗi QR đọc từ ảnh CCCD. Chỉ để gửi kèm và lưu lại — KHÔNG điền ngược vào
+  // form, và KHÔNG hiện thông báo nào ra màn hình sinh viên.
+  const [cccdQrRaw, setCccdQrRaw] = useState<string | null>(null);
+  const [addressEditable, setAddressEditable] = useState(false);
 
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [ethnicities, setEthnicities] = useState<{ code: string; name: string }[]>([]);
   const [hospitals, setHospitals] = useState<{ code: string; name: string }[]>([]);
-  const [hospitalSearch, setHospitalSearch] = useState("");
+  const [hospitalsLoading, setHospitalsLoading] = useState(false);
   const [hospitalProvince, setHospitalProvince] = useState("");
 
   // Sử dụng useMemo để giữ nguyên reference của periodObj giữa các lần render.
@@ -104,10 +155,6 @@ function InsuranceRegistrationForm() {
       router.push("/dashboard/bao-hiem-y-te");
       return;
     }
-    if (periodObj.status !== "open") {
-      setIsLocked(true);
-    }
-
     Promise.all([
       api.insuranceRegistration.prefill(),
       api.locations.provinces(),
@@ -116,6 +163,7 @@ function InsuranceRegistrationForm() {
       .then(([pref, provs, eths]) => {
         if (!alive) return;
         const p = pref.prefill;
+        setPrefill(p);
         setValue("full_name", p.full_name);
         setValue("student_code", p.student_code);
         setValue("gender", p.gender as "Nam"|"Nữ");
@@ -134,9 +182,6 @@ function InsuranceRegistrationForm() {
         if (pref.config) {
           setConfig(pref.config);
         }
-        if (p.existing_registration_id) {
-          setIsLocked(true);
-        }
         // Tắt trạng thái loading khi tải thành công
         setLoading(false);
       })
@@ -150,16 +195,107 @@ function InsuranceRegistrationForm() {
     return () => { alive = false; };
   }, [periodObj, router, setValue]);
 
+  // Danh mục dân tộc nạp bất đồng bộ. Phải gán value SAU khi <option> đã render,
+  // nếu không thẻ <select> lặng lẽ bỏ qua vì chưa có option nào khớp.
+  useEffect(() => {
+    if (ethnicities.length > 0 && prefill?.ethnicity) {
+      setValue("ethnicity", prefill.ethnicity);
+    }
+  }, [ethnicities, prefill, setValue]);
+
+  // Nạp toàn bộ cơ sở KCB của tỉnh đã chọn. Không cắt bớt: thiếu ô tìm kiếm
+  // riêng thì danh sách phải đủ, nếu không sẽ có cơ sở không cách nào chọn.
   useEffect(() => {
     if (!hospitalProvince) {
       setHospitals([]);
       return;
     }
-    const timer = setTimeout(() => {
-      api.hospitals.search(hospitalProvince, hospitalSearch).then(setHospitals).catch(console.error);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [hospitalSearch, hospitalProvince]);
+    let alive = true;
+    setHospitalsLoading(true);
+    api.hospitals.byProvince(hospitalProvince)
+      .then((rows) => { if (alive) setHospitals(rows); })
+      .catch(console.error)
+      .finally(() => { if (alive) setHospitalsLoading(false); });
+    return () => { alive = false; };
+  }, [hospitalProvince]);
+
+  // ── Mã QR chuyển khoản ────────────────────────────────────────────────
+  // Nội dung bám theo MSSV + họ tên đang hiển thị trên form, nên sinh viên sửa
+  // họ tên thì nội dung chuyển khoản đổi theo.
+  const studentCode = watch("student_code");
+  const fullName = watch("full_name");
+
+  // BIN lấy từ cấu hình trước. Chỉ khi cột bỏ trống mới dò theo tên ngân hàng —
+  // dò theo tên là phương án chữa cháy, không phải đường chính.
+  const bankBin = useMemo(() => {
+    const explicit = String(config?.bank_bin ?? "").trim();
+    if (/^\d{6}$/.test(explicit)) return explicit;
+    return findBank(config?.bank_name)?.bin ?? null;
+  }, [config]);
+  // Mẫu Phòng CTSV quy định: "HO VA TEN- MSSV- Thanh toan phi BHYT nam <năm> <đợt>".
+  // Bỏ dấu vì nhiều app ngân hàng cắt hỏng nội dung có dấu; họ tên viết hoa cho
+  // khớp mẫu.
+  const transferNote = useMemo(() => {
+    const dot = PERIOD_IN_NOTE[(periodObj?.id ?? "").toUpperCase()] ?? "dot chinh";
+    const name = toAscii(fullName ?? "").toUpperCase();
+    return toAscii(`${name}- ${studentCode ?? ""}- Thanh toan phi BHYT nam ${currentYear} ${dot}`);
+  }, [fullName, studentCode, periodObj, currentYear]);
+  const qrPayload = useMemo(() => {
+    if (!bankBin || !config?.bank_account_number) return null;
+    return buildVietQrPayload({
+      bin: bankBin,
+      accountNumber: config.bank_account_number,
+      amount: config.insurance_fee,
+      addInfo: transferNote,
+    });
+  }, [bankBin, config, transferNote]);
+
+  /** Hồ sơ gốc đã có giá trị cho trường này chưa. */
+  const recorded = (v?: string | null) => !!(v && String(v).trim());
+  const fieldCls = (locked: boolean) => cn(ui.input, locked && "bg-slate-50 text-slate-500");
+
+  const bhxhLocked = recorded(prefill?.social_insurance_number) && !bhxhEditable;
+  const hasAddress = recorded(prefill?.permanent_province)
+    && recorded(prefill?.permanent_ward)
+    && recorded(prefill?.permanent_street);
+  const addressLocked = hasAddress && !addressEditable;
+
+  // Tải ảnh CCCD lên là đọc QR ngay tại máy người dùng, IM LẶNG — không hiện
+  // thông báo nào cho sinh viên. Đọc được hay không đều không ảnh hưởng tới
+  // việc nộp đơn.
+  //
+  // Thử CẢ HAI mặt: CCCD gắn chip in QR ở mặt trước, còn thẻ Căn cước mẫu mới
+  // (từ 01/07/2024) dời QR sang mặt sau. Không đoán theo mẫu thẻ — ảnh nào ra
+  // chuỗi đúng khuôn thì lấy ảnh đó.
+  const cccdFrontFile = watch("cccd_image");
+  const cccdBackFile = watch("cccd_image_back");
+  useEffect(() => {
+    const files = [cccdFrontFile?.[0], cccdBackFile?.[0]].filter(Boolean) as File[];
+    if (files.length === 0) {
+      setCccdQrRaw(null);
+      return;
+    }
+
+    let alive = true;
+    (async () => {
+      for (const file of files) {
+        let raw: string | null = null;
+        try {
+          raw = await readCccdQr(file);
+        } catch {
+          raw = null;
+        }
+        if (!alive) return;
+        if (looksLikeCccdQr(raw)) {
+          setCccdQrRaw(raw);
+          return;
+        }
+      }
+      if (alive) setCccdQrRaw(null);
+    })();
+
+    return () => { alive = false; };
+  }, [cccdFrontFile, cccdBackFile]);
 
   const onSubmit = async (data: FormData) => {
     setSaving(true);
@@ -186,7 +322,9 @@ function InsuranceRegistrationForm() {
       if (data.note) fd.append("note", data.note);
 
       fd.append("cccd_image", data.cccd_image[0]);
+      fd.append("cccd_image_back", data.cccd_image_back[0]);
       if (data.bhyt_image && data.bhyt_image.length > 0) fd.append("bhyt_image", data.bhyt_image[0]);
+      if (cccdQrRaw) fd.append("cccd_qr_raw", cccdQrRaw);
       fd.append("payment_receipt_image", data.payment_receipt_image[0]);
 
       await api.insuranceRegistration.submit(fd);
@@ -241,67 +379,95 @@ function InsuranceRegistrationForm() {
       {error && <div className="p-4 bg-danger-soft border border-danger-line text-danger-text rounded-lg text-sm">{error}</div>}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <fieldset disabled={isLocked} className="space-y-6">
+        <fieldset className="space-y-6">
           
         <div className={ui.card}>
           <div className={ui.cardHeader}>
             <h2 className={ui.sectionTitle}><User size={16} className="text-primary" /> Thông tin cá nhân</h2>
-            {isLocked ? (
-              <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5 px-3 py-1.5"><Lock size={12} /> Đã khóa</span>
-            ) : (
-              <span className="text-xs font-medium text-primary flex items-center gap-1.5 px-3 py-1.5"><Unlock size={12} /> Đang chỉnh sửa</span>
-            )}
+            <span className="text-xs text-muted">Ô để trống là phần hồ sơ chưa có, mời bạn bổ sung</span>
           </div>
           
           <div className="p-5 space-y-6">
             <div className="grid sm:grid-cols-2 gap-5">
               <div>
                 <label className={ui.fieldLabel}>Họ và tên</label>
-                <input {...register("full_name")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")} />
+                <input {...register("full_name")} disabled={recorded(prefill?.full_name)} className={fieldCls(recorded(prefill?.full_name))} />
                 {errors.full_name && <p className="text-xs text-danger-text mt-1">{errors.full_name.message}</p>}
               </div>
               <div>
                 <label className={ui.fieldLabel}>Mã số sinh viên</label>
-                <input {...register("student_code")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")} />
+                <input {...register("student_code")} disabled={recorded(prefill?.student_code)} className={fieldCls(recorded(prefill?.student_code))} />
               </div>
               <div>
                 <label className={ui.fieldLabel}>Giới tính</label>
-                <select {...register("gender")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")}>
+                <select {...register("gender")} disabled={recorded(prefill?.gender)} className={fieldCls(recorded(prefill?.gender))}>
                   <option value="Nam">Nam</option>
                   <option value="Nữ">Nữ</option>
                 </select>
               </div>
               <div>
                 <label className={ui.fieldLabel}>Ngày sinh</label>
-                <input type="date" {...register("dob")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")} />
+                <input type="date" {...register("dob")} disabled={recorded(prefill?.dob)} className={fieldCls(recorded(prefill?.dob))} />
               </div>
               <div>
                 <label className={ui.fieldLabel}>Dân tộc</label>
-                <select {...register("ethnicity")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")}>
+                <select {...register("ethnicity")} disabled={recorded(prefill?.ethnicity)} className={fieldCls(recorded(prefill?.ethnicity))}>
                   <option value="">-- Chọn dân tộc --</option>
                   {ethnicities.map((e) => <option key={e.code} value={e.name}>{e.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className={ui.fieldLabel}>Số điện thoại</label>
-                <input {...register("phone_number")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")} />
+                <input {...register("phone_number")} disabled={recorded(prefill?.phone_number)} className={fieldCls(recorded(prefill?.phone_number))} />
                 {errors.phone_number && <p className="text-xs text-danger-text mt-1">{errors.phone_number.message}</p>}
               </div>
               <div>
                 <label className={ui.fieldLabel}>Số CCCD</label>
-                <input {...register("citizen_id")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")} />
+                <input {...register("citizen_id")} disabled={recorded(prefill?.citizen_id)} className={fieldCls(recorded(prefill?.citizen_id))} />
                 {errors.citizen_id && <p className="text-xs text-danger-text mt-1">{errors.citizen_id.message}</p>}
               </div>
               <div>
                 <label className={ui.fieldLabel}>Số sổ BHXH (Nếu có)</label>
-                <input {...register("social_insurance_number")} disabled={isLocked} className={cn(ui.input, isLocked && "bg-slate-50 text-slate-500")} />
+                <input {...register("social_insurance_number")} disabled={bhxhLocked} className={fieldCls(bhxhLocked)} />
+                {recorded(prefill?.social_insurance_number) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Hủy sửa thì trả về đúng giá trị trong hồ sơ gốc.
+                      if (bhxhEditable) setValue("social_insurance_number", prefill?.social_insurance_number ?? "");
+                      setBhxhEditable((v) => !v);
+                    }}
+                    className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <Pencil size={12} /> {bhxhEditable ? "Hủy sửa" : "Chỉnh sửa"}
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="pt-4 border-t border-line2">
-              <h3 className="text-sm font-semibold mb-3">Thường trú</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">Thường trú</h3>
+                {hasAddress && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Hủy sửa thì trả về đúng địa chỉ trong hồ sơ gốc.
+                      if (addressEditable) setValue("permanent", {
+                        provinceCode: prefill?.permanent_province ?? "",
+                        wardCode: prefill?.permanent_ward ?? "",
+                        street: prefill?.permanent_street ?? "",
+                      });
+                      setAddressEditable((v) => !v);
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <Pencil size={12} /> {addressEditable ? "Hủy sửa" : "Chỉnh sửa"}
+                  </button>
+                )}
+              </div>
               <Controller control={control} name="permanent" render={({ field }) => (
-                <div className={cn("transition-opacity", isLocked && "opacity-70 pointer-events-none")}>
+                <div className={cn("transition-opacity", addressLocked && "opacity-70 pointer-events-none")}>
                   <AddressFields idPrefix="perm" value={field.value || { provinceCode: "", wardCode: "", street: "" }} onChange={field.onChange} provinces={provinces} errors={{ province: errors.permanent?.provinceCode?.message, ward: errors.permanent?.wardCode?.message, street: errors.permanent?.street?.message }} />
                 </div>
               )} />
@@ -318,25 +484,41 @@ function InsuranceRegistrationForm() {
             <h2 className={ui.sectionTitle}><ShieldPlus size={16} className="text-primary" /> Nơi KCB</h2>
           </div>
           <div className="p-5 space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className={ui.fieldLabel}>Tỉnh thành bệnh viện</label>
-                <select value={hospitalProvince} onChange={(e) => { setHospitalProvince(e.target.value); setValue("hospital_code", ""); }} className={ui.input}>
-                  <option value="">-- Chọn --</option>
-                  {provinces.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={ui.fieldLabel}>Tìm kiếm</label>
-                <input type="text" value={hospitalSearch} onChange={(e) => setHospitalSearch(e.target.value)} disabled={!hospitalProvince} className={ui.input} placeholder="Gõ tên..." />
-              </div>
+            <div>
+              <label className={ui.fieldLabel} htmlFor="kcb-province">Tỉnh thành bệnh viện</label>
+              <SearchableSelect
+                id="kcb-province"
+                value={hospitalProvince}
+                onChange={(v) => { setHospitalProvince(v); setValue("hospital_code", ""); }}
+                options={provinces.map((p) => ({ value: p.code, label: p.name }))}
+                placeholder="-- Chọn tỉnh thành --"
+                searchPlaceholder="Gõ tên tỉnh thành..."
+                emptyText="Không có tỉnh thành nào khớp"
+              />
             </div>
             <div>
-              <label className={ui.fieldLabel}>Bệnh viện</label>
-              <select {...register("hospital_code")} className={cn(ui.input, "h-auto py-2")}>
-                <option value="">-- Chọn bệnh viện KCB --</option>
-                {hospitals.map((h) => <option key={h.code} value={h.code}>{h.code} - {h.name}</option>)}
-              </select>
+              <label className={ui.fieldLabel} htmlFor="kcb-hospital">Bệnh viện</label>
+              <Controller control={control} name="hospital_code" render={({ field }) => (
+                <SearchableSelect
+                  id="kcb-hospital"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={hospitals.map((h) => ({ value: h.code, label: h.name, hint: h.code }))}
+                  disabled={!hospitalProvince || hospitalsLoading}
+                  placeholder={
+                    !hospitalProvince ? "-- Chọn tỉnh thành trước --"
+                      : hospitalsLoading ? "Đang tải danh sách..."
+                      : "-- Chọn bệnh viện KCB --"
+                  }
+                  searchPlaceholder="Gõ tên hoặc mã cơ sở..."
+                  emptyText="Không có cơ sở nào khớp"
+                />
+              )} />
+              {hospitalProvince && !hospitalsLoading && (
+                <p className="mt-1.5 text-xs text-muted">
+                  {hospitals.length} cơ sở trong tỉnh này. Gõ tên hoặc mã để tìm, không dấu cũng được.
+                </p>
+              )}
               {errors.hospital_code && <p className="text-xs text-danger-text mt-1">{errors.hospital_code.message}</p>}
             </div>
           </div>
@@ -348,68 +530,119 @@ function InsuranceRegistrationForm() {
               <h2 className={ui.sectionTitle}><CreditCard size={16} className="text-primary" /> Thanh toán & Hồ sơ</h2>
             </div>
           <div className="p-5 space-y-6">
-            <div className="bg-slate-50 p-4 rounded-lg border border-line flex flex-col md:flex-row items-center gap-6">
-              <div className="w-32 h-32 bg-white border border-line rounded-lg flex items-center justify-center p-2 flex-shrink-0">
-                <div className="w-full h-full border-4 border-slate-800 flex items-center justify-center bg-white">
-                  <div className="text-primary font-bold text-xs">VietQR</div>
-                </div>
+            <div className="flex flex-col items-start gap-6 rounded-lg border border-line bg-slate-50 p-4 md:flex-row">
+              <div className="mx-auto shrink-0 text-center md:mx-0">
+                {qrPayload ? (
+                  <>
+                    <div className="rounded-lg border border-line bg-white p-3">
+                      <QRCode value={qrPayload} size={148} level="M" style={{ height: 148, width: 148 }} />
+                    </div>
+                    <p className="mt-2 text-xs text-muted">Quét bằng app ngân hàng bất kỳ</p>
+                  </>
+                ) : (
+                  <div className="flex h-[176px] w-[176px] items-center justify-center rounded-lg border border-dashed border-line bg-white px-4 text-center text-xs text-muted">
+                    Chưa tạo được mã QR. Vui lòng chuyển khoản thủ công theo thông tin bên cạnh.
+                  </div>
+                )}
               </div>
-              <div>
-                <h3 className="font-bold mb-2">Thông tin chuyển khoản</h3>
-                <ul className="text-sm text-slate-600 space-y-1">
-                  <li>Ngân hàng: <strong>{config?.bank_name || "Vietcombank"}</strong></li>
-                  <li>Số tài khoản: <strong>{config?.bank_account_number || "0123456789"}</strong></li>
-                  <li>Chủ tài khoản: <strong>{config?.bank_account_name || "ĐẠI HỌC QUỐC TẾ"}</strong></li>
-                  <li>Số tiền: <strong className="text-primary text-base">
-                    {config?.insurance_fee 
-                      ? new Intl.NumberFormat('vi-VN').format(config.insurance_fee) 
-                      : "631.800"} VNĐ
-                  </strong></li>
-                  <li>Nội dung: <strong>BHYT - MSSV - Họ Tên</strong></li>
+
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-2 font-semibold text-ink">Thông tin chuyển khoản</h3>
+                <ul className="space-y-1.5 text-sm text-slate-600">
+                  <li>
+                    Ngân hàng: <strong className="text-ink">{config?.bank_name || "—"}</strong>
+                    {bankBin && <span className="ml-1.5 text-xs text-muted">(BIN {bankBin})</span>}
+                  </li>
+                  <li className="flex flex-wrap items-center gap-x-2">
+                    <span>Số tài khoản: <strong className="font-mono text-ink">{config?.bank_account_number || "—"}</strong></span>
+                    {config?.bank_account_number && <CopyButton text={config.bank_account_number} />}
+                  </li>
+                  <li>Chủ tài khoản: <strong className="text-ink">{config?.bank_account_name || "—"}</strong></li>
+                  <li>
+                    Số tiền: <strong className="text-base text-primary">
+                      {config?.insurance_fee ? new Intl.NumberFormat("vi-VN").format(config.insurance_fee) : "—"} VNĐ
+                    </strong>
+                  </li>
+                  <li className="flex flex-wrap items-center gap-x-2">
+                    <span>Nội dung: <strong className="break-all text-ink">{transferNote}</strong></span>
+                    <CopyButton text={transferNote} />
+                  </li>
                 </ul>
+                <p className="mt-3 text-xs text-muted">
+                  Mã QR đã gồm sẵn số tài khoản, số tiền và nội dung. Giữ nguyên nội dung chuyển
+                  khoản để Phòng CTSV đối chiếu được đơn của bạn.
+                </p>
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-5">
-              <div>
-                <label className={ui.fieldLabel}>Ảnh CCCD (Bắt buộc)</label>
-                <div className="relative border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                  <input type="file" accept="image/*" {...register("cccd_image")} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+            <div className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex flex-col">
+                <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1")}>
+                  <span>Ảnh CCCD mặt trước</span><span className="text-danger-text" title="Bắt buộc">*</span>
+                </label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                  <input type="file" accept="image/*" {...register("cccd_image")} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                      {watch('cccd_image') && watch('cccd_image').length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <Plus size={20} />}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-500 transition-transform group-hover:scale-110">
+                      {watch("cccd_image")?.length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <Plus size={20} />}
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{watch('cccd_image') && watch('cccd_image').length > 0 ? watch('cccd_image')[0].name : 'Tải lên ảnh CCCD'}</span>
-                    <span className="text-xs text-slate-500">Kích thước tối đa 5MB</span>
+                    <span className="text-sm font-medium text-slate-700 break-all">
+                      {watch("cccd_image")?.length > 0 ? watch("cccd_image")[0].name : "Tải lên mặt trước"}
+                    </span>
+                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
                   </div>
                 </div>
-                {errors.cccd_image && <p className="text-xs text-danger-text mt-1">{errors.cccd_image.message as string}</p>}
+                {errors.cccd_image && <p className="mt-1 text-xs text-danger-text">{errors.cccd_image.message as string}</p>}
               </div>
-              
-              <div>
-                <label className={ui.fieldLabel}>Bill chuyển khoản (Bắt buộc)</label>
-                <div className="relative border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                  <input type="file" accept="image/*" {...register("payment_receipt_image")} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              <div className="flex flex-col">
+                <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1")}>
+                  <span>Ảnh CCCD mặt sau</span><span className="text-danger-text" title="Bắt buộc">*</span>
+                </label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                  <input type="file" accept="image/*" {...register("cccd_image_back")} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                      {watch('payment_receipt_image') && watch('payment_receipt_image').length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <CreditCard size={20} />}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-500 transition-transform group-hover:scale-110">
+                      {watch("cccd_image_back")?.length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <Plus size={20} />}
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{watch('payment_receipt_image') && watch('payment_receipt_image').length > 0 ? watch('payment_receipt_image')[0].name : 'Tải lên biên lai'}</span>
-                    <span className="text-xs text-slate-500">Kích thước tối đa 5MB</span>
+                    <span className="text-sm font-medium text-slate-700 break-all">
+                      {watch("cccd_image_back")?.length > 0 ? watch("cccd_image_back")[0].name : "Tải lên mặt sau"}
+                    </span>
+                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
                   </div>
                 </div>
-                {errors.payment_receipt_image && <p className="text-xs text-danger-text mt-1">{errors.payment_receipt_image.message as string}</p>}
+                {errors.cccd_image_back && <p className="mt-1 text-xs text-danger-text">{errors.cccd_image_back.message as string}</p>}
               </div>
-              
-              <div>
-                <label className={ui.fieldLabel}>Thẻ BHYT cũ (Tuỳ chọn)</label>
-                <div className="relative border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-                  <input type="file" accept="image/*" {...register("bhyt_image")} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              <div className="flex flex-col">
+                <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1")}>
+                  <span>Bill chuyển khoản</span><span className="text-danger-text" title="Bắt buộc">*</span>
+                </label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                  <input type="file" accept="image/*" {...register("payment_receipt_image")} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                      {watch('bhyt_image') && watch('bhyt_image').length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <FileText size={20} />}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 transition-transform group-hover:scale-110">
+                      {watch("payment_receipt_image")?.length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <CreditCard size={20} />}
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{watch('bhyt_image') && watch('bhyt_image').length > 0 ? watch('bhyt_image')[0].name : 'Tải lên thẻ BHYT cũ'}</span>
+                    <span className="text-sm font-medium text-slate-700 break-all">
+                      {watch("payment_receipt_image")?.length > 0 ? watch("payment_receipt_image")[0].name : "Tải lên biên lai"}
+                    </span>
+                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
+                  </div>
+                </div>
+                {errors.payment_receipt_image && <p className="mt-1 text-xs text-danger-text">{errors.payment_receipt_image.message as string}</p>}
+              </div>
+              <div className="flex flex-col">
+                <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1")}>
+                  <span>Thẻ BHYT cũ</span><span className="text-xs font-normal text-muted">(tuỳ chọn)</span>
+                </label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                  <input type="file" accept="image/*" {...register("bhyt_image")} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-500 transition-transform group-hover:scale-110">
+                      {watch("bhyt_image")?.length > 0 ? <CheckSquare size={20} className="text-success-text" /> : <FileText size={20} />}
+                    </div>
+                    <span className="text-sm font-medium text-slate-700 break-all">
+                      {watch("bhyt_image")?.length > 0 ? watch("bhyt_image")[0].name : "Tải lên thẻ BHYT cũ"}
+                    </span>
                     <span className="text-xs text-slate-500">Không bắt buộc</span>
                   </div>
                 </div>
@@ -432,7 +665,7 @@ function InsuranceRegistrationForm() {
 
         <div className="flex justify-end gap-3">
           <Link href="/dashboard/bao-hiem-y-te" className={ui.btnGhost}>Hủy</Link>
-          <button type="submit" disabled={saving || isLocked} className={ui.btnPrimary}>
+          <button type="submit" disabled={saving} className={ui.btnPrimary}>
             {saving ? <Loader2 size={16} className="animate-spin" /> : null} Gửi đăng ký
           </button>
         </div>

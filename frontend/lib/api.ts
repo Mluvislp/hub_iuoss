@@ -270,16 +270,14 @@ export const api = {
   },
 
   hospitals: {
-    search(provinceCode: string, q: string): Promise<{ code: string; name: string }[]> {
-      const params = new URLSearchParams();
-      if (provinceCode) params.set('province', provinceCode);
-      if (q) params.set('q', q);
-      return request(`/hospitals/?${params.toString()}`);
+    /** Toàn bộ cơ sở KCB của một tỉnh, đã xếp theo tên. */
+    byProvince(provinceCode: string): Promise<{ code: string; name: string }[]> {
+      return request(`/hospitals/?province=${encodeURIComponent(provinceCode)}`);
     },
   },
 
   insuranceRegistration: {
-    prefill(): Promise<{ prefill: InsuranceRegistrationPrefill; config: { description: string; bank_name: string; bank_account_number: string; bank_account_name: string; insurance_fee: number; }; }> {
+    prefill(): Promise<{ prefill: InsuranceRegistrationPrefill; config: { description: string; bank_name: string; bank_bin: string; bank_account_number: string; bank_account_name: string; insurance_fee: number; }; }> {
       return request('/health-insurance/registrations/');
     },
     submit(formData: FormData): Promise<{ id: number; status: string }> {

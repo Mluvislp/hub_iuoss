@@ -66,6 +66,7 @@ export interface InsuranceRegistrationPrefill {
   student_code: string;
   gender: string;
   dob: string;
+  ethnicity: string;
   phone_number: string;
   social_insurance_number: string;
   citizen_id: string;
@@ -76,6 +77,7 @@ export interface InsuranceRegistrationPrefill {
     description: string;
     insurance_fee: number;
     bank_name: string;
+    bank_bin: string;
     bank_account_number: string;
     bank_account_name: string;
   };

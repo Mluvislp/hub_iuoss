@@ -151,11 +151,22 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
         "required": "Vui lòng chọn bệnh viện KCB ban đầu.",
     })
     cccd_image = serializers.FileField(required=True, error_messages={
-        "required": "Vui lòng đính kèm ảnh CCCD.",
-        "null": "Vui lòng đính kèm ảnh CCCD.",
-        "invalid": "Vui lòng đính kèm ảnh CCCD."
+        "required": "Vui lòng đính kèm ảnh CCCD mặt trước.",
+        "null": "Vui lòng đính kèm ảnh CCCD mặt trước.",
+        "invalid": "Vui lòng đính kèm ảnh CCCD mặt trước.",
+    })
+    cccd_image_back = serializers.FileField(required=True, error_messages={
+        "required": "Vui lòng đính kèm ảnh CCCD mặt sau.",
+        "null": "Vui lòng đính kèm ảnh CCCD mặt sau.",
+        "invalid": "Vui lòng đính kèm ảnh CCCD mặt sau.",
     })
     bhyt_image = serializers.FileField(required=False, allow_null=True)
+    # Chuỗi thô đọc từ mã QR trên ảnh CCCD, do trình duyệt giải mã. Trình duyệt
+    # thử cả hai mặt (CCCD gắn chip in ở mặt trước, thẻ Căn cước mẫu mới in ở
+    # mặt sau). Không bắt buộc: ảnh mờ thì vẫn phải nộp đơn được.
+    cccd_qr_raw = serializers.CharField(
+        required=False, allow_blank=True, max_length=512, trim_whitespace=True,
+    )
     payment_receipt_image = serializers.FileField(required=True, error_messages={
         "required": "Vui lòng đính kèm ảnh biên lai thanh toán.",
         "null": "Vui lòng đính kèm ảnh biên lai thanh toán.",
@@ -212,7 +223,10 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
         return f
 
     def validate_cccd_image(self, value):
-        return self._validate_file(value, "Ảnh CCCD")
+        return self._validate_file(value, "Ảnh CCCD mặt trước")
+
+    def validate_cccd_image_back(self, value):
+        return self._validate_file(value, "Ảnh CCCD mặt sau")
 
     def validate_bhyt_image(self, value):
         return self._validate_file(value, "Ảnh thẻ BHYT cũ")
