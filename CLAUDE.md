@@ -34,10 +34,10 @@ Cả hai dùng chung **MySQL database** `iuoss_student_data`. Không có API gi�
 ### Backend (`backend/`) — Django REST API
 
 - [x] LDAP authentication hoàn toàn tùy chỉnh — không dùng `django.contrib.auth`
-- [x] Session management: `core/session.py`, cookie `hub_sessionid`
-- [x] Decorator `@hub_login_required`
+- [x] Đăng nhập Microsoft / Entra ID (song song LDAP)
+- [x] Xác thực bằng **JWT** (SimpleJWT, claim `ldap_uid`) — không còn session cookie
 - [x] Logging phân tầng: `backend/logs/auth.log` + `backend/logs/app.log`
-- [x] Sidebar layout Django templates còn dùng tạm trong giai đoạn chuyển đổi
+- [x] Backend **chỉ phục vụ `/api/`** — giao diện render bằng template Django đã gỡ bỏ
 - [x] Dashboard: 4 stat cards + BHYT + sinh hoạt công dân + yêu cầu giấy tờ
 - [x] Models read-only: `Student`, `Department`, `DegreeLevel`, `StudentStatus`, `HealthInsuranceCard`, `CivicActivity`
 - [x] Bảng `hub_confirmation_requests` — form tạo, danh sách theo dõi
@@ -63,14 +63,9 @@ Cả hai dùng chung **MySQL database** `iuoss_student_data`. Không có API gi�
 
 `django.contrib.auth` **không có** trong `INSTALLED_APPS`.
 
-```python
-# Thay thế:
-from core.session import current_student
-from core.decorators import hub_login_required
-
-student_session = current_student(request)
-# → {"ldap_uid", "student_id", "student_code", "full_name"}
-```
+Thay thế: **JWT** của SimpleJWT, claim định danh là `ldap_uid` (= MSSV hiện tại).
+Trong view DRF, danh tính lấy từ token đã xác thực chứ không phải `request.user`
+của Django. Xem `core/api/views.py::issue_session()` và `docs/AUTH_FLOW.md`.
 
 ### 2. Backend: Không chạy `makemigrations`
 
@@ -101,14 +96,11 @@ Middleware đọc cookie `hub_token`. Login page set cookie này sau khi API tr�
 ```
 backend/
   config/settings.py         ← LDAP config, SESSION config, LOGGING, MIGRATION_MODULES
-  config/urls.py             ← URL root (mount core.urls)
+  config/urls.py             ← URL root — CHỈ mount core.api.urls dưới /api/
   core/auth.py               ← verify_ldap() — LDAP 2-bước bind
-  core/session.py            ← set/get/clear student session
-  core/decorators.py         ← @hub_login_required
+  core/login_policy.py       ← check_login() — ai được phép vào cổng
   core/models.py             ← HubStudent, ConfirmationRequest
-  core/views.py              ← login_view, logout_view, home_view, confirmation_request_create_view
-  core/urls.py               ← routes: /, /login/, /logout/, /requests/new/
-  core/templates/core/       ← Django templates (tạm dùng, sẽ thay bằng Next.js)
+  core/api/                  ← toàn bộ endpoint DRF (đăng nhập, hồ sơ, yêu cầu…)
   students/models.py         ← read-only models từ shared DB
   logs/auth.log              ← log login/logout/LDAP
   logs/app.log               ← log Django warnings/errors

@@ -45,14 +45,11 @@ hub_iuoss/
 │   │   ├── settings.py          ← tất cả cấu hình (DB, LDAP, SESSION, LOGGING)
 │   │   ├── urls.py              ← URL root
 │   │   └── wsgi.py
-│   ├── core/                    ← app chính: auth, session, views, models hub
+│   ├── core/                    ← app chính: auth, models hub, API
 │   │   ├── auth.py              ← verify_ldap() — 2-bước bind
-│   │   ├── session.py           ← đọc/ghi hub_student session
-│   │   ├── decorators.py        ← @hub_login_required
+│   │   ├── login_policy.py      ← check_login() — ai được vào cổng
 │   │   ├── models.py            ← HubStudent, ConfirmationRequest
-│   │   ├── views.py             ← views hiện tại (Django templates)
-│   │   ├── urls.py              ← routes: /, /login/, /logout/, /requests/new/
-│   │   └── templates/core/      ← Django templates (giai đoạn chuyển tiếp)
+│   │   └── api/                 ← toàn bộ endpoint DRF (mount dưới /api/)
 │   ├── students/
 │   │   └── models.py            ← read-only: Student, Dept, Degree, Status, BHYT, CivicActivity
 │   ├── logs/
@@ -118,20 +115,12 @@ hub_iuoss/
 | Component | File | Vai trò |
 |---|---|---|
 | Xác thực LDAP | `backend/core/auth.py` | 2-bước bind: service account → user bind |
-| Quản lý session | `backend/core/session.py` | Đọc/ghi `request.session["hub_student"]` |
-| Bảo vệ views | `backend/core/decorators.py` | `@hub_login_required` |
+| Chính sách vào cổng | `backend/core/login_policy.py` | `check_login()` — trạng thái SV, mã cũ |
+| Phát token | `backend/core/api/views.py` | `issue_session()` → JWT claim `ldap_uid` |
 | Lưu login history | `backend/core/models.py` | `HubStudent` → bảng `hub_students` |
 
-**Không** có `django.contrib.auth` trong `INSTALLED_APPS`. Không dùng `request.user`, `@login_required`, `auth.login()`.
-
-```python
-from core.session import current_student
-from core.decorators import hub_login_required
-
-student_session = current_student(request)
-# → {"ldap_uid": "BABAWE21603", "student_id": 12345,
-#    "student_code": "BABAWE21603", "full_name": "Nguyễn Văn A"}
-```
+**Không** có `django.contrib.auth` trong `INSTALLED_APPS`. Không dùng `request.user`,
+`@login_required`, `auth.login()`. Danh tính lấy từ **JWT**, không phải session cookie.
 
 ### 2. Backend: Quản lý schema DB thủ công
 
@@ -178,17 +167,7 @@ Trong production, Nginx cũng proxy `/api/` về Gunicorn :8002 (hai tầng, red
 
 ## Luồng auth tổng thể
 
-### Backend (hiện tại — Django session)
-
-```
-Sinh viên nhập uid + password
-  → core/auth.py::verify_ldap() → LDAP server
-  → login_view() → tìm Student trong DB
-  → set_student_session() → request.session["hub_student"]
-  → redirect về home_view()
-```
-
-### Frontend → Backend (roadmap — JWT)
+### Frontend → Backend (JWT — đường duy nhất)
 
 ```
 Sinh viên nhập uid + password
@@ -254,7 +233,7 @@ MySQL    :3306  (iuoss_student_data)
 | Schema bảng hub | `docs/schema.sql` |
 | Config Django | `backend/config/settings.py` |
 | LDAP logic | `backend/core/auth.py` |
-| Session management | `backend/core/session.py` |
+| Chính sách đăng nhập | `backend/core/login_policy.py` |
 | API client (frontend) | `frontend/lib/api.ts` |
 | TypeScript types | `frontend/lib/types.ts` |
 | Route protection | `frontend/middleware.ts` |

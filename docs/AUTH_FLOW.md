@@ -2,23 +2,27 @@
 
 ## Tổng quan
 
-Hub không dùng `django.contrib.auth`. Toàn bộ authentication được xây từ đầu với 3 thành phần:
+Hub không dùng `django.contrib.auth`. Toàn bộ authentication được xây từ đầu:
 
 | File | Vai trò |
 |---|---|
 | `core/auth.py` | Kết nối LDAP, xác minh credentials |
-| `core/session.py` | Quản lý session sau khi login thành công |
-| `core/decorators.py` | Bảo vệ views yêu cầu đăng nhập |
+| `core/login_policy.py` | `check_login()` — quyết định ai được phép vào cổng |
+| `core/api/views.py` | Endpoint đăng nhập (LDAP + Microsoft), phát JWT |
+
+> Backend **chỉ phục vụ API**. Bản giao diện render bằng template Django (kèm
+> session cookie, `core/views.py`, `core/session.py`, `core/decorators.py`) đã được
+> **gỡ bỏ hoàn toàn** — giao diện duy nhất là Next.js, xác thực duy nhất là JWT.
 
 ---
 
 ## Luồng đăng nhập chi tiết
 
 ```
-[Browser] POST /login/ {uid, password}
+[Browser] POST /api/auth/login/ {uid, password}
          │
          ▼
-login_view (core/views.py)
+LoginView (core/api/views.py)
     │  validate: uid và password không rỗng
     │
     ▼ verify_ldap(uid, password)  ← core/auth.py
@@ -38,19 +42,17 @@ login_view (core/views.py)
     │
     ▼ check_login(uid)  ← core/login_policy.py
     │  Xét có được vào cổng không (xem mục "Điều kiện được phép vào cổng")
-    │  → Bị chặn: API trả 403 + câu giải thích, view Django hiện messages.error
-    │             KHÔNG tạo session, KHÔNG đụng hub_students
+    │  → Bị chặn: trả 403 + câu giải thích.
+    │             KHÔNG phát token, KHÔNG đụng hub_students
     │
     ▼ (được phép)
-    │  Tạo/update HubStudent: hub_students (ldap_uid, student_id, last_login_at, login_count)
+    │  HubStudent.record_login(): hub_students
+    │  (ldap_uid, student_id, last_login_at, last_login_ldap_at, login_count)
     │
-    ▼ set_student_session(request, ...)  ← core/session.py
-    │  request.session["hub_student"] = {
-    │      ldap_uid, student_id, student_code, full_name
-    │  }
-    │  session.cycle_key()  ← chống session fixation
+    ▼ issue_session() → phát JWT (claim `ldap_uid`)
+    │  { access, refresh, student: {…} }
     │
-    ▼ redirect → next_url hoặc /
+    ▼ Next.js lưu token, chuyển hướng tới `next` hoặc /dashboard
 ```
 
 ---

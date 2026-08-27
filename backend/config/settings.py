@@ -76,7 +76,6 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.messages.context_processors.messages",
-                "core.context_processors.feature_flags",
             ],
         },
     },
@@ -142,9 +141,6 @@ MS_REDIRECT_URI = os.getenv(
 # tenant nên kiểm `tid` không phân biệt được — bắt buộc lọc theo hậu tố này.
 MS_ALLOWED_EMAIL_DOMAIN = os.getenv("MS_ALLOWED_EMAIL_DOMAIN", "student.hcmiu.edu.vn")
 MS_LOGIN_ENABLED = bool(MS_TENANT_ID and MS_CLIENT_ID and MS_CLIENT_SECRET)
-
-# Không dùng Django auth, dùng custom hub login
-HUB_LOGIN_URL = "/login/"
 
 # ── Bảo mật & Reverse proxy ──────────────────────────────────────────────────
 # Django chạy sau Nginx + Cloudflare Tunnel: SSL kết thúc ở tầng trên, Gunicorn
@@ -271,11 +267,6 @@ LOGGING = {
         "core.auth": {
             "handlers": ["auth_file", "console"],
             "level": "DEBUG",
-            "propagate": False,
-        },
-        "core.views": {
-            "handlers": ["auth_file", "console"],
-            "level": "INFO",
             "propagate": False,
         },
         "core.api.views": {
