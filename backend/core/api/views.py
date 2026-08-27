@@ -235,21 +235,18 @@ class LoginView(APIView):
 
         logger.info("LOGIN_ATTEMPT     | uid=%-20s | ip=%s", uid, ip)
 
-        # ── DEBUG bypass: bỏ qua LDAP, chỉ tra DB ────────────────────────
-        # Khi chạy local (DEBUG=True / DJANGO_ENV=local) không có LDAP server,
-        # nên bỏ qua bước xác thực mật khẩu và để check_login() tra thẳng DB.
-        # Production BẮT BUỘC phải qua LDAP trước.
-        if not settings.DEBUG:
-            if verify_ldap(uid, password) is None:
-                logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
-                return Response(
-                    {"detail": "Tài khoản hoặc mật khẩu không đúng."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
-        else:
-            logger.info("LOGIN_DEBUG_BYPASS | uid=%-20s | ip=%s | LDAP skipped", uid, ip)
+        # KHÔNG thêm nhánh bỏ qua verify_ldap() cho môi trường dev. Từng có một
+        # nhánh như vậy gắn với settings.DEBUG; mà DEBUG lại tự bật khi thiếu
+        # DJANGO_ENV trong .env, nên toàn bộ an toàn treo vào một dòng cấu hình:
+        # đặt sai là đăng nhập được bằng MSSV bất kỳ, không cần mật khẩu.
+        if verify_ldap(uid, password) is None:
+            logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
+            return Response(
+                {"detail": "Tài khoản hoặc mật khẩu không đúng."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
-        # Mật khẩu đúng (hoặc đã bypass) nhưng chưa chắc được vào — xem core/login_policy.py.
+        # Mật khẩu đúng nhưng chưa chắc được vào — xem core/login_policy.py.
         decision = check_login(uid)
         if not decision.allowed:
             logger.warning(
