@@ -116,12 +116,87 @@ class HubStudent(models.Model):
         return row
 
 
+import os
+import re
+from django.db import models
+from django.utils import timezone
+
+# 1. Hàm hỗ trợ xóa dấu tiếng Việt
+def remove_vietnamese_accents(s):
+    if not s:
+        return ""
+    s = re.sub(r'[àáạảãâầấậẩẫăằắặẳẵ]', 'a', s)
+    s = re.sub(r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]', 'A', s)
+    s = re.sub(r'[èéẹẻẽêềếệểễ]', 'e', s)
+    s = re.sub(r'[ÈÉẸẺẼÊỀẾỆỂỄ]', 'E', s)
+    s = re.sub(r'[òóọỏõôồốộổỗơờớợởỡ]', 'o', s)
+    s = re.sub(r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]', 'O', s)
+    s = re.sub(r'[ìíịỉĩ]', 'i', s)
+    s = re.sub(r'[ÌÍỊỈĨ]', 'I', s)
+    s = re.sub(r'[ùúụủũưừứựửữ]', 'u', s)
+    s = re.sub(r'[ÙÚỤỦŨƯỪỨỰỬỮ]', 'U', s)
+    s = re.sub(r'[ỳýỵỷỹ]', 'y', s)
+    s = re.sub(r'[ỲÝỴỶỸ]', 'Y', s)
+    s = re.sub(r'[đ]', 'd', s)
+    s = re.sub(r'[Đ]', 'D', s)
+    return s
+
+# 2. Hàm định dạng tên file chuẩn
+def get_registration_filename(instance, filename, suffix):
+    ext = filename.split('.')[-1]
+    
+    # Lấy thông tin gốc từ Student
+    name = instance.student.full_name if instance.student else "Khach"
+    dob_formatted = "01012000"
+    if instance.student and instance.student.date_of_birth:
+        dob_formatted = instance.student.date_of_birth.strftime('%d%m%Y')
+    cccd = "NO_CCCD"
+    
+    # Ưu tiên lấy từ change_log nếu sinh viên có sửa trên form
+    cl = instance.change_log or {}
+    if cl.get('full_name', {}).get('to'):
+        name = cl.get('full_name')['to']
+        
+    if cl.get('dob', {}).get('to'):
+        try:
+            from datetime import datetime
+            dob_formatted = datetime.strptime(cl.get('dob')['to'], '%Y-%m-%d').strftime('%d%m%Y')
+        except:
+            pass
+            
+    if cl.get('citizen_id', {}).get('to'):
+        cccd = cl.get('citizen_id')['to']
+    elif instance.student:
+        # Nếu form không đổi CCCD, truy vấn CCCD hiện tại dưới DB
+        doc = instance.student.identity_documents.filter(document_type="CCCD", is_current=True).first()
+        if doc:
+            cccd = doc.document_number
+
+    # Xử lý tên: Bỏ dấu và viết liền
+    name_clean = remove_vietnamese_accents(name).replace(" ", "")
+    
+    # Lắp ghép: {CCCD}_{HoTen}_{ddmmyyyy}_{LoaiAnh}.{ext}
+    new_filename = f"{cccd}_{name_clean}_{dob_formatted}_{suffix}.{ext}"
+    
+    # Lưu vào thư mục theo năm/tháng
+    now = timezone.now()
+    return f"insurance_data/{now.strftime('%Y/%m')}/{new_filename}"
+
+# 3. Các hàm con gắn vào từng FileField
+def cccd_front_path(instance, filename): return get_registration_filename(instance, filename, "CCCD_Front")
+def cccd_back_path(instance, filename): return get_registration_filename(instance, filename, "CCCD_Back")
+def receipt_path(instance, filename): return get_registration_filename(instance, filename, "Bill")
+def bhyt_path(instance, filename): return get_registration_filename(instance, filename, "BHYT")
+
+# ==========================================
+# MODEL CHÍNH
+# ==========================================
 class HealthInsuranceRegistration(models.Model):
     PERIOD_CHOICES = [
-        ("MAIN", "Đợt chính (Tháng 9)"),
-        ("Q2", "Đợt phụ Quý 2"),
-        ("Q3", "Đợt phụ Quý 3"),
-        ("Q4", "Đợt phụ Quý 4"),
+        ("MAIN", "Đăng ký BHYT cho năm sau"),
+        ("Q2", "Đăng ký Quý 2"),
+        ("Q3", "Đăng ký Quý 3"),
+        ("Q4", "Đăng ký Quý 4"),
     ]
     STATUS_CHOICES = [
         ("pending", "Chờ xử lý"),
@@ -140,10 +215,11 @@ class HealthInsuranceRegistration(models.Model):
 
     hospital_code = models.CharField(max_length=16)
 
-    cccd_image = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
-    cccd_image_back = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
-    bhyt_image = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
-    payment_receipt_image = models.FileField(upload_to="insurance_data/%Y/%m/")
+    # Thay đường dẫn tĩnh bằng các hàm sinh tên tự động
+    cccd_image = models.FileField(upload_to=cccd_front_path, blank=True, null=True)
+    cccd_image_back = models.FileField(upload_to=cccd_back_path, blank=True, null=True)
+    bhyt_image = models.FileField(upload_to=bhyt_path, blank=True, null=True)
+    payment_receipt_image = models.FileField(upload_to=receipt_path)
 
     change_log = models.JSONField(blank=True, null=True)
     
