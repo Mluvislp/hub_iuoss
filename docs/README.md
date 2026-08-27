@@ -139,3 +139,53 @@ cd frontend && npm run dev
 ## Production Deployment
 
 Xem [`docs/SERVER_SETUP.md`](SERVER_SETUP.md).
+
+
+### Migration Script cho hub_insurance_registrations
+Do bảng này dùng managed=False nên cần chạy query ALTER TABLE trên MySQL:
+
+`sql
+ALTER TABLE hub_insurance_registrations
+  DROP COLUMN ldap_uid,
+  DROP COLUMN period,
+  DROP COLUMN full_name,
+  DROP COLUMN student_code,
+  DROP COLUMN gender,
+  DROP COLUMN dob,
+  DROP COLUMN ethnicity,
+  DROP COLUMN phone_number,
+  DROP COLUMN social_insurance_number,
+  DROP COLUMN citizen_id,
+  DROP COLUMN permanent_province,
+  DROP COLUMN permanent_ward,
+  DROP COLUMN permanent_street,
+  DROP COLUMN temporary_province,
+  DROP COLUMN temporary_ward,
+  DROP COLUMN temporary_street,
+  DROP COLUMN note;
+
+ALTER TABLE hub_insurance_registrations
+  ADD COLUMN registration_year INT NOT NULL AFTER student_id,
+  ADD COLUMN registration_period VARCHAR(32) NOT NULL AFTER registration_year,
+  ADD COLUMN payment_receipt_image VARCHAR(500) NOT NULL AFTER bhyt_image,
+  ADD COLUMN change_log JSON NULL AFTER payment_receipt_image,
+  ADD COLUMN rejection_reason TEXT NULL AFTER status,
+  ADD KEY idx_hir_period_year (registration_year, registration_period);
+
+
+  CREATE TABLE hub_insurance_configs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    description TEXT,
+    bank_name VARCHAR(255) NOT NULL,
+    bank_account_number VARCHAR(64) NOT NULL,
+    bank_account_name VARCHAR(255) NOT NULL,
+    insurance_fee INT NOT NULL,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+);
+
+-- Tạo sẵn 1 dòng dữ liệu cấu hình mặc định để lúc GET API không bị rỗng:
+INSERT INTO hub_insurance_configs (description, bank_name, bank_account_number, bank_account_name, insurance_fee) 
+VALUES ('<p>Sinh viên cung cấp đầy đủ thông tin vào biểu mẫu...</p>', 'Vietcombank', '0123456789', 'ĐẠI HỌC QUỐC TẾ', 631800);
+`
+**Lưu ý:** Việc lưu trữ hình ảnh sẽ nằm ở thư mục media/insurance_data/%Y/%m/ theo cấu trúc hệ thống.

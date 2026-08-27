@@ -114,3 +114,107 @@ class HubStudent(models.Model):
         row.login_count = (row.login_count or 0) + 1
         row.save(update_fields=["student_id", "last_login_at", field, "login_count"])
         return row
+
+
+class HealthInsuranceRegistration(models.Model):
+    PERIOD_CHOICES = [
+        ("MAIN", "Đợt chính (Tháng 9)"),
+        ("Q2", "Đợt phụ Quý 2"),
+        ("Q3", "Đợt phụ Quý 3"),
+        ("Q4", "Đợt phụ Quý 4"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Chờ xử lý"),
+        ("processing", "Đang xử lý"),
+        ("done", "Hoàn thành"),
+        ("rejected", "Từ chối"),
+    ]
+
+    student = models.ForeignKey(
+        "students.Student", on_delete=models.DO_NOTHING,
+        db_column="student_id"
+    )
+    
+    registration_year = models.IntegerField()
+    registration_period = models.CharField(max_length=32, choices=PERIOD_CHOICES)
+
+    hospital_code = models.CharField(max_length=16)
+
+    cccd_image = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
+    cccd_image_back = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
+    bhyt_image = models.FileField(upload_to="insurance_data/%Y/%m/", blank=True, null=True)
+    payment_receipt_image = models.FileField(upload_to="insurance_data/%Y/%m/")
+
+    change_log = models.JSONField(blank=True, null=True)
+    
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    rejection_reason = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_insurance_registrations"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Student {self.student_id} — {self.get_registration_period_display()} {self.registration_year} ({self.status})"
+
+class CccdScan(models.Model):
+    """Dữ liệu đọc từ mã QR trên thẻ CCCD, gom từ mọi luồng có thu thập.
+
+    Bảng dùng CHUNG: `source` cho biết dòng này thu được ở đâu, `source_ref_id`
+    trỏ về bản ghi ở luồng đó. Thêm luồng mới KHÔNG được xin thêm bảng.
+
+    Ghi thêm dòng mỗi lần quét, không sửa đè — hai lần quét lệch nhau là thông
+    tin đáng giá (đổi thẻ, quét nhầm thẻ người khác), gộp lại là mất.
+    """
+
+    SOURCE_BHYT_REGISTRATION = "bhyt_registration"
+
+    student = models.ForeignKey(
+        "students.Student", on_delete=models.DO_NOTHING, db_column="student_id",
+        related_name="cccd_scans",
+    )
+    source = models.CharField(max_length=32)
+    source_ref_id = models.BigIntegerField(null=True, blank=True)
+
+    citizen_id = models.CharField(max_length=12)
+    old_id_number = models.CharField(max_length=12, blank=True, null=True)
+    full_name = models.CharField(max_length=255)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=10, blank=True, null=True)
+    # Nguyên văn trên thẻ, cơ cấu hành chính TRƯỚC sáp nhập 2025.
+    # KHÔNG ánh xạ sang vn_provinces/vn_wards — xem core/cccd.py.
+    residence_address = models.CharField(max_length=255, blank=True, null=True)
+    issue_date = models.DateField(null=True, blank=True)
+    # Giữ chuỗi gốc để dựng lại được nếu sau này phát hiện bộ đọc sai.
+    raw_payload = models.CharField(max_length=512, blank=True, null=True)
+    scanned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_cccd_scans"
+        ordering = ["-scanned_at"]
+
+    def __str__(self):
+        return f"{self.citizen_id} — {self.full_name}"
+
+
+class HealthInsuranceConfig(models.Model):
+    description = models.TextField(blank=True, null=True)
+    bank_name = models.CharField(max_length=255)
+    # Mã BIN 6 số của Napas, dùng dựng VietQR. Bỏ trống thì frontend dò theo
+    # `bank_name`; điền vào đây thì khỏi phải đoán.
+    bank_bin = models.CharField(max_length=6, blank=True, null=True)
+    bank_account_number = models.CharField(max_length=64)
+    bank_account_name = models.CharField(max_length=255)
+    insurance_fee = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_insurance_configs"
+

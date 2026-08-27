@@ -62,6 +62,9 @@ class Student(models.Model):
     full_name = models.CharField(max_length=255)
     sex = models.CharField(max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
+    # Lưu dạng `NN_tên` (`01_Kinh`) — xem core/api/views.py::ethnicity_name().
+    # Cột ĐÃ tồn tại trong bảng `students`, khai thêm ở đây KHÔNG cần ALTER.
+    ethnicity = models.CharField(max_length=120, null=True, blank=True)
     academic_entry_year = models.PositiveSmallIntegerField(null=True, blank=True)
     # class_code đã bỏ khỏi bảng students — mã lớp giờ ở student_academic_enrollments.
     current_department = models.ForeignKey(
@@ -399,6 +402,21 @@ class VnWard(models.Model):
         managed = False
         db_table = "vn_wards"
         ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+
+class VnEthnicity(models.Model):
+    code = models.CharField(max_length=2, unique=True)
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "vn_ethnicities"
+        ordering = ["code"]
 
     def __str__(self):
         return self.name

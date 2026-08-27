@@ -115,6 +115,9 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # LDAP
@@ -178,10 +181,11 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
-    # Chống brute-force/spam. ScopedRateThrottle chỉ kích hoạt ở view có khai báo
-    # `throttle_scope` (LoginView, RequestsView.POST) → các view khác không bị ảnh hưởng.
+    # Chống brute-force/spam. HubScopedRateThrottle kế thừa ScopedRateThrottle,
+    # dùng ldap_uid thay vì user.pk (StudentPrincipal không có .pk).
+    # Chỉ kích hoạt ở view có khai báo `throttle_scope` → các view khác không bị ảnh hưởng.
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.ScopedRateThrottle",
+        "core.api.throttling.HubScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         # Nới rộng để tránh chặn nhầm khi nhiều SV dùng chung IP (NAT ký túc xá/wifi trường)

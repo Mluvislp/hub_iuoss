@@ -1,6 +1,8 @@
 import logging
 from django.conf import settings
 from django.db import connection
+from django.utils import timezone
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -30,7 +32,8 @@ from core.documents import (
 )
 from core import offcampus
 from students.models import (
-    Student, HealthInsuranceCard, CivicActivity, Hospital, VnProvince, VnWard,
+    Student, HealthInsuranceCard, CivicActivity, Hospital, VnProvince, VnWard, VnEthnicity,
+    StudentContactPoint, StudentIdentityDocument, StudentAddress,
 )
 from .authentication import IsHubAuthenticated
 from .tokens import HubRefreshToken
@@ -39,7 +42,11 @@ from .serializers import (
     HealthInsuranceCardSerializer,
     CivicActivitySerializer,
     ConfirmationRequestSerializer,
+    InsuranceRegistrationSerializer,
 )
+from core.models import HealthInsuranceRegistration, HealthInsuranceConfig, CccdScan
+from core.cccd import parse_cccd_qr
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +60,33 @@ def feature_flags() -> dict:
         # app registration hay chưa, để không bao giờ hiện nút dẫn tới endpoint chết.
         "microsoft_login": settings.MS_LOGIN_ENABLED,
     }
+
+
+def ethnicity_name(raw) -> str:
+    """`students.ethnicity` lưu dạng `NN_tên` (`01_Kinh`), còn form chọn theo TÊN
+    trong danh mục `vn_ethnicities`. Trả về tên chuẩn của danh mục để hai bên
+    khớp nhau.
+
+    Tra theo TÊN trước, mã chỉ là phương án dự phòng: đã từng có dòng mang mã
+    sai (`55_Người nước ngoài` trong khi 55 là "Ca dong"), tra theo mã sẽ đổi
+    nhầm dân tộc của sinh viên.
+    """
+    if not raw:
+        return ""
+    code, _, name = str(raw).partition("_")
+    if name:
+        hit = (VnEthnicity.objects
+               .filter(name=name, is_active=True)
+               .values_list("name", flat=True).first())
+        if hit:
+            return hit
+    if code.isdigit():
+        hit = (VnEthnicity.objects
+               .filter(code=code, is_active=True)
+               .values_list("name", flat=True).first())
+        if hit:
+            return hit
+    return name or str(raw)
 
 
 def hospital_names(cards) -> dict:
@@ -201,6 +235,10 @@ class LoginView(APIView):
 
         logger.info("LOGIN_ATTEMPT     | uid=%-20s | ip=%s", uid, ip)
 
+        # KHÔNG thêm nhánh bỏ qua verify_ldap() cho môi trường dev. Từng có một
+        # nhánh như vậy gắn với settings.DEBUG; mà DEBUG lại tự bật khi thiếu
+        # DJANGO_ENV trong .env, nên toàn bộ an toàn treo vào một dòng cấu hình:
+        # đặt sai là đăng nhập được bằng MSSV bất kỳ, không cần mật khẩu.
         if verify_ldap(uid, password) is None:
             logger.warning("LOGIN_FAIL        | uid=%-20s | ip=%s", uid, ip)
             return Response(
@@ -433,7 +471,9 @@ class HealthInsuranceView(APIView):
     def get(self, request):
         student_id = request.user.student_id
         if not student_id:
-            return Response({"current": None, "history": []})
+            return Response({
+                "is_eligible": False, "current": None, "history": [], "registrations": [],
+            })
 
         cards = list(
             HealthInsuranceCard.objects
@@ -444,11 +484,240 @@ class HealthInsuranceView(APIView):
         current = next((c for c in cards if c.is_current), None)
         history = [c for c in cards if c is not current]
 
+        regs = (
+            HealthInsuranceRegistration.objects
+            .filter(student_id=student_id)
+            .defer("change_log")
+            .order_by("-created_at")
+        )
+        reg_data = [{
+            "id": r.id,
+            "registration_year": r.registration_year,
+            "registration_period": r.registration_period,
+            "created_at": r.created_at,
+            "status": r.status,
+            "rejection_reason": r.rejection_reason,
+        } for r in regs]
+
+        # Điều kiện mở nút đăng ký
+        # Mặc định là cho phép đăng ký (Bao gồm chưa có thẻ, hoặc thẻ đánh dấu NULL)
+        is_eligible = True 
+        
+        # Chỉ chặn lại (False) KHI VÀ CHỈ KHI có thẻ thật và hạn còn dài hơn 60 ngày
+        if current and current.valid_until:
+            if (current.valid_until - timezone.localdate()).days > 60:
+                is_eligible = False
+
         ctx = {"hospital_names": hospital_names(cards)}
         return Response({
+            "is_eligible": is_eligible,
             "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
+            "registrations": reg_data,
         })
+
+
+# ── GET /api/hospitals/ ─────────────────────────────────────────────────────
+# Danh mục cơ sở KCB để chọn trong form đăng ký BHYT.
+
+# Đủ cho tỉnh đông nhất (Hà Nội 697 cơ sở) mà vẫn chặn được request quét cả
+# bảng 11.843 dòng khi không chọn tỉnh.
+HOSPITAL_PAGE_SIZE = 1000
+
+
+class HospitalListView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        province_code = request.GET.get("province", "").strip()
+        search = request.GET.get("q", "").strip()
+
+        qs = Hospital.objects.filter(is_active=True)
+        if province_code:
+            qs = qs.filter(province_code=province_code)
+        if search:
+            qs = qs.filter(name__icontains=search)
+
+        # Xếp theo TÊN, không theo mã. Meta ordering của model là
+        # (province_code, code); với TP.HCM sau sáp nhập 2025 thì 271 cơ sở mang
+        # mã 74xxx/77xxx đứng trước toàn bộ 376 cơ sở mã 79xxx — người dùng mở
+        # danh sách ra chỉ thấy Bình Dương. Xếp theo tên cũng là điều kiện để
+        # type-ahead của thẻ <select> dùng được.
+        qs = qs.order_by("name", "code")
+        return Response(list(qs.values("code", "name")[:HOSPITAL_PAGE_SIZE]))
+
+
+class EthnicityListView(APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        qs = VnEthnicity.objects.filter(is_active=True).values("code", "name")
+        return Response(list(qs))
+
+
+# ── GET + POST /api/health-insurance/registrations/ ──────────────────────────
+# GET  : dữ liệu điền sẵn form + cấu hình chuyển khoản.
+# POST : sinh viên gửi đơn đăng ký BHYT (multipart, có ảnh).
+
+class InsuranceRegistrationView(APIView):
+    permission_classes = [IsHubAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_throttles(self):
+        # Chỉ giới hạn thao tác TẠO; GET form không giới hạn.
+        if self.request.method == "POST":
+            self.throttle_scope = "create_request"
+            return super().get_throttles()
+        return []
+
+    def _student(self, request):
+        if not request.user.student_id:
+            return None
+        return Student.objects.filter(pk=request.user.student_id).first()
+
+    def _snapshot(self, student) -> dict:
+        """Ảnh chụp hồ sơ gốc — dùng CHUNG cho prefill (GET) và change_log (POST).
+
+        Một đường đọc duy nhất; tách làm hai là change_log báo thay đổi giả.
+        """
+        phone_row = StudentContactPoint.objects.filter(
+            student_id=student.id,
+            contact_type=StudentContactPoint.TYPE_MOBILE_PHONE,
+            is_current=True,
+        ).first()
+        cccd_row = StudentIdentityDocument.objects.filter(
+            student_id=student.id,
+            document_type=StudentIdentityDocument.TYPE_CCCD,
+            is_current=True,
+        ).first()
+        addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
+        # Ưu tiên bản thường trú đã chuẩn hóa 2025; chưa có thì lùi về bản cũ.
+        perm = (addresses.get(StudentAddress.TYPE_CURRENT_STD)
+                or addresses.get(StudentAddress.TYPE_CURRENT))
+        card = student.health_insurance_cards.filter(is_current=True).first()
+
+        return {
+            "full_name": student.full_name or "",
+            "student_code": student.current_student_code or "",
+            "gender": student.sex or "",
+            "dob": student.date_of_birth.strftime("%Y-%m-%d") if student.date_of_birth else "",
+            "ethnicity": ethnicity_name(student.ethnicity),
+            "phone_number": phone_row.contact_value if phone_row else "",
+            "citizen_id": cccd_row.document_number if cccd_row else "",
+            "social_insurance_number": card.social_insurance_code if card else "",
+            "permanent_province": (perm.province_code or "") if perm else "",
+            "permanent_ward": (perm.ward_code or "") if perm else "",
+            "permanent_street": (perm.full_address or "") if perm else "",
+        }
+
+    def get(self, request):
+        student = self._student(request)
+        if not student:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cfg = HealthInsuranceConfig.objects.order_by("-id").first()
+        return Response({
+            "prefill": self._snapshot(student),
+            "config": {
+                "description": cfg.description or "",
+                "bank_name": cfg.bank_name,
+                "bank_bin": cfg.bank_bin or "",
+                "bank_account_number": cfg.bank_account_number,
+                "bank_account_name": cfg.bank_account_name,
+                "insurance_fee": cfg.insurance_fee,
+            } if cfg else None,
+        })
+
+    def post(self, request):
+        student = self._student(request)
+        if not student:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = InsuranceRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+
+        # Một sinh viên chỉ có một đơn còn hiệu lực cho mỗi đợt. `rejected`
+        # KHÔNG chặn — bị từ chối thì phải nộp lại được.
+        if HealthInsuranceRegistration.objects.filter(
+            student_id=student.id,
+            registration_year=data["registration_year"],
+            registration_period=data["registration_period"],
+            status__in=["pending", "processing", "done"],
+        ).exists():
+            return Response(
+                {"detail": "Bạn đã gửi yêu cầu đăng ký cho đợt này rồi."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # change_log chỉ là NHẬT KÝ chênh lệch so với hồ sơ gốc — không tự ghi
+        # đè hồ sơ. Nhân viên đối chiếu khi duyệt.
+        old = self._snapshot(student)
+        change_log = {}
+        for field in ("full_name", "gender", "dob", "ethnicity", "phone_number",
+                      "citizen_id", "social_insurance_number"):
+            new_value = str(data.get(field) or "")
+            if new_value and new_value != old[field]:
+                change_log[field] = {"from": old[field], "to": new_value}
+
+        new_perm = {
+            "province": data.get("permanent_province", ""),
+            "ward": data.get("permanent_ward", ""),
+            "street": data.get("permanent_street", ""),
+        }
+        old_perm = {
+            "province": old["permanent_province"],
+            "ward": old["permanent_ward"],
+            "street": old["permanent_street"],
+        }
+        if new_perm != old_perm:
+            change_log["permanent_address"] = {"from": old_perm, "to": new_perm}
+
+        reg = HealthInsuranceRegistration(
+            student_id=student.id,
+            registration_year=data["registration_year"],
+            registration_period=data["registration_period"],
+            hospital_code=data["hospital_code"],
+            change_log=change_log,
+            status="pending",
+        )
+        reg.cccd_image = data["cccd_image"]
+        reg.cccd_image_back = data["cccd_image_back"]
+        reg.payment_receipt_image = data["payment_receipt_image"]
+        if data.get("bhyt_image"):
+            reg.bhyt_image = data["bhyt_image"]
+        reg.save()
+
+        # Dữ liệu QR trên thẻ đi vào bảng dùng chung, không nằm trong đơn.
+        # Đọc được thì lưu, không đọc được thì thôi — không chặn nộp đơn.
+        scanned = parse_cccd_qr(data.get("cccd_qr_raw"))
+        if scanned:
+            CccdScan.objects.create(
+                student_id=student.id,
+                source=CccdScan.SOURCE_BHYT_REGISTRATION,
+                source_ref_id=reg.id,
+                raw_payload=str(data.get("cccd_qr_raw"))[:512],
+                **scanned,
+            )
+            logger.info(
+                "CCCD_SCAN_SAVED   | student=%s | nguon=%s ref=%s",
+                student.current_student_code, CccdScan.SOURCE_BHYT_REGISTRATION, reg.id,
+            )
+
+        logger.info(
+            "BHYT_REG_CREATED  | student=%s | %s %s | changes=%d",
+            student.current_student_code, data["registration_period"],
+            data["registration_year"], len(change_log),
+        )
+        return Response({"id": reg.id, "status": "pending"},
+                        status=status.HTTP_201_CREATED)
 
 
 # ── GET + POST /api/requests/ ────────────────────────────────────────────────

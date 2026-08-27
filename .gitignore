@@ -34,3 +34,12 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+
+# Dump DB: chứa dữ liệu sinh viên thật (CCCD, email, SĐT) và hash mật khẩu
+# tài khoản nhân viên. Repo này từng để PUBLIC — không đưa dump lên git.
+# Schema thì dùng docs/schema.sql (được theo dõi, chỉ có DDL, không có dữ liệu).
+*.sql
+!docs/schema.sql
+
+# Rác build lọt vào repo
+encoded.txt

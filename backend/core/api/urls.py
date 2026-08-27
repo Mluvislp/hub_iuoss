@@ -20,6 +20,7 @@ urlpatterns = [
     # Data
     path("dashboard/",  views.DashboardView.as_view(),  name="api_dashboard"),
     path("health-insurance/", views.HealthInsuranceView.as_view(), name="api_health_insurance"),
+    path("health-insurance/registrations/", views.InsuranceRegistrationView.as_view(), name="api_health_insurance_registrations"),
     path("requests/",             views.RequestsView.as_view(),          name="api_requests"),
     path("requests/other/form/",      views.OtherRequestFormView.as_view(),      name="api_other_request_form"),
     path("requests/deferment/form/",   views.DefermentRequestFormView.as_view(),   name="api_deferment_request_form"),
@@ -35,4 +36,6 @@ urlpatterns = [
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),
     path("locations/wards/",      views.WardListView.as_view(),      name="api_wards"),
+    path("locations/ethnicities/", views.EthnicityListView.as_view(), name="api_ethnicities"),
+    path("hospitals/",            views.HospitalListView.as_view(),  name="api_hospitals"),
 ]
