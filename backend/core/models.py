@@ -213,9 +213,23 @@ class HealthInsuranceRegistration(models.Model):
     registration_year = models.IntegerField()
     registration_period = models.CharField(max_length=32, choices=PERIOD_CHOICES)
 
+    # --- CÁC TRƯỜNG LƯU TRỮ SNAPSHOT THÔNG TIN CÁ NHÂN TỪ FORM ---
+    full_name = models.CharField(max_length=255, blank=True, null=True)
+    student_code = models.CharField(max_length=64, blank=True, null=True)
+    gender = models.CharField(max_length=10, blank=True, null=True)
+    dob = models.DateField(blank=True, null=True)
+    ethnicity = models.CharField(max_length=64, blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    citizen_id = models.CharField(max_length=20, blank=True, null=True)
+    social_insurance_number = models.CharField(max_length=20, blank=True, null=True)
+    
+    permanent_province = models.CharField(max_length=32, blank=True, null=True)
+    permanent_ward = models.CharField(max_length=32, blank=True, null=True)
+    permanent_street = models.CharField(max_length=255, blank=True, null=True)
+    # ----------------------------------------------------------------
+
     hospital_code = models.CharField(max_length=16)
 
-    # Thay đường dẫn tĩnh bằng các hàm sinh tên tự động
     cccd_image = models.FileField(upload_to=cccd_front_path, blank=True, null=True)
     cccd_image_back = models.FileField(upload_to=cccd_back_path, blank=True, null=True)
     bhyt_image = models.FileField(upload_to=bhyt_path, blank=True, null=True)

@@ -684,8 +684,24 @@ class InsuranceRegistrationView(APIView):
             student_id=student.id,
             registration_year=data["registration_year"],
             registration_period=data["registration_period"],
+            
+            # --- LƯU THÔNG TIN SINH VIÊN KHAI BÁO ---
+            full_name=data.get("full_name"),
+            student_code=data.get("student_code"),
+            gender=data.get("gender"),
+            dob=data.get("dob") or None,
+            ethnicity=data.get("ethnicity"),
+            phone_number=data.get("phone_number"),
+            citizen_id=data.get("citizen_id"),
+            social_insurance_number=data.get("social_insurance_number"),
+            
+            permanent_province=data.get("permanent_province"),
+            permanent_ward=data.get("permanent_ward"),
+            permanent_street=data.get("permanent_street"),
+            # ----------------------------------------
+            
             hospital_code=data["hospital_code"],
-            change_log=change_log,
+            change_log=change_log, # Giữ lại change_log để tiện xem chênh lệch
             status="pending",
         )
         reg.cccd_image = data["cccd_image"]

@@ -145,6 +145,7 @@ function InsuranceRegistrationForm() {
   const searchParams = useSearchParams();
   const periodId = searchParams.get("period") || "";
   const currentYear = new Date().getFullYear();
+  const [infoEditable, setInfoEditable] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -488,9 +489,43 @@ function InsuranceRegistrationForm() {
               <h2 className={ui.sectionTitle}>
                 <User size={16} className="text-primary" /> Thông tin cá nhân
               </h2>
-              <span className="text-xs text-muted">
-                Ô để trống là phần hồ sơ chưa có, mời bạn bổ sung
-              </span>
+              {prefill && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Nếu đang mở mà bấm Hủy -> Khôi phục lại data gốc từ prefill
+                    if (infoEditable) {
+                      setValue("full_name", prefill.full_name ?? "");
+                      setValue("student_code", prefill.student_code ?? "");
+                      setValue(
+                        "gender",
+                        (prefill.gender as "Nam" | "Nữ") ?? "Nam",
+                      );
+                      setValue("dob", prefill.dob ?? "");
+                      setValue("ethnicity", prefill.ethnicity ?? "");
+                      setValue("phone_number", prefill.phone_number ?? "");
+                      setValue("citizen_id", prefill.citizen_id ?? "");
+
+                      // Bổ sung reset cho Số sổ BHXH
+                      setValue(
+                        "social_insurance_number",
+                        prefill.social_insurance_number ?? "",
+                      );
+
+                      // Bổ sung reset cho Địa chỉ thường trú
+                      setValue("permanent", {
+                        provinceCode: prefill.permanent_province ?? "",
+                        wardCode: prefill.permanent_ward ?? "",
+                        street: prefill.permanent_street ?? "",
+                      });
+                    }
+                    setInfoEditable(!infoEditable);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Pencil size={12} /> {infoEditable ? "Hủy sửa" : "Chỉnh sửa"}
+                </button>
+              )}
             </div>
 
             <div className="p-5 space-y-6">
@@ -499,8 +534,10 @@ function InsuranceRegistrationForm() {
                   <label className={ui.fieldLabel}>Họ và tên</label>
                   <input
                     {...register("full_name")}
-                    disabled={recorded(prefill?.full_name)}
-                    className={fieldCls(recorded(prefill?.full_name))}
+                    disabled={recorded(prefill?.full_name) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.full_name) && !infoEditable,
+                    )}
                   />
                   {errors.full_name && (
                     <p className="text-xs text-danger-text mt-1">
@@ -512,16 +549,20 @@ function InsuranceRegistrationForm() {
                   <label className={ui.fieldLabel}>Mã số sinh viên</label>
                   <input
                     {...register("student_code")}
-                    disabled={recorded(prefill?.student_code)}
-                    className={fieldCls(recorded(prefill?.student_code))}
+                    disabled={recorded(prefill?.student_code) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.student_code) && !infoEditable,
+                    )}
                   />
                 </div>
                 <div>
                   <label className={ui.fieldLabel}>Giới tính</label>
                   <select
                     {...register("gender")}
-                    disabled={recorded(prefill?.gender)}
-                    className={fieldCls(recorded(prefill?.gender))}
+                    disabled={recorded(prefill?.gender) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.gender) && !infoEditable,
+                    )}
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
@@ -532,16 +573,20 @@ function InsuranceRegistrationForm() {
                   <input
                     type="date"
                     {...register("dob")}
-                    disabled={recorded(prefill?.dob)}
-                    className={fieldCls(recorded(prefill?.dob))}
+                    disabled={recorded(prefill?.dob) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.dob) && !infoEditable,
+                    )}
                   />
                 </div>
                 <div>
                   <label className={ui.fieldLabel}>Dân tộc</label>
                   <select
                     {...register("ethnicity")}
-                    disabled={recorded(prefill?.ethnicity)}
-                    className={fieldCls(recorded(prefill?.ethnicity))}
+                    disabled={recorded(prefill?.ethnicity) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.ethnicity) && !infoEditable,
+                    )}
                   >
                     <option value="">-- Chọn dân tộc --</option>
                     {ethnicities.map((e) => (
@@ -555,8 +600,10 @@ function InsuranceRegistrationForm() {
                   <label className={ui.fieldLabel}>Số điện thoại</label>
                   <input
                     {...register("phone_number")}
-                    disabled={recorded(prefill?.phone_number)}
-                    className={fieldCls(recorded(prefill?.phone_number))}
+                    disabled={recorded(prefill?.phone_number) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.phone_number) && !infoEditable,
+                    )}
                   />
                   {errors.phone_number && (
                     <p className="text-xs text-danger-text mt-1">
@@ -568,8 +615,10 @@ function InsuranceRegistrationForm() {
                   <label className={ui.fieldLabel}>Số CCCD</label>
                   <input
                     {...register("citizen_id")}
-                    disabled={recorded(prefill?.citizen_id)}
-                    className={fieldCls(recorded(prefill?.citizen_id))}
+                    disabled={recorded(prefill?.citizen_id) && !infoEditable}
+                    className={fieldCls(
+                      recorded(prefill?.citizen_id) && !infoEditable,
+                    )}
                   />
                   {errors.citizen_id && (
                     <p className="text-xs text-danger-text mt-1">
@@ -583,32 +632,21 @@ function InsuranceRegistrationForm() {
                   </label>
                   <input
                     {...register("social_insurance_number")}
-                    disabled={bhxhLocked}
-                    className={fieldCls(bhxhLocked)}
+                    disabled={
+                      recorded(prefill?.social_insurance_number) &&
+                      !infoEditable
+                    }
+                    className={fieldCls(
+                      recorded(prefill?.social_insurance_number) &&
+                        !infoEditable,
+                    )}
                   />
+
                   {/* Dòng hiển thị lỗi Zod */}
                   {errors.social_insurance_number && (
                     <p className="text-xs text-danger-text mt-1">
                       {errors.social_insurance_number.message as string}
                     </p>
-                  )}
-                  {recorded(prefill?.social_insurance_number) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Hủy sửa thì trả về đúng giá trị trong hồ sơ gốc.
-                        if (bhxhEditable)
-                          setValue(
-                            "social_insurance_number",
-                            prefill?.social_insurance_number ?? "",
-                          );
-                        setBhxhEditable((v) => !v);
-                      }}
-                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      <Pencil size={12} />{" "}
-                      {bhxhEditable ? "Hủy sửa" : "Chỉnh sửa"}
-                    </button>
                   )}
                 </div>
               </div>
@@ -616,26 +654,8 @@ function InsuranceRegistrationForm() {
               <div className="pt-4 border-t border-line2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold">Thường trú</h3>
-                  {hasAddress && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        // Hủy sửa thì trả về đúng địa chỉ trong hồ sơ gốc.
-                        if (addressEditable)
-                          setValue("permanent", {
-                            provinceCode: prefill?.permanent_province ?? "",
-                            wardCode: prefill?.permanent_ward ?? "",
-                            street: prefill?.permanent_street ?? "",
-                          });
-                        setAddressEditable((v) => !v);
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      <Pencil size={12} />{" "}
-                      {addressEditable ? "Hủy sửa" : "Chỉnh sửa"}
-                    </button>
-                  )}
                 </div>
+
                 <Controller
                   control={control}
                   name="permanent"
@@ -643,7 +663,10 @@ function InsuranceRegistrationForm() {
                     <div
                       className={cn(
                         "transition-opacity",
-                        addressLocked && "opacity-70 pointer-events-none",
+                        /* Khóa form mờ đi nếu đã có data gốc VÀ đang không bật chế độ chỉnh sửa */
+                        hasAddress &&
+                          !infoEditable &&
+                          "opacity-70 pointer-events-none",
                       )}
                     >
                       <AddressFields
@@ -691,10 +714,19 @@ function InsuranceRegistrationForm() {
                   setHospitalProvince(v);
                   setValue("hospital_code", "");
                 }}
-                options={provinces.map((p) => ({
-                  value: p.code,
-                  label: p.name,
-                }))}
+                // filter dùng để lọc mã tỉnh HCM và Đồng Nai trước khi map
+                options={provinces
+                  .filter(
+                    (p) =>
+                      p.code === "79" ||
+                      p.code === "75" ||
+                      p.name.includes("Hồ Chí Minh") ||
+                      p.name.includes("Đồng Nai"),
+                  )
+                  .map((p) => ({
+                    value: p.code,
+                    label: p.name,
+                  }))}
                 placeholder="-- Chọn tỉnh thành --"
                 searchPlaceholder="Gõ tên tỉnh thành..."
                 emptyText="Không có tỉnh thành nào khớp"
@@ -746,7 +778,7 @@ function InsuranceRegistrationForm() {
               )}
 
               {/* Ghi chú hướng dẫn chọn bệnh viện - Bắt chước 100% style Thường trú */}
-              <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted opacity-70">
+              <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
                 <li>
                   • <b>Link tra cứu bệnh viện:</b>{" "}
                   <a
@@ -763,12 +795,12 @@ function InsuranceRegistrationForm() {
                   <b>Đồng Nai</b>.
                 </li>
                 <li>
-                  • <b>Lưu ý:</b> Sinh viên <b className="text-danger-text">không</b>{" "}
-                  chọn bệnh viện{" "}
+                  • <b>Lưu ý:</b> Sinh viên{" "}
+                  <b className="text-danger-text">không</b> chọn bệnh viện{" "}
                   <b className="text-danger-text">không được đăng ký mới</b> và{" "}
                   <b className="text-danger-text">
                     {" "}
-                    đổi Nơi khám chữa bệnh (NKCB)
+                    đổi nơi Khám chữa bệnh (KCBBD)
                   </b>
                   .
                 </li>
