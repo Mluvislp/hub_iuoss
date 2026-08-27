@@ -1,9 +1,9 @@
 """Điều kiện được phép vào cổng — nơi DUY NHẤT giữ chính sách đăng nhập.
 
-Cả API (`core/api/views.py`) lẫn view Django cũ (`core/views.py`) đều gọi
-`check_login()`, nên đổi quy định chỉ cần sửa file này, không phải đi lùng từng
-view. LDAP chỉ trả lời "đúng người, đúng mật khẩu"; việc người đó có được dùng
-cổng hay không do đây quyết định.
+Cả hai đường đăng nhập (LDAP và Microsoft, đều ở `core/api/views.py`) gọi
+`check_login()`, nên đổi quy định chỉ cần sửa file này. LDAP/Entra ID chỉ trả lời
+"đúng người, đúng mật khẩu"; việc người đó có được dùng cổng hay không do đây
+quyết định.
 """
 import logging
 
