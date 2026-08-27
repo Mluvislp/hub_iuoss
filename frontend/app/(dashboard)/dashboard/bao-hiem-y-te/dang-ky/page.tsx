@@ -27,13 +27,13 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
  * Mã đợt → cách gọi đợt trong NỘI DUNG CHUYỂN KHOẢN.
  *
  * ⚠️ Không trùng với mã đợt: ba đợt phụ được Phòng CTSV đánh số 1/2/3 theo quý,
- * riêng đợt tháng 9 gọi là "đợt chính". Ghi sai số đợt thì nhân viên đối soát
+ * riêng đợt tháng 9 gọi là "đợt chính quý 1 năm sau". Ghi sai số đợt thì nhân viên đối soát
  * nhầm kỳ thu, nên sửa ở đây phải hỏi lại Phòng CTSV.
  */
 const PERIOD_IN_NOTE: Record<string, string> = {
-  Q2: "dot 1",
-  Q3: "dot 2",
-  Q4: "dot 3",
+  Q2: "dot 2",
+  Q3: "dot 3",
+  Q4: "dot 4",
   MAIN: "dot chinh",
 };
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
@@ -54,14 +54,14 @@ const schema = z.object({
   dob: z.string().min(1, "Vui lòng nhập ngày sinh"),
   ethnicity: z.string().min(1, "Vui lòng chọn dân tộc"),
   phone_number: z.string().regex(/^(0|\+84)\d{9,10}$/, "Số điện thoại không hợp lệ"),
-  social_insurance_number: z.string().optional(),
-  citizen_id: z.string().regex(/^\d{9,12}$/, "Số CCCD phải từ 9-12 số"),
+  social_insurance_number: z.string().regex(/^\d{10}$/, "Mã BHXH phải bao gồm đúng 10 chữ số cuối của mã BHYT"),
+  citizen_id: z.string().regex(/^\d{12}$/, "Số CCCD là 12 số"),
   permanent: z.object({
     provinceCode: z.string().min(1, "Vui lòng chọn tỉnh/thành"),
     wardCode: z.string().min(1, "Vui lòng chọn phường/xã"),
     street: z.string().min(1, "Vui lòng nhập số nhà, đường"),
   }),
-  hospital_code: z.string().min(1, "Vui lòng chọn KCB ban đầu"),
+  hospital_code: z.string().min(1, "Vui lòng chọn nơi ĐK KCB ban đầu"),
   note: z.string().optional(),
   cccd_image: fileSchema,
   cccd_image_back: fileSchema,
@@ -345,7 +345,7 @@ function InsuranceRegistrationForm() {
           <CheckSquare size={32} />
         </div>
         <h2 className="text-xl font-semibold text-ink mb-2">Đăng ký thành công</h2>
-        <p className="text-slate-600 mb-6">Yêu cầu đăng ký BHYT của bạn đã được ghi nhận. Phòng CTSV sẽ kiểm tra và cập nhật trạng thái trong thời gian sớm nhất.</p>
+        <p className="text-slate-600 mb-6">Yêu cầu đăng ký BHYT của sinh viên đã được ghi nhận. Phòng CTSV sẽ tiến hành gửi hồ sơ lên BHXH để gia hạn/đăng ký mới. BHYT sẽ có hiệu lực từ ngày đầu quý tiếp theo.</p>
         <Link href="/dashboard/bao-hiem-y-te" className={ui.btnPrimary}>Quay lại trang BHYT</Link>
       </div>
     );
@@ -370,8 +370,8 @@ function InsuranceRegistrationForm() {
         ) : (
           <ul className="text-sm space-y-1 mt-3">
             <li><strong>Đối tượng:</strong> Sinh viên bắt buộc tham gia BHYT theo quy định.</li>
-            <li><strong>Thời hạn:</strong> 01/01 - 31/12 (Tùy đợt đăng ký).</li>
-            <li><strong>Lệ phí:</strong> 631.800 đồng/sinh viên.</li>
+            <li><strong>Thời hạn:</strong> 01/10/2026 - 31/12/2026.</li>
+            <li><strong>Lệ phí:</strong> 170.775 đồng/sinh viên.</li>
           </ul>
         )}
       </div>
@@ -427,8 +427,14 @@ function InsuranceRegistrationForm() {
                 {errors.citizen_id && <p className="text-xs text-danger-text mt-1">{errors.citizen_id.message}</p>}
               </div>
               <div>
-                <label className={ui.fieldLabel}>Số sổ BHXH (Nếu có)</label>
+                <label className={ui.fieldLabel}>Số sổ BHXH (10 số cuối của BHYT)</label>
                 <input {...register("social_insurance_number")} disabled={bhxhLocked} className={fieldCls(bhxhLocked)} />
+                {/* Dòng hiển thị lỗi Zod */}
+                {errors.social_insurance_number && (
+                <p className="text-xs text-danger-text mt-1">
+                 {errors.social_insurance_number.message as string}
+                 </p>
+                 )}
                 {recorded(prefill?.social_insurance_number) && (
                   <button
                     type="button"
@@ -481,7 +487,7 @@ function InsuranceRegistrationForm() {
 
         <div className={ui.card}>
           <div className={ui.cardHeader}>
-            <h2 className={ui.sectionTitle}><ShieldPlus size={16} className="text-primary" /> Nơi KCB</h2>
+            <h2 className={ui.sectionTitle}><ShieldPlus size={16} className="text-primary" /> Nơi Đăng ký Khám chữ bệnh ban đầu</h2>
           </div>
           <div className="p-5 space-y-4">
             <div>
@@ -498,6 +504,9 @@ function InsuranceRegistrationForm() {
             </div>
             <div>
               <label className={ui.fieldLabel} htmlFor="kcb-hospital">Bệnh viện</label>
+              <p className="mt-1.5 text-xs text-muted">
+                  Sinh viên chỉ chọn các Bệnh viện tại TP.HCM hoặc Đồng Nai.
+                </p>
               <Controller control={control} name="hospital_code" render={({ field }) => (
                 <SearchableSelect
                   id="kcb-hospital"
@@ -570,7 +579,7 @@ function InsuranceRegistrationForm() {
                 </ul>
                 <p className="mt-3 text-xs text-muted">
                   Mã QR đã gồm sẵn số tài khoản, số tiền và nội dung. Giữ nguyên nội dung chuyển
-                  khoản để Phòng CTSV đối chiếu được đơn của bạn.
+                  khoản để Phòng KHTC đối chiếu được hóa đơn.
                 </p>
               </div>
             </div>

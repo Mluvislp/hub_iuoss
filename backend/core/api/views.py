@@ -502,13 +502,14 @@ class HealthInsuranceView(APIView):
             "rejection_reason": r.rejection_reason,
         } for r in regs]
 
-        # Được đăng ký khi: chưa có thẻ nào, hoặc thẻ đang dùng còn ≤ 60 ngày.
-        if not current:
-            is_eligible = True
-        elif current.valid_until:
-            is_eligible = (current.valid_until - timezone.localdate()).days <= 60
-        else:
-            is_eligible = False
+        # Điều kiện mở nút đăng ký
+        # Mặc định là cho phép đăng ký (Bao gồm chưa có thẻ, hoặc thẻ đánh dấu NULL)
+        is_eligible = True 
+        
+        # Chỉ chặn lại (False) KHI VÀ CHỈ KHI có thẻ thật và hạn còn dài hơn 60 ngày
+        if current and current.valid_until:
+            if (current.valid_until - timezone.localdate()).days > 60:
+                is_eligible = False
 
         ctx = {"hospital_names": hospital_names(cards)}
         return Response({
