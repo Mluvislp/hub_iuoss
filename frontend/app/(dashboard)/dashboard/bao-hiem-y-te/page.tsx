@@ -15,10 +15,10 @@ const EXPIRING_SOON_DAYS = 60;
 
 /** Mã đợt lưu trong DB → tên hiển thị. */
 const PERIOD_LABELS: Record<string, string> = {
-  MAIN: 'Đợt chính (Tháng 9)',
-  Q2: 'Đợt phụ Quý 2',
-  Q3: 'Đợt phụ Quý 3',
-  Q4: 'Đợt phụ Quý 4',
+  MAIN: 'Đợt 1',
+  Q2: 'Đợt 2',
+  Q3: 'Đợt 3',
+  Q4: 'Đợt 4',
 };
 
 function Empty() {
@@ -226,7 +226,7 @@ export default function HealthInsurancePage() {
               <thead>
                 <tr>
                   <th className="px-5 py-3 w-[20%]">Mã đợt</th>
-                  <th className="px-5 py-3 w-[25%]">Ngày ghi danh</th>
+                  <th className="px-5 py-3 w-[25%]">Ngày đăng ký</th>
                   <th className="px-5 py-3 w-[25%]">Trạng thái</th>
                   <th className="px-5 py-3">Ghi chú phản hồi</th>
                 </tr>
@@ -235,7 +235,7 @@ export default function HealthInsurancePage() {
                 {data.registrations.map(reg => (
                   <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3 font-medium text-[0.85rem] text-ink">
-                      {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} {reg.registration_year}
+                      {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} năm {reg.registration_year}
                     </td>
                     <td className="px-5 py-3 text-[0.82rem] text-slate-600">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3">
@@ -278,7 +278,7 @@ export default function HealthInsurancePage() {
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
-                      {isOpen ? 'Đang mở' : `Sẽ mở từ ${formatDate(p.startDate.toISOString())}`}
+                      {isOpen ? 'Đang mở' : `Dự kiến mở từ ${formatDate(p.startDate.toISOString())}`}
                     </p>
                   </div>
                   <div className="mt-4">
