@@ -33,12 +33,26 @@ CREATE TABLE IF NOT EXISTS `hub_confirmation_requests` (
   KEY `idx_hcr_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Bảng đăng ký BHYT từ sinh viên
+-- Bảng đăng ký BHYT từ sinh viên.
+-- 11 cột từ `full_name` tới `permanent_street` chụp lại NGUYÊN TRẠNG thứ sinh
+-- viên khai trên form; hồ sơ gốc trong `students` KHÔNG bị đơn này sửa (chênh
+-- lệch nằm ở `change_log`). Tỉnh/phường lưu MÃ, tra tên khi hiển thị.
 CREATE TABLE IF NOT EXISTS `hub_insurance_registrations` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `student_id` BIGINT NOT NULL,
   `registration_year` INT NOT NULL,
   `registration_period` VARCHAR(32) NOT NULL,
+  `full_name` VARCHAR(255) NULL,
+  `student_code` VARCHAR(64) NULL,
+  `gender` VARCHAR(10) NULL,
+  `dob` DATE NULL,
+  `ethnicity` VARCHAR(64) NULL,
+  `phone_number` VARCHAR(20) NULL,
+  `citizen_id` VARCHAR(20) NULL,
+  `social_insurance_number` VARCHAR(20) NULL,
+  `permanent_province` VARCHAR(32) NULL,
+  `permanent_ward` VARCHAR(32) NULL,
+  `permanent_street` VARCHAR(255) NULL,
   `hospital_code` VARCHAR(16) NOT NULL,
   `cccd_image` VARCHAR(500) NULL COMMENT 'Ảnh CCCD mặt trước',
   `cccd_image_back` VARCHAR(500) NULL COMMENT 'Ảnh CCCD mặt sau',
