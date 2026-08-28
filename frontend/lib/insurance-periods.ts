@@ -50,10 +50,10 @@ export function getInsurancePeriods(now = new Date()): InsurancePeriod[] {
   const mainEnd = endOfDay(year, 10, lastDayOfMonth(year, 10));
 
   const periods = [
-    { id: 'q2', name: 'Đăng ký Quý 2', startDate: q2Start, endDate: q2End },
-    { id: 'q3', name: 'Đăng ký Quý 3', startDate: q3Start, endDate: q3End },
-    { id: 'q4', name: 'Đăng ký Quý 4', startDate: q4Start, endDate: q4End },
-    { id: 'main', name: `Đăng ký BHYT cho năm ${year + 1}`, startDate: mainStart, endDate: mainEnd },
+    { id: 'q2', name: 'Đợt 2', startDate: q2Start, endDate: q2End },
+    { id: 'q3', name: 'Đợt 3', startDate: q3Start, endDate: q3End },
+    { id: 'q4', name: 'Đợt 4', startDate: q4Start, endDate: q4End },
+    { id: 'main', name: `Đợt 1 ${year + 1}`, startDate: mainStart, endDate: mainEnd },
   ];
 
   return periods.map(p => {

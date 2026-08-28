@@ -44,7 +44,7 @@ const PERIOD_IN_NOTE: Record<string, string> = {
   Q2: "dot 2",
   Q3: "dot 3",
   Q4: "dot 4",
-  MAIN: "dot chinh",
+  MAIN: "dot 1",
 };
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
@@ -310,8 +310,13 @@ function InsuranceRegistrationForm() {
 
   /** Hồ sơ gốc đã có giá trị cho trường này chưa. */
   const recorded = (v?: string | null) => !!(v && String(v).trim());
-  const fieldCls = (locked: boolean) =>
-    cn(ui.input, locked && "bg-slate-50 text-slate-500");
+  const fieldCls = (locked: boolean, hasError?: boolean) =>
+    cn(
+      ui.input,
+      locked && "bg-slate-50 text-slate-500",
+      hasError &&
+        "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
+    );
 
   const bhxhLocked =
     recorded(prefill?.social_insurance_number) && !bhxhEditable;
@@ -450,8 +455,8 @@ function InsuranceRegistrationForm() {
 
       <div className="bg-primary-soft border border-primary-line rounded-lg p-5 text-primary-text">
         <h1 className="text-lg font-bold mb-2 flex items-center gap-2">
-          <ShieldPlus size={20} /> Khai thông tin Đăng ký BHYT {periodObj?.name}{" "}
-          năm {currentYear}
+          <ShieldPlus size={20} /> Khai thông tin - Mua BHYT năm {currentYear} -{" "}
+          {periodObj?.name}{" "}
         </h1>
         {config?.description ? (
           <div
@@ -537,6 +542,7 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.full_name) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.full_name) && !infoEditable,
+                      !!errors.full_name,
                     )}
                   />
                   {errors.full_name && (
@@ -552,8 +558,14 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.student_code) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.student_code) && !infoEditable,
+                      !!errors.student_code,
                     )}
                   />
+                  {errors.student_code && (
+                    <p className="text-xs text-danger-text mt-1">
+                      {errors.student_code.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={ui.fieldLabel}>Giới tính</label>
@@ -562,11 +574,17 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.gender) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.gender) && !infoEditable,
+                      !!errors.gender,
                     )}
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                   </select>
+                  {errors.gender && (
+                    <p className="text-xs text-danger-text mt-1">
+                      {errors.gender.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={ui.fieldLabel}>Ngày sinh</label>
@@ -576,8 +594,14 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.dob) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.dob) && !infoEditable,
+                      !!errors.dob,
                     )}
                   />
+                  {errors.dob && (
+                    <p className="text-xs text-danger-text mt-1">
+                      {errors.dob.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={ui.fieldLabel}>Dân tộc</label>
@@ -586,6 +610,7 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.ethnicity) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.ethnicity) && !infoEditable,
+                      !!errors.ethnicity,
                     )}
                   >
                     <option value="">-- Chọn dân tộc --</option>
@@ -595,6 +620,11 @@ function InsuranceRegistrationForm() {
                       </option>
                     ))}
                   </select>
+                  {errors.ethnicity && (
+                    <p className="text-xs text-danger-text mt-1">
+                      {errors.ethnicity.message}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={ui.fieldLabel}>Số điện thoại</label>
@@ -603,6 +633,7 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.phone_number) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.phone_number) && !infoEditable,
+                      !!errors.phone_number,
                     )}
                   />
                   {errors.phone_number && (
@@ -618,6 +649,7 @@ function InsuranceRegistrationForm() {
                     disabled={recorded(prefill?.citizen_id) && !infoEditable}
                     className={fieldCls(
                       recorded(prefill?.citizen_id) && !infoEditable,
+                      !!errors.citizen_id,
                     )}
                   />
                   {errors.citizen_id && (
@@ -639,10 +671,9 @@ function InsuranceRegistrationForm() {
                     className={fieldCls(
                       recorded(prefill?.social_insurance_number) &&
                         !infoEditable,
+                      !!errors.social_insurance_number,
                     )}
                   />
-
-                  {/* Dòng hiển thị lỗi Zod */}
                   {errors.social_insurance_number && (
                     <p className="text-xs text-danger-text mt-1">
                       {errors.social_insurance_number.message as string}
@@ -653,7 +684,9 @@ function InsuranceRegistrationForm() {
 
               <div className="pt-4 border-t border-line2">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold">Thường trú</h3>
+                  <h3 className={cn("text-sm font-semibold", errors.permanent && "text-danger-text")}>
+                    Thường trú
+                  </h3>
                 </div>
 
                 <Controller
@@ -664,9 +697,9 @@ function InsuranceRegistrationForm() {
                       className={cn(
                         "transition-opacity",
                         /* Khóa form mờ đi nếu đã có data gốc VÀ đang không bật chế độ chỉnh sửa */
-                        hasAddress &&
-                          !infoEditable &&
-                          "opacity-70 pointer-events-none",
+                        hasAddress && !infoEditable && "opacity-70 pointer-events-none",
+                        /* Highlight khung đỏ nếu có lỗi validation */
+                        errors.permanent && "p-3 -mx-3 rounded-lg border border-red-500 bg-red-50/40"
                       )}
                     >
                       <AddressFields
@@ -704,65 +737,70 @@ function InsuranceRegistrationForm() {
           </div>
           <div className="p-5 space-y-4">
             <div>
-              <label className={ui.fieldLabel} htmlFor="kcb-province">
+              <label className={cn(ui.fieldLabel, (!hospitalProvince && errors.hospital_code) && "text-danger-text")} htmlFor="kcb-province">
                 Tỉnh thành bệnh viện
               </label>
-              <SearchableSelect
-                id="kcb-province"
-                value={hospitalProvince}
-                onChange={(v) => {
-                  setHospitalProvince(v);
-                  setValue("hospital_code", "");
-                }}
-                // filter dùng để lọc mã tỉnh HCM và Đồng Nai trước khi map
-                options={provinces
-                  .filter(
-                    (p) =>
-                      p.code === "79" ||
-                      p.code === "75" ||
-                      p.name.includes("Hồ Chí Minh") ||
-                      p.name.includes("Đồng Nai"),
-                  )
-                  .map((p) => ({
-                    value: p.code,
-                    label: p.name,
-                  }))}
-                placeholder="-- Chọn tỉnh thành --"
-                searchPlaceholder="Gõ tên tỉnh thành..."
-                emptyText="Không có tỉnh thành nào khớp"
-              />
+              {/* Bọc viền đỏ nếu chưa chọn tỉnh mà ấn Submit */}
+              <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                <SearchableSelect
+                  id="kcb-province"
+                  value={hospitalProvince}
+                  onChange={(v) => {
+                    setHospitalProvince(v);
+                    setValue("hospital_code", "");
+                  }}
+                  options={provinces
+                    .filter(
+                      (p) =>
+                        p.code === "79" ||
+                        p.code === "75" ||
+                        p.name.includes("Hồ Chí Minh") ||
+                        p.name.includes("Đồng Nai"),
+                    )
+                    .map((p) => ({
+                      value: p.code,
+                      label: p.name,
+                    }))}
+                  placeholder="-- Chọn tỉnh thành --"
+                  searchPlaceholder="Gõ tên tỉnh thành..."
+                  emptyText="Không có tỉnh thành nào khớp"
+                />
+              </div>
             </div>
             <div>
-              <label className={ui.fieldLabel} htmlFor="kcb-hospital">
+              <label className={cn(ui.fieldLabel, errors.hospital_code && "text-danger-text")} htmlFor="kcb-hospital">
                 Bệnh viện
               </label>
 
-              <Controller
-                control={control}
-                name="hospital_code"
-                render={({ field }) => (
-                  <SearchableSelect
-                    id="kcb-hospital"
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                    options={hospitals.map((h) => ({
-                      value: h.code,
-                      label: h.name,
-                      hint: h.code,
-                    }))}
-                    disabled={!hospitalProvince || hospitalsLoading}
-                    placeholder={
-                      !hospitalProvince
-                        ? "-- Chọn tỉnh thành trước --"
-                        : hospitalsLoading
-                          ? "Đang tải danh sách..."
-                          : "-- Chọn bệnh viện KCB --"
-                    }
-                    searchPlaceholder="Gõ tên hoặc mã cơ sở..."
-                    emptyText="Không có cơ sở nào khớp"
-                  />
-                )}
-              />
+              {/* Bọc viền đỏ nếu chưa chọn bệnh viện */}
+              <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                <Controller
+                  control={control}
+                  name="hospital_code"
+                  render={({ field }) => (
+                    <SearchableSelect
+                      id="kcb-hospital"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      options={hospitals.map((h) => ({
+                        value: h.code,
+                        label: h.name,
+                        hint: h.code,
+                      }))}
+                      disabled={!hospitalProvince || hospitalsLoading}
+                      placeholder={
+                        !hospitalProvince
+                          ? "-- Chọn tỉnh thành trước --"
+                          : hospitalsLoading
+                            ? "Đang tải danh sách..."
+                            : "-- Chọn bệnh viện KCB --"
+                      }
+                      searchPlaceholder="Gõ tên hoặc mã cơ sở..."
+                      emptyText="Không có cơ sở nào khớp"
+                    />
+                  )}
+                />
+              </div>
 
               {errors.hospital_code && (
                 <p className="text-xs text-danger-text mt-1">
@@ -777,7 +815,6 @@ function InsuranceRegistrationForm() {
                 </p>
               )}
 
-              {/* Ghi chú hướng dẫn chọn bệnh viện - Bắt chước 100% style Thường trú */}
               <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
                 <li>
                   • <b>Link tra cứu bệnh viện:</b>{" "}
@@ -798,11 +835,7 @@ function InsuranceRegistrationForm() {
                   • <b>Lưu ý:</b> Sinh viên{" "}
                   <b className="text-danger-text">không</b> chọn bệnh viện{" "}
                   <b className="text-danger-text">không được đăng ký mới</b> và{" "}
-                  <b className="text-danger-text">
-                    {" "}
-                    đổi nơi Khám chữa bệnh (KCBBD)
-                  </b>
-                  .
+                  <b className="text-danger-text">đổi nơi Khám chữa bệnh (KCBBD)</b>.
                 </li>
               </ul>
             </div>
@@ -904,6 +937,7 @@ function InsuranceRegistrationForm() {
             </div>
 
             <div className="grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {/* CCCD MẶT TRƯỚC */}
               <div className="flex flex-col">
                 <label
                   className={cn(
@@ -912,11 +946,16 @@ function InsuranceRegistrationForm() {
                   )}
                 >
                   <span>Ảnh VNeID/CCCD mặt trước</span>
-                  <span className="text-danger-text" title="Bắt buộc">
-                    *
-                  </span>
+                  <span className="text-danger-text">*</span>
                 </label>
-                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                <div
+                  className={cn(
+                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+                    errors.cccd_image
+                      ? "border-red-500 bg-red-50"
+                      : "border-slate-300 hover:bg-slate-50",
+                  )}
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -945,6 +984,8 @@ function InsuranceRegistrationForm() {
                   </p>
                 )}
               </div>
+
+              {/* CCCD MẶT SAU */}
               <div className="flex flex-col">
                 <label
                   className={cn(
@@ -953,11 +994,16 @@ function InsuranceRegistrationForm() {
                   )}
                 >
                   <span>Ảnh VNeID/CCCD mặt sau</span>
-                  <span className="text-danger-text" title="Bắt buộc">
-                    *
-                  </span>
+                  <span className="text-danger-text">*</span>
                 </label>
-                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                <div
+                  className={cn(
+                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+                    errors.cccd_image_back
+                      ? "border-red-500 bg-red-50"
+                      : "border-slate-300 hover:bg-slate-50",
+                  )}
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -986,6 +1032,8 @@ function InsuranceRegistrationForm() {
                   </p>
                 )}
               </div>
+
+              {/* BIÊN LAI */}
               <div className="flex flex-col">
                 <label
                   className={cn(
@@ -994,11 +1042,16 @@ function InsuranceRegistrationForm() {
                   )}
                 >
                   <span>Bill chuyển khoản</span>
-                  <span className="text-danger-text" title="Bắt buộc">
-                    *
-                  </span>
+                  <span className="text-danger-text">*</span>
                 </label>
-                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                <div
+                  className={cn(
+                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+                    errors.payment_receipt_image
+                      ? "border-red-500 bg-red-50"
+                      : "border-slate-300 hover:bg-slate-50",
+                  )}
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -1027,6 +1080,8 @@ function InsuranceRegistrationForm() {
                   </p>
                 )}
               </div>
+
+              {/* ẢNH THẺ BHYT */}
               <div className="flex flex-col">
                 <label
                   className={cn(
@@ -1035,14 +1090,19 @@ function InsuranceRegistrationForm() {
                   )}
                 >
                   <span>Ảnh thẻ BHYT</span>
-                  <span className="text-danger-text" title="Bắt buộc">
-                    *
-                  </span>
+                  <span className="text-danger-text">*</span>
                   <span className="text-xs font-normal text-muted">
                     (VssID/VNeID)
                   </span>
                 </label>
-                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                <div
+                  className={cn(
+                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+                    errors.bhyt_image
+                      ? "border-red-500 bg-red-50"
+                      : "border-slate-300 hover:bg-slate-50",
+                  )}
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -1065,9 +1125,9 @@ function InsuranceRegistrationForm() {
                     <span className="text-xs text-slate-500">Tối đa 5MB</span>
                   </div>
                 </div>
-                {errors.cccd_image && (
+                {errors.bhyt_image && (
                   <p className="mt-1 text-xs text-danger-text">
-                    {errors.cccd_image.message as string}
+                    {errors.bhyt_image.message as string}
                   </p>
                 )}
               </div>
@@ -1076,15 +1136,15 @@ function InsuranceRegistrationForm() {
         </div>
 
         <div className={ui.card}>
-          <div className="p-5">
+          <div className={cn("p-5 border rounded-lg transition-colors", errors.confirm_declaration ? "border-red-500 bg-red-50" : "border-transparent")}>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 {...register("confirm_declaration")}
-                className="mt-1 w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                className={cn("mt-1 w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary", errors.confirm_declaration && "border-red-500 outline-none ring-2 ring-red-500/20")}
               />
               <div>
-                <span className="text-sm font-medium text-ink">
+                <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-red-700" : "text-ink")}>
                   Xác nhận đã khai đúng thông tin, đã chuyển khoản và đồng ý
                   cung cấp thông tin cho nhà trường.
                 </span>
