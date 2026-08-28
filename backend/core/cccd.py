@@ -58,9 +58,13 @@ def parse_cccd_qr(raw: str | None) -> dict | None:
         return None
 
     parts = raw.split("|")
-    if len(parts) != FIELD_COUNT:
-        logger.info("CCCD_QR_SHAPE_MISMATCH | %d truong (can %d)", len(parts), FIELD_COUNT)
+    # `>=` chu KHONG phai `==`: the that do duoc tra ve 11 truong — 7 truong co
+    # noi dung roi 4 dau `|` rong o duoi. Bat dung 7 la loai nham the hop le.
+    # Frontend (lib/cccd-qr.ts::looksLikeCccdQr) noi cung kieu, hai ben phai khop.
+    if len(parts) < FIELD_COUNT:
+        logger.info("CCCD_QR_SHAPE_MISMATCH | %d truong (can it nhat %d)", len(parts), FIELD_COUNT)
         return None
+    parts = parts[:FIELD_COUNT]
 
     citizen_id = parts[0].strip()
     full_name = parts[2].strip()
