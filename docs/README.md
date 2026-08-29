@@ -108,7 +108,13 @@ DJANGO_API_URL=http://127.0.0.1:8000
 npm run dev
 ```
 
-Mở `http://localhost:3000`. Next.js tự proxy `/api/*` về Django `:8000` qua `next.config.ts`.
+Mở `http://localhost:3000`.
+
+> **Next.js KHÔNG proxy `/api/*`** — `next.config.mjs` cố ý bỏ rewrite (gây redirect
+> loop với POST). Khi dev phải tạo `frontend/.env.local` với
+> `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api` để trình duyệt gọi thẳng Django;
+> CORS đã mở sẵn cho `localhost:3000`. Thiếu biến này thì frontend gọi `/api` tương
+> đối và không có gì phục vụ. Xem [`CODEBASE.md §7`](../CODEBASE.md).
 
 ---
 

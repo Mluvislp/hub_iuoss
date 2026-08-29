@@ -83,7 +83,7 @@ hub_iuoss/
 │   │   ├── types.ts             ← TypeScript interfaces đầy đủ
 │   │   └── utils.ts             ← cn(), formatDate(), getInitials()
 │   ├── middleware.ts             ← route protection (kiểm tra hub_token cookie)
-│   ├── next.config.ts           ← rewrite /api/* → DJANGO_API_URL
+│   ├── next.config.mjs          ← KHÔNG rewrite /api/ — Nginx lo (xem §7)
 │   ├── tailwind.config.ts       ← theme (sidebar colors, font)
 │   ├── tsconfig.json            ← TypeScript config (@/* alias)
 │   ├── package.json
@@ -151,17 +151,27 @@ Middleware `frontend/middleware.ts` đọc cookie `hub_token`. Nếu thiếu →
 
 `lib/auth.ts` quản lý cookie lifecycle. `lib/api.ts` tự động thêm `Authorization: Bearer <token>` header.
 
-### 6. Frontend: API chưa kết nối — Django chưa có REST endpoints
+### 6. Frontend đã nối API thật
 
-`lib/api.ts` có cấu trúc đầy đủ nhưng Django chưa expose `/api/*`. Khi dev frontend, cần mock data hoặc dùng JSON fixture. Sau khi DRF được thêm vào backend thì kết nối ngay.
+`core/api/urls.py` expose **22 endpoint**; `lib/api.ts` gọi thẳng vào đó và tự gắn
+`Authorization: Bearer <token>`. Không còn mock data.
 
-### 7. Frontend: Next.js rewrite `/api/` → Django
+### 7. Frontend: KHÔNG dùng rewrite proxy — Nginx lo định tuyến
 
-`next.config.ts` cấu hình rewrite:
-```
-/api/* (Next.js nhận) → http://127.0.0.1:8002/api/* (Django xử lý)
-```
-Trong production, Nginx cũng proxy `/api/` về Gunicorn :8002 (hai tầng, redundant nhưng an toàn).
+`next.config.mjs` (không phải `.ts`) **cố ý bỏ rewrite `/api/*`**. Comment trong
+file giải thích: Next.js strip trailing slash trước khi rewrite chạy, khiến Django
+nhận URL sai → 301 → redirect loop với request POST.
+
+`lib/api.ts` đặt `API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api'`:
+
+| | `NEXT_PUBLIC_API_URL` | Kết quả |
+|---|---|---|
+| Dev | `http://127.0.0.1:8000/api` | Trình duyệt gọi thẳng Django (CORS mở cho `localhost:3000`) |
+| Production | **không set** | `API_BASE = '/api'` → Nginx định tuyến `/api/` → Gunicorn `:8002` |
+
+Chỉ **một** tầng định tuyến, nằm ở Nginx. Đừng tạo `.env.local` trên server
+production — `NEXT_PUBLIC_*` bị đông cứng vào bundle lúc build; `deploy.sh` có guard
+chặn build nếu phát hiện.
 
 ---
 

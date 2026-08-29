@@ -41,7 +41,11 @@ Cả hai dùng chung **MySQL database** `iuoss_student_data`. Không có API gi�
 - [x] Dashboard: 4 stat cards + BHYT + sinh hoạt công dân + yêu cầu giấy tờ
 - [x] Models read-only: `Student`, `Department`, `DegreeLevel`, `StudentStatus`, `HealthInsuranceCard`, `CivicActivity`
 - [x] Bảng `hub_confirmation_requests` — form tạo, danh sách theo dõi
-- [ ] **REST API endpoints** — chưa có (roadmap gần nhất)
+- [x] **REST API đã xong** — 22 endpoint trong `core/api/urls.py`, kèm
+      `serializers.py` · `authentication.py` · `throttling.py` · `tokens.py`.
+      Nhóm: `health/` · `features/` · `auth/*` (login, logout, Microsoft, refresh) ·
+      `dashboard/` · `health-insurance/*` · `requests/*` (5 loại giấy) ·
+      `offcampus/*` · `locations/*` · `hospitals/`
 
 ### Frontend (`frontend/`) — Next.js 14
 
@@ -52,8 +56,9 @@ Cả hai dùng chung **MySQL database** `iuoss_student_data`. Không có API gi�
 - [x] Dashboard home: stat cards, BHYT, sinh hoạt công dân, confirmation requests
 - [x] Form tạo yêu cầu giấy xác nhận — suggestions, success state
 - [x] TypeScript types đầy đủ (`lib/types.ts`)
-- [x] API client cấu trúc sẵn (`lib/api.ts`) — chờ backend endpoints
-- [ ] Kết nối thật với Django API — chờ DRF endpoints
+- [x] API client `lib/api.ts` — đã nối thật với Django, tự gắn `Authorization: Bearer`
+- [x] Các trang chạy bằng dữ liệu thật: dashboard, BHYT (xem + đăng ký), khai báo
+      ngoại trú, 5 loại yêu cầu giấy tờ, sinh hoạt công dân — 15 route build ra
 
 ---
 
@@ -79,9 +84,21 @@ Thay đổi schema → viết SQL → chạy thủ công → cập nhật `docs/
 
 Chỉ đọc từ shared DB. **Không ghi** vào `students`, `departments`, hay bất kỳ bảng nào Dashboard sở hữu. Hub chỉ ghi vào bảng `hub_*`.
 
-### 4. Frontend: API chưa có — dùng mock data khi dev
+### 4. Frontend: KHÔNG dùng rewrite proxy cho `/api/`
 
-`lib/api.ts` cấu trúc sẵn nhưng endpoints Django chưa tồn tại. Khi dev frontend, dùng mock data tạm hoặc hardcode trực tiếp trong component.
+`next.config.mjs` **cố ý không cấu hình rewrite**. Next.js strip trailing slash
+trước khi rewrite chạy, khiến Django nhận URL sai → 301 → redirect loop với request
+POST. Lý do này có ghi trong chính file đó.
+
+Thay vào đó `lib/api.ts` đặt `API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api'`:
+
+- **Dev:** set `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api` trong `.env.local` →
+  trình duyệt gọi thẳng Django, CORS đã mở cho `localhost:3000`
+- **Production:** không set → `API_BASE = '/api'` (tương đối) → Nginx định tuyến
+  `/api/` sang Gunicorn `:8002`
+
+> Đừng tạo `.env.local` trên server production: `NEXT_PUBLIC_*` bị đông cứng vào
+> bundle lúc build. `deploy.sh` có guard chặn build nếu phát hiện.
 
 ### 5. Frontend: Auth dùng cookie `hub_token`
 
@@ -121,7 +138,7 @@ frontend/
   lib/types.ts                     ← TypeScript types đầy đủ
   lib/utils.ts                     ← cn(), formatDate(), ...
   middleware.ts                    ← bảo vệ route dashboard, redirect nếu chưa login
-  next.config.ts                   ← rewrite /api/* → Django :8002
+  next.config.mjs                  ← KHÔNG rewrite /api/ (xem mục 4) 
   tailwind.config.ts               ← Tailwind theme
   ecosystem.config.js              ← PM2 config cho production
 ```
@@ -175,5 +192,6 @@ NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
 | Hệ sinh thái + hạ tầng server | `docs/ECOSYSTEM.md` |
 | LDAP flow chi tiết | `docs/AUTH_FLOW.md` |
 | Deploy lên server (cấu hình chi tiết) | `docs/SERVER_SETUP.md` |
+| Môi trường sandbox | `docs/SERVER_SETUP.md` §Sandbox · đầy đủ ở `docs/SANDBOX.md` repo `dashboard_iuoss` |
 | Schema bảng hub_* | `docs/schema.sql` |
 | Setup local | `docs/README.md` |

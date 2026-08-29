@@ -33,10 +33,10 @@
 │  Django (dashboard_iuoss│◄────────►   (shared database)           │
 │  (staff-facing)         │  R/W    │                                │
 │                         │         │  students, departments,        │
-│  - Nhân viên OSS login  │         │  student_statuses, tickets,    │
-│  - Quản lý hồ sơ SV     │         │  ticket_*, imports_*,          │
-│  - Xử lý ticket         │         │  hub_students,                 │
-│  - Import Excel          │         │  hub_confirmation_requests,   │
+│  - Nhân viên OSS login  │         │  student_statuses, danh mục,   │
+│  - Quản lý hồ sơ SV     │         │  hospitals, vn_provinces,      │
+│  - Duyệt yêu cầu giấy tờ│         │  hub_students,                 │
+│  - Duyệt đơn BHYT       │         │  hub_confirmation_requests,   │
 │  - Xuất báo cáo          │         │  django_session (×2)          │
 └─────────────────────────┘         └────────────────────────────────┘
 ```
@@ -66,19 +66,30 @@ Cả Dashboard và Hub đều kết nối vào **cùng một MySQL database**: `
 
 | Nhóm bảng | Chủ sở hữu (ghi) | Người đọc |
 |---|---|---|
-| `students`, `departments`, `degree_levels`, `joint_programs`, `academic_terms`, `student_statuses` | Dashboard (form sửa tay + sync trạng thái) | Hub (read-only) |
-| `student_*` (12 bảng con) | Dashboard | Hub (read-only, tương lai) |
-| `tickets`, `ticket_*` | Dashboard (sync từ WordPress) | Hub (tương lai) |
-| `audit_auditlog` | Dashboard | — |
-| `hub_students` | Hub | — |
-| `hub_confirmation_requests` | Hub | — |
-| `django_session` (×2) | Dashboard (session riêng) + Hub (session riêng, tên cookie khác) | — |
-| `majors` | Dashboard (seed command) | Hub (read-only, tương lai) |
+| `students` + **10 bảng con** ¹ | Dashboard | Hub (read-only) |
+| Danh mục: `departments`, `majors`, `student_statuses`, `degree_levels`, `joint_programs`, `academic_terms`, `nationalities`, `vn_ethnicities`, `hospitals`, `relationship_types`, `vn_provinces`, `vn_wards` | Dashboard | Hub (read-only) |
+| `audit_auditlog`, các bảng `*_batches` | Dashboard | — |
+| `hub_confirmation_requests`, `hub_profile_change_requests`, `hub_insurance_registrations` | Hub tạo dòng · Dashboard đổi trạng thái ² | cả hai |
+| `hub_students`, `hub_insurance_configs`, `hub_cccd_scans` | Hub | Dashboard (**chỉ đọc**) |
+| `django_session` (×2) | Dashboard + Hub, mỗi bên session riêng, tên cookie khác | — |
+
+¹ `student_academic_enrollments` · `student_addresses` · `student_civic_activities`
+· `student_code_history` · `student_contact_points` · `student_family_members` ·
+`student_health_insurance_cards` · `student_high_schools` ·
+`student_identity_documents` · `student_tuition_exemptions`.
+
+² Ba bảng này do Hub tạo dòng nhưng Dashboard **được phép** cập nhật trạng thái duyệt
+— đó là bản chất của luồng yêu cầu giấy tờ và luồng duyệt đơn BHYT. Với đơn BHYT
+ranh giới hẹp hơn: Dashboard **chỉ ghi** `status` · `rejection_reason` · `updated_at`,
+mọi cột còn lại là của Hub.
+
+> Các bảng `tickets` / `ticket_*` đã bị **gỡ bỏ hoàn toàn** (commit `ac82bc8` bên
+> `dashboard_iuoss`, thay bằng luồng Yêu cầu giấy tờ). Không còn tồn tại trong DB.
 
 ### Quy tắc quan trọng
 
 > **Hub chỉ được đọc dữ liệu từ các bảng do Dashboard sở hữu.**
-> Hub không bao giờ ghi vào `students`, `tickets`, hay bất kỳ bảng nào Dashboard quản lý.
+> Hub không bao giờ ghi vào `students` hay bất kỳ bảng nào Dashboard quản lý.
 > Hub chỉ ghi vào các bảng `hub_*` của riêng mình.
 
 ### Session cookies — tách biệt
@@ -108,27 +119,32 @@ Cả WordPress và Hub đều xác thực qua cùng LDAP server của trường:
 
 ---
 
-## 5. Luồng dữ liệu ticket
+## 5. Luồng yêu cầu giấy tờ (thay cho ticket cũ)
+
+> **Module ticket đã bị gỡ bỏ hoàn toàn** — commit `ac82bc8` bên `dashboard_iuoss`.
+> Các bảng `tickets`, `ticket_statuses`, `ticket_wp_authors` không còn trong DB, và
+> luồng đồng bộ từ WordPress cũng không còn code nào chạy (biến `IUOSS_WP_API_*` vẫn
+> nằm trong `.env` của Dashboard nhưng là di sản chưa dọn, không Python nào đọc).
+>
+> Thay thế bằng luồng **Yêu cầu giấy tờ** dưới đây — sinh viên tạo thẳng trên Hub,
+> không đi qua WordPress nữa.
 
 ```
-Sinh viên gửi yêu cầu
+Sinh viên đăng nhập hub.iuoss.com
     │
-    ▼ iuoss.com (WordPress)
-    │  Lưu vào WordPress DB (wp_posts, wp_postmeta)
+    ▼ Tạo yêu cầu (5 loại: lý do khác · hoãn NVQS · thương binh ·
+    │                vay vốn ngân hàng · mẫu tiếng Anh)
+    │  POST /api/requests/<loại>/form/
     │
-    ▼ Nhân viên OSS bấm "Đồng bộ" trên Dashboard
+    ▼ MySQL — bảng hub_confirmation_requests
     │
-    ▼ dashboard.iuoss.com → tickets/services.py
-    │  GET https://iuoss.com/wp-json/iuoss/v1/tickets?date=...
-    │  → upsert vào MySQL: tickets, ticket_statuses, ticket_wp_authors, ...
+    ▼ dashboard.iuoss.com — nhân viên OSS duyệt
+    │  Đọc bảng, đổi trạng thái, sinh file DOCX/PDF
     │
-    ▼ MySQL (iuoss_student_data) — source of truth mới
-    │
-    ▼ hub.iuoss.com (tương lai)
-       Sinh viên xem trạng thái ticket của mình
+    ▼ Sinh viên theo dõi trạng thái trên Hub
 ```
 
-**Lưu ý:** Hub hiện tại chưa hiển thị ticket — đây là tính năng roadmap. Khi implement, Hub đọc trực tiếp từ bảng `tickets` trong MySQL (không cần API).
+Không có API giữa hai app — trao đổi hoàn toàn qua bảng dùng chung.
 
 ---
 
@@ -201,9 +217,9 @@ Chi tiết vận hành: `docs/SERVER_INFRASTRUCTURE.md` (dashboard repo) · `doc
 Khi thay đổi **schema DB** (thêm/sửa/xóa cột bảng dùng chung):
 
 ```
-Thay đổi bảng students/* hoặc tickets/*
+Thay đổi bảng students/* hoặc danh mục dùng chung
     │
-    ├─► dashboard_iuoss: cập nhật model trong students/models.py hoặc tickets/models.py
+    ├─► dashboard_iuoss: cập nhật model trong students/models.py
     └─► hub_iuoss:        cập nhật model trong students/models.py (nếu field đó được dùng)
 ```
 
@@ -218,8 +234,13 @@ Khi thay đổi **bảng hub_*** (chỉ Hub sở hữu):
 
 | Tính năng | Hiện tại | Kế hoạch |
 |---|---|---|
-| Sinh viên xem ticket của mình | ❌ | Đọc bảng `tickets` từ Hub |
-| Sinh viên gửi yêu cầu mới | Qua WordPress | Gửi trực tiếp từ Hub vào DB |
+| Sinh viên gửi yêu cầu giấy tờ | ✅ Gửi thẳng từ Hub vào `hub_confirmation_requests` (5 loại) | — |
+| Sinh viên đăng ký BHYT trực tuyến | ✅ `hub_insurance_registrations`, Dashboard duyệt | — |
+| Khai báo ngoại trú | ✅ Hub ghi vào bảng địa chỉ của SV | — |
+| Sinh viên sửa CCCD / email / SĐT | ✅ `hub_profile_change_requests`, Dashboard duyệt | — |
 | Thông báo từ phòng CTSV | ❌ | Bảng `hub_announcements` mới |
 | SSO WordPress ↔ Hub | ❌ (login riêng) | OAuth2 hoặc JWT Cookie |
 | Staff reply cho sinh viên | ❌ | Dashboard ghi → Hub đọc |
+
+> Ba dòng đầu trước đây nằm ở cột "Kế hoạch" và đi qua WordPress. Nay đã ship và
+> chạy thẳng Hub → DB, không qua WordPress nữa.

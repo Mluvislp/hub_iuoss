@@ -1,7 +1,11 @@
 # IUOSS Hub — Triển khai production (appctsv)
 
 > Server production chung với `dashboard.iuoss.com`.
-> Xem `SERVER_INFRASTRUCTURE.md` trong repo `dashboard_iuoss` để hiểu tổng quan hạ tầng.
+> Tổng quan hạ tầng nằm ở `docs/DEPLOY.md` trong repo `dashboard_iuoss`.
+>
+> Từ 29/08/2026 trên **cùng server** còn có môi trường **sandbox** (`hub-sandbox` /
+> `dashboard-sandbox`, database riêng) — xem §Sandbox ở cuối file. File này nói về
+> production.
 
 ---
 
@@ -10,21 +14,28 @@
 ```
 Internet (HTTPS :443)
   │
-  ▼ Cloudflare Tunnel
+  ▼ Cloudflare Tunnel  (MỘT tunnel, 4 hostname)
 cloudflared
   │ HTTP → 127.0.0.1:80
   ▼
-Nginx :80
-  ├─ dashboard.iuoss.com   →  :8001  Gunicorn  (dashboard — không đụng)
+Nginx :80  ── phân biệt bằng server_name ──
   │
-  └─ hub.iuoss.com
-       ├─ /api/            →  :8002  Gunicorn  (Django REST API)
-       ├─ /static/         →  backend/staticfiles/
-       └─ /                →  :3000  PM2        (Next.js)
+  ├─ dashboard.iuoss.com          →  :8001  Gunicorn   (dashboard — không đụng)
+  │
+  ├─ hub.iuoss.com                                              [PRODUCTION]
+  │    ├─ /api/                   →  :8002  Gunicorn   (Django REST API)
+  │    ├─ /static/                →  backend/staticfiles/
+  │    └─ /                       →  :3000  PM2        (Next.js)
+  │
+  ├─ dashboard-sandbox.iuoss.com  →  :8003  Gunicorn      [SANDBOX]
+  │
+  └─ hub-sandbox.iuoss.com                                      [SANDBOX]
+       ├─ /api/                   →  :8004  Gunicorn
+       └─ /                       →  :3001  PM2
 
-Gunicorn :8002   (systemd: iuoss_hub)
+Gunicorn :8002   (systemd: iuoss_hub)          — 6 worker
 PM2      :3000   (iuoss_hub_front)
-MySQL    :3306   (iuoss_student_data — shared)
+MySQL    :3306   (iuoss_student_data — shared với dashboard)
 ```
 
 ---
@@ -160,7 +171,7 @@ WorkingDirectory=/var/www/apps/hub_iuoss/backend
 ExecStart=/var/www/apps/hub_iuoss/backend/venv/bin/gunicorn \
     config.wsgi:application \
     --bind 127.0.0.1:8002 \
-    --workers 3 \
+    --workers 6 \
     --timeout 60 \
     --access-logfile /var/log/apps/hub_iuoss/access.log \
     --error-logfile /var/log/apps/hub_iuoss/error.log
@@ -260,11 +271,19 @@ cloudflared tunnel route dns <TUNNEL_ID> hub.iuoss.com
 
 Cập nhật `/etc/cloudflared/config.yml`:
 
+Trạng thái hiện tại của `/etc/cloudflared/config.yml` — 4 hostname, 1 tunnel:
+
 ```yaml
 ingress:
-  - hostname: dashboard.iuoss.com      # GIỮ NGUYÊN
+  # --- PRODUCTION ---
+  - hostname: dashboard.iuoss.com
     service: http://127.0.0.1:80
-  - hostname: hub.iuoss.com            # THÊM DÒNG NÀY
+  - hostname: hub.iuoss.com
+    service: http://127.0.0.1:80
+  # --- SANDBOX ---
+  - hostname: dashboard-sandbox.iuoss.com
+    service: http://127.0.0.1:80
+  - hostname: hub-sandbox.iuoss.com
     service: http://127.0.0.1:80
   - service: http_status:404           # PHẢI là rule cuối cùng
 ```
@@ -272,6 +291,10 @@ ingress:
 ```bash
 sudo systemctl restart cloudflared
 ```
+
+> ⚠️ Còn một file thừa `~/.cloudflared/config.yml` là bản cũ chỉ có 1 hostname.
+> systemd dùng bản ở `/etc/cloudflared/`, nhưng ai chạy tay `cloudflared tunnel run`
+> bằng user `hhdang` sẽ bốc nhầm bản cũ và 3 hostname còn lại thành 404.
 
 ---
 
@@ -283,6 +306,11 @@ sudo systemctl restart cloudflared
 cd /var/www/apps/hub_iuoss
 bash deploy.sh
 ```
+
+> ⚠️ **`deploy.sh` hardcode `APP_ROOT="/var/www/apps/hub_iuoss"` và `cd` vào đó ngay
+> đầu script.** Đứng ở thư mục sandbox gõ `bash deploy.sh` **vẫn deploy PRODUCTION**,
+> không báo lỗi gì. Bản clone sandbox có cùng file này nên bẫy càng dễ dính. Sandbox
+> hiện chưa có script deploy riêng — cập nhật thủ công, xem §Sandbox.
 
 ### Deploy từng phần
 
@@ -384,3 +412,81 @@ venv/bin/python manage.py clearsessions
 | Nginx `/api/` | không có | → Gunicorn |
 | Node.js | không cần | v20 LTS |
 | Dashboard | không đụng | không đụng |
+
+---
+
+## Sandbox
+
+Dựng 29/08/2026 trên **chính server này**, chạy song song production, bám nhánh
+`main`, nhưng **database riêng**. Mục đích: xem trước và kiểm thử trước khi deploy
+production.
+
+> Tài liệu đầy đủ nằm ở **`docs/SANDBOX.md` trong repo `dashboard_iuoss`** — sandbox
+> là *một* môi trường trải trên *hai* repo, tách đôi tài liệu là tự tạo ra cặp file
+> phải sửa song song. Dưới đây chỉ là phần liên quan tới Hub.
+
+| | Production | Sandbox |
+|---|---|---|
+| Domain | `hub.iuoss.com` | `hub-sandbox.iuoss.com` |
+| Code | `/var/www/apps/hub_iuoss/` | `/var/www/apps/hub_sandbox/` |
+| Gunicorn | `127.0.0.1:8002`, 6 worker | `127.0.0.1:8004`, **2 worker** |
+| systemd | `iuoss_hub` | `iuoss_hub_sandbox` |
+| PM2 | `iuoss_hub_front` — `:3000` | `iuoss_hub_front_sandbox` — `:3001` |
+| Nginx | `sites-available/iuoss_hub` | `sites-available/iuoss_hub_sandbox` |
+| Log | `/var/log/apps/hub_iuoss/` | `/var/log/apps/hub_sandbox/` |
+| `DJANGO_ENV` | `production` | **`staging`** |
+| `DB_NAME` | `iuoss_student_data` | `iuoss_student_data_sandbox` |
+| `DB_USER` | `iuoss_app` | `iuoss_sandbox` |
+
+### Chốt an toàn của database
+
+User `iuoss_sandbox` **cố ý không được cấp quyền nào trên DB production**. Hub và
+Dashboard trao đổi hoàn toàn qua DB dùng chung chứ không gọi API của nhau, nên chỉ
+cần **một dòng `DB_NAME` sai** trong `.env` là app sandbox ghi thẳng vào dữ liệu
+thật. Cách phân quyền này biến cấu hình sai thành lỗi permission tức thì thay vì
+hỏng dữ liệu âm thầm. **Đừng cấp thêm quyền cho user này.**
+
+DB sandbox chỉ giữ dữ liệu nền đầy đủ + hồ sơ của **5 sinh viên** mẫu.
+
+### Biết mình đang gọi vào môi trường nào
+
+```bash
+curl -s https://hub-sandbox.iuoss.com/api/health/
+# {"status":"ok","environment":"staging","database":true}     ← sandbox
+# {"status":"ok","environment":"production","database":true}  ← prod
+```
+
+Giá trị `environment` lấy thẳng từ `settings.DJANGO_ENV` — nhìn response là biết, không
+phải đoán theo hostname.
+
+### PM2 config của sandbox nằm NGOÀI repo
+
+`/home/hhdang/sandbox-tools/ecosystem.sandbox.config.js`.
+
+`frontend/ecosystem.config.js` là file được git theo dõi và thuộc về production
+(port 3000). Sửa nó trong bản clone sandbox thì mỗi lần `git pull` sẽ xung đột.
+
+### Bẫy: đừng thêm `--hostname 127.0.0.1` cho Next.js
+
+Cờ này **làm hỏng ứng dụng**. `middleware.ts` dựng redirect bằng
+`new URL('/login', request.url)`; khi có `--hostname`, Next.js lấy origin từ cờ đó
+chứ không từ header `Host`, nên trả `Location: http://localhost:3001/login` thay vì
+đường dẫn tương đối — trình duyệt từ internet đi không tới.
+
+Triệu chứng đáng nhớ: **health check nội bộ vẫn xanh**, chỉ lộ khi test qua HTTPS
+công khai. Muốn chặn truy cập thẳng vào port thì dùng firewall, không dùng cờ này.
+
+### Cập nhật code sandbox (chưa có script)
+
+```bash
+cd /var/www/apps/hub_sandbox && git pull origin main
+cd backend  && venv/bin/pip install -r requirements.txt -q
+venv/bin/python manage.py migrate --noinput
+venv/bin/python manage.py collectstatic --noinput --clear
+sudo systemctl restart iuoss_hub_sandbox
+
+cd ../frontend && npm ci && npm run build
+pm2 restart iuoss_hub_front_sandbox
+```
+
+**Không dùng `bash deploy.sh`** — nó sẽ deploy production, xem cảnh báo ở §Deploy.
