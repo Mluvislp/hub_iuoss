@@ -67,12 +67,24 @@ hub_iuoss/
 │   │   ├── (auth)/
 │   │   │   └── login/
 │   │   │       └── page.tsx     ← login page split-screen
+│   │   ├── auth/microsoft/callback/
+│   │   │   └── page.tsx         ← nhận code từ Entra ID, đổi lấy JWT
 │   │   └── (dashboard)/
 │   │       ├── layout.tsx       ← sidebar + topbar layout (client)
-│   │       ├── page.tsx         ← dashboard chính
-│   │       └── requests/
-│   │           └── new/
-│   │               └── page.tsx ← form tạo yêu cầu giấy tờ
+│   │       └── dashboard/       ← URL thật là /dashboard/*
+│   │           ├── page.tsx                     ← dashboard chính
+│   │           ├── bao-hiem-y-te/
+│   │           │   ├── page.tsx                 ← xem thẻ BHYT
+│   │           │   └── dang-ky/page.tsx         ← form đăng ký BHYT (nặng nhất)
+│   │           ├── khai-bao-ngoai-tru/page.tsx  ← khai báo ngoại trú
+│   │           ├── sinh-hoat-cong-dan/page.tsx  ← tra cứu SHCD
+│   │           └── requests/                    ← yêu cầu giấy tờ
+│   │               ├── new/page.tsx             ← chọn loại giấy
+│   │               ├── other/page.tsx           ← lý do khác
+│   │               ├── deferment/page.tsx       ← hoãn NVQS
+│   │               ├── thuong-binh/page.tsx     ← ưu đãi giáo dục
+│   │               ├── bank-loan/page.tsx       ← vay vốn ngân hàng
+│   │               └── english/page.tsx         ← mẫu tiếng Anh
 │   ├── components/
 │   │   └── layout/
 │   │       ├── sidebar.tsx      ← sidebar responsive (client component)

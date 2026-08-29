@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS `hub_students` (
   `id`             BIGINT       NOT NULL AUTO_INCREMENT,
   `ldap_uid`       VARCHAR(64)  NOT NULL,
   `student_id`     BIGINT       NULL,          -- soft ref → students.id
-  `last_login_at`  DATETIME(6)  NULL,
+  `last_login_at`  DATETIME(6)  NULL,          -- lần đăng nhập gần nhất, bất kể lối nào
+  `last_login_ldap_at` DATETIME(6) NULL,       -- riêng lối LDAP
+  `last_login_ms_at`   DATETIME(6) NULL,       -- riêng lối Microsoft/Entra ID
   `login_count`    INT          NOT NULL DEFAULT 0,
   `created_at`     DATETIME(6)  NOT NULL,
   PRIMARY KEY (`id`),
@@ -23,6 +25,7 @@ CREATE TABLE IF NOT EXISTS `hub_confirmation_requests` (
   `request_type` VARCHAR(64)   NOT NULL,
   `purpose`      VARCHAR(255)  NOT NULL,
   `note`         TEXT          NULL,
+  `payload`      JSON          NULL,           -- dữ liệu riêng theo từng loại giấy
   `status`       VARCHAR(16)   NOT NULL DEFAULT 'pending',
   `staff_note`   TEXT          NULL,
   `created_at`   DATETIME(6)   NOT NULL,
@@ -31,6 +34,36 @@ CREATE TABLE IF NOT EXISTS `hub_confirmation_requests` (
   KEY `idx_hcr_student_id` (`student_id`),
   KEY `idx_hcr_ldap_uid` (`ldap_uid`),
   KEY `idx_hcr_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sinh viên xin sửa CCCD / email / SĐT; nhân viên OSS duyệt bên Dashboard.
+-- `target` cho biết sửa trường nào (registry CHANGE_TARGETS bên dashboard),
+-- `group_key` gom nhiều dòng thuộc cùng một lần gửi.
+-- Đây là bảng hub_* DUY NHẤT có khoá ngoại thật; 4 bảng còn lại chỉ soft ref.
+CREATE TABLE IF NOT EXISTS `hub_profile_change_requests` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `student_id`     BIGINT        NOT NULL,
+  `target`         VARCHAR(64)   NOT NULL,
+  `target_id`      BIGINT        NULL,
+  `old_value`      TEXT          NULL,
+  `new_value`      TEXT          NOT NULL,
+  `source`         VARCHAR(32)   NOT NULL,
+  `group_key`      CHAR(32)      NULL,
+  `status`         VARCHAR(16)   NOT NULL DEFAULT 'pending',
+  `review_note`    VARCHAR(255)  NULL,
+  `reviewed_by_id` INT           NULL,
+  `reviewed_at`    DATETIME      NULL,
+  `created_at`     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `fk_hpcr_user` (`reviewed_by_id`),
+  KEY `idx_hpcr_queue` (`status`, `created_at`),
+  KEY `idx_hpcr_student` (`student_id`, `target`, `status`),
+  KEY `idx_hpcr_group` (`group_key`),
+  CONSTRAINT `fk_hpcr_student` FOREIGN KEY (`student_id`)
+    REFERENCES `students` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_hpcr_user` FOREIGN KEY (`reviewed_by_id`)
+    REFERENCES `auth_user` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bảng đăng ký BHYT từ sinh viên.

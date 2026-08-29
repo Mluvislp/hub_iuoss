@@ -58,7 +58,8 @@ Cả hai dùng chung **MySQL database** `iuoss_student_data`. Không có API gi�
 - [x] TypeScript types đầy đủ (`lib/types.ts`)
 - [x] API client `lib/api.ts` — đã nối thật với Django, tự gắn `Authorization: Bearer`
 - [x] Các trang chạy bằng dữ liệu thật: dashboard, BHYT (xem + đăng ký), khai báo
-      ngoại trú, 5 loại yêu cầu giấy tờ, sinh hoạt công dân — 15 route build ra
+      ngoại trú, 5 loại yêu cầu giấy tờ, sinh hoạt công dân — **14 trang**
+      (`next build` in ra 15 vì tính thêm `_not-found` tự sinh)
 
 ---
 

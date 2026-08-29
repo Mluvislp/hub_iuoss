@@ -17,7 +17,8 @@ Monorepo gồm 2 project:
 
 ### Yêu cầu
 
-- Python 3.11+
+- Python 3.11+ — nhưng **server production chạy 3.12**, và `SERVER_SETUP.md` dựng
+  venv bằng `python3.12`. Nên dùng 3.12 khi dev để khớp môi trường thật.
 - Quyền đọc database `iuoss_student_data` (host `127.0.0.1:3306`)
 - Kết nối tới LDAP server `ldap.hcmiu.edu.vn` (cần ở trong mạng trường hoặc VPN)
 
@@ -97,10 +98,15 @@ npm install
 cp .env.example .env.local
 ```
 
-Nội dung mặc định cho dev:
+Nội dung cho dev:
 ```env
-DJANGO_API_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
 ```
+
+> Biến đúng là **`NEXT_PUBLIC_API_URL`**, không phải `DJANGO_API_URL`. Cái tên cũ
+> gắn với cơ chế rewrite trong `next.config` đã bị gỡ — hiện **không code nào đọc**
+> `DJANGO_API_URL`, đặt nó vào chỉ vô nghĩa. Chỉ biến có tiền tố `NEXT_PUBLIC_` mới
+> tới được trình duyệt, mà `lib/api.ts` lại chạy phía client.
 
 ### Bước 3 — Chạy dev server
 

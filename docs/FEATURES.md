@@ -101,7 +101,7 @@ Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ (`valid_until`).
 - `valid_until >= hôm nay` → **Còn hiệu lực**.
 - `valid_until < hôm nay` → **Hết hạn**.
 
-> Lý do: `is_current` chỉ đánh dấu đâu là thẻ hiện hành đang dùng, không phản ánh việc thẻ đó còn hạn. Xem thêm quy ước cột `is_current` ở `dashboard_iuoss/docs/STUDENT_DATA_FLOW.md`.
+> Lý do: `is_current` chỉ đánh dấu đâu là thẻ hiện hành đang dùng, không phản ánh việc thẻ đó còn hạn. Xem thêm quy ước cột `is_current` ở `dashboard_iuoss/docs/ARCHITECTURE.md`.
 
 **Triển khai:** `components/health-insurance.tsx` — `validityState()` / `daysLeft()` /
 `<HealthValidityBadge>`, dùng CHUNG cho trang chủ và trang BHYT. Badge: neutral
@@ -271,7 +271,7 @@ thời đề xuất sửa CCCD / email cá nhân / SĐT.
   (`dashboard_iuoss/students/`). Sửa một bên phải sửa bên kia — chúng lệch đúng
   một dòng lọc `VnWard` vì hai repo khai model khác nhau.
 - **Tài liệu đầy đủ (mô hình địa chỉ, rule validate, bẫy):**
-  `dashboard_iuoss/docs/OFFCAMPUS_DECLARATION.md` — đọc file đó trước khi sửa.
+  `dashboard_iuoss/docs/OFFCAMPUS.md` — đọc file đó trước khi sửa.
 
 ---
 

@@ -208,7 +208,8 @@ Internet (HTTPS) → Cloudflare Edge
 | 8888 | 0.0.0.0 | phpMyAdmin (LAN only) |
 | 9090 | 0.0.0.0 | Cockpit (LAN only) |
 
-Chi tiết vận hành: `docs/SERVER_INFRASTRUCTURE.md` (dashboard repo) · `docs/SERVER_SETUP.md` (hub repo).
+Chi tiết vận hành: `docs/DEPLOY.md` và `docs/SANDBOX.md` (dashboard repo) ·
+`docs/SERVER_SETUP.md` (hub repo).
 
 ---
 
