@@ -309,8 +309,8 @@ bash deploy.sh
 
 > ⚠️ **`deploy.sh` hardcode `APP_ROOT="/var/www/apps/hub_iuoss"` và `cd` vào đó ngay
 > đầu script.** Đứng ở thư mục sandbox gõ `bash deploy.sh` **vẫn deploy PRODUCTION**,
-> không báo lỗi gì. Bản clone sandbox có cùng file này nên bẫy càng dễ dính. Sandbox
-> hiện chưa có script deploy riêng — cập nhật thủ công, xem §Sandbox.
+> không báo lỗi gì. Bản clone sandbox có cùng file này nên bẫy càng dễ dính.
+> Deploy sandbox phải dùng `deploy-sandbox.sh` — xem §Sandbox.
 
 ### Deploy từng phần
 
@@ -418,8 +418,16 @@ venv/bin/python manage.py clearsessions
 ## Sandbox
 
 Dựng 29/08/2026 trên **chính server này**, chạy song song production, bám nhánh
-`main`, nhưng **database riêng**. Mục đích: xem trước và kiểm thử trước khi deploy
-production.
+**`sandbox`** (đổi từ `main` ngày 02/09/2026), nhưng **database riêng**. Mục đích:
+xem trước và kiểm thử trước khi deploy production.
+
+```
+feature/*  →  sandbox  →  (kiểm thử trên hub-sandbox.iuoss.com)  →  main  →  deploy prod
+```
+
+> Trước đây sandbox bám `main` nên code chỉ tới sandbox *sau khi* đã vào nhánh đem
+> deploy prod — sandbox luôn đi sau, ngược với mục đích của nó. Ngày 02/09/2026
+> sandbox từng tụt 4 commit so với production.
 
 > Tài liệu đầy đủ nằm ở **`docs/SANDBOX.md` trong repo `dashboard_iuoss`** — sandbox
 > là *một* môi trường trải trên *hai* repo, tách đôi tài liệu là tự tạo ra cặp file
@@ -437,6 +445,7 @@ production.
 | `DJANGO_ENV` | `production` | **`staging`** |
 | `DB_NAME` | `iuoss_student_data` | `iuoss_student_data_sandbox` |
 | `DB_USER` | `iuoss_app` | `iuoss_sandbox` |
+| Nhánh git | `main` | **`sandbox`** |
 
 ### Chốt an toàn của database
 
@@ -476,17 +485,25 @@ chứ không từ header `Host`, nên trả `Location: http://localhost:3001/log
 Triệu chứng đáng nhớ: **health check nội bộ vẫn xanh**, chỉ lộ khi test qua HTTPS
 công khai. Muốn chặn truy cập thẳng vào port thì dùng firewall, không dùng cờ này.
 
-### Cập nhật code sandbox (chưa có script)
+### Cập nhật code sandbox
 
 ```bash
-cd /var/www/apps/hub_sandbox && git pull origin main
-cd backend  && venv/bin/pip install -r requirements.txt -q
-venv/bin/python manage.py migrate --noinput
-venv/bin/python manage.py collectstatic --noinput --clear
-sudo systemctl restart iuoss_hub_sandbox
-
-cd ../frontend && npm ci && npm run build
-pm2 restart iuoss_hub_front_sandbox
+bash /home/hhdang/sandbox-tools/deploy-sandbox.sh hub          # chỉ hub
+bash /home/hhdang/sandbox-tools/deploy-sandbox.sh all          # cả hai app
+bash /home/hhdang/sandbox-tools/deploy-sandbox.sh all --dry-run  # xem trước
 ```
 
-**Không dùng `bash deploy.sh`** — nó sẽ deploy production, xem cảnh báo ở §Deploy.
+Từ máy Windows:
+
+```bat
+ssh hhdang@10.8.20.33 "bash /home/hhdang/sandbox-tools/deploy-sandbox.sh all"
+```
+
+> ⛔ **Không dùng `bash deploy.sh`** — nó hardcode `APP_ROOT="/var/www/apps/hub_iuoss"`
+> nên sẽ deploy **production** dù bạn đang đứng trong thư mục sandbox. Xem cảnh báo
+> ở §Deploy.
+
+Script tự bỏ qua bước không cần (chỉ `npm ci` khi `package-lock.json` đổi, chỉ restart
+Gunicorn khi có `.py` đổi…), và có 4 chốt chặn kiểm trước khi chạy — quan trọng nhất
+là **`.env` phải trỏ đúng `iuoss_student_data_sandbox`**. Chi tiết ở `docs/SANDBOX.md §4`
+trong repo `dashboard_iuoss`.
