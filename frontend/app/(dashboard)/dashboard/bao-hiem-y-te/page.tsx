@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getInsurancePeriods } from '@/lib/insurance-periods';
+import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
 import { AlertCircle, History, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, accentIcon } from '@/lib/ui';
@@ -263,9 +263,7 @@ export default function HealthInsurancePage() {
             Sinh viên có thể đăng ký mua mới hoặc gia hạn BHYT tại trường vào các đợt theo quy định.
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
-            {getInsurancePeriods().map((p) => {
-              if (p.status === 'expired') return null;
-              
+            {getVisibleInsurancePeriods().map((p) => {
               const isOpen = p.status === 'open';
               // Mã đợt trong DB viết hoa ('MAIN'/'Q2'…), ở đây viết thường — so sánh cùng dạng.
               const registered = !!data?.registrations?.some(
@@ -274,12 +272,21 @@ export default function HealthInsurancePage() {
               );
               const blocked = !data?.is_eligible || registered;
               return (
-                <div key={p.id} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
+                <div key={`${p.id}-${p.startDate.getFullYear()}`} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
-                      {isOpen ? 'Đang mở' : `Dự kiến mở từ ${formatDate(p.startDate.toISOString())}`}
+                      {isOpen
+                        ? 'Đang mở'
+                        : p.status === 'expired'
+                          ? 'Đã kết thúc'
+                          : `Dự kiến mở từ ${formatDate(p.startDate.toISOString())}`}
                     </p>
+                    {isOpen && (
+                      <p className="text-[0.78rem] font-medium text-ink mt-1">
+                        Hạn cuối đăng ký: {formatDate(p.endDate.toISOString())}
+                      </p>
+                    )}
                   </div>
                   <div className="mt-4">
                     {isOpen ? (
@@ -292,6 +299,10 @@ export default function HealthInsurancePage() {
                       >
                         {!data?.is_eligible ? "Không đủ điều kiện" : registered ? "Đã đăng ký" : "Đăng ký ngay"}
                       </Link>
+                    ) : p.status === 'expired' ? (
+                      <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
+                        Đã kết thúc
+                      </button>
                     ) : (
                       <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
                         Chưa mở

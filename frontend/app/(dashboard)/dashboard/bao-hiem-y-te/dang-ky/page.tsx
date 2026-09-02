@@ -197,7 +197,7 @@ function InsuranceRegistrationForm() {
 
   useEffect(() => {
     let alive = true;
-    if (!periodObj) {
+    if (!periodObj || periodObj.status !== "open") {
       router.push("/dashboard/bao-hiem-y-te");
       return;
     }

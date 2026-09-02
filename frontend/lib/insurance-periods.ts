@@ -33,6 +33,35 @@ const lastDayOfMonth = (year: number, monthIndex: number) =>
 export function getInsurancePeriods(now = new Date()): InsurancePeriod[] {
   const year = now.getFullYear();
 
+  return getPeriodsForScheduleYear(year, now);
+}
+
+/**
+ * Hai đợt cần hiện trên trang tổng quan:
+ * - Có đợt đang mở: đợt đang mở + đợt kế tiếp.
+ * - Đang ở khoảng nghỉ: đợt vừa đóng + đợt kế tiếp.
+ *
+ * Lấy lịch của ba năm liền kề để phép luân phiên vẫn đúng ở đầu/cuối năm.
+ */
+export function getVisibleInsurancePeriods(now = new Date()): InsurancePeriod[] {
+  const year = now.getFullYear();
+  const timeline = [year - 1, year, year + 1]
+    .flatMap((scheduleYear) => getPeriodsForScheduleYear(scheduleYear, now))
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+  const openIndex = timeline.findIndex((period) => period.status === 'open');
+  if (openIndex >= 0) {
+    return timeline.slice(openIndex, openIndex + 2);
+  }
+
+  const nextIndex = timeline.findIndex((period) => period.status === 'upcoming');
+  if (nextIndex < 0) return timeline.slice(-1);
+
+  return timeline.slice(Math.max(0, nextIndex - 1), nextIndex + 1);
+}
+
+function getPeriodsForScheduleYear(year: number, now: Date): InsurancePeriod[] {
+
   // Đợt cho Quý 2: 15/2 - hết tháng 2
   const q2Start = new Date(year, 1, 15);
   const q2End = endOfDay(year, 1, lastDayOfMonth(year, 1));
@@ -43,7 +72,7 @@ export function getInsurancePeriods(now = new Date()): InsurancePeriod[] {
 
   // Đợt cho Quý 4: 15/8 - hết tháng 8
   const q4Start = new Date(year, 7, 15);
-  const q4End = endOfDay(year, 7, lastDayOfMonth(year, 7));
+  const q4End = new Date(year, 8, 11, 16, 0, 0); // Kết thúc lúc 16g0p ngày 11.9.2026.
 
   // Đợt chính cho QUÝ 1 NĂM SAU: 15/9 - hết tháng 11
   const mainStart = new Date(year, 8, 15);
