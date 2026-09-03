@@ -66,7 +66,10 @@ class Student(models.Model):
     # Cột ĐÃ tồn tại trong bảng `students`, khai thêm ở đây KHÔNG cần ALTER.
     ethnicity = models.CharField(max_length=120, null=True, blank=True)
     academic_entry_year = models.PositiveSmallIntegerField(null=True, blank=True)
-    # class_code đã bỏ khỏi bảng students — mã lớp giờ ở student_academic_enrollments.
+    # Mã lớp hiện tại. Cột này do Dashboard sở hữu; Hub CHỈ ĐỌC.
+    # (Trước 09/2026 nó nằm ở `student_academic_enrollments` mà Hub không có model,
+    #  nên form vay vốn phải bắt sinh viên tự gõ mã lớp.)
+    class_code = models.CharField(max_length=64, null=True, blank=True)
     current_department = models.ForeignKey(
         Department, on_delete=models.SET_NULL,
         null=True, blank=True, db_column="current_department_id",

@@ -496,12 +496,16 @@ def _bankloan_snapshot(student, class_code):
         "course_month_number": nums["course_month_number"],
         "max_year_number": nums["max_year_number"],
         "max_month_number": nums["max_month_number"],
-        "class_code": class_code,     # SV tự điền
+        "class_code": class_code,     # từ hồ sơ; SV tự điền khi hồ sơ chưa có
     }
 
 
 def build_bankloan_prefill(student):
-    """Prefill form vay vốn. CCCD/ngày cấp khóa khi đã có CCCD 12 số; mã lớp SV tự điền."""
+    """Prefill form vay vốn. CCCD/ngày cấp khóa khi đã có CCCD 12 số.
+
+    Mã lớp lấy từ hồ sơ (`students.class_code`); chỉ khi hồ sơ trống mới để SV tự
+    điền — phần lớn hồ sơ hiện chưa có mã lớp nên ô này vẫn hiện thường xuyên.
+    """
     num, issue = get_current_cccd_doc(student)
     snap = _bankloan_snapshot(student, "")
     snap.pop("class_code", None)
@@ -510,13 +514,15 @@ def build_bankloan_prefill(student):
         "cccd_locked": bool(CCCD_RE.match(num)),
         "citizen_id": num,
         "citizen_id_issue_date": issue,
+        "class_code": (student.class_code or "").strip(),
     })
     return snap
 
 
 def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code):
     """Dựng payload vay vốn. Trả (payload, purpose_label)."""
-    class_code = (class_code or "").strip()
+    # Ưu tiên mã lớp SV gửi lên; hồ sơ là nguồn dự phòng khi form để trống.
+    class_code = (class_code or "").strip() or (student.class_code or "").strip()
     if not class_code:
         raise ValueError("Vui lòng nhập mã lớp.")
     if len(class_code) > 64:

@@ -73,7 +73,7 @@ Cả Dashboard và Hub đều kết nối vào **cùng một MySQL database**: `
 | `hub_students`, `hub_insurance_configs`, `hub_cccd_scans` | Hub | Dashboard (**chỉ đọc**) |
 | `django_session` (×2) | Dashboard + Hub, mỗi bên session riêng, tên cookie khác | — |
 
-¹ `student_academic_enrollments` · `student_addresses` · `student_civic_activities`
+¹ `student_class_code_history` · `student_addresses` · `student_civic_activities`
 · `student_code_history` · `student_contact_points` · `student_family_members` ·
 `student_health_insurance_cards` · `student_high_schools` ·
 `student_identity_documents` · `student_tuition_exemptions`.

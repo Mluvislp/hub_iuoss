@@ -73,6 +73,8 @@ export default function BankLoanRequestPage() {
         setDob(data.prefill.dob);
         setCitizenId(data.prefill.citizen_id);
         setIssueDate(data.prefill.citizen_id_issue_date);
+        // Mã lớp đã có trong hồ sơ thì điền sẵn, SV chỉ gõ khi hồ sơ còn trống.
+        setClassCode(data.prefill.class_code ?? '');
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
