@@ -80,6 +80,9 @@ export default function BankLoanRequestPage() {
   }, []);
 
   const cccdLocked = !!form?.prefill.cccd_locked;
+  // Hồ sơ đã có mã lớp ⇒ khoá ô. Mã lớp trên hồ sơ do phòng đào tạo cập nhật hàng
+  // loạt, không để SV gõ đè lên giấy tờ nhà trường cấp.
+  const classLocked = !!form?.prefill.class_code_locked;
   const dobChanged = form ? dob.trim() !== form.prefill.dob.trim() : false;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -90,7 +93,7 @@ export default function BankLoanRequestPage() {
       const ce = validateCccd(citizenId); if (ce) errs.citizen_id = ce;
       const ie = validateIssueDate(issueDate); if (ie) errs.citizen_id_issue_date = ie;
     }
-    if (!classCode.trim()) errs.class_code = 'Vui lòng nhập mã lớp.';
+    if (!classLocked && !classCode.trim()) errs.class_code = 'Vui lòng nhập mã lớp.';
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
@@ -186,16 +189,25 @@ export default function BankLoanRequestPage() {
             </div>
           </div>
 
-          {/* Mã lớp — SV tự điền */}
+          {/* Mã lớp — lấy từ hồ sơ, chỉ cho gõ khi hồ sơ còn trống */}
           <div className="sm:max-w-[320px]">
-            <label className={ui.fieldLabel}>Mã lớp hiện tại <span className="text-red-500">*</span></label>
-            <input
-              type="text" value={classCode} maxLength={64}
-              onChange={(e) => { setClassCode(e.target.value); setFieldErrors((f) => ({ ...f, class_code: undefined })); }}
-              placeholder="Ví dụ: ITITIU20A1"
-              className={cn(ui.input, fieldErrors.class_code && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
-            />
-            {fieldErrors.class_code && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.class_code}</p>}
+            {classLocked ? (
+              <ReadonlyField label="Mã lớp hiện tại" value={p.class_code} />
+            ) : (
+              <>
+                <label className={ui.fieldLabel}>Mã lớp hiện tại <span className="text-red-500">*</span></label>
+                <input
+                  type="text" value={classCode} maxLength={64}
+                  onChange={(e) => { setClassCode(e.target.value); setFieldErrors((f) => ({ ...f, class_code: undefined })); }}
+                  placeholder="Ví dụ: ITITIU20A1"
+                  className={cn(ui.input, fieldErrors.class_code && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
+                />
+                {fieldErrors.class_code && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.class_code}</p>}
+                <p className="mt-1 text-[0.75rem] text-muted">
+                  Hồ sơ chưa có mã lớp nên bạn cần tự điền.
+                </p>
+              </>
+            )}
           </div>
 
           {/* Ngày sinh */}

@@ -496,33 +496,43 @@ def _bankloan_snapshot(student, class_code):
         "course_month_number": nums["course_month_number"],
         "max_year_number": nums["max_year_number"],
         "max_month_number": nums["max_month_number"],
-        "class_code": class_code,     # từ hồ sơ; SV tự điền khi hồ sơ chưa có
+        "class_code": class_code,     # hồ sơ là nguồn chuẩn; SV chỉ điền khi hồ sơ trống
     }
 
 
 def build_bankloan_prefill(student):
-    """Prefill form vay vốn. CCCD/ngày cấp khóa khi đã có CCCD 12 số.
+    """Prefill form vay vốn. CCCD/ngày cấp và MÃ LỚP khóa lại khi hồ sơ đã có.
 
-    Mã lớp lấy từ hồ sơ (`students.class_code`); chỉ khi hồ sơ trống mới để SV tự
-    điền — phần lớn hồ sơ hiện chưa có mã lớp nên ô này vẫn hiện thường xuyên.
+    `students.class_code` là **nguồn chuẩn** — được cập nhật hàng loạt từ file của
+    phòng đào tạo (Dashboard `/students/class-sync/`). Hồ sơ đã có mã lớp thì khóa
+    ô lại, đúng khuôn `cccd_locked` ngay bên cạnh: giấy tờ nhà trường cấp không
+    được lấy chữ SV tự gõ khi hồ sơ đã có dữ liệu chuẩn.
+
+    Chỉ hồ sơ CHƯA có mã lớp mới để SV tự điền, và giá trị đó **không** ghi ngược
+    vào hồ sơ — nó chỉ nằm trong snapshot của đơn.
     """
     num, issue = get_current_cccd_doc(student)
     snap = _bankloan_snapshot(student, "")
     snap.pop("class_code", None)
+    profile_class = (student.class_code or "").strip()
     snap.update({
         "dob": format_student_birth_date(student),
         "cccd_locked": bool(CCCD_RE.match(num)),
         "citizen_id": num,
         "citizen_id_issue_date": issue,
-        "class_code": (student.class_code or "").strip(),
+        "class_code": profile_class,
+        "class_code_locked": bool(profile_class),
     })
     return snap
 
 
 def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code):
     """Dựng payload vay vốn. Trả (payload, purpose_label)."""
-    # Ưu tiên mã lớp SV gửi lên; hồ sơ là nguồn dự phòng khi form để trống.
-    class_code = (class_code or "").strip() or (student.class_code or "").strip()
+    # HỒ SƠ THẮNG. Trước đây lấy giá trị SV gửi lên trước, nên SV sửa được mã lớp
+    # in trên giấy xác nhận của nhà trường — kể cả khi hồ sơ đã có mã chuẩn từ
+    # file phòng đào tạo. Chỉ khi hồ sơ trống mới dùng chữ SV nhập.
+    profile_class = (student.class_code or "").strip()
+    class_code = profile_class or (class_code or "").strip()
     if not class_code:
         raise ValueError("Vui lòng nhập mã lớp.")
     if len(class_code) > 64:

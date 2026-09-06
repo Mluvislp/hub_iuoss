@@ -200,6 +200,8 @@ export interface BankLoanPrefill {
   citizen_id_issue_date: string;
   /** Mã lớp lấy từ hồ sơ; rỗng thì sinh viên tự điền. */
   class_code: string;
+  /** Hồ sơ đã có mã lớp ⇒ khoá ô, không cho sinh viên sửa (giống cccd_locked). */
+  class_code_locked: boolean;
 }
 
 export interface BankLoanFormData {
