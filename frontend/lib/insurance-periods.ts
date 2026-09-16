@@ -1,7 +1,7 @@
 /**
  * Tính toán các đợt đăng ký BHYT dựa trên ngày hiện tại.
  * Đợt phụ (Q2, Q3, Q4): Mở trước 1.5 tháng, kéo dài 2 tuần.
- * Đợt chính (Quý 1 năm sau): Mở từ 15/9 đến hết 30/11 năm nay.
+ * Đợt chính (Quý 1 năm sau): Mở từ 20/9 đến hết 30/11 năm nay.
  */
 
 export interface InsurancePeriod {
@@ -74,8 +74,8 @@ function getPeriodsForScheduleYear(year: number, now: Date): InsurancePeriod[] {
   const q4Start = new Date(year, 7, 15);
   const q4End = new Date(year, 8, 11, 16, 0, 0); // Kết thúc lúc 16g0p ngày 11.9.2026.
 
-  // Đợt chính cho QUÝ 1 NĂM SAU: 15/9 - hết tháng 11
-  const mainStart = new Date(year, 8, 15);
+  // Đợt chính cho QUÝ 1 NĂM SAU: 20/9 - hết tháng 11
+  const mainStart = new Date(year, 8, 20);
   const mainEnd = endOfDay(year, 10, lastDayOfMonth(year, 10));
 
   const periods = [
