@@ -13,6 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core import microsoft_auth
 from core.auth import verify_ldap
 from core.login_policy import check_login
+from core import address_service
 from core.models import HubStudent, ConfirmationRequest
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
@@ -592,8 +593,8 @@ class InsuranceRegistrationView(APIView):
         ).first()
         addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
         # Ưu tiên bản thường trú đã chuẩn hóa 2025; chưa có thì lùi về bản cũ.
-        perm = (addresses.get(StudentAddress.TYPE_CURRENT_STD)
-                or addresses.get(StudentAddress.TYPE_CURRENT))
+        # Thứ tự do address_service.PERMANENT_TYPES giữ — đừng chép tay lại.
+        perm = address_service.pick_permanent(addresses)
         card = student.health_insurance_cards.filter(is_current=True).first()
 
         return {

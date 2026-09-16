@@ -63,6 +63,50 @@ def get_current(student, address_type, sequence_no=1):
     )
 
 
+# ── Thường trú: thứ tự ưu tiên khi ĐỌC ────────────────────────────────────────
+#
+# `CURRENT_STD` là bản thường trú đã chuẩn hoá theo cơ cấu hành chính 2025 —
+# sinh ra từ luồng giấy tờ, hoặc nạp hàng loạt từ file đã rà tay. Có bản đó thì
+# nó là sự thật; không có mới lùi về `CURRENT`, vốn là dữ liệu nền có thể còn
+# cấp huyện cũ và thiếu `province_code`/`ward_code`.
+#
+# CHỈ dùng cho đường ĐỌC. Đường GHI luôn nêu `address_type` tường minh — ghi
+# thường trú mà đi qua đây là hạ nhầm dòng của loại khác.
+PERMANENT_TYPES = (StudentAddress.TYPE_CURRENT_STD, StudentAddress.TYPE_CURRENT)
+
+
+def pick_permanent(by_type):
+    """Chọn dòng thường trú từ dict {address_type: row}.
+
+    Dành cho chỗ đã gom địa chỉ cả trang trong MỘT truy vấn — nhớ thêm
+    `TYPE_CURRENT_STD` vào bộ lọc `address_type__in` của truy vấn đó.
+    """
+    for address_type in PERMANENT_TYPES:
+        row = by_type.get(address_type)
+        if row is not None:
+            return row
+    return None
+
+
+def get_permanent(student, sequence_no=1):
+    """Dòng thường trú đang dùng, theo thứ tự ưu tiên `PERMANENT_TYPES`."""
+    for address_type in PERMANENT_TYPES:
+        row = get_current(student, address_type, sequence_no)
+        if row is not None:
+            return row
+    return None
+
+
+def describe_permanent(student, sequence_no=1):
+    """`describe()` cho thường trú, có áp thứ tự ưu tiên."""
+    address = get_permanent(student, sequence_no)
+    return {
+        "state": get_state(address),
+        "display": format_address(address),
+        "address": address,
+    }
+
+
 def get_state(address):
     if address is None:
         return STATE_EMPTY
@@ -150,6 +194,17 @@ def save_address(student, address_type, *, province_code, ward_code, street,
     province, ward = resolve_location(province_code, ward_code)
     street = clean_street(street)
     today = on_date or timezone.localdate()
+
+    # Khai lại thường trú thì bản CHUẨN HOÁ cũ phải nhường chỗ. Không có bước
+    # này thì `get_permanent()` vẫn trả bản cũ (CURRENT_STD đứng trước trong
+    # PERMANENT_TYPES) và lời khai vừa ghi thành vô hình.
+    if address_type == StudentAddress.TYPE_CURRENT:
+        StudentAddress.objects.filter(
+            student=student,
+            address_type=StudentAddress.TYPE_CURRENT_STD,
+            sequence_no=sequence_no,
+            is_current=True,
+        ).update(is_current=False, effective_to=today)
 
     locked = list(
         StudentAddress.objects

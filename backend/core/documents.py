@@ -8,6 +8,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 
+from core import address_service
 from students.models import StudentIdentityDocument, StudentAddress, VnProvince, VnWard
 from students.timeline import (
     course_year_label,
@@ -168,13 +169,21 @@ STREET_MAX = 255
 
 
 def get_current_address_raw(student):
-    """Địa chỉ thường trú đang lưu (address_type=CURRENT), ghép thô để tham chiếu."""
-    addr = (
-        StudentAddress.objects
-        .filter(student=student, address_type=StudentAddress.TYPE_CURRENT)
-        .order_by("-is_current", "-id")
-        .first()
-    )
+    """Địa chỉ thường trú đang lưu, ghép thô để tham chiếu.
+
+    Theo thứ tự ưu tiên `address_service.PERMANENT_TYPES`: có bản chuẩn hoá
+    CURRENT_STD thì lấy bản đó, không có mới lùi về CURRENT.
+    """
+    addr = None
+    for address_type in address_service.PERMANENT_TYPES:
+        addr = (
+            StudentAddress.objects
+            .filter(student=student, address_type=address_type)
+            .order_by("-is_current", "-id")
+            .first()
+        )
+        if addr:
+            break
     if not addr:
         return ""
     parts = [addr.full_address, addr.ward, addr.district, addr.province]
