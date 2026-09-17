@@ -323,6 +323,11 @@ class StudentContactPoint(models.Model):
     contact_value = models.CharField(max_length=255)
     normalized_contact_value = models.CharField(max_length=255)
     is_primary = models.BooleanField(default=False)
+    # Mốc của dòng, cùng quy ước với `student_addresses`: ngày bắt đầu dùng và
+    # ngày bị thay thế. Cột đã có sẵn trong bảng từ trước, model bên này chỉ
+    # chưa khai — cần từ 17/09/2026 khi `set_contact()` bắt đầu giữ lịch sử.
+    effective_from = models.DateField(blank=True, null=True)
+    effective_to = models.DateField(blank=True, null=True)
     is_current = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
