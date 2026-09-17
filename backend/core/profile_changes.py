@@ -411,6 +411,64 @@ def read_profile(student):
 TARGET_REOPEN_REQUEST = "declaration.reopen_request"
 
 
+# ── Dấu mốc "sinh viên đã hoàn tất khai báo ngoại trú" ────────────────────────
+#
+# ⚠️ BẢN SAO — sửa ở đây phải sửa luôn dashboard_iuoss/students/profile_changes.py
+#
+# ĐỪNG suy "đã khai" từ `student_addresses.effective_from`. Cột đó nghĩa là
+# "địa chỉ đã chuẩn hoá theo cơ cấu 2025", KHÔNG phải "sinh viên đã khai" —
+# `freshmen_import_service` bên Dashboard cũng đặt nó, lấy từ cột "Ngày hoàn
+# tất" của file tuyển sinh. Đo trên prod 17/09/2026: 203 SV trông như đã khai,
+# thật ra chỉ 18; 185 SV K26 chưa từng mở form vẫn bị KHOÁ.
+#
+# Cũng không suy được từ trạng thái bảng địa chỉ: 2.951 SV chưa có dòng CURRENT
+# nào, khai lần đầu sẽ không để lại dòng lịch sử nào để mà nhận ra.
+#
+# "Đã khai" là một SỰ KIỆN ⇒ ghi lại đúng lúc nó xảy ra, một dòng ở đây.
+# `new_value` giữ ngày khai dạng ISO (không đọc `created_at` vì auto_now_add,
+# không đặt lại được khi cần vá dữ liệu cũ).
+TARGET_DECLARED = "declaration.offcampus_done"
+
+
+def mark_declared(student, *, on_date=None, group_key=None, source=None):
+    """Ghi dấu mốc SV vừa hoàn tất một lần khai báo ngoại trú."""
+    on_date = on_date or timezone.localdate()
+    return ProfileChangeRequest.objects.create(
+        student=student,
+        target=TARGET_DECLARED,
+        old_value="",
+        new_value=on_date.isoformat(),
+        source=source or ProfileChangeRequest.SOURCE_OFFCAMPUS,
+        group_key=group_key,
+        status=ProfileChangeRequest.STATUS_APPROVED,
+    )
+
+
+def declared_rows(student):
+    """Các lần khai của một SV, mới nhất trước."""
+    return (
+        ProfileChangeRequest.objects
+        .filter(student=student, target=TARGET_DECLARED)
+        .order_by("-id")
+    )
+
+
+def has_declared(student):
+    """SV đã tự khai ngoại trú lần nào chưa."""
+    return declared_rows(student).exists()
+
+
+def declared_on(student):
+    """Ngày khai gần nhất (date) hoặc None."""
+    row = declared_rows(student).first()
+    if row is None:
+        return None
+    try:
+        return datetime.strptime(row.new_value, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return row.created_at.date() if row.created_at else None
+
+
 def active_reopen_request(student):
     return (
         ProfileChangeRequest.objects
