@@ -236,6 +236,9 @@ class HealthInsuranceRegistration(models.Model):
     payment_receipt_image = models.FileField(upload_to=receipt_path)
 
     change_log = models.JSONField(blank=True, null=True)
+    # Ảnh chụp cấu hình thanh toán tại thời điểm nộp. Bốn dòng config được tái
+    # sử dụng qua nhiều năm nên không được tra config hiện tại để diễn giải đơn cũ.
+    config_snapshot = models.JSONField(blank=True, null=True)
     
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
     rejection_reason = models.TextField(blank=True, null=True)
@@ -292,7 +295,38 @@ class CccdScan(models.Model):
         return f"{self.citizen_id} — {self.full_name}"
 
 
+class HealthInsuranceBankAccount(models.Model):
+    bank_name = models.CharField(max_length=255)
+    bank_bin = models.CharField(max_length=6)
+    account_number = models.CharField(max_length=64)
+    account_name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "hub_insurance_bank_accounts"
+
+
 class HealthInsuranceConfig(models.Model):
+    PERIOD_CHOICES = HealthInsuranceRegistration.PERIOD_CHOICES
+
+    registration_period = models.CharField(
+        max_length=32, choices=PERIOD_CHOICES, unique=True,
+    )
+    registration_year = models.IntegerField()
+    registration_opens_at = models.DateTimeField()
+    registration_closes_at = models.DateTimeField()
+    is_active = models.BooleanField(default=False)
+    bank_account = models.ForeignKey(
+        HealthInsuranceBankAccount,
+        on_delete=models.DO_NOTHING,
+        db_column="bank_account_id",
+        related_name="insurance_configs",
+        blank=True,
+        null=True,
+    )
     description = models.TextField(blank=True, null=True)
     bank_name = models.CharField(max_length=255)
     # Mã BIN 6 số của Napas, dùng dựng VietQR. Bỏ trống thì frontend dò theo
@@ -307,4 +341,8 @@ class HealthInsuranceConfig(models.Model):
     class Meta:
         managed = False
         db_table = "hub_insurance_configs"
+        ordering = ["registration_period"]
+
+    def __str__(self):
+        return f"{self.get_registration_period_display()} {self.registration_year}"
 

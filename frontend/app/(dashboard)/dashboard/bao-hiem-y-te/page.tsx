@@ -141,6 +141,7 @@ export default function HealthInsurancePage() {
                 value={<HospitalValue card={current} />}
               />
               <DefRow label="Diện đăng ký" value={current.registration_type} />
+              <DefRow label="Năm tham gia" value={current.registration_year} />
             </dl>
           </div>
         ) : (
@@ -171,6 +172,7 @@ export default function HealthInsurancePage() {
                   <th className="text-left font-medium px-5 py-2.5">Mã thẻ</th>
                   <th className="text-left font-medium px-3 py-2.5 hidden sm:table-cell">Nơi đăng ký KCB</th>
                   <th className="text-left font-medium px-3 py-2.5 hidden md:table-cell">Diện đăng ký</th>
+                  <th className="text-left font-medium px-3 py-2.5">Năm</th>
                   <th className="text-left font-medium px-5 py-2.5">Giá trị sử dụng</th>
                 </tr>
               </thead>
@@ -196,6 +198,7 @@ export default function HealthInsurancePage() {
                         {card.registration_type || '—'}
                       </span>
                     </td>
+                    <td className="px-3 py-3 text-slate-600">{card.registration_year || '—'}</td>
                     <td
                       className={cn(
                         'px-5 py-3 text-[0.82rem] whitespace-nowrap',
@@ -263,16 +266,17 @@ export default function HealthInsurancePage() {
             Sinh viên có thể đăng ký mua mới hoặc gia hạn BHYT tại trường vào các đợt theo quy định.
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
-            {getVisibleInsurancePeriods().map((p) => {
+            {getVisibleInsurancePeriods(data?.periods ?? []).map((p) => {
               const isOpen = p.status === 'open';
               // Mã đợt trong DB viết hoa ('MAIN'/'Q2'…), ở đây viết thường — so sánh cùng dạng.
               const registered = !!data?.registrations?.some(
                 (r) => r.registration_period?.toUpperCase() === p.id.toUpperCase()
+                  && r.registration_year === p.registration_year
                   && ['pending', 'processing', 'done'].includes(r.status),
               );
               const blocked = !data?.is_eligible || registered;
               return (
-                <div key={`${p.id}-${p.startDate.getFullYear()}`} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
+                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
@@ -280,11 +284,11 @@ export default function HealthInsurancePage() {
                         ? 'Đang mở'
                         : p.status === 'expired'
                           ? 'Đã kết thúc'
-                          : `Dự kiến mở từ ${formatDate(p.startDate.toISOString())}`}
+                          : `Dự kiến mở từ ${formatDate(p.start_date)}`}
                     </p>
                     {isOpen && (
                       <p className="text-[0.78rem] font-medium text-ink mt-1">
-                        Hạn cuối đăng ký: {formatDate(p.endDate.toISOString())}
+                        Hạn cuối đăng ký: {formatDate(p.end_date)}
                       </p>
                     )}
                   </div>

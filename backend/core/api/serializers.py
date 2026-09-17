@@ -60,6 +60,7 @@ class HealthInsuranceCardSerializer(serializers.ModelSerializer):
             "hospital_code",
             "hospital_name",
             "registration_type",
+            "registration_year",
             "valid_from",
             "valid_until",
             "is_current",

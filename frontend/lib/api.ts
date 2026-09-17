@@ -277,8 +277,8 @@ export const api = {
   },
 
   insuranceRegistration: {
-    prefill(): Promise<{ prefill: InsuranceRegistrationPrefill; config: { description: string; bank_name: string; bank_bin: string; bank_account_number: string; bank_account_name: string; insurance_fee: number; }; }> {
-      return request('/health-insurance/registrations/');
+    prefill(period: string): Promise<{ prefill: InsuranceRegistrationPrefill; config: import('./types').InsurancePeriodConfig; }> {
+      return request(`/health-insurance/registrations/?period=${encodeURIComponent(period)}`);
     },
     submit(formData: FormData): Promise<{ id: number; status: string }> {
       return requestMultipart('/health-insurance/registrations/', formData);

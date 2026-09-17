@@ -23,13 +23,12 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import type { Province, InsuranceRegistrationPrefill } from "@/lib/types";
+import type { Province, InsurancePeriodConfig, InsuranceRegistrationPrefill } from "@/lib/types";
 import AddressFields from "../../khai-bao-ngoai-tru/AddressFields";
 import SearchableSelect from "@/components/searchable-select";
 import QRCode from "react-qr-code";
 import { buildVietQrPayload, findBank, toAscii } from "@/lib/vietqr";
 import { readCccdQr, looksLikeCccdQr } from "@/lib/cccd-qr";
-import { getInsurancePeriods } from "@/lib/insurance-periods";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -144,7 +143,6 @@ function InsuranceRegistrationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const periodId = searchParams.get("period") || "";
-  const currentYear = new Date().getFullYear();
   const [infoEditable, setInfoEditable] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -175,14 +173,7 @@ function InsuranceRegistrationForm() {
   const [hospitalsLoading, setHospitalsLoading] = useState(false);
   const [hospitalProvince, setHospitalProvince] = useState("");
 
-  // Sử dụng useMemo để giữ nguyên reference của periodObj giữa các lần render.
-  // Điều này giúp ngăn chặn useEffect bên dưới bị kích hoạt lại liên tục khi state thay đổi,
-  // khắc phục lỗi vòng lặp vô hạn (infinite loop) khi gọi API.
-  const periodObj = useMemo(
-    () => getInsurancePeriods().find((p) => p.id === periodId),
-    [periodId],
-  );
-  const [config, setConfig] = useState<any>(null);
+  const [config, setConfig] = useState<InsurancePeriodConfig | null>(null);
 
   const {
     watch,
@@ -197,12 +188,12 @@ function InsuranceRegistrationForm() {
 
   useEffect(() => {
     let alive = true;
-    if (!periodObj || periodObj.status !== "open") {
+    if (!periodId) {
       router.push("/dashboard/bao-hiem-y-te");
       return;
     }
     Promise.all([
-      api.insuranceRegistration.prefill(),
+      api.insuranceRegistration.prefill(periodId),
       api.locations.provinces(),
       api.locations.ethnicities(),
     ])
@@ -241,7 +232,7 @@ function InsuranceRegistrationForm() {
     return () => {
       alive = false;
     };
-  }, [periodObj, router, setValue]);
+  }, [periodId, router, setValue]);
 
   // Danh mục dân tộc nạp bất đồng bộ. Phải gán value SAU khi <option> đã render,
   // nếu không thẻ <select> lặng lẽ bỏ qua vì chưa có option nào khớp.
@@ -292,12 +283,12 @@ function InsuranceRegistrationForm() {
   // khớp mẫu.
   const transferNote = useMemo(() => {
     const dot =
-      PERIOD_IN_NOTE[(periodObj?.id ?? "").toUpperCase()] ?? "dot chinh";
+      PERIOD_IN_NOTE[(config?.registration_period ?? "").toUpperCase()] ?? "dot chinh";
     const name = toAscii(fullName ?? "").toUpperCase();
     return toAscii(
-      `${name}- ${studentCode ?? ""}- Thanh toan phi BHYT nam ${currentYear} ${dot}`,
+      `${name}- ${studentCode ?? ""}- Thanh toan phi BHYT nam ${config?.registration_year ?? ""} ${dot}`,
     );
-  }, [fullName, studentCode, periodObj, currentYear]);
+  }, [fullName, studentCode, config]);
   const qrPayload = useMemo(() => {
     if (!bankBin || !config?.bank_account_number) return null;
     return buildVietQrPayload({
@@ -373,8 +364,9 @@ function InsuranceRegistrationForm() {
 
     try {
       const fd = new FormData();
-      fd.append("registration_year", currentYear.toString());
-      fd.append("registration_period", periodObj?.id.toUpperCase() || "MAIN");
+      if (!config) throw new Error("Không tìm thấy cấu hình đợt đăng ký.");
+      fd.append("registration_year", config.registration_year.toString());
+      fd.append("registration_period", config.registration_period);
       fd.append("full_name", data.full_name);
       fd.append("student_code", data.student_code);
       fd.append("gender", data.gender);
@@ -455,8 +447,8 @@ function InsuranceRegistrationForm() {
 
       <div className="bg-primary-soft border border-primary-line rounded-lg p-5 text-primary-text">
         <h1 className="text-lg font-bold mb-2 flex items-center gap-2">
-          <ShieldPlus size={20} /> Khai thông tin - Mua BHYT năm {currentYear} -{" "}
-          {periodObj?.name}{" "}
+          <ShieldPlus size={20} /> Khai thông tin - Mua BHYT năm {config?.registration_year} -{" "}
+          {config?.name}{" "}
         </h1>
         {config?.description ? (
           <div

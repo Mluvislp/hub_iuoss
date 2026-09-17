@@ -1,101 +1,37 @@
-/**
- * Tính toán các đợt đăng ký BHYT dựa trên ngày hiện tại.
- * Đợt phụ (Q2, Q3, Q4): Mở trước 1.5 tháng, kéo dài 2 tuần.
- * Đợt chính (Quý 1 năm sau): Mở từ 20/9 đến hết 30/11 năm nay.
- */
-
+/** Một trong bốn slot đăng ký BHYT do staff cấu hình trên Dashboard. */
 export interface InsurancePeriod {
   id: string;
+  registration_period: 'MAIN' | 'Q2' | 'Q3' | 'Q4';
+  registration_year: number;
   name: string;
-  startDate: Date;
-  endDate: Date;
+  start_date: string;
+  end_date: string;
+  coverage_start: string;
+  coverage_end: string;
   status: 'expired' | 'open' | 'upcoming';
+  is_active: boolean;
 }
 
 /**
- * Ngày cuối của đợt, lấy tới 23:59:59.
- *
- * ⚠️ Đặt mốc kết thúc ở 00:00 là mất trọn ngày cuối: 00:00:01 của chính ngày đó
- * đã lớn hơn mốc, đợt bị coi là đã đóng.
+ * Hai đợt gần thời điểm hiện tại để trang BHYT không bị quá dài.
+ * Trạng thái và thời gian đều do backend trả về; frontend không tự mở đợt.
  */
-const endOfDay = (year: number, monthIndex: number, day: number) =>
-  new Date(year, monthIndex, day, 23, 59, 59, 999);
-
-/**
- * Ngày cuối cùng của tháng.
- *
- * ⚠️ Dùng hàm này thay vì viết tay số 30/31: `new Date(y, 10, 31)` không báo lỗi
- * mà tự tràn sang 01/12 (tháng 11 chỉ có 30 ngày).
- */
-const lastDayOfMonth = (year: number, monthIndex: number) =>
-  new Date(year, monthIndex + 1, 0).getDate();
-
-export function getInsurancePeriods(now = new Date()): InsurancePeriod[] {
-  const year = now.getFullYear();
-
-  return getPeriodsForScheduleYear(year, now);
-}
-
-/**
- * Hai đợt cần hiện trên trang tổng quan:
- * - Có đợt đang mở: đợt đang mở + đợt kế tiếp.
- * - Đang ở khoảng nghỉ: đợt vừa đóng + đợt kế tiếp.
- *
- * Lấy lịch của ba năm liền kề để phép luân phiên vẫn đúng ở đầu/cuối năm.
- */
-export function getVisibleInsurancePeriods(now = new Date()): InsurancePeriod[] {
-  const year = now.getFullYear();
-  const timeline = [year - 1, year, year + 1]
-    .flatMap((scheduleYear) => getPeriodsForScheduleYear(scheduleYear, now))
-    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-
+export function getVisibleInsurancePeriods(periods: InsurancePeriod[]): InsurancePeriod[] {
+  const timeline = [...periods].sort(
+    (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+  );
   const openIndex = timeline.findIndex((period) => period.status === 'open');
-  if (openIndex >= 0) {
-    return timeline.slice(openIndex, openIndex + 2);
-  }
+  if (openIndex >= 0) return timeline.slice(openIndex, openIndex + 2);
 
   const nextIndex = timeline.findIndex((period) => period.status === 'upcoming');
-  if (nextIndex < 0) return timeline.slice(-1);
+  if (nextIndex < 0) return timeline.slice(-2);
 
-  return timeline.slice(Math.max(0, nextIndex - 1), nextIndex + 1);
-}
+  const expiredBeforeNext = timeline
+    .slice(0, nextIndex)
+    .filter((period) => period.status === 'expired');
+  const previousExpired = expiredBeforeNext[expiredBeforeNext.length - 1];
+  if (previousExpired) return [previousExpired, timeline[nextIndex]];
 
-function getPeriodsForScheduleYear(year: number, now: Date): InsurancePeriod[] {
-
-  // Đợt cho Quý 2: 15/2 - hết tháng 2
-  const q2Start = new Date(year, 1, 15);
-  const q2End = endOfDay(year, 1, lastDayOfMonth(year, 1));
-
-  // Đợt cho Quý 3: 15/5 - hết tháng 5
-  const q3Start = new Date(year, 4, 15);
-  const q3End = endOfDay(year, 4, lastDayOfMonth(year, 4));
-
-  // Đợt cho Quý 4: 15/8 - hết tháng 8
-  const q4Start = new Date(year, 7, 15);
-  const q4End = new Date(year, 8, 11, 16, 0, 0); // Kết thúc lúc 16g0p ngày 11.9.2026.
-
-  // Đợt chính cho QUÝ 1 NĂM SAU: 20/9 - hết tháng 11
-  const mainStart = new Date(year, 8, 20);
-  const mainEnd = endOfDay(year, 10, lastDayOfMonth(year, 10));
-
-  const periods = [
-    { id: 'q2', name: `Đợt 2 năm ${year}`, startDate: q2Start, endDate: q2End },
-    { id: 'q3', name: `Đợt 3 năm ${year}`, startDate: q3Start, endDate: q3End },
-    { id: 'q4', name: `Đợt 4 năm ${year}`, startDate: q4Start, endDate: q4End },
-    { id: 'main', name: `Đợt 1 năm ${year + 1}`, startDate: mainStart, endDate: mainEnd },
-  ];
-
-  return periods.map(p => {
-    let status: 'expired' | 'open' | 'upcoming' = 'upcoming';
-    if (now > p.endDate) {
-      status = 'expired';
-    } else if (now >= p.startDate && now <= p.endDate) {
-      status = 'open';
-    }
-
-    return {
-      ...p,
-      status,
-    };
-  });
+  // Chu kỳ mới chưa có đợt vừa hết hạn: vẫn hiện đợt kế tiếp + đợt sau nó.
+  return timeline.slice(nextIndex, nextIndex + 2);
 }

@@ -40,6 +40,8 @@ Thumbs.db
 # Schema thì dùng docs/schema.sql (được theo dõi, chỉ có DDL, không có dữ liệu).
 *.sql
 !docs/schema.sql
+!docs/insurance_config_upgrade.sql
+!docs/insurance_card_bank_upgrade.sql
 
 # Rác build lọt vào repo
 encoded.txt

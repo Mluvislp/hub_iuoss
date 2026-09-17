@@ -1,3 +1,5 @@
+import type { InsurancePeriod } from './insurance-periods';
+
 export interface StudentSession {
   ldap_uid: string;
   student_id: number | null;
@@ -46,6 +48,7 @@ export interface HealthInsuranceCard {
   hospital_name: string | null;
   /** Tên diện đăng ký (đã phẳng hoá từ danh mục). */
   registration_type: string | null;
+  registration_year: number | null;
   valid_from: string | null;
   valid_until: string | null;
   /** "Thẻ đang dùng" — KHÔNG phải "còn hiệu lực". */
@@ -89,7 +92,17 @@ export interface HealthInsuranceData {
   current: HealthInsuranceCard | null;
   history: HealthInsuranceCard[];
   registrations: HealthInsuranceRegistration[];
+  periods: InsurancePeriod[];
   is_eligible: boolean;
+}
+
+export interface InsurancePeriodConfig extends InsurancePeriod {
+  description: string;
+  insurance_fee: number;
+  bank_name: string;
+  bank_bin: string;
+  bank_account_number: string;
+  bank_account_name: string;
 }
 
 export interface CivicActivity {

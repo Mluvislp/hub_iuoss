@@ -70,7 +70,8 @@ Cả Dashboard và Hub đều kết nối vào **cùng một MySQL database**: `
 | Danh mục: `departments`, `majors`, `student_statuses`, `degree_levels`, `joint_programs`, `academic_terms`, `nationalities`, `vn_ethnicities`, `hospitals`, `relationship_types`, `vn_provinces`, `vn_wards` | Dashboard | Hub (read-only) |
 | `audit_auditlog`, các bảng `*_batches` | Dashboard | — |
 | `hub_confirmation_requests`, `hub_profile_change_requests`, `hub_insurance_registrations` | Hub tạo dòng · Dashboard đổi trạng thái ² | cả hai |
-| `hub_students`, `hub_insurance_configs`, `hub_cccd_scans` | Hub | Dashboard (**chỉ đọc**) |
+| `hub_students`, `hub_cccd_scans` | Hub | Dashboard (**chỉ đọc**) |
+| `hub_insurance_configs` | Dashboard quản lý 4 slot đợt | Hub đọc để mở form và chụp snapshot vào đơn |
 | `django_session` (×2) | Dashboard + Hub, mỗi bên session riêng, tên cookie khác | — |
 
 ¹ `student_class_code_history` · `student_addresses` · `student_bank_accounts`
