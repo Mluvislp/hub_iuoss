@@ -143,44 +143,9 @@ def remove_vietnamese_accents(s):
 
 # 2. Hàm định dạng tên file chuẩn
 def get_registration_filename(instance, filename, suffix):
-    ext = filename.split('.')[-1]
-    
-    # Lấy thông tin gốc từ Student
-    name = instance.student.full_name if instance.student else "Khach"
-    dob_formatted = "01012000"
-    if instance.student and instance.student.date_of_birth:
-        dob_formatted = instance.student.date_of_birth.strftime('%d%m%Y')
-    cccd = "NO_CCCD"
-    
-    # Ưu tiên lấy từ change_log nếu sinh viên có sửa trên form
-    cl = instance.change_log or {}
-    if cl.get('full_name', {}).get('to'):
-        name = cl.get('full_name')['to']
-        
-    if cl.get('dob', {}).get('to'):
-        try:
-            from datetime import datetime
-            dob_formatted = datetime.strptime(cl.get('dob')['to'], '%Y-%m-%d').strftime('%d%m%Y')
-        except:
-            pass
-            
-    if cl.get('citizen_id', {}).get('to'):
-        cccd = cl.get('citizen_id')['to']
-    elif instance.student:
-        # Nếu form không đổi CCCD, truy vấn CCCD hiện tại dưới DB
-        doc = instance.student.identity_documents.filter(document_type="CCCD", is_current=True).first()
-        if doc:
-            cccd = doc.document_number
-
-    # Xử lý tên: Bỏ dấu và viết liền
-    name_clean = remove_vietnamese_accents(name).replace(" ", "")
-    
-    # Lắp ghép: {CCCD}_{HoTen}_{ddmmyyyy}_{LoaiAnh}.{ext}
-    new_filename = f"{cccd}_{name_clean}_{dob_formatted}_{suffix}.{ext}"
-    
-    # Lưu vào thư mục theo năm/tháng
-    now = timezone.now()
-    return f"insurance_data/{now.strftime('%Y/%m')}/{new_filename}"
+    from uuid import uuid4
+    ext = filename.rsplit('.', 1)[-1].lower()
+    return f"insurance_private/{timezone.now():%Y/%m}/{uuid4().hex}_{suffix}.{ext}"
 
 # 3. Các hàm con gắn vào từng FileField
 def cccd_front_path(instance, filename): return get_registration_filename(instance, filename, "CCCD_Front")
@@ -193,17 +158,13 @@ def bhyt_path(instance, filename): return get_registration_filename(instance, fi
 # ==========================================
 class HealthInsuranceRegistration(models.Model):
     PERIOD_CHOICES = [
-        ("MAIN", "Đăng ký BHYT cho năm sau"),
-        ("Q2", "Đăng ký Quý 2"),
-        ("Q3", "Đăng ký Quý 3"),
-        ("Q4", "Đăng ký Quý 4"),
+        ("MAIN", "Đợt 1"),
+        ("Q2", "Đợt 2"),
+        ("Q3", "Đợt 3"),
+        ("Q4", "Đợt 4"),
     ]
-    STATUS_CHOICES = [
-        ("pending", "Chờ xử lý"),
-        ("processing", "Đang xử lý"),
-        ("done", "Hoàn thành"),
-        ("rejected", "Từ chối"),
-    ]
+    from .insurance_contract import STATUS_LABELS
+    STATUS_CHOICES = list(STATUS_LABELS.items())
 
     student = models.ForeignKey(
         "students.Student", on_delete=models.DO_NOTHING,
@@ -230,17 +191,21 @@ class HealthInsuranceRegistration(models.Model):
 
     hospital_code = models.CharField(max_length=16)
 
-    cccd_image = models.FileField(upload_to=cccd_front_path, blank=True, null=True)
-    cccd_image_back = models.FileField(upload_to=cccd_back_path, blank=True, null=True)
-    bhyt_image = models.FileField(upload_to=bhyt_path, blank=True, null=True)
-    payment_receipt_image = models.FileField(upload_to=receipt_path)
+    cccd_image = models.FileField(max_length=500, upload_to=cccd_front_path, blank=True, null=True)
+    cccd_image_back = models.FileField(max_length=500, upload_to=cccd_back_path, blank=True, null=True)
+    bhyt_image = models.FileField(max_length=500, upload_to=bhyt_path, blank=True, null=True)
+    payment_receipt_image = models.FileField(max_length=500, upload_to=receipt_path)
 
     change_log = models.JSONField(blank=True, null=True)
     # Ảnh chụp cấu hình thanh toán tại thời điểm nộp. Bốn dòng config được tái
     # sử dụng qua nhiều năm nên không được tra config hiện tại để diễn giải đơn cũ.
     config_snapshot = models.JSONField(blank=True, null=True)
     
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="iu_processing")
+    workflow_version = models.PositiveSmallIntegerField(default=2)
+    row_version = models.PositiveIntegerField(default=0)
+    fee_amount_vnd = models.BigIntegerField(null=True, blank=True)
+    rejection_reason_code = models.CharField(max_length=32, null=True, blank=True)
     rejection_reason = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -346,3 +311,5 @@ class HealthInsuranceConfig(models.Model):
     def __str__(self):
         return f"{self.get_registration_period_display()} {self.registration_year}"
 
+
+from .insurance_history_models import InsuranceEvent, InsuranceAssessment, InsuranceEvidence  # noqa: E402,F401

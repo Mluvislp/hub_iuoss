@@ -42,6 +42,12 @@ Thumbs.db
 !docs/schema.sql
 !docs/insurance_config_upgrade.sql
 !docs/insurance_card_bank_upgrade.sql
+!docs/insurance_workflow_preflight.sql
+!docs/insurance_workflow_upgrade.sql
+!docs/insurance_workflow_verify.sql
+!docs/insurance_workflow_production.sql
+!docs/insurance_status_hotfix.sql
 
 # Rác build lọt vào repo
 encoded.txt
+.insurance-test-runtime/

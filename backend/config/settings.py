@@ -282,3 +282,9 @@ LOGGING = {
         },
     },
 }
+
+# Activate only after shared schema expansion and coordinated rollout.
+# Schema workflow v2 is part of the current release. Set explicitly to 0 only
+# during a controlled maintenance/rollback window.
+INSURANCE_WORKFLOW_V2 = os.getenv("INSURANCE_WORKFLOW_V2", "1") == "1"
+INSURANCE_PRIORITY_TYPE_CODE = os.getenv("INSURANCE_PRIORITY_TYPE_CODE", "")

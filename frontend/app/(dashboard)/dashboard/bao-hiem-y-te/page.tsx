@@ -1,5 +1,6 @@
 'use client';
 
+import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
@@ -242,12 +243,12 @@ export default function HealthInsurancePage() {
                     </td>
                     <td className="px-5 py-3 text-[0.82rem] text-slate-600">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3">
-                      {reg.status === 'pending' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-slate-100 text-slate-600">Đang chờ</span>}
-                      {reg.status === 'processing' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-primary-soft text-primary-text">Đang xử lý</span>}
-                      {reg.status === 'done' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-success-soft text-success-text">Hoàn tất</span>}
+                      {reg.status === 'iu_processing' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-slate-100 text-slate-600">ĐHQT xử lý</span>}
+                      {reg.status === 'waiting_bhxh' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-primary-soft text-primary-text">Chờ BHXH xử lý</span>}
+                      {reg.status === 'issued' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-success-soft text-success-text">Phát hành</span>}
                       {reg.status === 'rejected' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-danger-soft text-danger-text">Từ chối</span>}
                     </td>
-                    <td className="px-5 py-3 text-[0.82rem] text-slate-600">{reg.rejection_reason || '—'}</td>
+                    <td className="px-5 py-3 text-[0.82rem] text-slate-600">{reg.rejection_reason || '—'}<div className="mt-2"><InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} /></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -272,7 +273,7 @@ export default function HealthInsurancePage() {
               const registered = !!data?.registrations?.some(
                 (r) => r.registration_period?.toUpperCase() === p.id.toUpperCase()
                   && r.registration_year === p.registration_year
-                  && ['pending', 'processing', 'done'].includes(r.status),
+,
               );
               const blocked = !data?.is_eligible || registered;
               return (

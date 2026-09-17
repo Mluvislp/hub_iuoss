@@ -212,15 +212,12 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
     def _validate_file(self, f, label):
         if f is None:
             return f
-        max_size = 5 * 1024 * 1024
-        if f.size > max_size:
-            raise serializers.ValidationError(f"{label} không được vượt quá 5MB.")
-        allowed = {"image/jpeg", "image/png", "image/webp", "image/heic"}
-        ct = getattr(f, "content_type", "")
-        if ct not in allowed:
-            raise serializers.ValidationError(
-                f"{label} phải là ảnh (JPEG, PNG, WebP, HEIC)."
-            )
+        from core.insurance_files import inspect_upload
+        from core.insurance_contract import WorkflowError
+        try:
+            inspect_upload(f)
+        except WorkflowError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         return f
 
     def validate_cccd_image(self, value):

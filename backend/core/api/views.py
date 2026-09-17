@@ -1,3 +1,7 @@
+from core.insurance_submission import submission
+from core.insurance_history import append_event
+from core.insurance_files import link_initial_receipt, inspect_upload
+from core.insurance_contract import normalized, integer
 import logging
 from django.conf import settings
 from django.db import connection
@@ -566,7 +570,9 @@ class HealthInsuranceView(APIView):
             "registration_year": r.registration_year,
             "registration_period": r.registration_period,
             "created_at": r.created_at,
-            "status": r.status,
+            "status": normalized(r.status),
+            "row_version": r.row_version,
+            "rejection_reason_code": r.rejection_reason_code,
             "rejection_reason": r.rejection_reason,
         } for r in regs]
 
@@ -702,6 +708,7 @@ class InsuranceRegistrationView(APIView):
             "config": _insurance_config_payload(cfg, include_payment=True),
         })
 
+    @submission
     def post(self, request):
         student = self._student(request)
         if not student:
@@ -727,13 +734,11 @@ class InsuranceRegistrationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Một sinh viên chỉ có một đơn còn hiệu lực cho mỗi đợt. `rejected`
-        # KHÔNG chặn — bị từ chối thì phải nộp lại được.
+        # Bổ sung dùng ID đơn hiện tại; không tạo đơn mới khi bị từ chối.
         if HealthInsuranceRegistration.objects.filter(
             student_id=student.id,
             registration_year=data["registration_year"],
             registration_period=data["registration_period"],
-            status__in=["pending", "processing", "done"],
         ).exists():
             return Response(
                 {"detail": "Bạn đã gửi yêu cầu đăng ký cho đợt này rồi."},
@@ -786,14 +791,28 @@ class InsuranceRegistrationView(APIView):
             hospital_code=data["hospital_code"],
             change_log=change_log, # Giữ lại change_log để tiện xem chênh lệch
             config_snapshot=_insurance_config_payload(cfg, include_payment=True),
-            status="pending",
+            status="iu_processing",
+            fee_amount_vnd=integer(cfg.insurance_fee),
+            workflow_version=2,
         )
         reg.cccd_image = data["cccd_image"]
         reg.cccd_image_back = data["cccd_image_back"]
         reg.payment_receipt_image = data["payment_receipt_image"]
         if data.get("bhyt_image"):
             reg.bhyt_image = data["bhyt_image"]
+        # Save files explicitly so a later DB failure can clean up only new writes.
+        from pathlib import Path
+        for field in ('cccd_image', 'cccd_image_back', 'payment_receipt_image', 'bhyt_image'):
+            file = getattr(reg, field)
+            if file and not file._committed:
+                ext = inspect_upload(file.file)[1]
+                file.save(f"attachment.{ext}", file.file, save=False)
+                request.insurance_written_files.append(Path(file.path))
         reg.save()
+        event = append_event(reg, 'SUBMITTED', source='Hub', actor_id=student.pk,
+            old=None, new='iu_processing', key=request.data.get('request_key'),
+            payload={'request_digest': request.insurance_request_digest})
+        link_initial_receipt(reg, event, original_filename=data['payment_receipt_image'].name)
 
         # Dữ liệu QR trên thẻ đi vào bảng dùng chung, không nằm trong đơn.
         # Đọc được thì lưu, không đọc được thì thôi — không chặn nộp đơn.
@@ -816,7 +835,7 @@ class InsuranceRegistrationView(APIView):
             student.current_student_code, data["registration_period"],
             data["registration_year"], len(change_log),
         )
-        return Response({"id": reg.id, "status": "pending"},
+        return Response({"id": reg.id, "status": "iu_processing"},
                         status=status.HTTP_201_CREATED)
 
 

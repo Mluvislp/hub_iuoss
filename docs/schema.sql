@@ -168,3 +168,6 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
 -- Bảng session cho hub (tách biệt với dashboard sessions)
 -- Django tự tạo bảng này khi chạy: python manage.py migrate
 -- (django.contrib.sessions dùng migration riêng, không bị tắt bởi MIGRATION_MODULES)
+
+-- BHYT workflow v2: after this base schema and the card/bank upgrade, run
+-- docs/insurance_workflow_upgrade.sql (idempotent expand; no data deletion).

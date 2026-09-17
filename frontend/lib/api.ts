@@ -277,10 +277,23 @@ export const api = {
   },
 
   insuranceRegistration: {
+    detail(id:number): Promise<import('./types').InsuranceDetail> {
+      return request(`/health-insurance/registrations/${id}/`);
+    },
+    supplement(id:number, body:FormData): Promise<{id:number; status:string}> {
+      return requestMultipart(`/health-insurance/registrations/${id}/`, body);
+    },
+    async evidence(path:string): Promise<Blob> {
+      if (!/^\/api\/health-insurance\/registrations\/\d+\/evidence\/\d+\/$/.test(path)) throw new Error('Đường dẫn ảnh không hợp lệ.');
+      const res = await fetch(`${API_BASE}${path.slice(4)}`, {headers:{Authorization:`Bearer ${getToken()}`}});
+      if (!res.ok) throw new Error('Không tải được ảnh.');
+      return res.blob();
+    },
     prefill(period: string): Promise<{ prefill: InsuranceRegistrationPrefill; config: import('./types').InsurancePeriodConfig; }> {
       return request(`/health-insurance/registrations/?period=${encodeURIComponent(period)}`);
     },
     submit(formData: FormData): Promise<{ id: number; status: string }> {
+      if (!formData.has('request_key')) formData.set('request_key', crypto.randomUUID());
       return requestMultipart('/health-insurance/registrations/', formData);
     },
   },

@@ -60,7 +60,7 @@ export interface HealthInsuranceRegistration {
   registration_year: number;
   registration_period: string;
   created_at: string;
-  status: 'pending' | 'processing' | 'done' | 'rejected';
+  status: 'iu_processing' | 'waiting_bhxh' | 'issued' | 'rejected';
   rejection_reason: string | null;
 }
 
@@ -384,3 +384,17 @@ export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   done:       'bg-success-soft text-success-text border-success-line',
   rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };
+
+export interface InsuranceEvidence { id:number; filename:string; url:string; }
+export interface InsuranceAssessment { required_amount_vnd:number; confirmed_paid_total_vnd:number; missing_amount_vnd:number; }
+export interface HospitalSnapshot { hospital_code:string; hospital_name:string; province_code:string; province_name:string; }
+export interface InsuranceTimelineItem {
+  id:number; label:string; created_at:string; source_app:string; from_status:string|null; to_status:string|null;
+  reason_label:string; reason_text:string|null; assessment:InsuranceAssessment|null; evidences:InsuranceEvidence[];
+  payload:{before?:HospitalSnapshot; after?:HospitalSnapshot};
+}
+export interface InsuranceDetail {
+  id:number; status:string; row_version:number; reason_code:string|null; reason_label:string; reason_text:string|null;
+  timeline:InsuranceTimelineItem[];
+  payment:(InsuranceAssessment & {qr_url:string|null; bank_name:string; bank_account_number:string; bank_account_name:string; reference:string})|null;
+}
