@@ -4,39 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
+import { ReadonlyField } from '@/components/editable-field';
+import { validateCccd, validateIssueDate } from '@/lib/form-validators';
 import { ui } from '@/lib/ui';
 import type { ThuongBinhFormData } from '@/lib/types';
-
-function validateCccd(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập số CCCD.';
-  if (!/^\d{12}$/.test(s)) return 'Số CCCD phải gồm 12 chữ số.';
-  return null;
-}
-
-function validateIssueDate(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập ngày cấp CCCD.';
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
-  if (!m) return 'Ngày cấp phải theo định dạng dd/mm/yyyy.';
-  const day = +m[1], mon = +m[2], year = +m[3];
-  const dt = new Date(year, mon - 1, day);
-  if (dt.getFullYear() !== year || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return 'Ngày cấp không hợp lệ.';
-  if (dt.getTime() > Date.now()) return 'Ngày cấp không được ở tương lai.';
-  return null;
-}
-
-function ReadonlyField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
+import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 
 type FErr = { citizen_id?: string; citizen_id_issue_date?: string };
 
@@ -47,6 +20,7 @@ export default function ThuongBinhRequestPage() {
   const [citizenId, setCitizenId] = useState('');
   const [issueDate, setIssueDate] = useState('');
   const [note, setNote] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -56,9 +30,10 @@ export default function ThuongBinhRequestPage() {
   useEffect(() => {
     api.requests.thuongbinhForm()
       .then((data) => {
+        const pf = data.prefill;
         setForm(data);
-        setCitizenId(data.prefill.citizen_id);
-        setIssueDate(data.prefill.citizen_id_issue_date);
+        setCitizenId(pf.citizen_id);
+        setIssueDate(pf.citizen_id_issue_date);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
@@ -67,9 +42,12 @@ export default function ThuongBinhRequestPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    if (!form) return;
+    const pf = form.prefill;
     const errs: FErr = {};
     if (!cccdLocked) {
-      const ce = validateCccd(citizenId); if (ce) errs.citizen_id = ce;
+      const ce = validateCccd(citizenId, pf.citizen_id); if (ce) errs.citizen_id = ce;
       const ie = validateIssueDate(issueDate); if (ie) errs.citizen_id_issue_date = ie;
     }
     setFieldErrors(errs);
@@ -184,11 +162,11 @@ export default function ThuongBinhRequestPage() {
                     {fieldErrors.citizen_id && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id}</p>}
                   </div>
                   <div>
-                    <label className={ui.fieldLabel}>Ngày cấp (dd/mm/yyyy) <span className="text-red-500">*</span></label>
+                    <label className={ui.fieldLabel}>Ngày cấp <span className="text-red-500">*</span></label>
                     <input
-                      type="text" value={issueDate} maxLength={10} inputMode="numeric"
-                      onChange={(e) => { setIssueDate(e.target.value); setFieldErrors((f) => ({ ...f, citizen_id_issue_date: undefined })); }}
-                      placeholder="dd/mm/yyyy"
+                      type="date" value={toDateInput(issueDate)}
+                      min={DATE_INPUT_MIN} max={todayInput()}
+                      onChange={(e) => { setIssueDate(fromDateInput(e.target.value)); setFieldErrors((f) => ({ ...f, citizen_id_issue_date: undefined })); }}
                       className={cn(ui.input, fieldErrors.citizen_id_issue_date && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
                     />
                     {fieldErrors.citizen_id_issue_date && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id_issue_date}</p>}
@@ -210,15 +188,24 @@ export default function ThuongBinhRequestPage() {
             />
           </div>
 
+          {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
+          <RequestConsent
+            checked={confirmed}
+            editCount={cccdLocked ? 0 : 2}
+            onChange={(v) => { setConfirmed(v); if (v) setError(''); }}
+          />
+
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <button type="submit" disabled={loading} className={ui.btnPrimary}>
-              {loading && <Loader2 size={15} className="animate-spin" />}
-              {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
-            </button>
+            <ConsentGate checked={confirmed}>
+              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+                {loading && <Loader2 size={15} className="animate-spin" />}
+                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+              </button>
+            </ConsentGate>
           </div>
         </form>
       </div>

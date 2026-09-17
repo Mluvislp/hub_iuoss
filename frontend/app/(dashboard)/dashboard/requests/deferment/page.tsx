@@ -2,52 +2,41 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, PencilLine, FileText } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { DefermentFormData, Province, Ward } from '@/lib/types';
+import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import {
+  ReadonlyField, EditableField, LockedBox, RequestEditButton, CancelEditButton, ChangedTag,
+} from '@/components/editable-field';
+import { validateDob } from '@/lib/form-validators';
 
-function validateDob(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập ngày sinh.';
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
-  if (!m) return 'Ngày sinh phải theo định dạng dd/mm/yyyy.';
-  const day = +m[1], mon = +m[2], year = +m[3];
-  const dt = new Date(year, mon - 1, day);
-  if (dt.getFullYear() !== year || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return 'Ngày sinh không hợp lệ.';
-  if (dt.getTime() > Date.now()) return 'Ngày sinh không được ở tương lai.';
-  if (year < 1940) return 'Năm sinh không hợp lệ.';
-  return null;
-}
+// Ba mốc thời gian học thuộc NHÓM CỨNG — chỉ xem.
+type FieldKey = 'dob';
+const FIELD_KEYS: FieldKey[] = ['dob'];
 
-function ReadonlyField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
-
-type FErr = { dob?: string; province?: string; ward?: string; street?: string };
+type FErr = Partial<Record<FieldKey | 'province' | 'ward' | 'street', string>>;
 
 export default function DefermentRequestPage() {
   const [form, setForm] = useState<DefermentFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
-  const [dob, setDob] = useState('');
+  const [values, setValues] = useState<Record<FieldKey, string>>({ dob: '' });
+  const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>({ dob: false });
+
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [wardsLoading, setWardsLoading] = useState(false);
   const [provinceCode, setProvinceCode] = useState('');
   const [wardCode, setWardCode] = useState('');
   const [street, setStreet] = useState('');
-  const [note, setNote] = useState('');
+  const [addressOpen, setAddressOpen] = useState(false);
   const pendingWardRef = useRef('');   // ward_code prefill, set sau khi nạp xong danh sách xã
 
+  const [note, setNote] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -56,11 +45,17 @@ export default function DefermentRequestPage() {
   useEffect(() => {
     api.requests.defermentForm()
       .then((data) => {
+        const pf = data.prefill;
         setForm(data);
-        setDob(data.prefill.dob);
-        setStreet(data.prefill.street);
-        pendingWardRef.current = data.prefill.ward_code || '';
-        setProvinceCode(data.prefill.province_code || '');   // trigger nạp xã + pre-select
+        setValues({ dob: pf.dob });
+        // Ô nào hồ sơ đã có dữ liệu thì khóa sẵn; trống thì mở sẵn (không có gì để khóa).
+        setOpenFields({ dob: !pf.dob.trim() });
+        setStreet(pf.street);
+        pendingWardRef.current = pf.ward_code || '';
+        setProvinceCode(pf.province_code || '');   // trigger nạp xã + pre-select
+        // Chỉ khóa cụm địa chỉ khi hồ sơ đã CHUẨN HÓA và đủ cả 3 phần. Bản đoán
+        // từ dữ liệu cũ không đáng tin nên để mở cho SV chọn lại.
+        setAddressOpen(!(pf.address_standardized && pf.province_code && pf.ward_code && pf.street.trim()));
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
     api.locations.provinces().then(setProvinces).catch(() => {});
@@ -84,25 +79,51 @@ export default function DefermentRequestPage() {
       .finally(() => setWardsLoading(false));
   }, [provinceCode]);
 
-  const dobChanged = form ? dob.trim() !== form.prefill.dob.trim() : false;
-  const addressLocked = !!form?.prefill.address_locked;
+  function setValue(key: FieldKey, v: string) {
+    setValues((s) => ({ ...s, [key]: v }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+  }
+
+  function openField(key: FieldKey) {
+    setOpenFields((s) => ({ ...s, [key]: true }));
+  }
+
+  function cancelField(key: FieldKey, originals: Record<FieldKey, string>) {
+    setValues((s) => ({ ...s, [key]: originals[key] }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+    setOpenFields((s) => ({ ...s, [key]: false }));
+  }
+
+  function cancelAddress() {
+    if (!form) return;
+    const pf = form.prefill;
+    setStreet(pf.street);
+    pendingWardRef.current = pf.ward_code || '';
+    setProvinceCode(pf.province_code || '');
+    setFieldErrors((f) => ({ ...f, province: undefined, ward: undefined, street: undefined }));
+    setAddressOpen(false);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form) return;
+    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    const pf = form.prefill;
+
     const errs: FErr = {};
-    const de = validateDob(dob); if (de) errs.dob = de;
-    if (!addressLocked) {
-      if (!provinceCode) errs.province = 'Vui lòng chọn tỉnh/thành.';
-      if (!wardCode) errs.ward = 'Vui lòng chọn phường/xã.';
-      if (!street.trim()) errs.street = 'Vui lòng nhập số nhà, tên đường.';
-    }
+    const de = validateDob(values.dob); if (de) errs.dob = de;
+    // Địa chỉ luôn bắt buộc đủ 3 phần — backend cũng vậy, kể cả khi ô đang khóa.
+    if (!provinceCode) errs.province = 'Vui lòng chọn tỉnh/thành.';
+    if (!wardCode) errs.ward = 'Vui lòng chọn phường/xã.';
+    if (!street.trim()) errs.street = 'Vui lòng nhập số nhà, tên đường.';
+
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
     setLoading(true);
     try {
       await api.requests.createDeferment({
-        dob: dob.trim(),
+        dob: values.dob.trim(),
         province_code: provinceCode,
         ward_code: wardCode,
         street: street.trim(),
@@ -145,6 +166,13 @@ export default function DefermentRequestPage() {
   }
 
   const p = form.prefill;
+  const originals: Record<FieldKey, string> = { dob: p.dob };
+  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const addressLockable = !!(p.address_standardized && p.province_code && p.ward_code && p.street.trim());
+  const addressChanged =
+    provinceCode !== p.province_code || wardCode !== p.ward_code || street.trim() !== p.street.trim();
+  const editCount =
+    FIELD_KEYS.filter((k) => values[k].trim() !== originals[k].trim()).length + (addressChanged ? 1 : 0);
 
   return (
     <div className="max-w-[760px] space-y-4">
@@ -186,37 +214,32 @@ export default function DefermentRequestPage() {
             </div>
           </div>
 
-          {/* Ngày sinh */}
-          <div className="sm:max-w-[260px]">
-            <label className={ui.fieldLabel}>
-              Ngày sinh (dd/mm/yyyy)
-              {dobChanged && (
-                <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-warning-text">
-                  <PencilLine size={11} /> sẽ gửi duyệt
-                </span>
-              )}
-            </label>
-            <input
-              type="text" value={dob} maxLength={10} inputMode="numeric"
-              onChange={(e) => { setDob(e.target.value); setFieldErrors((f) => ({ ...f, dob: undefined })); }}
-              placeholder="dd/mm/yyyy"
-              className={cn(ui.input, fieldErrors.dob ? 'border-danger-line focus:border-danger-line focus:ring-red-100' : dobChanged && 'border-warning-line')}
-            />
-            {fieldErrors.dob && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.dob}</p>}
+          {/* Thông tin có thể cập nhật */}
+          <div>
+            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
+            <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
+              <EditableField
+                label="Ngày sinh"
+                kind="date"
+                value={values.dob} original={originals.dob}
+                open={openFields.dob} lockable={lockable.dob}
+                error={fieldErrors.dob}
+                maxLength={10}
+                onChange={(v) => setValue('dob', v)}
+                onOpen={() => openField('dob')}
+                onCancel={() => cancelField('dob', originals)}
+              />
+            </div>
           </div>
 
-          {/* Địa chỉ thường trú — chuẩn hóa */}
+          {/* Địa chỉ thường trú — luôn sửa được, tách riêng 3 ô */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Địa chỉ thường trú</h2>
+            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">
+              Địa chỉ thường trú
+              {addressChanged && <ChangedTag />}
+            </h2>
 
-            {addressLocked ? (
-              <div>
-                <div className={ui.label}>Địa chỉ thường trú</div>
-                <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 py-2.5 text-sm text-ink">
-                  {p.address_display || '—'}
-                </div>
-              </div>
-            ) : (
+            {addressOpen ? (
               <>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
@@ -255,9 +278,30 @@ export default function DefermentRequestPage() {
                   />
                   {fieldErrors.street && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.street}</p>}
                 </div>
+                {addressLockable && <CancelEditButton onClick={cancelAddress} />}
                 <p className="mt-2 text-[0.78rem] text-muted">
-                  Địa chỉ chuẩn hóa sẽ được gửi cho Phòng CTSV duyệt và cập nhật vào hồ sơ của bạn.
+                  {p.address_standardized
+                    ? 'Địa chỉ mới sẽ được Phòng CTSV duyệt trước khi cập nhật vào hồ sơ của bạn.'
+                    : 'Hồ sơ chưa có địa chỉ theo đơn vị hành chính hiện hành — vui lòng chọn lại. Địa chỉ chuẩn hóa sẽ được Phòng CTSV duyệt và cập nhật vào hồ sơ.'}
                 </p>
+              </>
+            ) : (
+              <>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className={ui.label}>Tỉnh / Thành phố</div>
+                    <div className="mt-1"><LockedBox value={p.province_name} /></div>
+                  </div>
+                  <div>
+                    <div className={ui.label}>Phường / Xã</div>
+                    <div className="mt-1"><LockedBox value={p.ward_name} /></div>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className={ui.label}>Số nhà, tên đường</div>
+                  <div className="mt-1"><LockedBox value={p.street} /></div>
+                </div>
+                <RequestEditButton onClick={() => setAddressOpen(true)} />
               </>
             )}
           </div>
@@ -271,15 +315,24 @@ export default function DefermentRequestPage() {
             />
           </div>
 
+          {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
+          <RequestConsent
+            checked={confirmed}
+            editCount={editCount}
+            onChange={(v) => { setConfirmed(v); if (v) setError(''); }}
+          />
+
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <button type="submit" disabled={loading} className={ui.btnPrimary}>
-              {loading && <Loader2 size={15} className="animate-spin" />}
-              {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
-            </button>
+            <ConsentGate checked={confirmed}>
+              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+                {loading && <Loader2 size={15} className="animate-spin" />}
+                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+              </button>
+            </ConsentGate>
           </div>
         </form>
       </div>
@@ -287,7 +340,7 @@ export default function DefermentRequestPage() {
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Giấy sẽ dùng địa chỉ bạn vừa chuẩn hóa. Thời gian xử lý thông thường:{' '}
+          Giấy sẽ dùng thông tin đã xác nhận ở trên. Thời gian xử lý thông thường:{' '}
           <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
         </p>
       </div>

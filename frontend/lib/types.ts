@@ -142,16 +142,18 @@ export interface DefermentPrefill {
   student_id: string;
   department: string;
   cur_status_vi: string;
+  dob: string;
   start_label: string;
   graduation_label: string;
   max_label: string;
-  dob: string;
-  // Địa chỉ đã ở dạng 2 cấp (CURRENT_STD) → khóa, không cho sửa
-  address_locked: boolean;
-  address_display: string;
-  // Prefill địa chỉ (khi chưa khóa): match sẵn nếu khớp bảng chuẩn, ngược lại rỗng
+  /** Đã có bản thường trú chuẩn hóa 2 cấp (CURRENT_STD) — dữ liệu đáng tin, khóa sẵn. */
+  address_standardized: boolean;
+  // Địa chỉ tách riêng 3 phần; chưa chuẩn hóa thì đây là giá trị ĐOÁN từ dữ liệu cũ
+  // (có thể rỗng nếu đoán không ra).
   province_code: string;
+  province_name: string;
   ward_code: string;
+  ward_name: string;
   street: string;
 }
 

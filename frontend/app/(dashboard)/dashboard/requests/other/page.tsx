@@ -2,49 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, PencilLine, FileText } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { OtherRequestFormData } from '@/lib/types';
+import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { ReadonlyField, EditableField } from '@/components/editable-field';
+import { validateDob, validateCccd } from '@/lib/form-validators';
 
 const CCCD12 = /^\d{12}$/;
 
-function validateDob(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập ngày sinh.';
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
-  if (!m) return 'Ngày sinh phải theo định dạng dd/mm/yyyy.';
-  const day = +m[1], mon = +m[2], year = +m[3];
-  const dt = new Date(year, mon - 1, day);
-  if (dt.getFullYear() !== year || dt.getMonth() !== mon - 1 || dt.getDate() !== day)
-    return 'Ngày sinh không hợp lệ.';
-  if (dt.getTime() > Date.now()) return 'Ngày sinh không được ở tương lai.';
-  if (year < 1940) return 'Năm sinh không hợp lệ.';
-  return null;
-}
+// Hai ô sinh viên có thể xin sửa. Giữ trùng key với payload.editable của backend.
+// Niên khóa / thời gian đào tạo tối đa thuộc NHÓM CỨNG — chỉ xem.
+type FieldKey = 'dob' | 'citizen_id';
+const FIELD_KEYS: FieldKey[] = ['dob', 'citizen_id'];
 
-// CCCD trên giấy PHẢI 12 số; hồ sơ trống hoặc CMND cũ thì buộc nhập mới.
-function validateCccd(v: string, original: string): string | null {
-  const s = v.trim();
-  if (CCCD12.test(s)) return null;
-  if (!s) return 'Vui lòng nhập số CCCD (12 chữ số).';
-  if (!CCCD12.test((original || '').trim()))
-    return 'Hồ sơ chưa có CCCD hợp lệ (đang trống hoặc CMND cũ) — vui lòng nhập số CCCD mới gồm 12 chữ số.';
-  return 'Số CCCD phải gồm 12 chữ số.';
-}
-
-// Ô thông tin chỉ xem
-function ReadonlyField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
+type FieldErrors = Partial<Record<FieldKey | 'program_name', string>>;
 
 export default function OtherRequestPage() {
   const [form, setForm] = useState<OtherRequestFormData | null>(null);
@@ -52,32 +26,64 @@ export default function OtherRequestPage() {
 
   const [purposeCode, setPurposeCode] = useState('');
   const [programName, setProgramName] = useState('');
-  const [dob, setDob] = useState('');
-  const [citizenId, setCitizenId] = useState('');
   const [note, setNote] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+
+  const [values, setValues] = useState<Record<FieldKey, string>>({ dob: '', citizen_id: '' });
+  const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>({ dob: false, citizen_id: false });
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] =
-    useState<{ dob?: string; citizen_id?: string; program_name?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     api.requests.otherForm()
-      .then((data) => { setForm(data); setDob(data.prefill.dob); setCitizenId(data.prefill.citizen_id); })
+      .then((data) => {
+        const pf = data.prefill;
+        setForm(data);
+        setValues({ dob: pf.dob, citizen_id: pf.citizen_id });
+        // Hồ sơ trống thì không có gì để khóa → mở sẵn. CCCD không đủ 12 số
+        // cũng mở sẵn vì backend buộc phải nhập mới.
+        setOpenFields({
+          dob: !pf.dob.trim(),
+          citizen_id: !CCCD12.test(pf.citizen_id.trim()),
+        });
+      })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
 
   const isProgram = form ? purposeCode === form.program_purpose_code : false;
-  const dobChanged = form ? dob.trim() !== form.prefill.dob.trim() : false;
-  const cccdChanged = form ? citizenId.trim() !== form.prefill.citizen_id.trim() : false;
   const cccdMustRenew = form ? !CCCD12.test(form.prefill.citizen_id.trim()) : false;
+
+  function setValue(key: FieldKey, v: string) {
+    setValues((s) => ({ ...s, [key]: v }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+  }
+
+  function openField(key: FieldKey) {
+    setOpenFields((s) => ({ ...s, [key]: true }));
+  }
+
+  function cancelField(key: FieldKey, originals: Record<FieldKey, string>) {
+    setValues((s) => ({ ...s, [key]: originals[key] }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+    setOpenFields((s) => ({ ...s, [key]: false }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs: { dob?: string; citizen_id?: string; program_name?: string } = {};
-    const de = validateDob(dob); if (de) errs.dob = de;
-    const ce = validateCccd(citizenId, form?.prefill.citizen_id ?? ''); if (ce) errs.citizen_id = ce;
+    if (!form) return;
+    const pf = form.prefill;
+
+    if (!confirmed) {
+      setError(CONSENT_REQUIRED_MSG);
+      return;
+    }
+
+    const errs: FieldErrors = {};
+    const de = validateDob(values.dob); if (de) errs.dob = de;
+    const ce = validateCccd(values.citizen_id, pf.citizen_id); if (ce) errs.citizen_id = ce;
     if (isProgram && !programName.trim()) errs.program_name = 'Vui lòng nhập tên chương trình.';
     setFieldErrors(errs);
 
@@ -89,8 +95,8 @@ export default function OtherRequestPage() {
       await api.requests.createOther({
         purpose_code: purposeCode,
         program_name: isProgram ? programName.trim() : undefined,
-        dob: dob.trim(),
-        citizen_id: citizenId.trim(),
+        dob: values.dob.trim(),
+        citizen_id: values.citizen_id.trim(),
         note: note.trim() || undefined,
       });
       setSuccess(true);
@@ -131,6 +137,9 @@ export default function OtherRequestPage() {
   }
 
   const p = form.prefill;
+  const originals: Record<FieldKey, string> = { dob: p.dob, citizen_id: p.citizen_id };
+  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim(), citizen_id: !cccdMustRenew };
+  const editCount = FIELD_KEYS.filter((k) => values[k].trim() !== originals[k].trim()).length;
 
   return (
     <div className="max-w-[760px] space-y-4">
@@ -174,45 +183,35 @@ export default function OtherRequestPage() {
           {/* Thông tin có thể cập nhật */}
           <div>
             <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label className={ui.fieldLabel}>
-                  Ngày sinh (dd/mm/yyyy)
-                  {dobChanged && (
-                    <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-amber-700">
-                      <PencilLine size={11} /> sẽ gửi duyệt
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="text" value={dob} maxLength={10} inputMode="numeric"
-                  onChange={(e) => { setDob(e.target.value); setFieldErrors((f) => ({ ...f, dob: undefined })); }}
-                  placeholder="dd/mm/yyyy"
-                  className={cn(ui.input, fieldErrors.dob ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : dobChanged && 'border-amber-300')}
-                />
-                {fieldErrors.dob && <p className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.dob}</p>}
-              </div>
-              <div>
-                <label className={ui.fieldLabel}>
-                  Số CCCD
-                  {cccdChanged && (
-                    <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-amber-700">
-                      <PencilLine size={11} /> sẽ gửi duyệt
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="text" value={citizenId} maxLength={12} inputMode="numeric"
-                  onChange={(e) => { setCitizenId(e.target.value); setFieldErrors((f) => ({ ...f, citizen_id: undefined })); }}
-                  className={cn(ui.input, fieldErrors.citizen_id ? 'border-red-400 focus:border-red-400 focus:ring-red-100' : cccdChanged && 'border-amber-300')}
-                />
-                {fieldErrors.citizen_id
-                  ? <p className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.citizen_id}</p>
-                  : cccdMustRenew && <p className="mt-1 text-[0.75rem] text-amber-700">Hồ sơ chưa có CCCD 12 số — vui lòng nhập mới.</p>}
-              </div>
+            <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
+              <EditableField
+                label="Ngày sinh"
+                kind="date"
+                value={values.dob} original={originals.dob}
+                open={openFields.dob} lockable={lockable.dob}
+                error={fieldErrors.dob}
+                maxLength={10}
+                onChange={(v) => setValue('dob', v)}
+                onOpen={() => openField('dob')}
+                onCancel={() => cancelField('dob', originals)}
+              />
+              <EditableField
+                label="Số CCCD"
+                value={values.citizen_id} original={originals.citizen_id}
+                open={openFields.citizen_id} lockable={lockable.citizen_id}
+                error={fieldErrors.citizen_id}
+                hint={cccdMustRenew ? 'Hồ sơ chưa có CCCD 12 số — vui lòng nhập mới.' : undefined}
+                maxLength={12} inputMode="numeric" placeholder="12 chữ số"
+                onChange={(v) => setValue('citizen_id', v)}
+                onOpen={() => openField('citizen_id')}
+                onCancel={() => cancelField('citizen_id', originals)}
+              />
             </div>
-            <p className="mt-2 text-[0.78rem] text-muted">
-              Thay đổi ngày sinh / CCCD sẽ được gửi cho Phòng CTSV duyệt trước khi cập nhật hồ sơ.
+            <p className="mt-3 text-[0.78rem] text-muted leading-relaxed">
+              Thông tin đã có trong hồ sơ được khóa sẵn — bấm{' '}
+              <strong className="font-medium text-ink">Yêu cầu chỉnh sửa</strong> nếu cần sửa.
+              Nội dung sửa sẽ được Phòng CTSV duyệt trước khi in lên giấy; riêng ngày sinh và CCCD
+              nếu được duyệt sẽ cập nhật luôn vào hồ sơ của bạn.
             </p>
           </div>
 
@@ -251,15 +250,24 @@ export default function OtherRequestPage() {
             />
           </div>
 
+          {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
+          <RequestConsent
+            checked={confirmed}
+            editCount={editCount}
+            onChange={(v) => { setConfirmed(v); if (v) setError(''); }}
+          />
+
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <button type="submit" disabled={loading} className={ui.btnPrimary}>
-              {loading && <Loader2 size={15} className="animate-spin" />}
-              {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
-            </button>
+            <ConsentGate checked={confirmed}>
+              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+                {loading && <Loader2 size={15} className="animate-spin" />}
+                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+              </button>
+            </ConsentGate>
           </div>
         </form>
       </div>

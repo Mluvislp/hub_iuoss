@@ -2,64 +2,32 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, PencilLine, FileText } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
+import { ReadonlyField, EditableField } from '@/components/editable-field';
+import { validateDob, validateCccd, validateIssueDate } from '@/lib/form-validators';
 import { ui } from '@/lib/ui';
 import type { BankLoanFormData } from '@/lib/types';
+import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 
-function validateDob(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập ngày sinh.';
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
-  if (!m) return 'Ngày sinh phải theo định dạng dd/mm/yyyy.';
-  const day = +m[1], mon = +m[2], year = +m[3];
-  const dt = new Date(year, mon - 1, day);
-  if (dt.getFullYear() !== year || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return 'Ngày sinh không hợp lệ.';
-  if (dt.getTime() > Date.now()) return 'Ngày sinh không được ở tương lai.';
-  if (year < 1940) return 'Năm sinh không hợp lệ.';
-  return null;
-}
-function validateCccd(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập số CCCD.';
-  if (!/^\d{12}$/.test(s)) return 'Số CCCD phải gồm 12 chữ số.';
-  return null;
-}
-function validateIssueDate(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập ngày cấp CCCD.';
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
-  if (!m) return 'Ngày cấp phải theo định dạng dd/mm/yyyy.';
-  const day = +m[1], mon = +m[2], year = +m[3];
-  const dt = new Date(year, mon - 1, day);
-  if (dt.getFullYear() !== year || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return 'Ngày cấp không hợp lệ.';
-  if (dt.getTime() > Date.now()) return 'Ngày cấp không được ở tương lai.';
-  return null;
-}
+// Chỉ ngày sinh dùng cơ chế khóa/mở. Các nhãn tiến độ học thuộc NHÓM CỨNG — chỉ xem.
+type FieldKey = 'dob';
+const FIELD_KEYS: FieldKey[] = ['dob'];
 
-function ReadonlyField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
-
-type FErr = { dob?: string; citizen_id?: string; citizen_id_issue_date?: string; class_code?: string };
+type FErr = Partial<Record<FieldKey | 'citizen_id' | 'citizen_id_issue_date' | 'class_code', string>>;
 
 export default function BankLoanRequestPage() {
   const [form, setForm] = useState<BankLoanFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
-  const [dob, setDob] = useState('');
+  const [values, setValues] = useState<Record<FieldKey, string>>({ dob: '' });
+  const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>({ dob: false });
   const [citizenId, setCitizenId] = useState('');
   const [issueDate, setIssueDate] = useState('');
   const [classCode, setClassCode] = useState('');
   const [note, setNote] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -69,12 +37,15 @@ export default function BankLoanRequestPage() {
   useEffect(() => {
     api.requests.bankloanForm()
       .then((data) => {
+        const pf = data.prefill;
         setForm(data);
-        setDob(data.prefill.dob);
-        setCitizenId(data.prefill.citizen_id);
-        setIssueDate(data.prefill.citizen_id_issue_date);
+        setCitizenId(pf.citizen_id);
+        setIssueDate(pf.citizen_id_issue_date);
         // Mã lớp đã có trong hồ sơ thì điền sẵn, SV chỉ gõ khi hồ sơ còn trống.
-        setClassCode(data.prefill.class_code ?? '');
+        setClassCode(pf.class_code ?? '');
+        setValues({ dob: pf.dob });
+        // Hồ sơ đã có ngày sinh thì khóa sẵn; trống thì mở sẵn.
+        setOpenFields({ dob: !pf.dob.trim() });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
@@ -83,14 +54,27 @@ export default function BankLoanRequestPage() {
   // Hồ sơ đã có mã lớp ⇒ khoá ô. Mã lớp trên hồ sơ do phòng đào tạo cập nhật hàng
   // loạt, không để SV gõ đè lên giấy tờ nhà trường cấp.
   const classLocked = !!form?.prefill.class_code_locked;
-  const dobChanged = form ? dob.trim() !== form.prefill.dob.trim() : false;
+
+  function setValue(key: FieldKey, v: string) {
+    setValues((s) => ({ ...s, [key]: v }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+  }
+  function openField(key: FieldKey) { setOpenFields((s) => ({ ...s, [key]: true })); }
+  function cancelField(key: FieldKey, originals: Record<FieldKey, string>) {
+    setValues((s) => ({ ...s, [key]: originals[key] }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+    setOpenFields((s) => ({ ...s, [key]: false }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    if (!form) return;
+    const pf = form.prefill;
     const errs: FErr = {};
-    const de = validateDob(dob); if (de) errs.dob = de;
+    const de = validateDob(values.dob); if (de) errs.dob = de;
     if (!cccdLocked) {
-      const ce = validateCccd(citizenId); if (ce) errs.citizen_id = ce;
+      const ce = validateCccd(citizenId, pf.citizen_id); if (ce) errs.citizen_id = ce;
       const ie = validateIssueDate(issueDate); if (ie) errs.citizen_id_issue_date = ie;
     }
     if (!classLocked && !classCode.trim()) errs.class_code = 'Vui lòng nhập mã lớp.';
@@ -100,7 +84,7 @@ export default function BankLoanRequestPage() {
     setLoading(true);
     try {
       await api.requests.createBankLoan({
-        dob: dob.trim(),
+        dob: values.dob.trim(),
         citizen_id: citizenId.trim(),
         citizen_id_issue_date: issueDate.trim(),
         class_code: classCode.trim(),
@@ -143,6 +127,10 @@ export default function BankLoanRequestPage() {
   }
 
   const p = form.prefill;
+  const originals: Record<FieldKey, string> = { dob: p.dob };
+  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const editCount = (values.dob.trim() !== originals.dob.trim() ? 1 : 0)
+    + (cccdLocked ? 0 : 2) + (classLocked ? 0 : 1);
 
   return (
     <div className="max-w-[760px] space-y-4">
@@ -212,21 +200,15 @@ export default function BankLoanRequestPage() {
 
           {/* Ngày sinh */}
           <div className="sm:max-w-[260px]">
-            <label className={ui.fieldLabel}>
-              Ngày sinh (dd/mm/yyyy)
-              {dobChanged && (
-                <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-warning-text">
-                  <PencilLine size={11} /> sẽ gửi duyệt
-                </span>
-              )}
-            </label>
-            <input
-              type="text" value={dob} maxLength={10} inputMode="numeric"
-              onChange={(e) => { setDob(e.target.value); setFieldErrors((f) => ({ ...f, dob: undefined })); }}
-              placeholder="dd/mm/yyyy"
-              className={cn(ui.input, fieldErrors.dob ? 'border-danger-line focus:border-danger-line focus:ring-red-100' : dobChanged && 'border-warning-line')}
+            <EditableField
+              label="Ngày sinh" kind="date"
+              value={values.dob} original={originals.dob}
+              open={openFields.dob} lockable={lockable.dob}
+              error={fieldErrors.dob} maxLength={10}
+              onChange={(v) => setValue('dob', v)}
+              onOpen={() => openField('dob')}
+              onCancel={() => cancelField('dob', originals)}
             />
-            {fieldErrors.dob && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.dob}</p>}
           </div>
 
           {/* CCCD */}
@@ -251,11 +233,11 @@ export default function BankLoanRequestPage() {
                     {fieldErrors.citizen_id && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id}</p>}
                   </div>
                   <div>
-                    <label className={ui.fieldLabel}>Ngày cấp (dd/mm/yyyy) <span className="text-red-500">*</span></label>
+                    <label className={ui.fieldLabel}>Ngày cấp <span className="text-red-500">*</span></label>
                     <input
-                      type="text" value={issueDate} maxLength={10} inputMode="numeric"
-                      onChange={(e) => { setIssueDate(e.target.value); setFieldErrors((f) => ({ ...f, citizen_id_issue_date: undefined })); }}
-                      placeholder="dd/mm/yyyy"
+                      type="date" value={toDateInput(issueDate)}
+                      min={DATE_INPUT_MIN} max={todayInput()}
+                      onChange={(e) => { setIssueDate(fromDateInput(e.target.value)); setFieldErrors((f) => ({ ...f, citizen_id_issue_date: undefined })); }}
                       className={cn(ui.input, fieldErrors.citizen_id_issue_date && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
                     />
                     {fieldErrors.citizen_id_issue_date && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id_issue_date}</p>}
@@ -275,15 +257,24 @@ export default function BankLoanRequestPage() {
             />
           </div>
 
+          {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
+          <RequestConsent
+            checked={confirmed}
+            editCount={editCount}
+            onChange={(v) => { setConfirmed(v); if (v) setError(''); }}
+          />
+
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <button type="submit" disabled={loading} className={ui.btnPrimary}>
-              {loading && <Loader2 size={15} className="animate-spin" />}
-              {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
-            </button>
+            <ConsentGate checked={confirmed}>
+              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+                {loading && <Loader2 size={15} className="animate-spin" />}
+                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+              </button>
+            </ConsentGate>
           </div>
         </form>
       </div>

@@ -2,46 +2,31 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, PencilLine, FileText } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { EnglishFormData } from '@/lib/types';
+import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { ReadonlyField, EditableField } from '@/components/editable-field';
+import { validateDob } from '@/lib/form-validators';
 
-function validateDob(v: string): string | null {
-  const s = v.trim();
-  if (!s) return 'Vui lòng nhập ngày sinh.';
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
-  if (!m) return 'Ngày sinh phải theo định dạng dd/mm/yyyy.';
-  const day = +m[1], mon = +m[2], year = +m[3];
-  const dt = new Date(year, mon - 1, day);
-  if (dt.getFullYear() !== year || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return 'Ngày sinh không hợp lệ.';
-  if (dt.getTime() > Date.now()) return 'Ngày sinh không được ở tương lai.';
-  if (year < 1940) return 'Năm sinh không hợp lệ.';
-  return null;
-}
+// Mốc nhập học / ra trường thuộc NHÓM CỨNG — chỉ xem.
+type FieldKey = 'dob';
+const FIELD_KEYS: FieldKey[] = ['dob'];
 
-function ReadonlyField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
-
-type FErr = { dob?: string; purpose_code?: string; program_name?: string };
+type FErr = Partial<Record<FieldKey | 'purpose_code' | 'program_name', string>>;
 
 export default function EnglishRequestPage() {
   const [form, setForm] = useState<EnglishFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
-  const [dob, setDob] = useState('');
+  const [values, setValues] = useState<Record<FieldKey, string>>({ dob: '' });
+  const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>({ dob: false });
   const [purposeCode, setPurposeCode] = useState('');
   const [programName, setProgramName] = useState('');
   const [note, setNote] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -51,19 +36,34 @@ export default function EnglishRequestPage() {
   useEffect(() => {
     api.requests.englishForm()
       .then((data) => {
+        const pf = data.prefill;
         setForm(data);
-        setDob(data.prefill.dob);
+        setValues({ dob: pf.dob });
+        setOpenFields({ dob: !pf.dob.trim() });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
 
   const isProgram = !!form && purposeCode === form.program_purpose_code;
-  const dobChanged = form ? dob.trim() !== form.prefill.dob.trim() : false;
+
+  function setValue(key: FieldKey, v: string) {
+    setValues((s) => ({ ...s, [key]: v }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+  }
+  function openField(key: FieldKey) { setOpenFields((s) => ({ ...s, [key]: true })); }
+  function cancelField(key: FieldKey, originals: Record<FieldKey, string>) {
+    setValues((s) => ({ ...s, [key]: originals[key] }));
+    setFieldErrors((f) => ({ ...f, [key]: undefined }));
+    setOpenFields((s) => ({ ...s, [key]: false }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    if (!form) return;
+    const pf = form.prefill;
     const errs: FErr = {};
-    const de = validateDob(dob); if (de) errs.dob = de;
+    const de = validateDob(values.dob); if (de) errs.dob = de;
     if (!purposeCode) errs.purpose_code = 'Vui lòng chọn mục đích.';
     if (isProgram && !programName.trim()) errs.program_name = 'Vui lòng nhập tên chương trình.';
     setFieldErrors(errs);
@@ -72,7 +72,7 @@ export default function EnglishRequestPage() {
     setLoading(true);
     try {
       await api.requests.createEnglish({
-        dob: dob.trim(),
+        dob: values.dob.trim(),
         purpose_code: purposeCode,
         program_name: isProgram ? programName.trim() : undefined,
         note: note.trim() || undefined,
@@ -114,6 +114,9 @@ export default function EnglishRequestPage() {
   }
 
   const p = form.prefill;
+  const originals: Record<FieldKey, string> = { dob: p.dob };
+  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const editCount = FIELD_KEYS.filter((k) => values[k].trim() !== originals[k].trim()).length;
 
   return (
     <div className="max-w-[760px] space-y-4">
@@ -185,23 +188,24 @@ export default function EnglishRequestPage() {
             )}
           </div>
 
-          {/* Ngày sinh */}
-          <div className="sm:max-w-[260px]">
-            <label className={ui.fieldLabel}>
-              Ngày sinh (dd/mm/yyyy)
-              {dobChanged && (
-                <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-warning-text">
-                  <PencilLine size={11} /> sẽ gửi duyệt
-                </span>
-              )}
-            </label>
-            <input
-              type="text" value={dob} maxLength={10} inputMode="numeric"
-              onChange={(e) => { setDob(e.target.value); setFieldErrors((f) => ({ ...f, dob: undefined })); }}
-              placeholder="dd/mm/yyyy"
-              className={cn(ui.input, fieldErrors.dob ? 'border-danger-line focus:border-danger-line focus:ring-red-100' : dobChanged && 'border-warning-line')}
-            />
-            {fieldErrors.dob && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.dob}</p>}
+          {/* Thông tin có thể cập nhật */}
+          <div>
+            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
+            <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
+              <EditableField
+                label="Ngày sinh" kind="date"
+                value={values.dob} original={originals.dob}
+                open={openFields.dob} lockable={lockable.dob}
+                error={fieldErrors.dob} maxLength={10}
+                onChange={(v) => setValue('dob', v)}
+                onOpen={() => openField('dob')}
+                onCancel={() => cancelField('dob', originals)}
+              />
+            </div>
+            <p className="mt-3 text-[0.78rem] text-muted leading-relaxed">
+              Thông tin đã có trong hồ sơ được khóa sẵn — bấm <strong className="font-medium text-ink">Yêu cầu chỉnh sửa</strong> nếu cần sửa.
+              Nội dung sửa sẽ được Phòng CTSV duyệt trước khi in lên giấy.
+            </p>
           </div>
 
           {/* Ghi chú */}
@@ -213,15 +217,24 @@ export default function EnglishRequestPage() {
             />
           </div>
 
+          {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
+          <RequestConsent
+            checked={confirmed}
+            editCount={editCount}
+            onChange={(v) => { setConfirmed(v); if (v) setError(''); }}
+          />
+
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <button type="submit" disabled={loading} className={ui.btnPrimary}>
-              {loading && <Loader2 size={15} className="animate-spin" />}
-              {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
-            </button>
+            <ConsentGate checked={confirmed}>
+              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+                {loading && <Loader2 size={15} className="animate-spin" />}
+                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+              </button>
+            </ConsentGate>
           </div>
         </form>
       </div>
