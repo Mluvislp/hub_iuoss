@@ -97,11 +97,20 @@ def clean_street(value):
                 "VD: 123 Nguyễn Văn Cừ"
             )
 
-    first_alpha = next((ch for ch in text if ch.isalpha()), "")
-    if first_alpha and first_alpha != first_alpha.upper():
-        raise StreetError("Chữ cái đầu tiên phải viết hoa. VD: 123 Nguyễn Văn Cừ")
-
+    # Viết hoa chữ cái đầu ĐÃ TỪNG chặn cứng ở đây, bỏ 17/09/2026: luật cũ lấy
+    # ký tự chữ cái đầu tiên gặp ở BẤT KỲ đâu trong chuỗi, nên chặn nhầm cả
+    # «48/15 đường số 1» và «ngõ 5 Nguyễn Trãi» — hai địa chỉ viết đúng chính
+    # tả, vì "đường"/"ngõ" là danh từ chung, viết thường mới đúng. Chữ hoa là
+    # chuyện hình thức, không phải "chắc chắn sai", nên chuyển xuống
+    # `street_warnings()`.
     return text
+
+
+# Danh từ chung hay mở đầu địa chỉ — viết thường là ĐÚNG chính tả, đừng nhắc.
+_STREET_LEAD = (
+    "đường", "phố", "ngõ", "ngách", "hẻm", "kiệt", "tổ", "ấp", "thôn", "xóm",
+    "khu", "lô", "số", "căn", "tầng", "block", "đại lộ", "bis",
+)
 
 
 def street_warnings(value):
@@ -122,5 +131,15 @@ def street_warnings(value):
             notes.append(
                 f"Chuỗi có chứa «{word}» — kiểm tra lại xem có bị trùng với "
                 "mục Phường/Xã đã chọn phía trên không."
+            )
+
+    # Chữ cái đầu viết thường — chỉ NHẮC, không chặn. Bỏ qua khi từ đầu là danh
+    # từ chung ("đường", "ngõ"…), vì viết thường ở đó mới đúng chính tả.
+    if text[0].isalpha() and text[0] != text[0].upper():
+        first_word = _strip_accents(text.split()[0]).lower()
+        leads = {_strip_accents(w).lower().split()[0] for w in _STREET_LEAD}
+        if first_word not in leads:
+            notes.append(
+                "Nên viết hoa chữ cái đầu. VD: 123 Nguyễn Văn Cừ"
             )
     return notes
