@@ -54,8 +54,21 @@ def _suggest_from_legacy(address):
     }
 
 
-def _address_block(student, address_type):
-    current = addr.get_current(student, address_type)
+def _address_block(student, address_type, permanent=False):
+    """Khối dữ liệu dựng một ô địa chỉ trên form.
+
+    `permanent=True` ⇒ đọc theo thứ tự ưu tiên `PERMANENT_TYPES`, tức có bản
+    chuẩn hoá CURRENT_STD thì lấy bản đó. Không có bước này thì form vẫn đọc
+    dòng CURRENT cũ (không mang mã tỉnh/phường) rồi phải ĐOÁN lại bằng
+    `_suggest_from_legacy()` — đoán đúng ~72% tỉnh, ~20% phường — trong khi
+    mã chính xác đang nằm sẵn ở dòng bên cạnh.
+
+    `declared_on` bên dưới vẫn là mốc của chính dòng được chọn; còn mốc "đã
+    khai hay chưa" mà form dùng để khoá thì lấy từ `lock_state()`, luôn căn
+    trên CURRENT — một dòng nạp hàng loạt KHÔNG phải lời khai của sinh viên.
+    """
+    current = (addr.get_permanent(student) if permanent
+               else addr.get_current(student, address_type))
     return {
         "state": addr.get_state(current),
         "display": addr.format_address(current),
@@ -93,7 +106,7 @@ def lock_state(student):
 
 def build_prefill(student):
     """Toàn bộ dữ liệu dựng form."""
-    permanent = _address_block(student, PERMANENT)
+    permanent = _address_block(student, PERMANENT, permanent=True)
     temporary = _address_block(student, TEMPORARY)
 
     temp_current = addr.get_current(student, TEMPORARY)
