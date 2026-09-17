@@ -280,6 +280,7 @@ class StudentAddress(models.Model):
     TYPE_PERMANENT = "PERMANENT"
     TYPE_OTHER = "OTHER"
     TYPE_CURRENT_STD = "CURRENT_STD"  # thường trú đã chuẩn hóa theo cơ cấu 2025
+    TYPE_TEMPORARY_STD = "TEMPORARY_STD"  # tạm trú đã chuẩn hóa theo cơ cấu 2025
 
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,

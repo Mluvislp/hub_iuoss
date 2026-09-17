@@ -19,8 +19,11 @@ from . import profile_changes as pc
 from .address_validators import StreetError, street_warnings
 from .documents import _match_province, _match_ward, _ADMIN_KEYWORDS
 
-PERMANENT = StudentAddress.TYPE_CURRENT
-TEMPORARY = StudentAddress.TYPE_TEMPORARY
+# Form khai báo GHI vào bản chuẩn hoá — dữ liệu ở đây do SV chọn từ danh mục
+# 2025 nên đã chuẩn. Dòng nền (CURRENT / TEMPORARY) giữ nguyên làm chứng cứ dữ
+# liệu cũ, không xoá; `address_service.read_order()` ưu tiên bản chuẩn hoá khi đọc.
+PERMANENT = StudentAddress.TYPE_CURRENT_STD
+TEMPORARY = StudentAddress.TYPE_TEMPORARY_STD
 
 
 def _suggest_from_legacy(address):
@@ -54,21 +57,19 @@ def _suggest_from_legacy(address):
     }
 
 
-def _address_block(student, address_type, permanent=False):
+def _address_block(student, address_type):
     """Khối dữ liệu dựng một ô địa chỉ trên form.
 
-    `permanent=True` ⇒ đọc theo thứ tự ưu tiên `PERMANENT_TYPES`, tức có bản
-    chuẩn hoá CURRENT_STD thì lấy bản đó. Không có bước này thì form vẫn đọc
-    dòng CURRENT cũ (không mang mã tỉnh/phường) rồi phải ĐOÁN lại bằng
-    `_suggest_from_legacy()` — đoán đúng ~72% tỉnh, ~20% phường — trong khi
-    mã chính xác đang nằm sẵn ở dòng bên cạnh.
+    Đọc qua `get_effective()` — có bản chuẩn hoá (`*_STD`) thì lấy bản đó, không
+    có mới lùi về bản nền. Thiếu bước này thì form đọc dòng nền (không mang mã
+    tỉnh/phường) rồi phải ĐOÁN lại bằng `_suggest_from_legacy()` — đoán đúng
+    ~72% tỉnh, ~20% phường — trong khi mã chính xác nằm sẵn ở dòng bên cạnh.
 
-    `declared_on` bên dưới vẫn là mốc của chính dòng được chọn; còn mốc "đã
-    khai hay chưa" mà form dùng để khoá thì lấy từ `lock_state()`, luôn căn
-    trên CURRENT — một dòng nạp hàng loạt KHÔNG phải lời khai của sinh viên.
+    `declared_on` ở đây là mốc của chính dòng được chọn; còn mốc "đã khai hay
+    chưa" mà form dùng để khoá thì lấy từ `lock_state()`, căn vào DẤU MỐC khai
+    báo chứ không phải trạng thái bảng địa chỉ.
     """
-    current = (addr.get_permanent(student) if permanent
-               else addr.get_current(student, address_type))
+    current = addr.get_effective(student, address_type)
     return {
         "state": addr.get_state(current),
         "display": addr.format_address(current),
@@ -110,10 +111,10 @@ def lock_state(student):
 
 def build_prefill(student):
     """Toàn bộ dữ liệu dựng form."""
-    permanent = _address_block(student, PERMANENT, permanent=True)
+    permanent = _address_block(student, PERMANENT)
     temporary = _address_block(student, TEMPORARY)
 
-    temp_current = addr.get_current(student, TEMPORARY)
+    temp_current = addr.get_effective(student, TEMPORARY)
     in_hcmc = None
     if temp_current is not None and temp_current.effective_from:
         in_hcmc = temp_current.province_code == addr.HCMC_PROVINCE_CODE
