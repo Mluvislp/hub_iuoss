@@ -11,6 +11,7 @@ import { cn, toDateInput, fromDateInput, todayInput } from '@/lib/utils';
 import type { CccdValue, OffCampusForm, Province } from '@/lib/types';
 import AddressFields, { AddressValue } from './AddressFields';
 import PersonalField from './PersonalField';
+import { FormBusy } from '@/components/form-busy';
 
 const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: '' };
 
@@ -366,7 +367,8 @@ export default function OffCampusDeclarationPage() {
           </h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-7">
+        <form onSubmit={handleSubmit} className="px-6 py-5">
+          <FormBusy busy={saving} label="Đang gửi khai báo…" className="space-y-7">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -534,6 +536,7 @@ export default function OffCampusDeclarationPage() {
               {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</> : 'Gửi khai báo'}
             </button>
           </div>
+          </FormBusy>
         </form>
       </div>
     </div>
