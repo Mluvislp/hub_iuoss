@@ -105,8 +105,7 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
       ethnicity, phone_number, social_insurance_number, citizen_id,
       permanent_*, temporary_*
     - Bệnh viện KCB: hospital_code
-    - File ảnh: cccd_image (bắt buộc), bhyt_image (tuỳ chọn),
-      payment_receipt_image (bắt buộc)
+    - Bốn ảnh bắt buộc: hai mặt CCCD, thẻ BHYT cũ và biên lai thanh toán.
     """
 
     registration_year = serializers.IntegerField(
@@ -161,7 +160,11 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
         "null": "Vui lòng đính kèm ảnh CCCD mặt sau.",
         "invalid": "Vui lòng đính kèm ảnh CCCD mặt sau.",
     })
-    bhyt_image = serializers.FileField(required=False, allow_null=True)
+    bhyt_image = serializers.FileField(required=True, error_messages={
+        "required": "Vui lòng đính kèm ảnh thẻ BHYT cũ.",
+        "null": "Vui lòng đính kèm ảnh thẻ BHYT cũ.",
+        "invalid": "Vui lòng đính kèm ảnh thẻ BHYT cũ.",
+    })
     # Chuỗi thô đọc từ mã QR trên ảnh CCCD, do trình duyệt giải mã. Trình duyệt
     # thử cả hai mặt (CCCD gắn chip in ở mặt trước, thẻ Căn cước mẫu mới in ở
     # mặt sau). Không bắt buộc: ảnh mờ thì vẫn phải nộp đơn được.

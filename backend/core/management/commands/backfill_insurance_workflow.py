@@ -1,11 +1,9 @@
 """Manual, resumable migration; default is read-only and does not connect to other databases."""
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
-from core.models import HealthInsuranceRegistration, InsuranceEvidence
-from core.insurance_contract import LEGACY, STATUS_LABELS, safe_path, WorkflowError
+from core.models import HealthInsuranceRegistration
+from core.insurance_contract import LEGACY, STATUS_LABELS
 from core.insurance_history import ensure_legacy
-from core.insurance_files import inspect_upload
 
 
 class Command(BaseCommand):
@@ -31,24 +29,10 @@ class Command(BaseCommand):
                 if options['apply']:
                     query = query.select_for_update()
                 reg = query.get(pk=pk)
-                path = safe_path(settings.MEDIA_ROOT, str(reg.payment_receipt_image))
-                content = None
-                if path:
-                    try:
-                        with path.open('rb') as f:
-                            content = inspect_upload(f)
-                    except WorkflowError:
-                        pass
-                self.stdout.write(f'id={pk} status={reg.status} receipt={"valid" if content else "missing/invalid"}')
+                self.stdout.write(f'id={pk} status={reg.status}')
                 if not options['apply']:
                     continue
                 ensure_legacy(reg)
-                event = reg.events.filter(event_type='LEGACY_IMPORTED').first()
-                if event and content and not InsuranceEvidence.objects.filter(registration=reg, storage_key=str(reg.payment_receipt_image)).exists():
-                    data, ext, mime, digest = content
-                    InsuranceEvidence.objects.create(registration=reg, event=event,
-                        storage_key=str(reg.payment_receipt_image), original_filename=path.name[:255],
-                        mime_type=mime, file_size_bytes=len(data), sha256=digest)
                 if options['map_statuses'] and reg.workflow_version < 2:
                     if reg.status not in {*LEGACY, *STATUS_LABELS}:
                         self.stderr.write(f'id={pk}: unknown status; mapping left unchanged')

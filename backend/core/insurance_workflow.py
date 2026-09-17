@@ -51,11 +51,11 @@ def supplement(pk, student_id, *, key, row_version, uploads=(), hospital_code=''
             ensure_legacy(reg)
             if code == 'HOSPITAL_NOT_ACCEPTED':
                 append_event(reg, 'HOSPITAL_CHANGED', source='Hub', actor_id=student_id,
-                    old='rejected', new='rejected', payload={'before': before, 'after': after})
+                    payload={'before': before, 'after': after})
                 reg.hospital_code = hospital_code
             if uploads:
                 event = append_event(reg, 'PAYMENT_EVIDENCE_SUBMITTED', source='Hub', actor_id=student_id,
-                                     old='rejected', new='rejected')
+                                     old=None, new=None)
                 for upload, content in zip(uploads, checked):
                     store_evidence(reg, event, upload, content, written)
             append_event(reg, 'RESUBMITTED', source='Hub', actor_id=student_id, key=key,

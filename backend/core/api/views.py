@@ -1,6 +1,6 @@
 from core.insurance_submission import submission
 from core.insurance_history import append_event
-from core.insurance_files import link_initial_receipt, inspect_upload
+from core.insurance_files import inspect_upload
 from core.insurance_contract import normalized, integer
 import logging
 from django.conf import settings
@@ -809,10 +809,9 @@ class InsuranceRegistrationView(APIView):
                 file.save(f"attachment.{ext}", file.file, save=False)
                 request.insurance_written_files.append(Path(file.path))
         reg.save()
-        event = append_event(reg, 'SUBMITTED', source='Hub', actor_id=student.pk,
+        append_event(reg, 'SUBMITTED', source='Hub', actor_id=student.pk,
             old=None, new='iu_processing', key=request.data.get('request_key'),
             payload={'request_digest': request.insurance_request_digest})
-        link_initial_receipt(reg, event, original_filename=data['payment_receipt_image'].name)
 
         # Dữ liệu QR trên thẻ đi vào bảng dùng chung, không nằm trong đơn.
         # Đọc được thì lưu, không đọc được thì thôi — không chặn nộp đơn.

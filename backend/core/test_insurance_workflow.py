@@ -66,6 +66,8 @@ class HubWorkflowTests(TestCase):
         reg=self.submit(hospital_code='79002',province_code='79')
         self.assertEqual((reg.hospital_code,reg.status),('79002','iu_processing'))
         event=reg.events.get(event_type='HOSPITAL_CHANGED')
+        self.assertIsNone(event.from_status)
+        self.assertIsNone(event.to_status)
         self.assertEqual(event.payload['before']['hospital_name'],'Bệnh viện A')
         self.assertEqual(event.payload['after']['hospital_name'],'Bệnh viện B')
         Hospital.objects.filter(code='79001').update(name='Renamed')
@@ -156,7 +158,7 @@ class HubWorkflowTests(TestCase):
         call_command('backfill_insurance_workflow',**opts)
         self.reg.refresh_from_db()
         self.assertEqual(self.reg.status,'issued');self.assertIsNone(self.reg.fee_amount_vnd)
-        self.assertEqual(self.reg.events.count(),1);self.assertEqual(self.reg.evidences.count(),1)
+        self.assertEqual(self.reg.events.count(),1);self.assertEqual(self.reg.evidences.count(),0)
         self.assertEqual(self.reg.events.get().payload['observed_status'],'done')
 
     def test_backfill_default_read_only(self):
@@ -180,6 +182,7 @@ class HubWorkflowTests(TestCase):
             ethnicity='Kinh',phone_number='0901234567',citizen_id='012345678901',
             permanent_province='79',permanent_ward='00001',permanent_street='Test street',
             hospital_code='79001',cccd_image=picture('front.png'),cccd_image_back=picture('back.png'),
+            bhyt_image=picture('bhyt.png'),
             payment_receipt_image=picture('receipt.html'))
 
     def prepare_submission(self):
@@ -200,7 +203,7 @@ class HubWorkflowTests(TestCase):
         self.assertEqual(response.status_code,201,response.data)
         reg=Registration.objects.get(pk=response.data['id'])
         self.assertEqual(reg.status,'iu_processing');self.assertEqual(reg.fee_amount_vnd,1000000)
-        self.assertEqual(reg.events.get().event_type,'SUBMITTED');self.assertEqual(reg.evidences.count(),1)
+        self.assertEqual(reg.events.get().event_type,'SUBMITTED');self.assertEqual(reg.evidences.count(),0)
         self.assertTrue(reg.payment_receipt_image.name.endswith('.png'))
         self.assertTrue(reg.payment_receipt_image.name.startswith('insurance_private/'))
         response=self.client.post(url,self.submission_data(key),format='multipart')
@@ -210,9 +213,15 @@ class HubWorkflowTests(TestCase):
         response=self.client.post(url,self.submission_data(uuid4().hex),format='multipart')
         self.assertEqual(response.status_code,409)
 
+    def test_new_submission_requires_all_four_images(self):
+        self.prepare_submission();data=self.submission_data(uuid4().hex);data.pop('bhyt_image')
+        response=self.client.post(reverse('api_health_insurance_registrations'),data,format='multipart')
+        self.assertEqual(response.status_code,400,response.data)
+        self.assertIn('bhyt_image',response.data)
+
     def test_new_submission_failure_rolls_back_files_and_row(self):
         self.prepare_submission()
-        with patch('core.api.views.link_initial_receipt',side_effect=RuntimeError('evidence failure')):
+        with patch('core.api.views.append_event',side_effect=RuntimeError('event failure')):
             with self.assertRaises(RuntimeError):
                 self.client.post(reverse('api_health_insurance_registrations'),self.submission_data(uuid4().hex),format='multipart')
         self.assertEqual(Registration.objects.count(),1)

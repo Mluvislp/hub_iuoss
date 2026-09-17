@@ -63,13 +63,18 @@ def timeline(reg, evidence_url):
     items = []
     for event in reg.events.select_related('assessment').prefetch_related('evidences').order_by('event_no'):
         a = getattr(event, 'assessment', None)
+        # Các ảnh ban đầu đã nằm trong bốn cột của registration. Timeline chỉ
+        # hiển thị ảnh thanh toán tải thêm sau khi đơn bị từ chối vì tiền.
+        evidences = event.evidences.all() if event.event_type == 'PAYMENT_EVIDENCE_SUBMITTED' else []
+        from_status = event.from_status if event.from_status != event.to_status else None
+        to_status = event.to_status if event.from_status != event.to_status else None
         items.append(dict(id=event.pk, event_no=event.event_no, event_type=event.event_type,
             label=EVENT_LABELS.get(event.event_type, event.event_type), created_at=event.created_at,
             actor_type=event.actor_type, actor_id=event.actor_id, source_app=event.source_app,
-            from_status=event.from_status, to_status=event.to_status,
+            from_status=from_status, to_status=to_status,
             reason_code=event.reason_code, reason_label=REASONS.get(event.reason_code, ''),
             reason_text=event.reason_text, payload={k: v for k, v in (event.payload or {}).items() if k != 'request_digest'},
             assessment=({k: getattr(a, k) for k in ('required_amount_vnd', 'confirmed_paid_total_vnd', 'missing_amount_vnd', 'note')} if a else None),
             evidences=[dict(id=e.pk, filename=e.original_filename, url=evidence_url(e),
-                            mime_type=e.mime_type, file_size_bytes=e.file_size_bytes) for e in event.evidences.all()]))
+                            mime_type=e.mime_type, file_size_bytes=e.file_size_bytes) for e in evidences]))
     return items

@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 from django.conf import settings
 from PIL import Image, UnidentifiedImageError
-from .insurance_contract import WorkflowError, safe_path
+from .insurance_contract import WorkflowError
 from .models import InsuranceEvidence
 
 MAX_BYTES = 5 * 1024 * 1024
@@ -40,15 +40,4 @@ def store_evidence(reg, event, upload, checked, written):
         stream.write(data)
     return InsuranceEvidence.objects.create(registration=reg, event=event, storage_key=key,
         original_filename=Path(upload.name.replace('\\', '/')).name[:255],
-        mime_type=mime, file_size_bytes=len(data), sha256=digest)
-
-
-def link_initial_receipt(reg, event, original_filename=None):
-    path = safe_path(settings.MEDIA_ROOT, str(reg.payment_receipt_image))
-    if path is None:
-        raise WorkflowError('Không thể đọc biên lai vừa lưu.')
-    with path.open('rb') as f:
-        data, ext, mime, digest = inspect_upload(f)
-    InsuranceEvidence.objects.create(registration=reg, event=event,
-        storage_key=str(reg.payment_receipt_image), original_filename=Path((original_filename or path.name).replace('\\', '/')).name[:255],
         mime_type=mime, file_size_bytes=len(data), sha256=digest)
