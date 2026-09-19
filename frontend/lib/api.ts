@@ -5,6 +5,9 @@ import type {
   DashboardData,
   HealthInsuranceData,
   ConfirmationRequest,
+  ConfirmationRequestDetail,
+  RequestComment,
+  RequestStatus,
   RequestType,
   OtherRequestFormData,
   DefermentFormData,
@@ -158,6 +161,19 @@ export const api = {
   requests: {
     list(): Promise<ConfirmationRequest[]> {
       return request('/requests/');
+    },
+    detail(id: number): Promise<ConfirmationRequestDetail> {
+      return request(`/requests/${id}/`);
+    },
+    addComment(id: number, body: string): Promise<{
+      comment: RequestComment;
+      status: RequestStatus;
+      student_can_comment: boolean;
+    }> {
+      return request(`/requests/${id}/comments/`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      });
     },
     create(data: {
       request_type: RequestType;
