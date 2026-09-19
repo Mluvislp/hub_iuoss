@@ -45,6 +45,7 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class HealthInsuranceCardSerializer(serializers.ModelSerializer):
+    registration_type_code = serializers.CharField(source="registration_type.code", read_only=True, default=None)
     # Phẳng hoá diện đăng ký: SV chỉ cần cái tên, không cần cả object danh mục.
     registration_type = serializers.CharField(
         source="registration_type.name", read_only=True, default=None,
@@ -60,6 +61,7 @@ class HealthInsuranceCardSerializer(serializers.ModelSerializer):
             "hospital_code",
             "hospital_name",
             "registration_type",
+            "registration_type_code",
             "registration_year",
             "valid_from",
             "valid_until",

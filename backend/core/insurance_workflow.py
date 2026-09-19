@@ -37,7 +37,7 @@ def supplement(pk, student_id, *, key, row_version, uploads=(), hospital_code=''
             if code == 'HOSPITAL_NOT_ACCEPTED':
                 if uploads:
                     raise WorkflowError('Hãy điều chỉnh bệnh viện theo yêu cầu.')
-                if not VnProvince.objects.filter(code=province_code, is_active=True).exists():
+                if province_code not in {'79', '75'} or not VnProvince.objects.filter(code=province_code, is_active=True).exists():
                     raise WorkflowError('Tỉnh/thành phố không hợp lệ hoặc không còn được phép chọn.')
                 if hospital_code == reg.hospital_code or not Hospital.objects.filter(
                         code=hospital_code, province_code=province_code, is_active=True).exists():

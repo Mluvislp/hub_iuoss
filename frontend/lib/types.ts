@@ -48,6 +48,7 @@ export interface HealthInsuranceCard {
   hospital_name: string | null;
   /** Tên diện đăng ký (đã phẳng hoá từ danh mục). */
   registration_type: string | null;
+  registration_type_code: string | null;
   registration_year: number | null;
   valid_from: string | null;
   valid_until: string | null;
@@ -394,6 +395,7 @@ export interface InsuranceTimelineItem {
   payload:{before?:HospitalSnapshot; after?:HospitalSnapshot};
 }
 export interface InsuranceDetail {
+  hospital_code: string;
   id:number; status:string; row_version:number; reason_code:string|null; reason_label:string; reason_text:string|null;
   timeline:InsuranceTimelineItem[];
   payment:(InsuranceAssessment & {qr_url:string|null; bank_name:string; bank_account_number:string; bank_account_name:string; reference:string})|null;

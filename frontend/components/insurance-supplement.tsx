@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Building2, Clock3, FileClock, ImageIcon, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import SearchableSelect from '@/components/searchable-select';
+import { InsuranceStatus } from '@/components/insurance-status';
+import { ui } from '@/lib/ui';
 import { api } from '@/lib/api';
 import type { InsuranceDetail, InsuranceEvidence, Province } from '@/lib/types';
 
 const money = (value: number) => value.toLocaleString('vi-VN') + ' VNĐ';
-const statusNames: Record<string, string> = {iu_processing:'ĐHQT xử lý', waiting_bhxh:'Chờ BHXH xử lý', issued:'Phát hành', rejected:'Từ chối'};
 
 function EvidenceImage({ evidence }: { evidence: InsuranceEvidence }) {
   const [url, setUrl] = useState('');
@@ -42,7 +45,14 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
   const [hospital, setHospital] = useState('');
   const [hospitals, setHospitals] = useState<{code:string; name:string}[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [hospitalsLoading, setHospitalsLoading] = useState(false);
   const pending = useRef<FormData | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = overflow; };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -52,13 +62,16 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
   }, [open, id]);
   useEffect(() => {
     if (editing && data?.reason_code === 'HOSPITAL_NOT_ACCEPTED')
-      api.locations.provinces().then(setProvinces).catch(e => setError(e.message));
+      api.locations.provinces().then(items => setProvinces(items.filter(p => ['79', '75'].includes(p.code)))).catch(e => setError(e.message));
   }, [editing, data?.reason_code]);
   useEffect(() => {
     setHospital(''); setHospitals([]);
-    if (!province) return;
+    if (!province) { setHospitalsLoading(false); return; }
+    setHospitalsLoading(true);
     let active = true;
-    api.hospitals.byProvince(province).then(h => { if (active) setHospitals(h); }).catch(e => setError(e.message));
+    api.hospitals.byProvince(province).then(h => { if (active) setHospitals(h); })
+      .catch(e => { if (active) setError(e.message); })
+      .finally(() => { if (active) setHospitalsLoading(false); });
     return () => { active = false; };
   }, [province]);
 
@@ -88,32 +101,42 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
   return <>
     <button className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
       onClick={() => { setOpen(true); setError(''); }}><FileClock className="h-4 w-4" />Chi tiết / bổ sung</button>
-    {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Chi tiết đơn BHYT">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-slate-50 text-left shadow-2xl ring-1 ring-black/5">
+    {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Chi tiết đơn BHYT">
+      <div className="max-h-[calc(100dvh-1.5rem)] min-w-0 w-full max-w-4xl overflow-x-hidden overflow-y-auto overscroll-contain whitespace-normal break-words sm:max-h-[calc(100dvh-3rem)] rounded-2xl bg-slate-50 text-left shadow-2xl ring-1 ring-black/5">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
           <div><p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Hồ sơ bảo hiểm y tế</p><h2 className="mt-0.5 text-lg font-bold text-slate-900">Đơn BHYT #{id}</h2></div>
           <button aria-label="Đóng" className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" disabled={busy} onClick={() => { setOpen(false); setEditing(false); }}><X className="h-5 w-5" /></button></div>
-        <div className="px-5 py-5 sm:px-7">
+        <div className="px-3 py-4 sm:px-7 sm:py-5">
         {error && <p role="alert" className="my-3 text-red-700">{error} <button className="underline" onClick={async () => {
           pending.current = null; setData(await api.insuranceRegistration.detail(id)); setError('');
         }}>Tải lại đơn</button></p>}
         {!data ? <p>Đang tải…</p> : <>
-          <div className="mb-5 flex items-center gap-2"><span className="text-sm text-slate-500">Trạng thái hiện tại</span><span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">{statusNames[data.status] || data.status}</span></div>
+          <div className="mb-5 flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">Trạng thái hiện tại</span><InsuranceStatus status={data.status} /></div>
           {rejected && <section className="rounded-lg border border-red-200 bg-red-50 p-4">
             <p className="font-semibold">{data.reason_label}</p><p className="whitespace-pre-wrap">{data.reason_text}</p>
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' || paymentReason ?
-              <button className="mt-3 rounded border bg-white px-3 py-2" onClick={() => setEditing(true)}>
+              <button className={ui.btnOutline + " mt-3"} onClick={() => setEditing(true)}>
                 {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
               : <p className="mt-2">Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
           </section>}
           {rejected && editing && <section className="my-4 space-y-3 rounded-lg border p-4">
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? <>
-              <label className="block">Tỉnh/Thành phố<select className="mt-1 block w-full rounded border p-2" value={province}
-                onChange={e => { setProvince(e.target.value); pending.current = null; }}><option value="">Chọn tỉnh/thành</option>
-                {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}</select></label>
-              <label className="block">Bệnh viện<select className="mt-1 block w-full rounded border p-2" value={hospital}
-                onChange={e => { setHospital(e.target.value); pending.current = null; }}><option value="">Chọn bệnh viện</option>
-                {hospitals.map(h => <option key={h.code} value={h.code}>{h.name} — {h.code}</option>)}</select></label>
+              <div className="space-y-2">
+                <label className={ui.fieldLabel} htmlFor={'supplement-province-' + id}>Tỉnh/Thành phố</label>
+                <SearchableSelect id={'supplement-province-' + id} value={province}
+                  onChange={value => { setProvince(value); setHospital(''); setHospitals([]); pending.current = null; }}
+                  options={provinces.map(p => ({value: p.code, label: p.code === '79' ? 'Thành phố Hồ Chí Minh' : 'Đồng Nai'}))}
+                  placeholder="-- Chọn tỉnh thành --" searchPlaceholder="Gõ tên tỉnh thành..." />
+              </div>
+              <div className="space-y-2">
+                <label className={ui.fieldLabel} htmlFor={'supplement-hospital-' + id}>Bệnh viện</label>
+                <SearchableSelect id={'supplement-hospital-' + id} value={hospital}
+                  onChange={value => { setHospital(value); pending.current = null; }}
+                  options={hospitals.filter(h => h.code !== data.hospital_code).map(h => ({value: h.code, label: h.name, hint: h.code}))}
+                  disabled={!province || hospitalsLoading}
+                  placeholder={!province ? '-- Chọn tỉnh thành trước --' : hospitalsLoading ? 'Đang tải danh sách...' : '-- Chọn bệnh viện KCB --'}
+                  searchPlaceholder="Gõ tên hoặc mã cơ sở..." emptyText="Không có cơ sở nào khớp" />
+              </div>
             </> : <>
               {data.payment ? <>
                 <p>Phí gốc: {money(data.payment.required_amount_vnd)}</p>
@@ -121,19 +144,19 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                 <p className="font-semibold">Cần đóng bổ sung: {money(data.payment.missing_amount_vnd)}</p>
                 {data.payment.missing_amount_vnd === 0 ? <p>Không cần chuyển thêm tiền.</p> : data.payment.qr_url ? <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={data.payment.qr_url} alt="QR chuyển khoản số tiền còn thiếu" className="w-64" />
+                  <img src={data.payment.qr_url} alt="QR chuyển khoản số tiền còn thiếu" className="w-64 max-w-full" />
                   <p>{data.payment.bank_name} · {data.payment.bank_account_number} · {data.payment.bank_account_name}</p>
                   <p>Nội dung: {data.payment.reference}</p>
                 </> : <p>Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
               </> : <p>Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
               <label className="block">Ảnh minh chứng bổ sung (tối đa 8 ảnh, 5 MB/ảnh)
-                <input className="mt-2 block" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
+                <input className="mt-2 block w-full min-w-0 max-w-full text-sm" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
                   setFiles(Array.from(e.target.files || [])); pending.current = null;
                 }} /></label><p>{files.map(f => f.name).join(', ')}</p>
               <p className="text-sm text-slate-600">Ảnh gửi lên chưa đồng nghĩa tiền đã được xác nhận. Các ảnh cũ được giữ nguyên.</p>
             </>}
-            <button disabled={busy || (data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? !hospital : !files.length)}
-              className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50" onClick={submit}>
+            <button disabled={busy || hospitalsLoading || (data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? !hospital : !files.length)}
+              className={ui.btnPrimary + " w-full whitespace-normal sm:w-auto disabled:opacity-50"} onClick={submit}>
               {busy ? 'Đang gửi…' : data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? 'Lưu và gửi lại' : 'Gửi minh chứng bổ sung và gửi lại'}</button>
           </section>}
           <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -144,7 +167,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
               <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-4 border-white bg-blue-500 shadow-sm sm:-left-[39px]" />
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-slate-900">{e.label}</p><p className="mt-1 text-xs text-slate-500">Bước {index + 1} · {actorName(e.source_app)}</p></div><time className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{new Date(e.created_at).toLocaleString('vi-VN')}</time></div>
-                {e.from_status && e.to_status && e.from_status !== e.to_status && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{statusNames[e.from_status] || e.from_status}</span><ArrowRight className="h-4 w-4 text-slate-400" /><span className="rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">{statusNames[e.to_status] || e.to_status}</span></div>}
+                {e.from_status && e.to_status && e.from_status !== e.to_status && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><InsuranceStatus status={e.from_status} /><ArrowRight className="h-4 w-4 text-slate-400" /><InsuranceStatus status={e.to_status} /></div>}
                 {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="font-semibold">{e.reason_label}</span>{e.reason_text && <span>: {e.reason_text}</span>}</div>}
                 {e.assessment && <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-2.5"><span className="block text-xs text-slate-500">Phí phải đóng</span><b>{money(e.assessment.required_amount_vnd)}</b></div><div className="rounded-lg bg-emerald-50 p-2.5"><span className="block text-xs text-emerald-700">Đã xác nhận</span><b>{money(e.assessment.confirmed_paid_total_vnd)}</b></div><div className="rounded-lg bg-amber-50 p-2.5"><span className="block text-xs text-amber-700">Còn thiếu</span><b>{money(e.assessment.missing_amount_vnd)}</b></div></div>}
                 {e.payload.before && e.payload.after && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name} · {e.payload.before.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-blue-700">{e.payload.after.hospital_name} · {e.payload.after.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
@@ -156,6 +179,6 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
         </>}
         </div>
       </div>
-    </div>}
+    </div>, document.body)}
   </>;
 }

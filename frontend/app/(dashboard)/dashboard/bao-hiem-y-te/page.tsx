@@ -1,5 +1,6 @@
 'use client';
 
+import { InsuranceStatus } from '@/components/insurance-status';
 import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -62,6 +63,10 @@ function periodText(card: HealthInsuranceCard): string {
   return `${formatDate(card.valid_from)} — ${formatDate(card.valid_until)}`;
 }
 
+function outsideSchool(card: HealthInsuranceCard): boolean {
+  return !!card.registration_type_code && card.registration_type_code !== 'DHQT';
+}
+
 export default function HealthInsurancePage() {
   const [data, setData] = useState<HealthInsuranceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +114,9 @@ export default function HealthInsurancePage() {
 
         {current ? (
           <div className="px-5 py-5">
+            {outsideSchool(current) && <p className="mb-4 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+              SV đăng ký không tham gia BHYT tại trường · Năm tham gia: {current.registration_year || 'Chưa cập nhật'} · {current.registration_type}
+            </p>}
             {/* Mã thẻ là thứ SV cần nhất khi đi khám → cho nổi lên trên cùng. */}
             <div className="rounded-lg border border-primary-line bg-[#f5f9ff] px-5 py-4">
               <div className={ui.label}>Mã thẻ BHYT</div>
@@ -183,8 +191,11 @@ export default function HealthInsurancePage() {
                     key={card.id}
                     className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
                   >
-                    <td className="px-5 py-3 font-mono text-[0.82rem] text-ink whitespace-nowrap">
+                    <td className="px-5 py-3 text-[0.82rem] text-ink">
                       {card.medical_insurance_code || '—'}
+                      {outsideSchool(card) && <p className="mt-1 min-w-[140px] text-xs text-slate-500">
+                        SV đăng ký không tham gia BHYT tại trường · Năm {card.registration_year || 'Chưa cập nhật'} · {card.registration_type}
+                      </p>}
                     </td>
                     <td className="px-3 py-3 text-slate-600 hidden sm:table-cell max-w-[220px]">
                       <span
@@ -243,10 +254,7 @@ export default function HealthInsurancePage() {
                     </td>
                     <td className="px-5 py-3 text-[0.82rem] text-slate-600">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3">
-                      {reg.status === 'iu_processing' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-slate-100 text-slate-600">ĐHQT xử lý</span>}
-                      {reg.status === 'waiting_bhxh' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-primary-soft text-primary-text">Chờ BHXH xử lý</span>}
-                      {reg.status === 'issued' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-success-soft text-success-text">Phát hành</span>}
-                      {reg.status === 'rejected' && <span className="inline-flex px-2 py-0.5 rounded text-[0.75rem] font-medium bg-danger-soft text-danger-text">Từ chối</span>}
+                      <InsuranceStatus status={reg.status} />
                     </td>
                     <td className="px-5 py-3 text-[0.82rem] text-slate-600">{reg.rejection_reason || '—'}<div className="mt-2"><InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} /></div></td>
                   </tr>

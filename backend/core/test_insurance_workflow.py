@@ -78,6 +78,16 @@ class HubWorkflowTests(TestCase):
         with self.assertRaises(WorkflowError): self.submit(hospital_code='wrong',province_code='79')
         self.assertFalse(self.reg.events.exists())
 
+    def test_hospital_outside_allowed_provinces_cannot_resubmit(self):
+        VnProvince.objects.create(code='01', name='Hà Nội', unit_type='Thành phố')
+        Hospital.objects.create(code='01001', name='Bệnh viện khác', province_code='01',
+                                created_at=timezone.now(), updated_at=timezone.now())
+        self.reg.rejection_reason_code = 'HOSPITAL_NOT_ACCEPTED'
+        self.reg.save()
+        with self.assertRaises(WorkflowError):
+            self.submit(hospital_code='01001', province_code='01')
+        self.assertFalse(self.reg.events.exists())
+
     def test_replay_upload_does_not_duplicate(self):
         key=uuid4().hex
         self.submit(key=key,uploads=[picture()]);self.submit(key=key,uploads=[picture()])

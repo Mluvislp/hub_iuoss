@@ -59,7 +59,7 @@ Giao diện hoàn thiện trong code (chưa chụp/kiểm tra trình duyệt đ�
 4. Kiểm tra duplicate, orphan, nhiều thẻ current, done chưa liên kết thẻ, snapshot/ảnh thiếu, trạng thái lạ. Không sửa/xóa các đơn trùng hoặc tự tạo thẻ cho done thiếu thẻ trong backfill.
 5. Mapping được code cũ chứng minh: pending/processing → iu_processing; done → issued; rejected giữ nguyên. Nếu kiểm kê cho thấy ý nghĩa khác, chưa dùng `--map-statuses`, ghi lại các ID và xử lý nghiệp vụ riêng.
 6. Kiểm tra dung lượng, metadata locks, replica lag, thời gian DDL trên staging. Không giả định ALTER không khóa.
-7. Đối chiếu danh mục ưu tiên: code chỉ ghi nhận có `DHQT_UT_SV`, chưa chứng minh đây là diện đúng theo phản hồi BHXH thực tế. IT xác minh rồi đặt `INSURANCE_PRIORITY_TYPE_CODE=<mã đã xác minh>` ở Dashboard. Khi chưa cấu hình, chức năng ưu tiên bị chặn. Không tự seed một loại mới hoặc đổi nghĩa loại cũ.
+7. Đối chiếu danh mục phát hành: Dashboard cho chọn mọi dòng `is_active=1` trong `student_health_insurance_registration_types` và ghi loại đã chọn vào thẻ. IT chỉ đặt `INSURANCE_PRIORITY_TYPE_CODE=<mã đã xác minh>` để đánh dấu loại ưu tiên không sao chép thông tin diện trường. Không tự seed một loại mới hoặc đổi nghĩa loại cũ.
 
 ### 2. Expand schema
 
