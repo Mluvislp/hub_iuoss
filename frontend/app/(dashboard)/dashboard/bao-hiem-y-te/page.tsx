@@ -244,7 +244,7 @@ export default function HealthInsurancePage() {
                   <th className="px-5 py-3 w-[20%]">Mã đợt</th>
                   <th className="px-5 py-3 w-[25%]">Ngày đăng ký</th>
                   <th className="px-5 py-3 w-[25%]">Trạng thái</th>
-                  <th className="px-5 py-3">Ghi chú phản hồi</th>
+                  <th className="px-5 py-3">Phản hồi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

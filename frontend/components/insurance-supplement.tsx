@@ -1,15 +1,31 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Building2, Clock3, FileClock, ImageIcon, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Building2, Check, CheckSquare, Clock3, Copy, CreditCard, FileClock, ImageIcon, Plus, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import QRCode from 'react-qr-code';
 import SearchableSelect from '@/components/searchable-select';
 import { InsuranceStatus } from '@/components/insurance-status';
 import { ui } from '@/lib/ui';
 import { api } from '@/lib/api';
+import { buildVietQrPayload, findBank } from '@/lib/vietqr';
 import type { InsuranceDetail, InsuranceEvidence, Province } from '@/lib/types';
 
 const money = (value: number) => value.toLocaleString('vi-VN') + ' VNĐ';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+    onClick={async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch { /* Người dùng vẫn có thể chọn và sao chép thủ công. */ }
+    }}>
+    {copied ? <><Check className="h-3 w-3" />Đã chép</> : <><Copy className="h-3 w-3" />Chép</>}
+  </button>;
+}
 
 function EvidenceImage({ evidence }: { evidence: InsuranceEvidence }) {
   const [url, setUrl] = useState('');
@@ -98,6 +114,17 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
 
   const rejected = data?.status === 'rejected';
   const paymentReason = data?.reason_code === 'UNPAID' || data?.reason_code === 'UNDERPAID';
+  const paymentQr = useMemo(() => {
+    const payment = data?.payment;
+    const bankBin = findBank(payment?.bank_name)?.bin;
+    if (!payment || !bankBin || payment.missing_amount_vnd <= 0) return null;
+    return buildVietQrPayload({
+      bin: bankBin,
+      accountNumber: payment.bank_account_number,
+      amount: payment.missing_amount_vnd,
+      addInfo: payment.reference,
+    });
+  }, [data?.payment]);
   return <>
     <button className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
       onClick={() => { setOpen(true); setError(''); }}><FileClock className="h-4 w-4" />Chi tiết</button>
@@ -139,21 +166,62 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
               </div>
             </> : <>
               {data.payment ? <>
-                <p>Phí gốc: {money(data.payment.required_amount_vnd)}</p>
-                <p>Tổng tiền đã được cán bộ xác nhận: {money(data.payment.confirmed_paid_total_vnd)}</p>
-                <p className="font-semibold">Cần đóng bổ sung: {money(data.payment.missing_amount_vnd)}</p>
-                {data.payment.missing_amount_vnd === 0 ? <p>Không cần chuyển thêm tiền.</p> : data.payment.qr_url ? <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={data.payment.qr_url} alt="QR chuyển khoản số tiền còn thiếu" className="w-64 max-w-full" />
-                  <p>{data.payment.bank_name} · {data.payment.bank_account_number} · {data.payment.bank_account_name}</p>
-                  <p>Nội dung: {data.payment.reference}</p>
-                </> : <p>Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-line bg-slate-50 p-3.5">
+                    <span className="text-xs font-medium text-muted">Số tiền phải đóng</span>
+                    <p className="mt-1 text-lg font-bold text-ink">{money(data.payment.required_amount_vnd)}</p>
+                  </div>
+                  <div className="rounded-lg border border-success-line bg-success-soft p-3.5">
+                    <span className="text-xs font-medium text-success-text">Số tiền đã xác nhận</span>
+                    <p className="mt-1 text-lg font-bold text-success-text">{money(data.payment.confirmed_paid_total_vnd)}</p>
+                  </div>
+                  <div className="rounded-lg border border-warning-line bg-warning-soft p-3.5">
+                    <span className="text-xs font-medium text-warning-text">Số tiền còn thiếu</span>
+                    <p className="mt-1 text-lg font-bold text-warning-text">{money(data.payment.missing_amount_vnd)}</p>
+                  </div>
+                </div>
+
+                {data.payment.missing_amount_vnd === 0 ? <p className="rounded-lg border border-success-line bg-success-soft p-3 text-sm font-medium text-success-text">Bạn không cần chuyển thêm tiền.</p> :
+                  data.payment.bank_account_number ? <div className="flex flex-col items-start gap-6 rounded-lg border border-line bg-slate-50 p-4 md:flex-row">
+                    <div className="mx-auto shrink-0 text-center md:mx-0">
+                      {paymentQr ? <>
+                        <div className="rounded-lg border border-line bg-white p-3">
+                          <QRCode value={paymentQr} size={148} level="M" style={{ height: 148, width: 148 }} />
+                        </div>
+                        <p className="mt-2 text-xs text-muted">Quét bằng app ngân hàng bất kỳ</p>
+                      </> : <div className="flex h-[174px] w-[174px] items-center justify-center rounded-lg border border-dashed border-line bg-white px-4 text-center text-xs text-muted">Chưa tạo được mã QR. Vui lòng chuyển khoản thủ công.</div>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="mb-2 font-semibold text-ink">Thông tin chuyển khoản</h3>
+                      <ul className="space-y-1.5 text-sm text-slate-600">
+                        <li>Ngân hàng: <strong className="text-ink">{data.payment.bank_name || '—'}</strong></li>
+                        <li className="flex flex-wrap items-center gap-x-2"><span>Số tài khoản: <strong className="font-mono text-ink">{data.payment.bank_account_number}</strong></span><CopyButton text={data.payment.bank_account_number} /></li>
+                        <li>Chủ tài khoản: <strong className="text-ink">{data.payment.bank_account_name || '—'}</strong></li>
+                        <li>Số tiền: <strong className="text-base text-primary">{money(data.payment.missing_amount_vnd)}</strong></li>
+                        <li className="flex flex-wrap items-center gap-x-2"><span>Nội dung: <strong className="break-all text-ink">{data.payment.reference}</strong></span><CopyButton text={data.payment.reference} /></li>
+                      </ul>
+                      <p className="mt-3 text-xs text-muted">Mã QR đã gồm sẵn số tài khoản, số tiền còn thiếu và nội dung chuyển khoản.</p>
+                    </div>
+                  </div> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
               </> : <p>Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
-              <label className="block">Ảnh minh chứng bổ sung (tối đa 8 ảnh, 5 MB/ảnh)
-                <input className="mt-2 block w-full min-w-0 max-w-full text-sm" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
-                  setFiles(Array.from(e.target.files || [])); pending.current = null;
-                }} /></label><p>{files.map(f => f.name).join(', ')}</p>
-              <p className="text-sm text-slate-600">Ảnh gửi lên chưa đồng nghĩa tiền đã được xác nhận. Các ảnh cũ được giữ nguyên.</p>
+
+              <div>
+                <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 8 ảnh, 5 MB/ảnh)</span></label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
+                  <input className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
+                    setFiles(Array.from(e.target.files || [])); pending.current = null;
+                  }} />
+                  <div className="flex min-w-0 flex-col items-center gap-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 transition-transform group-hover:scale-110">
+                      {files.length ? <CheckSquare size={20} /> : <Plus size={20} />}
+                    </div>
+                    <span className="max-w-full break-all text-sm font-medium text-slate-700">{files.length ? `${files.length} ảnh đã chọn` : 'Tải lên minh chứng chuyển khoản'}</span>
+                    <span className="text-xs text-slate-500">JPEG, PNG hoặc WEBP · Tối đa 5MB/ảnh</span>
+                  </div>
+                </div>
+                {!!files.length && <div className="mt-2 flex flex-wrap gap-1.5">{files.map(file => <span key={file.name + file.lastModified} className="max-w-full truncate rounded-md border border-line bg-white px-2 py-1 text-xs text-muted">{file.name}</span>)}</div>}
+              </div>
+              <p className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><CreditCard className="mt-0.5 h-4 w-4 shrink-0" />Ảnh gửi lên chưa đồng nghĩa tiền đã được xác nhận. Các ảnh cũ được giữ nguyên.</p>
             </>}
             <button disabled={busy || hospitalsLoading || (data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? !hospital : !files.length)}
               className={ui.btnPrimary + " w-full whitespace-normal sm:w-auto disabled:opacity-50"} onClick={submit}>
