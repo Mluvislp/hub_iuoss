@@ -118,7 +118,11 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href;
+                  // Sáng cho cả route con — trước đây so khớp tuyệt đối nên vào
+                  // trang chi tiết là menu tắt hết, không biết mình đang ở đâu.
+                  const isActive = item.href === '/dashboard'
+                    ? pathname === item.href
+                    : pathname === item.href || pathname.startsWith(item.href + '/');
                   // Chỉ đánh dấu cái BẤT THƯỜNG: tính năng chưa mở mới có chấm.
                   const pending = !!item.feature && !features[item.feature];
 
