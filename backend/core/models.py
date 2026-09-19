@@ -86,6 +86,9 @@ class ConfirmationRequestComment(models.Model):
     author_user_id = models.BigIntegerField(null=True, blank=True)
     author_name = models.CharField(max_length=255)
     body = models.TextField()
+    # Hai cờ do Dashboard đặt; Hub chỉ ĐỌC và luôn lọc bỏ khi trả cho sinh viên.
+    is_internal = models.BooleanField(default=False)
+    is_removed = models.BooleanField(default=False)
     event = models.CharField(max_length=32, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -96,6 +99,11 @@ class ConfirmationRequestComment(models.Model):
 
     def __str__(self):
         return f"#{self.request_id} {self.author_role}: {self.body[:40]}"
+
+    @classmethod
+    def visible_qs(cls):
+        """Chỉ những lượt sinh viên được thấy — dùng ở MỌI chỗ prefetch."""
+        return cls.objects.filter(is_internal=False, is_removed=False)
 
 
 class HubStudent(models.Model):

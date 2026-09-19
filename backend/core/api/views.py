@@ -1,6 +1,7 @@
 import logging
 from django.conf import settings
 from django.db import connection
+from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
@@ -444,7 +445,8 @@ class DashboardView(APIView):
                     civic_activities = list(CivicActivity.objects.filter(student=student))
 
         confirmation_requests = (
-            list(ConfirmationRequest.objects.filter(ldap_uid=ldap_uid).prefetch_related("comments")[:10])
+            list(ConfirmationRequest.objects.filter(ldap_uid=ldap_uid)
+                 .prefetch_related(_visible_comments())[:10])
             if settings.FEATURE_DOCUMENT_REQUESTS else []
         )
 
@@ -754,7 +756,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
     def get(self, request):
         qs = (ConfirmationRequest.objects
               .filter(ldap_uid=request.user.ldap_uid)
-              .prefetch_related("comments"))
+              .prefetch_related(_visible_comments()))
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
@@ -1009,6 +1011,15 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
 
+def _visible_comments():
+    """Prefetch chỉ những lượt sinh viên được thấy.
+
+    Lọc Ở ĐÂY chứ không ở serializer: `comment_count` đếm trên cùng danh sách đã
+    prefetch nên đếm và hiển thị không thể lệch nhau.
+    """
+    return Prefetch("comments", queryset=ConfirmationRequestComment.visible_qs())
+
+
 class _OwnRequestMixin(DocumentRequestsRequiredMixin):
     """Lấy yêu cầu THEO CHỦ SỞ HỮU.
 
@@ -1021,7 +1032,7 @@ class _OwnRequestMixin(DocumentRequestsRequiredMixin):
     def get_own_request(self, request, pk):
         return (ConfirmationRequest.objects
                 .filter(pk=pk, ldap_uid=request.user.ldap_uid)
-                .prefetch_related("comments")
+                .prefetch_related(_visible_comments())
                 .first())
 
 
