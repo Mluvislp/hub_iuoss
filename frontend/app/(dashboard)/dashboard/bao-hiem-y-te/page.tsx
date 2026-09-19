@@ -67,6 +67,10 @@ function outsideSchool(card: HealthInsuranceCard): boolean {
   return !!card.registration_type_code && card.registration_type_code !== 'DHQT';
 }
 
+function hideHistoricalCardDetails(card: HealthInsuranceCard): boolean {
+  return !!card.registration_type_code && !['DHQT', 'KTX_DHQG'].includes(card.registration_type_code);
+}
+
 export default function HealthInsurancePage() {
   const [data, setData] = useState<HealthInsuranceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,18 +196,15 @@ export default function HealthInsurancePage() {
                     className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
                   >
                     <td className="px-5 py-3 text-[0.82rem] text-ink">
-                      {card.medical_insurance_code || '—'}
-                      {outsideSchool(card) && <p className="mt-1 min-w-[140px] text-xs text-slate-500">
-                        SV đăng ký không tham gia BHYT tại trường · Năm {card.registration_year || 'Chưa cập nhật'} · {card.registration_type}
-                      </p>}
+                      {hideHistoricalCardDetails(card) ? null : card.medical_insurance_code || '—'}
                     </td>
                     <td className="px-3 py-3 text-slate-600 hidden sm:table-cell max-w-[220px]">
-                      <span
+                      {!hideHistoricalCardDetails(card) && <span
                         className="line-clamp-2"
                         title={[card.hospital_name, card.hospital_code].filter(Boolean).join(' — ') || undefined}
                       >
                         {card.hospital_name || card.hospital_code || '—'}
-                      </span>
+                      </span>}
                     </td>
                     <td className="px-3 py-3 text-slate-600 hidden md:table-cell max-w-[220px]">
                       <span className="line-clamp-2" title={card.registration_type ?? undefined}>
@@ -217,7 +218,7 @@ export default function HealthInsurancePage() {
                         validityState(card.valid_until) === 'expired' ? 'text-slate-400' : 'text-muted',
                       )}
                     >
-                      {periodText(card) || '—'}
+                      {hideHistoricalCardDetails(card) ? null : periodText(card) || '—'}
                     </td>
                   </tr>
                 ))}
@@ -233,7 +234,7 @@ export default function HealthInsurancePage() {
           <div className={ui.cardHeader}>
             <h2 className={ui.sectionTitle}>
               <History size={16} className={accentIcon.primary} />
-              Lịch sử ghi danh mua thẻ/gia hạn
+              Lịch sử đăng ký BHYT
             </h2>
           </div>
           <div className="overflow-x-auto">
@@ -256,7 +257,7 @@ export default function HealthInsurancePage() {
                     <td className="px-5 py-3">
                       <InsuranceStatus status={reg.status} />
                     </td>
-                    <td className="px-5 py-3 text-[0.82rem] text-slate-600">{reg.rejection_reason || '—'}<div className="mt-2"><InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} /></div></td>
+                    <td className="px-5 py-3 text-[0.82rem] text-slate-600"><InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} /></td>
                   </tr>
                 ))}
               </tbody>

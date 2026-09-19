@@ -100,7 +100,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
   const paymentReason = data?.reason_code === 'UNPAID' || data?.reason_code === 'UNDERPAID';
   return <>
     <button className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-      onClick={() => { setOpen(true); setError(''); }}><FileClock className="h-4 w-4" />Chi tiết / bổ sung</button>
+      onClick={() => { setOpen(true); setError(''); }}><FileClock className="h-4 w-4" />Chi tiết</button>
     {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Chi tiết đơn BHYT">
       <div className="max-h-[calc(100dvh-1.5rem)] min-w-0 w-full max-w-4xl overflow-x-hidden overflow-y-auto overscroll-contain whitespace-normal break-words sm:max-h-[calc(100dvh-3rem)] rounded-2xl bg-slate-50 text-left shadow-2xl ring-1 ring-black/5">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
