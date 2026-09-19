@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard,
+  FilePlus2,
   Home,
   LogOut,
   ShieldCheck,
@@ -53,7 +54,15 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Dịch vụ sinh viên',
     items: [
+      // Danh sách đứng TRƯỚC form tạo: vào đây phần lớn là để xem yêu cầu cũ
+      // chạy tới đâu, tạo mới là việc thỉnh thoảng.
       featureItem('document_requests'),
+      {
+        href: '/dashboard/requests/new',
+        icon: FilePlus2,
+        label: 'Tạo yêu cầu mới',
+        feature: 'document_requests',
+      },
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
     ],
   },
@@ -61,6 +70,14 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
 
 export default function Sidebar({ session, features, open, onClose }: SidebarProps) {
   const pathname = usePathname();
+
+  // Mục sáng = href khớp DÀI NHẤT với URL hiện tại. So khớp tuyệt đối thì vào
+  // trang con là menu tắt hết; so khớp tiền tố đơn thuần thì ở /requests/new sẽ
+  // sáng cả "Yêu cầu giấy tờ" lẫn "Tạo yêu cầu mới".
+  const activeHref = NAV_SECTIONS
+    .flatMap((section) => section.items.map((item) => item.href))
+    .filter((href) => pathname === href || pathname.startsWith(href + '/'))
+    .sort((a, b) => b.length - a.length)[0] ?? '';
   const router = useRouter();
 
   function handleLogout() {
@@ -118,11 +135,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  // Sáng cho cả route con — trước đây so khớp tuyệt đối nên vào
-                  // trang chi tiết là menu tắt hết, không biết mình đang ở đâu.
-                  const isActive = item.href === '/dashboard'
-                    ? pathname === item.href
-                    : pathname === item.href || pathname.startsWith(item.href + '/');
+                  const isActive = item.href === activeHref;
                   // Chỉ đánh dấu cái BẤT THƯỜNG: tính năng chưa mở mới có chấm.
                   const pending = !!item.feature && !features[item.feature];
 
