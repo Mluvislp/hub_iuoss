@@ -379,7 +379,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   pending: 'Chờ xử lý',
   processing: 'Đang xử lý',
-  awaiting_info: 'Cần em bổ sung thông tin',
+  awaiting_info: 'Chờ bổ sung thông tin',
   done: 'Hoàn thành',
   rejected: 'Từ chối',
 };

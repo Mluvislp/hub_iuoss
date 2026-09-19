@@ -68,9 +68,7 @@ function Bubble({ c }: { c: RequestComment }) {
         )}
       >
         <div className="mb-1 flex flex-wrap items-center gap-2">
-          <span className="text-[0.78rem] font-semibold text-ink">
-            {mine ? 'Em' : c.author_name}
-          </span>
+          <span className="text-[0.78rem] font-semibold text-ink">{c.author_name}</span>
           <span className={cn(badge.base, mine ? badge.info : badge.neutral, 'py-0')}>
             {mine ? 'Sinh viên' : 'Phòng CTSV'}
           </span>
@@ -135,7 +133,7 @@ export default function RequestDetailPage() {
           : prev,
       );
     } catch (err) {
-      setSendError(err instanceof ApiError ? err.message : 'Không gửi được, em thử lại.');
+      setSendError(err instanceof ApiError ? err.message : 'Không gửi được. Vui lòng thử lại.');
     } finally {
       setSending(false);
     }
@@ -200,14 +198,14 @@ export default function RequestDetailPage() {
             {data.portal_code}
           </p>
           <p className="mt-1.5 text-[0.82rem] text-primary-text/80">
-            Em trình mã này khi đến Phòng Công tác Sinh viên (O1.105) nhận giấy.
+            Xuất trình mã này khi đến nhận giấy tại Phòng Công tác Sinh viên (O1.105).
           </p>
         </section>
       )}
 
       <section className={ui.card}>
         <div className={ui.cardHeader}>
-          <h2 className={ui.sectionTitle}>Thông tin em đã gửi</h2>
+          <h2 className={ui.sectionTitle}>Thông tin đã gửi</h2>
         </div>
         <div className="px-5 py-2">
           <div className={ui.dtRow}>
@@ -244,7 +242,7 @@ export default function RequestDetailPage() {
           })}
           {data.note ? (
             <div className={ui.dtRow}>
-              <span className={ui.dtLabel}>Ghi chú của em</span>
+              <span className={ui.dtLabel}>Ghi chú của sinh viên</span>
               <span className={ui.dtValue}>{data.note}</span>
             </div>
           ) : null}
@@ -265,7 +263,7 @@ export default function RequestDetailPage() {
         <div className="max-h-[520px] space-y-2.5 overflow-y-auto px-5 py-4">
           {data.comments.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted">
-              Chưa có trao đổi nào. Em có thể nhắn cho Phòng CTSV nếu cần lưu ý điều gì về yêu cầu này.
+              Chưa có trao đổi.
             </p>
           ) : (
             data.comments.map((c) => <Bubble key={c.id} c={c} />)
@@ -289,8 +287,8 @@ export default function RequestDetailPage() {
                 className={ui.textarea}
                 placeholder={
                   data.status === 'awaiting_info'
-                    ? 'Trả lời nội dung Phòng CTSV yêu cầu bổ sung…'
-                    : 'Ví dụ: em cần giấy trước ngày 30/09 để kịp nộp cho địa phương.'
+                    ? 'Nội dung bổ sung theo yêu cầu…'
+                    : 'Nội dung cần lưu ý với Phòng Công tác Sinh viên…'
                 }
               />
               {sendError && (
@@ -312,8 +310,8 @@ export default function RequestDetailPage() {
           ) : (
             <p className="flex items-start gap-2 text-[0.85rem] text-muted">
               <Lock size={14} className="mt-0.5 shrink-0" />
-              Yêu cầu đang ở trạng thái “{REQUEST_STATUS_LABELS[data.status]}” nên em không gửi
-              thêm trao đổi được. Cần hỗ trợ, em liên hệ Phòng Công tác Sinh viên (O1.105).
+              Không gửi được trao đổi khi yêu cầu ở trạng thái “{REQUEST_STATUS_LABELS[data.status]}”.
+              Liên hệ Phòng Công tác Sinh viên (O1.105) nếu cần hỗ trợ.
             </p>
           )}
         </div>

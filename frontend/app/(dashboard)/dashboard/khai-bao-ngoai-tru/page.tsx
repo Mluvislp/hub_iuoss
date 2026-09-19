@@ -146,7 +146,7 @@ export default function OffCampusDeclarationPage() {
           </div>
           <h2 className="text-lg font-semibold text-ink">Đã ghi nhận khai báo</h2>
           <p className="text-sm text-muted mt-2">
-            Thông tin của bạn đã được cập nhật vào hồ sơ. Cần sửa lại thì gửi yêu cầu
+            Thông tin đã được cập nhật vào hồ sơ. Cần sửa lại thì gửi yêu cầu
             chỉnh sửa ở màn hình xem lại.
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
@@ -190,7 +190,7 @@ export default function OffCampusDeclarationPage() {
                 ? `Bạn đã gửi khai báo ngày ${new Date(form.declared_on).toLocaleDateString('vi-VN')}. `
                 : ''}
               Thông tin bên dưới đang được dùng làm hồ sơ chính thức. Nếu có thay đổi,
-              hãy gửi yêu cầu chỉnh sửa để phòng CTSV mở lại biểu mẫu cho bạn.
+              vui lòng gửi yêu cầu chỉnh sửa để Phòng Công tác Sinh viên mở lại biểu mẫu.
             </p>
           </div>
 

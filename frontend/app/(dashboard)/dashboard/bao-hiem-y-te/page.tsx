@@ -147,7 +147,7 @@ export default function HealthInsurancePage() {
           <div className="px-5 py-10 text-center">
             <p className="text-sm text-muted">Chưa có thông tin bảo hiểm y tế.</p>
             <p className="mt-1.5 text-[0.82rem] text-muted">
-              Nếu bạn đã tham gia BHYT tại trường, vui lòng liên hệ Phòng Công tác Sinh viên để được
+              Trường hợp đã tham gia BHYT tại trường, vui lòng liên hệ Phòng Công tác Sinh viên để được
               cập nhật.
             </p>
           </div>

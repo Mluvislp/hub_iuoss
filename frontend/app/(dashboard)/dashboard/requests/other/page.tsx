@@ -157,7 +157,7 @@ export default function OtherRequestPage() {
             <FileText size={17} className="text-primary" />
             Giấy xác nhận sinh viên (lý do khác)
           </h1>
-          <p className="text-sm text-muted mt-1">Thông tin dưới đây lấy từ hồ sơ của bạn. Kiểm tra, chỉnh sửa nếu cần rồi chọn mục đích.</p>
+          <p className="text-sm text-muted mt-1">Thông tin dưới đây lấy từ hồ sơ sinh viên. Kiểm tra, chỉnh sửa nếu cần rồi chọn mục đích.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
@@ -211,7 +211,7 @@ export default function OtherRequestPage() {
               Thông tin đã có trong hồ sơ được khóa sẵn — bấm{' '}
               <strong className="font-medium text-ink">Yêu cầu chỉnh sửa</strong> nếu cần sửa.
               Nội dung sửa sẽ được Phòng CTSV duyệt trước khi in lên giấy; riêng ngày sinh và CCCD
-              nếu được duyệt sẽ cập nhật luôn vào hồ sơ của bạn.
+              nếu được duyệt sẽ cập nhật vào hồ sơ sinh viên.
             </p>
           </div>
 
@@ -233,7 +233,7 @@ export default function OtherRequestPage() {
                 <input
                   type="text" value={programName} maxLength={200}
                   onChange={(e) => { setProgramName(e.target.value); setFieldErrors((f) => ({ ...f, program_name: undefined })); }}
-                  placeholder="Nhập tên chương trình bạn tham gia…"
+                  placeholder="Nhập tên chương trình tham gia…"
                   className={cn(ui.input, fieldErrors.program_name && 'border-red-400 focus:border-red-400 focus:ring-red-100')}
                 />
                 {fieldErrors.program_name && <p className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.program_name}</p>}

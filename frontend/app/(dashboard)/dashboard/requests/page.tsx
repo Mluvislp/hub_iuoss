@@ -60,7 +60,7 @@ export default function RequestHistoryPage() {
         <div>
           <h1 className="text-xl font-semibold text-ink">Yêu cầu giấy tờ</h1>
           <p className="mt-1 text-sm text-muted">
-            Toàn bộ yêu cầu em đã gửi, trạng thái xử lý và trao đổi với Phòng CTSV.
+            Danh sách yêu cầu đã gửi, trạng thái xử lý và trao đổi với Phòng Công tác Sinh viên.
           </p>
         </div>
         <Link href="/dashboard/requests/new" className={ui.btnPrimary}>
@@ -73,8 +73,8 @@ export default function RequestHistoryPage() {
         <div className="flex items-start gap-2.5 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
           <AlertCircle size={16} className="mt-0.5 shrink-0 text-violet-700" />
           <p className="text-sm text-violet-900">
-            Em có <strong>{needsAction}</strong> yêu cầu cần bổ sung thông tin. Mở yêu cầu và
-            trả lời trong phần trao đổi để Phòng CTSV xử lý tiếp.
+            <strong>{needsAction}</strong> yêu cầu cần bổ sung thông tin. Phản hồi trong phần
+            trao đổi của yêu cầu để được xử lý tiếp.
           </p>
         </div>
       )}
@@ -97,13 +97,13 @@ export default function RequestHistoryPage() {
         <section className={ui.card}>
           <div className="px-5 py-12 text-center">
             <FileText size={22} className="mx-auto mb-2 text-slate-300" />
-            <p className="text-sm text-muted">Em chưa gửi yêu cầu giấy tờ nào.</p>
+            <p className="text-sm text-muted">Chưa có yêu cầu giấy tờ nào.</p>
             <Link
               href="/dashboard/requests/new"
               className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary-text hover:underline"
             >
               <Plus size={15} />
-              Tạo yêu cầu đầu tiên
+              Tạo yêu cầu
             </Link>
           </div>
         </section>

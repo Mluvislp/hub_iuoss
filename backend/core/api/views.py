@@ -1049,8 +1049,8 @@ class RequestCommentsView(_OwnRequestMixin, APIView):
 
         if not req.student_can_comment:
             return Response(
-                {"detail": f"Yêu cầu đang ở trạng thái “{req.get_status_display()}” nên "
-                           f"em không gửi thêm trao đổi được."},
+                {"detail": f"Không gửi được trao đổi khi yêu cầu ở trạng thái "
+                           f"“{req.get_status_display()}”."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
