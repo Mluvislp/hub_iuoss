@@ -36,7 +36,7 @@ export function RequestConsent({
       </label>
       {editCount > 0 && (
         <p className="mt-2 pl-[26px] text-[0.78rem] text-amber-700">
-          Đơn này có {editCount} thông tin bạn yêu cầu chỉnh sửa so với hồ sơ.
+          Đơn này có {editCount} thông tin được yêu cầu chỉnh sửa so với hồ sơ.
         </p>
       )}
     </div>

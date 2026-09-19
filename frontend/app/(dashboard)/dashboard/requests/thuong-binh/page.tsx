@@ -114,7 +114,7 @@ export default function ThuongBinhRequestPage() {
             <FileText size={17} className="text-primary" />
             Giấy xác nhận sinh viên — Ưu đãi giáo dục (thương binh)
           </h1>
-          <p className="text-sm text-muted mt-1">Thông tin lấy từ hồ sơ của bạn. Kiểm tra, bổ sung CCCD nếu cần rồi gửi yêu cầu.</p>
+          <p className="text-sm text-muted mt-1">Thông tin lấy từ hồ sơ sinh viên. Kiểm tra, bổ sung CCCD nếu cần rồi gửi yêu cầu.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">

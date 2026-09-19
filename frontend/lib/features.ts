@@ -27,7 +27,9 @@ export interface FeatureMeta {
 export const FEATURE_META: Record<FeatureKey, FeatureMeta> = {
   document_requests: {
     label: 'Yêu cầu giấy tờ',
-    href: '/dashboard/requests/new',
+    // Trang lịch sử, KHÔNG phải trang tạo mới: sinh viên vào đây nhiều nhất là để
+    // xem yêu cầu cũ chạy tới đâu; nút "Tạo yêu cầu" nằm sẵn trên trang đó.
+    href: '/dashboard/requests',
     icon: FileText,
   },
   civic_activities: {

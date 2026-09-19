@@ -192,7 +192,7 @@ export default function BankLoanRequestPage() {
                 />
                 {fieldErrors.class_code && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.class_code}</p>}
                 <p className="mt-1 text-[0.75rem] text-muted">
-                  Hồ sơ chưa có mã lớp nên bạn cần tự điền.
+                  Hồ sơ chưa có mã lớp, vui lòng nhập.
                 </p>
               </>
             )}

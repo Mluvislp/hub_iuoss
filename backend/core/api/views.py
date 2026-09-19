@@ -1,6 +1,7 @@
 import logging
 from django.conf import settings
 from django.db import connection
+from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
@@ -14,7 +15,7 @@ from core import microsoft_auth
 from core.auth import verify_ldap
 from core.login_policy import check_login
 from core import address_service
-from core.models import HubStudent, ConfirmationRequest
+from core.models import HubStudent, ConfirmationRequest, ConfirmationRequestComment
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
@@ -43,6 +44,8 @@ from .serializers import (
     HealthInsuranceCardSerializer,
     CivicActivitySerializer,
     ConfirmationRequestSerializer,
+    ConfirmationRequestDetailSerializer,
+    RequestCommentSerializer,
     InsuranceRegistrationSerializer,
 )
 from core.models import HealthInsuranceRegistration, HealthInsuranceConfig, CccdScan
@@ -442,7 +445,8 @@ class DashboardView(APIView):
                     civic_activities = list(CivicActivity.objects.filter(student=student))
 
         confirmation_requests = (
-            list(ConfirmationRequest.objects.filter(ldap_uid=ldap_uid)[:10])
+            list(ConfirmationRequest.objects.filter(ldap_uid=ldap_uid)
+                 .prefetch_related(_visible_comments())[:10])
             if settings.FEATURE_DOCUMENT_REQUESTS else []
         )
 
@@ -750,7 +754,9 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         return []
 
     def get(self, request):
-        qs = ConfirmationRequest.objects.filter(ldap_uid=request.user.ldap_uid)
+        qs = (ConfirmationRequest.objects
+              .filter(ldap_uid=request.user.ldap_uid)
+              .prefetch_related(_visible_comments()))
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
@@ -1004,6 +1010,95 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
+
+def _visible_comments():
+    """Prefetch chỉ những lượt sinh viên được thấy.
+
+    Lọc Ở ĐÂY chứ không ở serializer: `comment_count` đếm trên cùng danh sách đã
+    prefetch nên đếm và hiển thị không thể lệch nhau.
+    """
+    return Prefetch("comments", queryset=ConfirmationRequestComment.visible_qs())
+
+
+class _OwnRequestMixin(DocumentRequestsRequiredMixin):
+    """Lấy yêu cầu THEO CHỦ SỞ HỮU.
+
+    `ldap_uid` lấy từ JWT do server ký, không nhận từ client — nên không có IDOR
+    dù endpoint có nhận id trên URL.
+    """
+
+    permission_classes = [IsHubAuthenticated]
+
+    def get_own_request(self, request, pk):
+        return (ConfirmationRequest.objects
+                .filter(pk=pk, ldap_uid=request.user.ldap_uid)
+                .prefetch_related(_visible_comments())
+                .first())
+
+
+class RequestDetailView(_OwnRequestMixin, APIView):
+    """Chi tiết một yêu cầu của chính sinh viên, kèm toàn bộ dòng trao đổi."""
+
+    def get(self, request, pk):
+        req = self.get_own_request(request, pk)
+        if req is None:
+            raise NotFound("Không tìm thấy yêu cầu này.")
+        return Response(ConfirmationRequestDetailSerializer(req).data)
+
+
+class RequestCommentsView(_OwnRequestMixin, APIView):
+    """Sinh viên gửi một lượt trao đổi trên yêu cầu của mình."""
+
+    throttle_scope = "create_request"
+
+    MAX_BODY_LEN = 2000
+
+    def post(self, request, pk):
+        req = self.get_own_request(request, pk)
+        if req is None:
+            raise NotFound("Không tìm thấy yêu cầu này.")
+
+        if not req.student_can_comment:
+            return Response(
+                {"detail": f"Không gửi được trao đổi khi yêu cầu ở trạng thái "
+                           f"“{req.get_status_display()}”."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        body = _get_str(request.data, "body")
+        if not body:
+            return Response({"body": "Vui lòng nhập nội dung trao đổi."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if len(body) > self.MAX_BODY_LEN:
+            return Response({"body": f"Nội dung quá dài (tối đa {self.MAX_BODY_LEN} ký tự)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        comment = ConfirmationRequestComment.objects.create(
+            request=req,
+            author_role=ConfirmationRequestComment.ROLE_STUDENT,
+            author_user_id=None,
+            author_name=request.user.full_name or request.user.ldap_uid,
+            body=body,
+        )
+
+        # SV đã trả lời ⇒ việc quay về phía văn phòng. Nếu để nguyên
+        # `awaiting_info` thì yêu cầu nằm mãi trong nhóm "đang chờ sinh viên" dù
+        # sinh viên đã phản hồi — đúng lối Zendesk/Freshdesk: khách trả lời thì
+        # ticket mở lại.
+        if req.status == ConfirmationRequest.STATUS_AWAITING_INFO:
+            req.status = ConfirmationRequest.STATUS_PROCESSING
+            req.save(update_fields=["status", "updated_at"])
+
+        logger.info("REQUEST_COMMENT | uid=%-20s | req=%s | len=%s",
+                    request.user.ldap_uid, req.pk, len(body))
+
+        return Response(
+            {"comment": RequestCommentSerializer(comment).data,
+             "status": req.status,
+             "student_can_comment": req.student_can_comment},
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class OtherRequestFormView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]

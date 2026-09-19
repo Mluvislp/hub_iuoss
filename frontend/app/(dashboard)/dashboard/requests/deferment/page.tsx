@@ -281,7 +281,7 @@ export default function DefermentRequestPage() {
                 {addressLockable && <CancelEditButton onClick={cancelAddress} />}
                 <p className="mt-2 text-[0.78rem] text-muted">
                   {p.address_standardized
-                    ? 'Địa chỉ mới sẽ được Phòng CTSV duyệt trước khi cập nhật vào hồ sơ của bạn.'
+                    ? 'Địa chỉ mới được Phòng Công tác Sinh viên duyệt trước khi cập nhật vào hồ sơ.'
                     : 'Hồ sơ chưa có địa chỉ theo đơn vị hành chính hiện hành — vui lòng chọn lại. Địa chỉ chuẩn hóa sẽ được Phòng CTSV duyệt và cập nhật vào hồ sơ.'}
                 </p>
               </>

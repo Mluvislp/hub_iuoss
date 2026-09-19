@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Plus, AlertCircle, Loader2, UserRound, ShieldCheck, ClipboardList, FileText, ChevronRight,
+  History, MessageSquare,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { getSession } from '@/lib/auth';
@@ -217,10 +218,16 @@ export default function DashboardPage() {
         accent="primary"
         bodyClassName={confirmation_requests?.length ? 'p-0' : 'px-5 py-4'}
         action={
-          <Link href="/dashboard/requests/new" className={ui.btnSecondary}>
-            <Plus size={15} />
-            Tạo yêu cầu
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/requests" className={ui.btnSecondary}>
+              <History size={15} />
+              Lịch sử
+            </Link>
+            <Link href="/dashboard/requests/new" className={ui.btnSecondary}>
+              <Plus size={15} />
+              Tạo yêu cầu
+            </Link>
+          </div>
         }
       >
         {confirmation_requests?.length ? (
@@ -232,7 +239,8 @@ export default function DashboardPage() {
                   <th className="text-left font-medium px-5 py-2.5 hidden sm:table-cell">Mục đích</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden md:table-cell">Ngày tạo</th>
                   <th className="text-left font-medium px-5 py-2.5">Trạng thái</th>
-                  <th className="text-left font-medium px-5 py-2.5 hidden lg:table-cell">Phản hồi CTSV</th>
+                  <th className="text-left font-medium px-5 py-2.5 hidden lg:table-cell">Trao đổi</th>
+                  <th className="px-5 py-2.5"><span className="sr-only">Xem chi tiết</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -255,10 +263,23 @@ export default function DashboardPage() {
                         {STATUS_LABELS[req.status]}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-600 hidden lg:table-cell align-top max-w-[240px]">
-                      {req.staff_note
-                        ? <span className="line-clamp-2">{req.staff_note}</span>
-                        : <span className="italic text-slate-400">—</span>}
+                    <td className="px-5 py-3.5 text-slate-600 hidden lg:table-cell align-top">
+                      {req.comment_count > 0 ? (
+                        <span className={cn(badge.base, badge.neutral)}>
+                          <MessageSquare size={12} />
+                          {req.comment_count}
+                        </span>
+                      ) : (
+                        <span className="italic text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 align-top whitespace-nowrap">
+                      <Link
+                        href={`/dashboard/requests/${req.id}`}
+                        className="text-[0.82rem] font-medium text-primary-text hover:underline"
+                      >
+                        Xem
+                      </Link>
                     </td>
                   </tr>
                 ))}
