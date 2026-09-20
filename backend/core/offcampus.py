@@ -19,8 +19,11 @@ from . import profile_changes as pc
 from .address_validators import StreetError, street_warnings
 from .documents import _match_province, _match_ward, _ADMIN_KEYWORDS
 
-PERMANENT = StudentAddress.TYPE_CURRENT
-TEMPORARY = StudentAddress.TYPE_TEMPORARY
+# Form khai báo GHI vào bản chuẩn hoá — dữ liệu ở đây do SV chọn từ danh mục
+# 2025 nên đã chuẩn. Dòng nền (CURRENT / TEMPORARY) giữ nguyên làm chứng cứ dữ
+# liệu cũ, không xoá; `address_service.read_order()` ưu tiên bản chuẩn hoá khi đọc.
+PERMANENT = StudentAddress.TYPE_CURRENT_STD
+TEMPORARY = StudentAddress.TYPE_TEMPORARY_STD
 
 
 def _suggest_from_legacy(address):
@@ -55,7 +58,18 @@ def _suggest_from_legacy(address):
 
 
 def _address_block(student, address_type):
-    current = addr.get_current(student, address_type)
+    """Khối dữ liệu dựng một ô địa chỉ trên form.
+
+    Đọc qua `get_effective()` — có bản chuẩn hoá (`*_STD`) thì lấy bản đó, không
+    có mới lùi về bản nền. Thiếu bước này thì form đọc dòng nền (không mang mã
+    tỉnh/phường) rồi phải ĐOÁN lại bằng `_suggest_from_legacy()` — đoán đúng
+    ~72% tỉnh, ~20% phường — trong khi mã chính xác nằm sẵn ở dòng bên cạnh.
+
+    `declared_on` ở đây là mốc của chính dòng được chọn; còn mốc "đã khai hay
+    chưa" mà form dùng để khoá thì lấy từ `lock_state()`, căn vào DẤU MỐC khai
+    báo chứ không phải trạng thái bảng địa chỉ.
+    """
+    current = addr.get_effective(student, address_type)
     return {
         "state": addr.get_state(current),
         "display": addr.format_address(current),
@@ -70,9 +84,13 @@ def _address_block(student, address_type):
 
 
 def is_declared(student):
-    """Đã khai lần nào chưa — căn cứ vào dòng thường trú có effective_from."""
-    current = addr.get_current(student, PERMANENT)
-    return current is not None and current.effective_from is not None
+    """Đã khai lần nào chưa — căn cứ DẤU MỐC KHAI BÁO, không phải trạng thái địa chỉ.
+
+    Trước 17/09/2026 hàm này đọc `effective_from` của dòng thường trú. Sai: cột
+    đó nghĩa là "địa chỉ đã chuẩn hoá", mà `import_freshmen` cũng đặt nó từ file
+    tuyển sinh — 185 SV K26 chưa từng mở form vẫn bị khoá. Xem pc.TARGET_DECLARED.
+    """
+    return pc.has_declared(student)
 
 
 def lock_state(student):
@@ -83,12 +101,12 @@ def lock_state(student):
     thêm bảng/cột. Vé còn hiệu lực = status 'approved'; dùng xong chuyển
     'cancelled' nên form tự khóa lại — không phải so mốc thời gian.
     """
-    declared = is_declared(student)
-    if not declared:
+    declared_at = pc.declared_on(student)
+    if declared_at is None:
         return False, None
     if pc.active_reopen(student):
-        return False, addr.get_current(student, PERMANENT).effective_from
-    return True, addr.get_current(student, PERMANENT).effective_from
+        return False, declared_at
+    return True, declared_at
 
 
 def build_prefill(student):
@@ -96,7 +114,7 @@ def build_prefill(student):
     permanent = _address_block(student, PERMANENT)
     temporary = _address_block(student, TEMPORARY)
 
-    temp_current = addr.get_current(student, TEMPORARY)
+    temp_current = addr.get_effective(student, TEMPORARY)
     in_hcmc = None
     if temp_current is not None and temp_current.effective_from:
         in_hcmc = temp_current.province_code == addr.HCMC_PROVINCE_CODE
@@ -247,6 +265,11 @@ def submit(student, data):
 
     if errors:
         raise DeclarationError(errors)
+
+    # Dấu mốc "đã khai": ghi SAU khi mọi ô đã ghi xong, trong cùng transaction.
+    # Đây là thứ duy nhất quyết định form có khoá lại hay không — xem
+    # pc.TARGET_DECLARED để biết vì sao không suy từ bảng địa chỉ.
+    pc.mark_declared(student, group_key=group_key)
 
     # Ghi xong mới tiêu vé — sai ở bất kỳ ô nào thì transaction rollback và vé
     # vẫn còn nguyên để SV nhập lại.

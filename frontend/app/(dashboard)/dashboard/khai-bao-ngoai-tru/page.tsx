@@ -7,24 +7,17 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, accentIcon } from '@/lib/ui';
-import { cn } from '@/lib/utils';
+import { cn, toDateInput, fromDateInput, todayInput } from '@/lib/utils';
 import type { CccdValue, OffCampusForm, Province } from '@/lib/types';
 import AddressFields, { AddressValue } from './AddressFields';
 import PersonalField from './PersonalField';
+import { FormBusy } from '@/components/form-busy';
 
 const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: '' };
 
 /* API dùng dd/mm/yyyy (thống nhất với các form giấy tờ khác), còn
-   <input type="date"> chỉ nhận yyyy-mm-dd — đổi qua lại ở đúng biên này. */
-const toISODate = (vn: string) => {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((vn || '').trim());
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
-};
-const toVNDate = (iso: string) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso || '').trim());
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
-};
-const TODAY_ISO = new Date().toISOString().slice(0, 10);
+   <input type="date"> chỉ nhận yyyy-mm-dd — đổi qua lại bằng helper chung ở
+   `lib/utils.ts` (trước đây file này tự chép một bản riêng). */
 
 /** Ô thông tin cá nhân chỉ xem, không có nút sửa (họ tên, email trường). */
 function ReadonlyField({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -113,7 +106,7 @@ export default function OffCampusDeclarationPage() {
         const cccd = (data.fields['student.citizen_id']?.value ?? {}) as CccdValue;
         setCccdExtra({
           issue_place: cccd.issue_place || '',
-          issue_date: toISODate(cccd.issue_date || ''),
+          issue_date: toDateInput(cccd.issue_date || ''),
         });
         const open: Record<string, string | undefined> = {};
         Object.entries(data.fields).forEach(([key, f]) => {
@@ -153,7 +146,7 @@ export default function OffCampusDeclarationPage() {
           </div>
           <h2 className="text-lg font-semibold text-ink">Đã ghi nhận khai báo</h2>
           <p className="text-sm text-muted mt-2">
-            Thông tin của bạn đã được cập nhật vào hồ sơ. Cần sửa lại thì gửi yêu cầu
+            Thông tin đã được cập nhật vào hồ sơ. Cần sửa lại thì gửi yêu cầu
             chỉnh sửa ở màn hình xem lại.
           </p>
           <div className="mt-6 flex items-center justify-center gap-2">
@@ -197,7 +190,7 @@ export default function OffCampusDeclarationPage() {
                 ? `Bạn đã gửi khai báo ngày ${new Date(form.declared_on).toLocaleDateString('vi-VN')}. `
                 : ''}
               Thông tin bên dưới đang được dùng làm hồ sơ chính thức. Nếu có thay đổi,
-              hãy gửi yêu cầu chỉnh sửa để phòng CTSV mở lại biểu mẫu cho bạn.
+              vui lòng gửi yêu cầu chỉnh sửa để Phòng Công tác Sinh viên mở lại biểu mẫu.
             </p>
           </div>
 
@@ -328,7 +321,7 @@ export default function OffCampusDeclarationPage() {
           ? {
               number: drafts['student.citizen_id']!.trim(),
               issue_place: cccdExtra.issue_place.trim(),
-              issue_date: toVNDate(cccdExtra.issue_date),
+              issue_date: fromDateInput(cccdExtra.issue_date),
             }
           : undefined,
         personal_email: drafts['contact.personal_email']?.trim() || undefined,
@@ -374,7 +367,8 @@ export default function OffCampusDeclarationPage() {
           </h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-7">
+        <form onSubmit={handleSubmit} className="px-6 py-5">
+          <FormBusy busy={saving} label="Đang gửi khai báo…" className="space-y-7">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -423,7 +417,7 @@ export default function OffCampusDeclarationPage() {
                       <input
                         type="date"
                         value={cccdExtra.issue_date}
-                        max={TODAY_ISO}
+                        max={todayInput()}
                         onChange={(e) => setCccdExtra((s) => ({ ...s, issue_date: e.target.value }))}
                         className={cn(ui.input, 'h-9 text-[0.85rem]')}
                       />
@@ -542,6 +536,7 @@ export default function OffCampusDeclarationPage() {
               {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</> : 'Gửi khai báo'}
             </button>
           </div>
+          </FormBusy>
         </form>
       </div>
     </div>

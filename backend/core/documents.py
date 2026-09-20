@@ -8,6 +8,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 
+from core import address_service
 from students.models import StudentIdentityDocument, StudentAddress, VnProvince, VnWard
 from students.timeline import (
     course_year_label,
@@ -127,8 +128,12 @@ def validate_citizen_id(value, original=""):
 def build_other_payload(student, *, purpose_code, program_name, dob, citizen_id):
     """Dựng payload snapshot cho GXN 'Lý do khác'. Trả (payload, purpose_label).
 
-    Chỉ validate DOB/CCCD nếu SV THỰC SỰ sửa (khác giá trị gốc) — tránh chặn nộp
-    khi dữ liệu gốc trong DB không đúng chuẩn.
+    Chỉ validate nếu SV THỰC SỰ sửa (khác giá trị gốc) — tránh chặn nộp khi dữ
+    liệu gốc trong DB không đúng chuẩn. Riêng CCCD luôn validate.
+
+    Niên khóa / thời gian đào tạo tối đa là NHÓM CỨNG: chỉ nằm trong `snapshot`,
+    SV không sửa được. Chúng suy ra từ đợt nhập học + thời gian đào tạo của ngành;
+    sai thì phải sửa nguồn (hồ sơ SV hoặc bảng `major_training_durations`).
     """
     purpose_label, program_name = resolve_other_purpose(purpose_code, program_name)
 
@@ -168,13 +173,21 @@ STREET_MAX = 255
 
 
 def get_current_address_raw(student):
-    """Địa chỉ thường trú đang lưu (address_type=CURRENT), ghép thô để tham chiếu."""
-    addr = (
-        StudentAddress.objects
-        .filter(student=student, address_type=StudentAddress.TYPE_CURRENT)
-        .order_by("-is_current", "-id")
-        .first()
-    )
+    """Địa chỉ thường trú đang lưu, ghép thô để tham chiếu.
+
+    Theo thứ tự ưu tiên `address_service.PERMANENT_TYPES`: có bản chuẩn hoá
+    CURRENT_STD thì lấy bản đó, không có mới lùi về CURRENT.
+    """
+    addr = None
+    for address_type in address_service.PERMANENT_TYPES:
+        addr = (
+            StudentAddress.objects
+            .filter(student=student, address_type=address_type)
+            .order_by("-is_current", "-id")
+            .first()
+        )
+        if addr:
+            break
     if not addr:
         return ""
     parts = [addr.full_address, addr.ward, addr.district, addr.province]
@@ -318,24 +331,41 @@ def resolve_address_prefill(student):
 def build_deferment_prefill(student):
     """Prefill form 'Hoãn nghĩa vụ quân sự'.
 
-    Nếu đã có địa chỉ chuẩn hóa 2 cấp (CURRENT_STD) → khóa, không cho sửa nữa.
+    Địa chỉ LUÔN sửa được (trước đây có bản chuẩn hóa là khóa vĩnh viễn — SV
+    chuyển nhà hoặc nhập sai thì kẹt). Form khóa sẵn ô nào đã có dữ liệu và mở
+    ra khi SV bấm "Yêu cầu chỉnh sửa", nhưng không có ô nào bị khóa cứng.
+
+    Địa chỉ trả về TÁCH RIÊNG tỉnh / phường / số nhà (kèm cả mã lẫn tên) để form
+    hiển thị ba ô độc lập kể cả lúc đang khóa — không gộp thành một dòng.
     """
     labels = build_timeline_labels(student)
     std = get_current_std(student)
     addr = resolve_address_prefill(student)
+
+    # Tên tỉnh/phường để hiện lúc ô đang khóa. Có bản chuẩn hóa thì lấy thẳng,
+    # chưa có thì tra từ mã đoán được (có thể rỗng nếu đoán không ra).
+    if std:
+        province_name, ward_name = std["province_name"], std["ward_name"]
+    else:
+        pv = VnProvince.objects.filter(code=addr["province_code"]).first() if addr["province_code"] else None
+        wd = VnWard.objects.filter(code=addr["ward_code"], province_code=addr["province_code"]).first() if addr["ward_code"] else None
+        province_name, ward_name = (pv.name if pv else ""), (wd.name if wd else "")
+
     return {
         "student_name": student.full_name or "",
         "student_id": student.current_student_code or "",
         "department": student.current_department.name_vi if student.current_department else "",
         "cur_status_vi": student.current_status.name_vi if student.current_status else "",
+        "dob": format_student_birth_date(student),
         "start_label": labels["start_label"],
         "graduation_label": labels["graduation_label"],
         "max_label": labels["max_label"],
-        "dob": format_student_birth_date(student),
-        "address_locked": std is not None,
-        "address_display": std["full"] if std else "",
+        # Địa chỉ thường trú — ba ô riêng
+        "address_standardized": std is not None,
         "province_code": addr["province_code"],
+        "province_name": province_name,
         "ward_code": addr["ward_code"],
+        "ward_name": ward_name,
         "street": addr["street"],
     }
 
@@ -343,24 +373,34 @@ def build_deferment_prefill(student):
 def build_deferment_payload(student, *, dob, province_code, ward_code, street):
     """Dựng payload snapshot cho GXN hoãn NVQS. Trả (payload, purpose_label).
 
-    Địa chỉ thường trú buộc chọn theo cơ cấu 2025 (tỉnh + phường/xã) + số nhà/đường.
+    Địa chỉ thường trú buộc chọn theo cơ cấu 2025 (tỉnh + phường/xã) + số nhà/đường,
+    và LUÔN nhận từ input SV — kể cả khi hồ sơ đã có bản chuẩn hóa. Nếu SV gửi lên
+    đúng y bản đang có thì đánh `changed=false` để khỏi tạo việc duyệt vô nghĩa.
+
+    Ba mốc thời gian học (nhập học / ra trường / tối đa) là NHÓM CỨNG: chỉ nằm trong
+    `snapshot`, SV không sửa được.
     """
+    labels = build_timeline_labels(student)
+
     dob_field = _editable_field(format_student_birth_date(student), dob)
     if dob_field["changed"]:
         validate_dob(dob_field["proposed"])
 
+    # Địa chỉ: luôn dựng từ input SV; so với bản chuẩn hóa đang có để biết có đổi không.
     baseline = get_current_std(student)
+    proposed_addr = build_address_proposed(province_code, ward_code, street)
     if baseline:
-        # Địa chỉ đã ở dạng 2 cấp (CURRENT_STD) → KHÓA, dùng thẳng, bỏ qua input client
+        same = all(
+            (baseline.get(k) or "") == (proposed_addr.get(k) or "")
+            for k in ("street", "ward_code", "province_code")
+        )
         addr_field = {
             "original": baseline,
-            "proposed": baseline,
-            "changed": False,
-            "review": None,
+            "proposed": proposed_addr,
+            "changed": not same,
+            "review": None if same else "pending",
         }
     else:
-        # Lần đầu chuẩn hóa → dựng từ input SV, cần duyệt
-        proposed_addr = build_address_proposed(province_code, ward_code, street)
         addr_field = {
             "original": get_current_address_raw(student),
             "proposed": proposed_addr,
@@ -368,7 +408,6 @@ def build_deferment_payload(student, *, dob, province_code, ward_code, street):
             "review": "pending",
         }
 
-    labels = build_timeline_labels(student)
     purpose_label = "Hoãn nghĩa vụ quân sự"
     payload = {
         "doc_type": "deferment",
@@ -447,7 +486,12 @@ def build_thuongbinh_prefill(student):
 
 
 def build_thuongbinh_payload(student, *, citizen_id, citizen_id_issue_date):
-    """Dựng payload thương binh. Trả (payload, purpose_label)."""
+    """Dựng payload thương binh. Trả (payload, purpose_label).
+
+    Các nhãn tiến độ học (năm thứ, học kỳ, năm học, niên khóa, số năm đào tạo) là
+    NHÓM CỨNG: chỉ nằm trong `snapshot`, SV không sửa được.
+    """
+    snap0 = _thuongbinh_snapshot(student)
     num, issue = get_current_cccd_doc(student)
     if CCCD_RE.match(num):
         # Đã có CCCD 12 số → khóa, dùng thẳng
@@ -465,7 +509,7 @@ def build_thuongbinh_payload(student, *, citizen_id, citizen_id_issue_date):
     payload = {
         "doc_type": "thuong_binh",
         "purpose": {"code": "thuong_binh", "label": purpose_label, "program_name": None},
-        "snapshot": _thuongbinh_snapshot(student),
+        "snapshot": snap0,
         "editable": {
             "citizen_id": cid_field,
             "citizen_id_issue_date": issue_field,
@@ -527,7 +571,11 @@ def build_bankloan_prefill(student):
 
 
 def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code):
-    """Dựng payload vay vốn. Trả (payload, purpose_label)."""
+    """Dựng payload vay vốn. Trả (payload, purpose_label).
+
+    Các nhãn tiến độ học (niên khóa, học kỳ, mốc nhập học/ra trường, số năm–tháng
+    đào tạo) là NHÓM CỨNG: chỉ nằm trong `snapshot`, SV không sửa được.
+    """
     # HỒ SƠ THẮNG. Trước đây lấy giá trị SV gửi lên trước, nên SV sửa được mã lớp
     # in trên giấy xác nhận của nhà trường — kể cả khi hồ sơ đã có mã chuẩn từ
     # file phòng đào tạo. Chỉ khi hồ sơ trống mới dùng chữ SV nhập.
@@ -554,11 +602,13 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
         cid_field = {"original": num, "proposed": cid_val, "changed": True, "review": "pending"}
         issue_field = {"original": issue, "proposed": issue_val, "changed": True, "review": "pending"}
 
+    snap0 = _bankloan_snapshot(student, class_code)
+
     purpose_label = "Xác nhận vay vốn ngân hàng"
     payload = {
         "doc_type": "bank_loan",
         "purpose": {"code": "bank_loan", "label": purpose_label, "program_name": None},
-        "snapshot": _bankloan_snapshot(student, class_code),
+        "snapshot": snap0,
         "editable": {
             "dob": dob_field,
             "citizen_id": cid_field,
@@ -634,14 +684,18 @@ def build_english_prefill(student):
 
 
 def build_english_payload(student, *, dob, purpose_code, program_name):
+    """Mốc nhập học / ra trường là NHÓM CỨNG: chỉ nằm trong `snapshot`."""
     purpose_label, program_name = resolve_english_purpose(purpose_code, program_name)
     dob_field = _editable_field(format_student_birth_date(student), dob)
     if dob_field["changed"]:
         validate_dob(dob_field["proposed"])
+
+    snap0 = _english_snapshot(student)
+
     payload = {
         "doc_type": "english_form",
         "purpose": {"code": purpose_code, "label": purpose_label, "program_name": program_name},
-        "snapshot": _english_snapshot(student),
+        "snapshot": snap0,
         "editable": {"dob": dob_field},
     }
     return payload, purpose_label

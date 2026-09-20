@@ -181,24 +181,62 @@ def _apply_cccd(student, value):
     )
 
 
-def _apply_contact(student, contact_type, value):
-    row = (
+@transaction.atomic
+def set_contact(student, contact_type, value, *, is_primary=None, on_date=None):
+    """ĐƯỜNG GHI DUY NHẤT cho `student_contact_points`.
+
+    ⚠️ BẢN SAO — hàm này có ở cả hai repo, sửa một bên phải sửa luôn bên kia:
+         dashboard_iuoss/students/profile_changes.py
+         hub_iuoss/backend/core/profile_changes.py
+
+    Đổi giá trị thì GHI DÒNG MỚI và hạ dòng cũ xuống `is_current=False`, y hệt
+    quy ước con trỏ đang dùng cho CCCD (`_apply_cccd`), địa chỉ và thẻ BHYT.
+
+    Trước 17/09/2026 cả hai đường ghi đều **sửa đè tại chỗ**, nên email/SĐT cũ
+    mất sạch — dù bảng đã có sẵn đủ ba cột
+    `is_current`/`effective_from`/`effective_to`.
+
+    - Gửi lại đúng giá trị đang có ⇒ không đẻ dòng lịch sử rác.
+    - Xoá trắng ⇒ **hạ dòng cũ, KHÔNG xoá cứng**; trả về None.
+    - `is_primary=None` ⇒ giữ nguyên cờ của dòng cũ (mặc định False nếu chưa có).
+    """
+    today = on_date or timezone.localdate()
+    value = (value or "").strip()
+
+    olds = list(
         StudentContactPoint.objects
+        .select_for_update()
         .filter(student=student, contact_type=contact_type, is_current=True)
-        .order_by("-id").first()
+        .order_by("-id")
     )
-    if row:
-        row.contact_value = value
-        row.normalized_contact_value = value.lower()
-        row.save(update_fields=["contact_value", "normalized_contact_value", "updated_at"])
-        return row
+
+    if len(olds) == 1 and (olds[0].contact_value or "").strip() == value and value:
+        return olds[0]
+
+    if is_primary is None:
+        is_primary = olds[0].is_primary if olds else False
+
+    for row in olds:
+        row.is_current = False
+        row.effective_to = today
+        row.save(update_fields=["is_current", "effective_to", "updated_at"])
+
+    if not value:
+        return None
+
     return StudentContactPoint.objects.create(
         student=student,
         contact_type=contact_type,
         contact_value=value,
         normalized_contact_value=value.lower(),
+        is_primary=is_primary,
         is_current=True,
+        effective_from=today,
     )
+
+
+def _apply_contact(student, contact_type, value):
+    return set_contact(student, contact_type, value)
 
 
 # `approval` = True thì phải chờ nhân viên duyệt; False thì ghi thẳng và bản ghi
@@ -371,6 +409,64 @@ def read_profile(student):
 # Khác TARGET_REOPEN (vé do nhân viên cấp): đây là ĐỀ NGHỊ do SV gửi, nằm chờ ở
 # trạng thái pending cho tới khi nhân viên mở lại hoặc từ chối.
 TARGET_REOPEN_REQUEST = "declaration.reopen_request"
+
+
+# ── Dấu mốc "sinh viên đã hoàn tất khai báo ngoại trú" ────────────────────────
+#
+# ⚠️ BẢN SAO — sửa ở đây phải sửa luôn dashboard_iuoss/students/profile_changes.py
+#
+# ĐỪNG suy "đã khai" từ `student_addresses.effective_from`. Cột đó nghĩa là
+# "địa chỉ đã chuẩn hoá theo cơ cấu 2025", KHÔNG phải "sinh viên đã khai" —
+# `freshmen_import_service` bên Dashboard cũng đặt nó, lấy từ cột "Ngày hoàn
+# tất" của file tuyển sinh. Đo trên prod 17/09/2026: 203 SV trông như đã khai,
+# thật ra chỉ 18; 185 SV K26 chưa từng mở form vẫn bị KHOÁ.
+#
+# Cũng không suy được từ trạng thái bảng địa chỉ: 2.951 SV chưa có dòng CURRENT
+# nào, khai lần đầu sẽ không để lại dòng lịch sử nào để mà nhận ra.
+#
+# "Đã khai" là một SỰ KIỆN ⇒ ghi lại đúng lúc nó xảy ra, một dòng ở đây.
+# `new_value` giữ ngày khai dạng ISO (không đọc `created_at` vì auto_now_add,
+# không đặt lại được khi cần vá dữ liệu cũ).
+TARGET_DECLARED = "declaration.offcampus_done"
+
+
+def mark_declared(student, *, on_date=None, group_key=None, source=None):
+    """Ghi dấu mốc SV vừa hoàn tất một lần khai báo ngoại trú."""
+    on_date = on_date or timezone.localdate()
+    return ProfileChangeRequest.objects.create(
+        student=student,
+        target=TARGET_DECLARED,
+        old_value="",
+        new_value=on_date.isoformat(),
+        source=source or ProfileChangeRequest.SOURCE_OFFCAMPUS,
+        group_key=group_key,
+        status=ProfileChangeRequest.STATUS_APPROVED,
+    )
+
+
+def declared_rows(student):
+    """Các lần khai của một SV, mới nhất trước."""
+    return (
+        ProfileChangeRequest.objects
+        .filter(student=student, target=TARGET_DECLARED)
+        .order_by("-id")
+    )
+
+
+def has_declared(student):
+    """SV đã tự khai ngoại trú lần nào chưa."""
+    return declared_rows(student).exists()
+
+
+def declared_on(student):
+    """Ngày khai gần nhất (date) hoặc None."""
+    row = declared_rows(student).first()
+    if row is None:
+        return None
+    try:
+        return datetime.strptime(row.new_value, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return row.created_at.date() if row.created_at else None
 
 
 def active_reopen_request(student):

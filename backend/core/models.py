@@ -10,18 +10,29 @@ class ConfirmationRequest(models.Model):
         ("deferment", "Hoãn nghĩa vụ quân sự"),
         ("other", "Khác"),
     ]
+    STATUS_PENDING = "pending"
+    STATUS_PROCESSING = "processing"
+    STATUS_AWAITING_INFO = "awaiting_info"
+    STATUS_DONE = "done"
+    STATUS_REJECTED = "rejected"
     STATUS_CHOICES = [
-        ("pending", "Chờ xử lý"),
-        ("processing", "Đang xử lý"),
-        ("done", "Hoàn thành"),
-        ("rejected", "Từ chối"),
+        (STATUS_PENDING, "Chờ xử lý"),
+        (STATUS_PROCESSING, "Đang xử lý"),
+        (STATUS_AWAITING_INFO, "Chờ bổ sung thông tin"),
+        (STATUS_DONE, "Hoàn thành"),
+        (STATUS_REJECTED, "Từ chối"),
     ]
     STATUS_BADGE = {
         "pending": "warning",
         "processing": "info",
+        "awaiting_info": "warning",
         "done": "success",
         "rejected": "danger",
     }
+
+    # Sinh viên chỉ gửi trao đổi khi yêu cầu còn mở. Luật này phải khớp
+    # `DocumentRequest.STUDENT_CAN_COMMENT_STATUSES` bên Dashboard — sửa cả hai.
+    STUDENT_CAN_COMMENT_STATUSES = (STATUS_PENDING, STATUS_AWAITING_INFO)
 
     student_id = models.BigIntegerField()
     ldap_uid = models.CharField(max_length=64)
@@ -30,7 +41,11 @@ class ConfirmationRequest(models.Model):
     note = models.TextField(null=True, blank=True)
     payload = models.JSONField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    # Ghi chú NỘI BỘ của chuyên viên — KHÔNG trả ra API cho sinh viên. Kênh nói với
+    # sinh viên là `ConfirmationRequestComment`.
     staff_note = models.TextField(null=True, blank=True)
+    # Mã hồ sơ portal do chuyên viên nhập lúc hoàn thành; SV trình mã này khi nhận giấy.
+    portal_code = models.CharField(max_length=64, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -45,6 +60,51 @@ class ConfirmationRequest(models.Model):
     @property
     def status_badge(self):
         return self.STATUS_BADGE.get(self.status, "secondary")
+
+    @property
+    def student_can_comment(self):
+        return self.status in self.STUDENT_CAN_COMMENT_STATUSES
+
+
+class ConfirmationRequestComment(models.Model):
+    """Một lượt trao đổi giữa sinh viên và chuyên viên trên một yêu cầu giấy tờ.
+
+    Bảng dùng chung với Dashboard (`documents.RequestComment`) — mỗi repo giữ model
+    riêng, managed=False. Dòng phẳng theo thời gian, không phân cấp.
+    """
+
+    ROLE_STUDENT = "student"
+    ROLE_STAFF = "staff"
+
+    request = models.ForeignKey(
+        ConfirmationRequest,
+        on_delete=models.CASCADE,
+        db_column="request_id",
+        db_constraint=False,
+        related_name="comments",
+    )
+    author_role = models.CharField(max_length=16)
+    author_user_id = models.BigIntegerField(null=True, blank=True)
+    author_name = models.CharField(max_length=255)
+    body = models.TextField()
+    # Hai cờ do Dashboard đặt; Hub chỉ ĐỌC và luôn lọc bỏ khi trả cho sinh viên.
+    is_internal = models.BooleanField(default=False)
+    is_removed = models.BooleanField(default=False)
+    event = models.CharField(max_length=32, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = "hub_confirmation_request_comments"
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"#{self.request_id} {self.author_role}: {self.body[:40]}"
+
+    @classmethod
+    def visible_qs(cls):
+        """Chỉ những lượt sinh viên được thấy — dùng ở MỌI chỗ prefetch."""
+        return cls.objects.filter(is_internal=False, is_removed=False)
 
 
 class HubStudent(models.Model):

@@ -63,6 +63,84 @@ def get_current(student, address_type, sequence_no=1):
     )
 
 
+# ── Thường trú: thứ tự ưu tiên khi ĐỌC ────────────────────────────────────────
+#
+# `CURRENT_STD` là bản thường trú đã chuẩn hoá theo cơ cấu hành chính 2025 —
+# sinh ra từ luồng giấy tờ, hoặc nạp hàng loạt từ file đã rà tay. Có bản đó thì
+# nó là sự thật; không có mới lùi về `CURRENT`, vốn là dữ liệu nền có thể còn
+# cấp huyện cũ và thiếu `province_code`/`ward_code`.
+#
+# CHỈ dùng cho đường ĐỌC. Đường GHI luôn nêu `address_type` tường minh — ghi
+# thường trú mà đi qua đây là hạ nhầm dòng của loại khác.
+PERMANENT_TYPES = (StudentAddress.TYPE_CURRENT_STD, StudentAddress.TYPE_CURRENT)
+
+# Tạm trú đối xứng với thường trú (thêm 17/09/2026). Trước đó OFFCAMPUS.md chốt
+# "không thêm TEMPORARY_STD"; người dùng đảo lại quyết định đó để hai loại địa
+# chỉ cùng một mô hình — bản chuẩn hoá nằm ở type riêng, bản nền giữ nguyên.
+TEMPORARY_TYPES = (StudentAddress.TYPE_TEMPORARY_STD, StudentAddress.TYPE_TEMPORARY)
+
+# Loại NỀN → loại CHUẨN HOÁ. Đường ghi của form khai báo luôn ghi vào bản chuẩn
+# hoá; dòng nền giữ nguyên làm chứng cứ dữ liệu cũ, không xoá.
+STANDARD_OF = {
+    StudentAddress.TYPE_CURRENT: StudentAddress.TYPE_CURRENT_STD,
+    StudentAddress.TYPE_TEMPORARY: StudentAddress.TYPE_TEMPORARY_STD,
+}
+
+
+def read_order(address_type):
+    """Thứ tự ưu tiên khi ĐỌC một loại địa chỉ: bản chuẩn hoá trước, bản nền sau.
+
+    Truyền loại nào trong cặp cũng ra cùng một thứ tự — caller không phải nhớ
+    mình đang cầm bản nền hay bản chuẩn hoá.
+    """
+    if address_type in PERMANENT_TYPES:
+        return PERMANENT_TYPES
+    if address_type in TEMPORARY_TYPES:
+        return TEMPORARY_TYPES
+    return (address_type,)
+
+
+def get_effective(student, address_type, sequence_no=1):
+    """Dòng đang dùng của một loại địa chỉ, theo `read_order()`."""
+    for t in read_order(address_type):
+        row = get_current(student, t, sequence_no)
+        if row is not None:
+            return row
+    return None
+
+
+def pick_effective(by_type, address_type):
+    """Như `get_effective` nhưng chọn từ dict {address_type: row} đã gom theo lô.
+
+    Nhớ thêm ĐỦ cả cặp vào bộ lọc `address_type__in` của truy vấn gom.
+    """
+    for t in read_order(address_type):
+        row = by_type.get(t)
+        if row is not None:
+            return row
+    return None
+
+
+def pick_permanent(by_type):
+    """Chọn dòng thường trú từ dict {address_type: row} đã gom theo lô."""
+    return pick_effective(by_type, StudentAddress.TYPE_CURRENT)
+
+
+def get_permanent(student, sequence_no=1):
+    """Dòng thường trú đang dùng, theo thứ tự ưu tiên `PERMANENT_TYPES`."""
+    return get_effective(student, StudentAddress.TYPE_CURRENT, sequence_no)
+
+
+def describe_permanent(student, sequence_no=1):
+    """`describe()` cho thường trú, có áp thứ tự ưu tiên."""
+    address = get_permanent(student, sequence_no)
+    return {
+        "state": get_state(address),
+        "display": format_address(address),
+        "address": address,
+    }
+
+
 def get_state(address):
     if address is None:
         return STATE_EMPTY
@@ -150,6 +228,19 @@ def save_address(student, address_type, *, province_code, ward_code, street,
     province, ward = resolve_location(province_code, ward_code)
     street = clean_street(street)
     today = on_date or timezone.localdate()
+
+    # Ghi vào bản NỀN thì bản CHUẨN HOÁ cũ phải nhường chỗ — bản chuẩn hoá đứng
+    # trước trong `read_order()`, không hạ nó xuống thì thứ vừa ghi thành vô hình.
+    # Ngược lại (ghi thẳng vào bản chuẩn hoá) thì không phải hạ gì: dòng nền vốn
+    # đã đứng sau, giữ lại làm chứng cứ dữ liệu cũ.
+    standard_type = STANDARD_OF.get(address_type)
+    if standard_type:
+        StudentAddress.objects.filter(
+            student=student,
+            address_type=standard_type,
+            sequence_no=sequence_no,
+            is_current=True,
+        ).update(is_current=False, effective_to=today)
 
     locked = list(
         StudentAddress.objects

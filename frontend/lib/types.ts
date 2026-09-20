@@ -132,7 +132,7 @@ export interface CivicActivity {
 }
 
 export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'other';
-export type RequestStatus = 'pending' | 'processing' | 'done' | 'rejected';
+export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' | 'rejected';
 
 export interface ConfirmationRequest {
   id: number;
@@ -141,9 +141,26 @@ export interface ConfirmationRequest {
   note: string | null;
   payload: Record<string, unknown> | null;
   status: RequestStatus;
-  staff_note: string | null;
+  /** Mã hồ sơ portal — sinh viên trình mã này khi tới nhận giấy. */
+  portal_code: string | null;
+  comment_count: number;
+  student_can_comment: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** Một lượt trao đổi trên yêu cầu. `event` khác null = đi kèm một lần đổi trạng thái. */
+export interface RequestComment {
+  id: number;
+  author_role: 'student' | 'staff';
+  author_name: string;
+  body: string;
+  event: string | null;
+  created_at: string;
+}
+
+export interface ConfirmationRequestDetail extends ConfirmationRequest {
+  comments: RequestComment[];
 }
 
 export interface PurposeChoice {
@@ -173,16 +190,18 @@ export interface DefermentPrefill {
   student_id: string;
   department: string;
   cur_status_vi: string;
+  dob: string;
   start_label: string;
   graduation_label: string;
   max_label: string;
-  dob: string;
-  // Địa chỉ đã ở dạng 2 cấp (CURRENT_STD) → khóa, không cho sửa
-  address_locked: boolean;
-  address_display: string;
-  // Prefill địa chỉ (khi chưa khóa): match sẵn nếu khớp bảng chuẩn, ngược lại rỗng
+  /** Đã có bản thường trú chuẩn hóa 2 cấp (CURRENT_STD) — dữ liệu đáng tin, khóa sẵn. */
+  address_standardized: boolean;
+  // Địa chỉ tách riêng 3 phần; chưa chuẩn hóa thì đây là giá trị ĐOÁN từ dữ liệu cũ
+  // (có thể rỗng nếu đoán không ra).
   province_code: string;
+  province_name: string;
   ward_code: string;
+  ward_name: string;
   street: string;
 }
 
@@ -391,6 +410,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
 export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   pending: 'Chờ xử lý',
   processing: 'Đang xử lý',
+  awaiting_info: 'Chờ bổ sung thông tin',
   done: 'Hoàn thành',
   rejected: 'Từ chối',
 };
@@ -399,6 +419,9 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
 export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   pending:    'bg-warning-soft text-warning-text border-warning-line',
   processing: 'bg-primary-soft text-primary-text border-primary-line',
+  // Cố ý KHÁC hẳn 'pending': đây là trạng thái việc đang nằm ở phía sinh viên,
+  // phải nhìn ra ngay giữa một danh sách toàn màu vàng "chờ xử lý".
+  awaiting_info: 'bg-violet-50 text-violet-700 border-violet-200',
   done:       'bg-success-soft text-success-text border-success-line',
   rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };

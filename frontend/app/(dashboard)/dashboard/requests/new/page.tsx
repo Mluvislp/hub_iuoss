@@ -56,7 +56,7 @@ export default function NewRequestPage() {
             Tạo yêu cầu giấy tờ
           </h1>
           <p className="text-sm text-muted mt-1">
-            Chọn loại giấy tờ bạn cần. Mỗi loại có biểu mẫu riêng để điền thông tin chính xác;
+            Chọn loại giấy tờ cần cấp. Mỗi loại có biểu mẫu riêng để điền thông tin chính xác;
             Phòng CTSV sẽ xử lý và phản hồi trên hệ thống.
           </p>
         </div>
@@ -128,7 +128,7 @@ export default function NewRequestPage() {
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Sau khi gửi biểu mẫu, bạn có thể theo dõi trạng thái xử lý tại{' '}
+          Sau khi gửi biểu mẫu, theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
           Thời gian xử lý thông thường: <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
         </p>

@@ -281,6 +281,7 @@ class StudentAddress(models.Model):
     TYPE_PERMANENT = "PERMANENT"
     TYPE_OTHER = "OTHER"
     TYPE_CURRENT_STD = "CURRENT_STD"  # thường trú đã chuẩn hóa theo cơ cấu 2025
+    TYPE_TEMPORARY_STD = "TEMPORARY_STD"  # tạm trú đã chuẩn hóa theo cơ cấu 2025
 
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,
@@ -324,6 +325,11 @@ class StudentContactPoint(models.Model):
     contact_value = models.CharField(max_length=255)
     normalized_contact_value = models.CharField(max_length=255)
     is_primary = models.BooleanField(default=False)
+    # Mốc của dòng, cùng quy ước với `student_addresses`: ngày bắt đầu dùng và
+    # ngày bị thay thế. Cột đã có sẵn trong bảng từ trước, model bên này chỉ
+    # chưa khai — cần từ 17/09/2026 khi `set_contact()` bắt đầu giữ lịch sử.
+    effective_from = models.DateField(blank=True, null=True)
+    effective_to = models.DateField(blank=True, null=True)
     is_current = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

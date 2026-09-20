@@ -197,6 +197,24 @@ Kết quả: `YES` (Đạt) / `NO` (Không đạt) / `UNKNOWN` (Chưa có kết 
 - Frontend: `app/(dashboard)/dashboard/requests/other/page.tsx`, `lib/api.ts` (`otherForm`/`createOther`)
 - Registry loại giấy: `core/documents.py`; prefill niên khóa/đào tạo: `students/timeline.py`
 
+### Lịch sử yêu cầu + trao đổi (09/2026)
+
+- `GET /api/requests/` — danh sách của chính SV (kèm `comment_count`, `portal_code`).
+- `GET /api/requests/<id>/` — chi tiết + toàn bộ trao đổi. Lọc theo `ldap_uid` lấy từ
+  JWT nên không có IDOR dù URL có id.
+- `POST /api/requests/<id>/comments/` — SV gửi trao đổi. **Chỉ khi trạng thái là
+  `pending` hoặc `awaiting_info`**; trả lời lúc `awaiting_info` thì yêu cầu tự
+  chuyển về `processing`. Throttle dùng chung scope `create_request`.
+- Frontend: `dashboard/requests/page.tsx` (lịch sử) · `dashboard/requests/[id]/page.tsx`
+  (chi tiết + dòng trao đổi + ô trả lời).
+- `staff_note` **không còn** trong API: đó là ghi chú nội bộ của chuyên viên, trước
+  đây bị hiện cho sinh viên ở trang chủ.
+- Luật "SV được trao đổi ở trạng thái nào" **viết ở hai nơi** —
+  `ConfirmationRequest.STUDENT_CAN_COMMENT_STATUSES` bên Hub và
+  `DocumentRequest.STUDENT_CAN_COMMENT_STATUSES` bên Dashboard. Sửa thì sửa cả hai.
+
+Chi tiết luồng + DDL: `dashboard_iuoss/docs/DOCUMENT_REQUESTS.md`.
+
 **Model:** `core.ConfirmationRequest` → bảng `hub_confirmation_requests` (có cột `payload` JSON).
 
 ### Loại giấy hỗ trợ

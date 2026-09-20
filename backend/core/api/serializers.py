@@ -4,7 +4,7 @@ from students.models import (
     Student, HealthInsuranceCard, CivicActivity,
     Hospital, VnProvince, VnWard, VnEthnicity,
 )
-from core.models import ConfirmationRequest, HealthInsuranceRegistration
+from core.models import ConfirmationRequest, ConfirmationRequestComment, HealthInsuranceRegistration
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -88,14 +88,44 @@ class CivicActivitySerializer(serializers.ModelSerializer):
         ]
 
 
+class RequestCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConfirmationRequestComment
+        fields = ["id", "author_role", "author_name", "body", "event", "created_at"]
+        read_only_fields = fields
+
+
 class ConfirmationRequestSerializer(serializers.ModelSerializer):
+    """Dữ liệu yêu cầu trả cho sinh viên.
+
+    `staff_note` CỐ Ý không có ở đây: Dashboard ghi nhãn ô đó là "ghi chú nội bộ"
+    nhưng trước 2026-09 nó vẫn được trả ra và Hub hiện thẳng cho sinh viên. Kênh
+    nói với sinh viên nay là `comments`.
+    """
+
+    comment_count = serializers.SerializerMethodField()
+    student_can_comment = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = ConfirmationRequest
         fields = [
             "id", "request_type", "purpose", "note", "payload",
-            "status", "staff_note", "created_at", "updated_at",
+            "status", "portal_code", "comment_count", "student_can_comment",
+            "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "status", "staff_note", "payload", "created_at", "updated_at"]
+        read_only_fields = fields
+
+    def get_comment_count(self, obj):
+        # Đã prefetch ở view danh sách nên không sinh thêm query mỗi dòng.
+        return len(obj.comments.all())
+
+
+class ConfirmationRequestDetailSerializer(ConfirmationRequestSerializer):
+    comments = RequestCommentSerializer(many=True, read_only=True)
+
+    class Meta(ConfirmationRequestSerializer.Meta):
+        fields = ConfirmationRequestSerializer.Meta.fields + ["comments"]
+        read_only_fields = fields
 
 
 class InsuranceRegistrationSerializer(serializers.Serializer):

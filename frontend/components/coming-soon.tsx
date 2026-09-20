@@ -31,12 +31,12 @@ export default function ComingSoon({ feature }: { feature: FeatureKey }) {
         </div>
 
         <p className="mt-5 text-sm text-muted leading-relaxed">
-          Chức năng đang phát triển và sẽ sớm hoàn thiện, bạn vui lòng chờ thêm một thời gian.
+          Chức năng đang được phát triển và sẽ sớm hoàn thiện.
         </p>
 
         <div className="mt-7 pt-6 border-t border-line2">
           <p className="text-[0.82rem] text-muted">
-            Trong thời gian chờ, bạn có thể liên hệ trực tiếp Phòng Công tác Sinh viên nếu cần hỗ trợ.
+            Trong thời gian chờ, vui lòng liên hệ Phòng Công tác Sinh viên nếu cần hỗ trợ.
           </p>
           <Link href="/dashboard" className={cn(ui.btnSecondary, 'mt-4')}>
             <ArrowLeft size={15} />

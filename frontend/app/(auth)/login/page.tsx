@@ -139,7 +139,7 @@ function LoginForm() {
               <span className="text-blue-400">sinh viên</span>
             </h1>
             <p className="mt-3 text-slate-400 text-sm leading-relaxed">
-              Tra cứu hồ sơ, theo dõi yêu cầu và quản lý thông tin học vụ của bạn tại Trường Đại học Quốc tế HCMIU.
+              Tra cứu hồ sơ, theo dõi yêu cầu và quản lý thông tin học vụ tại Trường Đại học Quốc tế HCMIU.
             </p>
           </div>
 

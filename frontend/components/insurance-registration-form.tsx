@@ -523,7 +523,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
             </div>
           </section>
         )}
-        <fieldset className="space-y-6">
+        {/* disabled khi đang gửi: trước đây thẻ này chỉ gom, không khoá gì. */}
+        <fieldset disabled={saving} className={saving ? "space-y-6 opacity-60" : "space-y-6"}>
           <div className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
