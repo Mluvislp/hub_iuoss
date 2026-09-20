@@ -1,3 +1,7 @@
+from core.insurance_submission import submission
+from core.insurance_history import append_event
+from core.insurance_files import inspect_upload
+from core.insurance_contract import normalized, integer
 import logging
 from django.conf import settings
 from django.db import connection
@@ -15,7 +19,12 @@ from core import microsoft_auth
 from core.auth import verify_ldap
 from core.login_policy import check_login
 from core import address_service
-from core.models import HubStudent, ConfirmationRequest, ConfirmationRequestComment
+from core.models import (
+    HubStudent,
+    ConfirmationRequest,
+    ConfirmationRequestComment,
+    ExternalInsuranceDeclaration,
+)
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
@@ -436,7 +445,8 @@ class DashboardView(APIView):
                 health_insurance = (
                     HealthInsuranceCard.objects
                     .select_related("registration_type")
-                    .filter(student=student, is_current=True)
+                    .filter(student=student)
+                    .order_by("-id")
                     .first()
                 )
                 # Tính năng tắt → không truy vấn, không trả dữ liệu (ẩn thật, không
@@ -467,6 +477,72 @@ class DashboardView(APIView):
         })
 
 
+# ── Cấu hình các đợt đăng ký BHYT ───────────────────────────────────────────
+
+_PERIOD_NUMBER = {"MAIN": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+
+
+def _coverage_dates(period: str, year: int):
+    """Khoảng sử dụng: đầu quý của đợt đến hết năm hưởng BHYT."""
+    from datetime import date
+
+    start_month = {"MAIN": 1, "Q2": 4, "Q3": 7, "Q4": 10}[period]
+    return date(year, start_month, 1), date(year, 12, 31)
+
+
+def _insurance_config_status(cfg, now=None):
+    now = now or timezone.now()
+    if now > cfg.registration_closes_at:
+        return "expired"
+    if now < cfg.registration_opens_at:
+        return "upcoming"
+    # Nằm trong lịch nhưng staff chưa bật thì vẫn hiện là "Chưa mở"; chỉ cờ
+    # active + đúng thời gian mới cho phép vào form và nộp đơn.
+    return "open" if cfg.is_active else "upcoming"
+
+
+def _insurance_config_error(cfg):
+    if cfg is None:
+        return "Đợt đăng ký không tồn tại hoặc chưa được cấu hình."
+    if not cfg.is_active:
+        return "Đợt đăng ký hiện đang tắt."
+    now = timezone.now()
+    if now < cfg.registration_opens_at:
+        return "Đợt đăng ký chưa mở."
+    if now > cfg.registration_closes_at:
+        return "Đợt đăng ký đã kết thúc."
+    return ""
+
+
+def _insurance_config_payload(cfg, *, include_payment):
+    coverage_start, coverage_end = _coverage_dates(
+        cfg.registration_period, cfg.registration_year,
+    )
+    payload = {
+        "id": cfg.registration_period.lower(),
+        "registration_period": cfg.registration_period,
+        "registration_year": cfg.registration_year,
+        "name": f"Đợt {_PERIOD_NUMBER[cfg.registration_period]} năm {cfg.registration_year}",
+        "start_date": cfg.registration_opens_at.isoformat(),
+        "end_date": cfg.registration_closes_at.isoformat(),
+        "coverage_start": coverage_start.isoformat(),
+        "coverage_end": coverage_end.isoformat(),
+        "status": _insurance_config_status(cfg),
+        "is_active": cfg.is_active,
+    }
+    if include_payment:
+        account = cfg.bank_account
+        payload.update({
+            "description": cfg.description or "",
+            "bank_name": account.bank_name if account else cfg.bank_name,
+            "bank_bin": account.bank_bin if account else (cfg.bank_bin or ""),
+            "bank_account_number": account.account_number if account else cfg.bank_account_number,
+            "bank_account_name": account.account_name if account else cfg.bank_account_name,
+            "insurance_fee": cfg.insurance_fee,
+        })
+    return payload
+
+
 # ── GET /api/health-insurance/ ───────────────────────────────────────────────
 # Trang BHYT riêng: thẻ đang dùng + lịch sử các thẻ cũ.
 
@@ -475,19 +551,34 @@ class HealthInsuranceView(APIView):
 
     def get(self, request):
         student_id = request.user.student_id
+        periods = [
+            _insurance_config_payload(cfg, include_payment=False)
+            for cfg in HealthInsuranceConfig.objects.select_related("bank_account").all()
+        ]
         if not student_id:
             return Response({
                 "is_eligible": False, "current": None, "history": [], "registrations": [],
+                "external_declarations": [],
+                "periods": periods,
             })
 
         cards = list(
             HealthInsuranceCard.objects
             .filter(student_id=student_id)
             .select_related("registration_type")
+            .order_by("-id")
         )
-        # is_current = thẻ đang dùng (KHÔNG phải "còn hiệu lực") — xem model.
-        current = next((c for c in cards if c.is_current), None)
-        history = [c for c in cards if c is not current]
+        # Staff chọn thẻ ưu tiên bằng is_current; ngày tạo và hạn thẻ không được
+        # tự ý thay quyết định đó.
+        current = next((card for card in cards if card.is_current), None)
+        # Dữ liệu lịch sử có nhiều dòng cũ chưa được gắn is_current. Nếu sinh viên
+        # chỉ có đúng một record thì chính record đó là thông tin duy nhất có thể
+        # hiển thị, kể cả khi thiếu mã thẻ/BHXH/KCB hoặc chỉ ghi nhận diện tham gia.
+        if current is None and len(cards) == 1:
+            current = cards[0]
+        # Danh sách này cố ý giữ TẤT CẢ thẻ, kể cả thẻ đang được ưu tiên ở trên.
+        # is_current chỉ điều khiển ô nổi bật, không làm mất một dòng lịch sử.
+        history = cards
 
         regs = (
             HealthInsuranceRegistration.objects
@@ -500,9 +591,47 @@ class HealthInsuranceView(APIView):
             "registration_year": r.registration_year,
             "registration_period": r.registration_period,
             "created_at": r.created_at,
-            "status": r.status,
+            "status": normalized(r.status),
+            "row_version": r.row_version,
+            "rejection_reason_code": r.rejection_reason_code,
             "rejection_reason": r.rejection_reason,
         } for r in regs]
+        external_rows = list(ExternalInsuranceDeclaration.objects.filter(
+            student_id=student_id
+        ).order_by("-created_at"))
+        external_hospitals = dict(Hospital.objects.filter(
+            code__in={row.hospital_code for row in external_rows if row.hospital_code}
+        ).values_list("code", "name"))
+        external_data = [{
+            "id": row.id,
+            "medical_insurance_code": row.medical_insurance_code,
+            "social_insurance_code": row.social_insurance_code,
+            "hospital_code": row.hospital_code,
+            "hospital_name": external_hospitals.get(row.hospital_code),
+            "valid_from": row.valid_from,
+            "valid_until": row.valid_until,
+            "registration_year": row.registration_year,
+            "status": row.status,
+            "review_note": row.review_note,
+            "created_at": row.created_at,
+            "reviewed_at": row.reviewed_at,
+            "declared": [
+                {"label": label, "value": row.snapshot.get(field, "")}
+                for field, label in (
+                    ("full_name", "Họ và tên"),
+                    ("student_code", "MSSV"),
+                    ("gender", "Giới tính"),
+                    ("dob", "Ngày sinh"),
+                    ("ethnicity", "Dân tộc"),
+                    ("phone_number", "Số điện thoại"),
+                    ("citizen_id", "Số CCCD"),
+                    ("social_insurance_number", "Mã số BHXH"),
+                    ("permanent_province", "Mã tỉnh/thành thường trú"),
+                    ("permanent_ward", "Mã phường/xã thường trú"),
+                    ("permanent_street", "Địa chỉ thường trú"),
+                )
+            ],
+        } for row in external_rows]
 
         # Điều kiện mở nút đăng ký
         # Mặc định là cho phép đăng ký (Bao gồm chưa có thẻ, hoặc thẻ đánh dấu NULL)
@@ -519,6 +648,8 @@ class HealthInsuranceView(APIView):
             "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
             "registrations": reg_data,
+            "external_declarations": external_data,
+            "periods": periods,
         })
 
 
@@ -623,19 +754,19 @@ class InsuranceRegistrationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cfg = HealthInsuranceConfig.objects.order_by("-id").first()
+        period = request.query_params.get("period", "").strip().upper()
+        cfg = HealthInsuranceConfig.objects.select_related("bank_account").filter(
+            registration_period=period,
+        ).first()
+        error = _insurance_config_error(cfg)
+        if error:
+            return Response({"detail": error}, status=status.HTTP_409_CONFLICT)
         return Response({
             "prefill": self._snapshot(student),
-            "config": {
-                "description": cfg.description or "",
-                "bank_name": cfg.bank_name,
-                "bank_bin": cfg.bank_bin or "",
-                "bank_account_number": cfg.bank_account_number,
-                "bank_account_name": cfg.bank_account_name,
-                "insurance_fee": cfg.insurance_fee,
-            } if cfg else None,
+            "config": _insurance_config_payload(cfg, include_payment=True),
         })
 
+    @submission
     def post(self, request):
         student = self._student(request)
         if not student:
@@ -649,13 +780,23 @@ class InsuranceRegistrationView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         data = serializer.validated_data
 
-        # Một sinh viên chỉ có một đơn còn hiệu lực cho mỗi đợt. `rejected`
-        # KHÔNG chặn — bị từ chối thì phải nộp lại được.
+        cfg = HealthInsuranceConfig.objects.select_related("bank_account").filter(
+            registration_period=data["registration_period"],
+        ).first()
+        config_error = _insurance_config_error(cfg)
+        if config_error:
+            return Response({"detail": config_error}, status=status.HTTP_409_CONFLICT)
+        if data["registration_year"] != cfg.registration_year:
+            return Response(
+                {"detail": "Năm đăng ký không khớp với đợt đang mở."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Bổ sung dùng ID đơn hiện tại; không tạo đơn mới khi bị từ chối.
         if HealthInsuranceRegistration.objects.filter(
             student_id=student.id,
             registration_year=data["registration_year"],
             registration_period=data["registration_period"],
-            status__in=["pending", "processing", "done"],
         ).exists():
             return Response(
                 {"detail": "Bạn đã gửi yêu cầu đăng ký cho đợt này rồi."},
@@ -707,14 +848,28 @@ class InsuranceRegistrationView(APIView):
             
             hospital_code=data["hospital_code"],
             change_log=change_log, # Giữ lại change_log để tiện xem chênh lệch
-            status="pending",
+            config_snapshot=_insurance_config_payload(cfg, include_payment=True),
+            status="iu_processing",
+            fee_amount_vnd=integer(cfg.insurance_fee),
+            workflow_version=2,
         )
         reg.cccd_image = data["cccd_image"]
         reg.cccd_image_back = data["cccd_image_back"]
         reg.payment_receipt_image = data["payment_receipt_image"]
         if data.get("bhyt_image"):
             reg.bhyt_image = data["bhyt_image"]
+        # Save files explicitly so a later DB failure can clean up only new writes.
+        from pathlib import Path
+        for field in ('cccd_image', 'cccd_image_back', 'payment_receipt_image', 'bhyt_image'):
+            file = getattr(reg, field)
+            if file and not file._committed:
+                ext = inspect_upload(file.file)[1]
+                file.save(f"attachment.{ext}", file.file, save=False)
+                request.insurance_written_files.append(Path(file.path))
         reg.save()
+        append_event(reg, 'SUBMITTED', source='Hub', actor_id=student.pk,
+            old=None, new='iu_processing', key=request.data.get('request_key'),
+            payload={'request_digest': request.insurance_request_digest})
 
         # Dữ liệu QR trên thẻ đi vào bảng dùng chung, không nằm trong đơn.
         # Đọc được thì lưu, không đọc được thì thôi — không chặn nộp đơn.
@@ -737,7 +892,7 @@ class InsuranceRegistrationView(APIView):
             student.current_student_code, data["registration_period"],
             data["registration_year"], len(change_log),
         )
-        return Response({"id": reg.id, "status": "pending"},
+        return Response({"id": reg.id, "status": "iu_processing"},
                         status=status.HTTP_201_CREATED)
 
 

@@ -1,3 +1,5 @@
+import type { InsurancePeriod } from './insurance-periods';
+
 export interface StudentSession {
   ldap_uid: string;
   student_id: number | null;
@@ -46,6 +48,8 @@ export interface HealthInsuranceCard {
   hospital_name: string | null;
   /** Tên diện đăng ký (đã phẳng hoá từ danh mục). */
   registration_type: string | null;
+  registration_type_code: string | null;
+  registration_year: number | null;
   valid_from: string | null;
   valid_until: string | null;
   /** "Thẻ đang dùng" — KHÔNG phải "còn hiệu lực". */
@@ -57,8 +61,24 @@ export interface HealthInsuranceRegistration {
   registration_year: number;
   registration_period: string;
   created_at: string;
-  status: 'pending' | 'processing' | 'done' | 'rejected';
+  status: 'iu_processing' | 'waiting_bhxh' | 'issued' | 'rejected';
   rejection_reason: string | null;
+}
+
+export interface ExternalInsuranceDeclaration {
+  id: number;
+  medical_insurance_code: string;
+  social_insurance_code: string;
+  hospital_code: string;
+  hospital_name: string | null;
+  valid_from: string;
+  valid_until: string;
+  registration_year: number;
+  status: 'pending' | 'confirmed' | 'rejected';
+  review_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  declared: { label: string; value: string }[];
 }
 
 export interface InsuranceRegistrationPrefill {
@@ -89,7 +109,18 @@ export interface HealthInsuranceData {
   current: HealthInsuranceCard | null;
   history: HealthInsuranceCard[];
   registrations: HealthInsuranceRegistration[];
+  external_declarations: ExternalInsuranceDeclaration[];
+  periods: InsurancePeriod[];
   is_eligible: boolean;
+}
+
+export interface InsurancePeriodConfig extends InsurancePeriod {
+  description: string;
+  insurance_fee: number;
+  bank_name: string;
+  bank_bin: string;
+  bank_account_number: string;
+  bank_account_name: string;
 }
 
 export interface CivicActivity {
@@ -394,3 +425,18 @@ export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   done:       'bg-success-soft text-success-text border-success-line',
   rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };
+
+export interface InsuranceEvidence { id:number; filename:string; url:string; }
+export interface InsuranceAssessment { required_amount_vnd:number; confirmed_paid_total_vnd:number; missing_amount_vnd:number; }
+export interface HospitalSnapshot { hospital_code:string; hospital_name:string; province_code:string; province_name:string; }
+export interface InsuranceTimelineItem {
+  id:number; label:string; created_at:string; source_app:string; from_status:string|null; to_status:string|null;
+  reason_label:string; reason_text:string|null; assessment:InsuranceAssessment|null; evidences:InsuranceEvidence[];
+  payload:{before?:HospitalSnapshot; after?:HospitalSnapshot};
+}
+export interface InsuranceDetail {
+  hospital_code: string;
+  id:number; status:string; row_version:number; reason_code:string|null; reason_label:string; reason_text:string|null;
+  timeline:InsuranceTimelineItem[];
+  payment:(InsuranceAssessment & {qr_url:string|null; bank_name:string; bank_account_number:string; bank_account_name:string; reference:string})|null;
+}
