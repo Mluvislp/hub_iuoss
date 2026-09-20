@@ -12,7 +12,10 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from core.api.authentication import StudentPrincipal
 from core.models import HealthInsuranceRegistration as Registration, HealthInsuranceConfig, InsuranceEvent, InsuranceEvidence
-from students.models import Student, Hospital, VnProvince, HealthInsuranceCard
+from students.models import (
+    Student, Hospital, VnProvince, HealthInsuranceCard,
+    HealthInsuranceRegistrationType,
+)
 from core.insurance_contract import WorkflowError, Conflict, assessment, safe_path, validate_transition
 from core.insurance_history import append_event, add_assessment
 from core.insurance_workflow import supplement, detail
@@ -64,6 +67,35 @@ class HubWorkflowTests(TestCase):
         restored = self.client.get('/api/health-insurance/').data
         self.assertEqual(restored['current']['id'], old.pk)
         self.assertEqual([card['id'] for card in restored['history']], [old.pk])
+
+    def test_single_card_is_displayed_even_without_current_flag_or_card_details(self):
+        now = timezone.now()
+        registration_type = HealthInsuranceRegistrationType.objects.create(
+            code='KHONG_THAM_GIA',
+            name='SV đăng ký không tham gia BHYT tại trường',
+            created_at=now,
+            updated_at=now,
+        )
+        card = HealthInsuranceCard.objects.create(
+            student=self.student,
+            registration_type=registration_type,
+            registration_year=2027,
+            is_current=False,
+            created_at=now,
+            updated_at=now,
+        )
+
+        data = self.client.get('/api/health-insurance/').data
+
+        self.assertEqual(data['current']['id'], card.pk)
+        self.assertIsNone(data['current']['medical_insurance_code'])
+        self.assertIsNone(data['current']['social_insurance_code'])
+        self.assertIsNone(data['current']['hospital_code'])
+        self.assertEqual(
+            data['current']['registration_type'],
+            'SV đăng ký không tham gia BHYT tại trường',
+        )
+        self.assertEqual([row['id'] for row in data['history']], [card.pk])
 
     def test_image_append_resubmit_and_never_assess(self):
         reg=self.submit(uploads=[picture()])

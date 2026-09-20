@@ -36,7 +36,7 @@ class ExternalInsuranceTests(TestCase):
             citizen_id='012345678901', social_insurance_number='0123456789',
             permanent_province='01', permanent_ward='00001', permanent_street='Test street',
             hospital_code='01001', medical_insurance_code='GD4790123456789',
-            valid_from='2026-01-01', valid_until='2028-12-31',
+            valid_from='2026-03-17', valid_until='2028-12-31',
             cccd_image=picture(), cccd_image_back=picture(), bhyt_image=picture())
         data.update(changes)
         return data
@@ -55,6 +55,8 @@ class ExternalInsuranceTests(TestCase):
         self.assertTrue(old.is_current)
         self.assertEqual(row.status, 'pending')
         self.assertIsNone(row.card_id)
+        self.assertEqual(row.valid_from.isoformat(), '2026-03-17')
+        self.assertEqual(row.snapshot['valid_from'], '2026-03-17')
         self.assertEqual(HealthInsuranceCard.objects.count(), 1)
         self.assertEqual(row.snapshot['citizen_id'], '012345678901')
         self.assertEqual(len(row.images), 3)

@@ -561,6 +561,11 @@ class HealthInsuranceView(APIView):
         # Staff chọn thẻ ưu tiên bằng is_current; ngày tạo và hạn thẻ không được
         # tự ý thay quyết định đó.
         current = next((card for card in cards if card.is_current), None)
+        # Dữ liệu lịch sử có nhiều dòng cũ chưa được gắn is_current. Nếu sinh viên
+        # chỉ có đúng một record thì chính record đó là thông tin duy nhất có thể
+        # hiển thị, kể cả khi thiếu mã thẻ/BHXH/KCB hoặc chỉ ghi nhận diện tham gia.
+        if current is None and len(cards) == 1:
+            current = cards[0]
         # Danh sách này cố ý giữ TẤT CẢ thẻ, kể cả thẻ đang được ưu tiên ở trên.
         # is_current chỉ điều khiển ô nổi bật, không làm mất một dòng lịch sử.
         history = cards
