@@ -45,6 +45,7 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class HealthInsuranceCardSerializer(serializers.ModelSerializer):
+    registration_type_code = serializers.CharField(source="registration_type.code", read_only=True, default=None)
     # Phẳng hoá diện đăng ký: SV chỉ cần cái tên, không cần cả object danh mục.
     registration_type = serializers.CharField(
         source="registration_type.name", read_only=True, default=None,
@@ -60,6 +61,8 @@ class HealthInsuranceCardSerializer(serializers.ModelSerializer):
             "hospital_code",
             "hospital_name",
             "registration_type",
+            "registration_type_code",
+            "registration_year",
             "valid_from",
             "valid_until",
             "is_current",
@@ -134,8 +137,7 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
       ethnicity, phone_number, social_insurance_number, citizen_id,
       permanent_*, temporary_*
     - Bệnh viện KCB: hospital_code
-    - File ảnh: cccd_image (bắt buộc), bhyt_image (tuỳ chọn),
-      payment_receipt_image (bắt buộc)
+    - Bốn ảnh bắt buộc: hai mặt CCCD, thẻ BHYT cũ và biên lai thanh toán.
     """
 
     registration_year = serializers.IntegerField(
@@ -190,7 +192,11 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
         "null": "Vui lòng đính kèm ảnh CCCD mặt sau.",
         "invalid": "Vui lòng đính kèm ảnh CCCD mặt sau.",
     })
-    bhyt_image = serializers.FileField(required=False, allow_null=True)
+    bhyt_image = serializers.FileField(required=True, error_messages={
+        "required": "Vui lòng đính kèm ảnh thẻ BHYT cũ.",
+        "null": "Vui lòng đính kèm ảnh thẻ BHYT cũ.",
+        "invalid": "Vui lòng đính kèm ảnh thẻ BHYT cũ.",
+    })
     # Chuỗi thô đọc từ mã QR trên ảnh CCCD, do trình duyệt giải mã. Trình duyệt
     # thử cả hai mặt (CCCD gắn chip in ở mặt trước, thẻ Căn cước mẫu mới in ở
     # mặt sau). Không bắt buộc: ảnh mờ thì vẫn phải nộp đơn được.
@@ -241,15 +247,12 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
     def _validate_file(self, f, label):
         if f is None:
             return f
-        max_size = 5 * 1024 * 1024
-        if f.size > max_size:
-            raise serializers.ValidationError(f"{label} không được vượt quá 5MB.")
-        allowed = {"image/jpeg", "image/png", "image/webp", "image/heic"}
-        ct = getattr(f, "content_type", "")
-        if ct not in allowed:
-            raise serializers.ValidationError(
-                f"{label} phải là ảnh (JPEG, PNG, WebP, HEIC)."
-            )
+        from core.insurance_files import inspect_upload
+        from core.insurance_contract import WorkflowError
+        try:
+            inspect_upload(f)
+        except WorkflowError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         return f
 
     def validate_cccd_image(self, value):

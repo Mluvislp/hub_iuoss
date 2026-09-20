@@ -91,6 +91,25 @@ Hiển thị dạng stat cards: MSSV, Khoa, Bậc đào tạo, Trạng thái h�
 
 ### Bảo hiểm y tế
 
+Lịch nhận đăng ký không còn hardcode trong frontend. Bảng `hub_insurance_configs`
+luôn có đúng bốn slot `MAIN/Q2/Q3/Q4`, staff cập nhật năm hưởng, thời gian mở/đóng,
+mô tả, mức phí và tài khoản trên Dashboard. Hub đọc cả bốn lịch để luôn hiện đúng
+cặp đợt gần nhất, nhưng chỉ slot `is_active=1` và đang nằm trong khung giờ mới có
+trạng thái `open`. Backend kiểm tra lại khi GET form và POST, nên không thể truy cập
+trực tiếp hoặc nộp ngoài đợt.
+
+Trang BHYT hiện hai đợt: đợt đang mở + kế tiếp; nếu không có đợt mở thì đợt vừa
+hết hạn + kế tiếp (chu kỳ mới chưa có đợt hết hạn thì hiện hai đợt sắp tới). Đợt
+đang mở luôn hiện hạn cuối đăng ký.
+
+Thời hạn sử dụng được suy ra từ năm hưởng: `MAIN` 01/01–31/12, `Q2`
+01/04–31/12, `Q3` 01/07–31/12, `Q4` 01/10–31/12. Đợt chính mở tháng 9 năm trước
+phải mang `registration_year` của năm hưởng kế tiếp. Mỗi đơn lưu `config_snapshot`
+để việc tái sử dụng slot không làm sai mức phí/tài khoản lịch sử.
+
+Nâng cấp DB hiện hữu: chạy `docs/insurance_config_upgrade.sql` thủ công **trước**
+khi deploy cả hai ứng dụng.
+
 **Model:** `students.HealthInsuranceCard` → bảng `student_health_insurance_cards`  
 Chỉ lấy bản ghi `is_current=True` của sinh viên (đây là **thẻ đang dùng**, không phải "thẻ còn hạn").  
 Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ (`valid_until`).

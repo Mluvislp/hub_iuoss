@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_registrations` (
   `bhyt_image` VARCHAR(500) NULL,
   `payment_receipt_image` VARCHAR(500) NOT NULL,
   `change_log` JSON NULL,
+  `config_snapshot` JSON NULL COMMENT 'Cấu hình phí/ngân hàng tại thời điểm nộp',
   `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
   `rejection_reason` TEXT NULL,
   `created_at` DATETIME(6) NOT NULL,
@@ -125,10 +126,29 @@ CREATE TABLE IF NOT EXISTS `hub_cccd_scans` (
   KEY `idx_cccd_source` (`source`, `source_ref_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Nội dung hiển thị trên form đăng ký BHYT: mô tả, tài khoản nhận tiền, mức phí.
--- Một dòng đang dùng; đọc dòng có id lớn nhất.
+-- Danh sách tài khoản nhận phí do IT quản lý; staff chỉ được chọn trên Dashboard.
+CREATE TABLE IF NOT EXISTS `hub_insurance_bank_accounts` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `bank_name` VARCHAR(255) NOT NULL,
+  `bank_bin` VARCHAR(6) NOT NULL,
+  `account_number` VARCHAR(64) NOT NULL,
+  `account_name` VARCHAR(255) NOT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hiba_account` (`bank_bin`, `account_number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Bốn slot MAIN/Q2/Q3/Q4 được staff cập nhật và tái sử dụng qua từng năm.
 CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `registration_period` VARCHAR(32) NOT NULL,
+  `registration_year` INT NOT NULL,
+  `registration_opens_at` DATETIME(6) NOT NULL,
+  `registration_closes_at` DATETIME(6) NOT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 0,
+  `bank_account_id` BIGINT NULL,
   `description` TEXT NULL,
   `bank_name` VARCHAR(255) NOT NULL,
   `bank_bin` VARCHAR(6) NULL COMMENT 'Mã BIN 6 số của Napas, dùng dựng VietQR',
@@ -137,9 +157,17 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `insurance_fee` INT NOT NULL COMMENT 'Đơn vị: VNĐ',
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hic_period` (`registration_period`),
+  KEY `idx_hic_bank_account` (`bank_account_id`),
+  CONSTRAINT `fk_hic_bank_account` FOREIGN KEY (`bank_account_id`)
+    REFERENCES `hub_insurance_bank_accounts` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT `chk_hic_period` CHECK (`registration_period` IN ('MAIN','Q2','Q3','Q4'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bảng session cho hub (tách biệt với dashboard sessions)
 -- Django tự tạo bảng này khi chạy: python manage.py migrate
 -- (django.contrib.sessions dùng migration riêng, không bị tắt bởi MIGRATION_MODULES)
+
+-- BHYT workflow v2: after this base schema and the card/bank upgrade, run
+-- docs/insurance_workflow_upgrade.sql (idempotent expand; no data deletion).

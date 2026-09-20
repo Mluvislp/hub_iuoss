@@ -16,6 +16,7 @@ db.sqlite3
 # ── Node / Next.js ───────────────────────────────────────────
 frontend/node_modules/
 frontend/.next/
+frontend/.next-dev/
 frontend/out/
 frontend/.env.local
 frontend/.env.production.local
@@ -40,6 +41,17 @@ Thumbs.db
 # Schema thì dùng docs/schema.sql (được theo dõi, chỉ có DDL, không có dữ liệu).
 *.sql
 !docs/schema.sql
+!docs/insurance_config_upgrade.sql
+!docs/insurance_card_bank_upgrade.sql
+!docs/insurance_workflow_preflight.sql
+!docs/insurance_workflow_upgrade.sql
+!docs/insurance_workflow_verify.sql
+!docs/insurance_workflow_production.sql
+!docs/insurance_status_hotfix.sql
+!docs/external_insurance_upgrade.sql
+!docs/external_insurance_review_upgrade.sql
+!docs/external_insurance_validity_fix.sql
 
 # Rác build lọt vào repo
 encoded.txt
+.insurance-test-runtime/
