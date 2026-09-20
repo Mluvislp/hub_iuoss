@@ -242,7 +242,40 @@ export default function HealthInsurancePage() {
             </h2>
             <span className="text-xs text-muted">{history.length} thẻ</span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-slate-100 md:hidden">
+            {history.map(card => (
+              <article key={card.id} className="space-y-3 px-4 py-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-sm font-semibold text-ink">
+                      {card.medical_insurance_code || 'Chưa có mã thẻ'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">{card.registration_type || 'Chưa xác định diện tham gia'}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                    {card.registration_year || '—'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <div>
+                    <span className="block text-muted">Mã số BHXH</span>
+                    <span className="mt-0.5 block break-all font-mono text-ink">{card.social_insurance_code || '—'}</span>
+                  </div>
+                  {!hideHistoricalCardDetails(card) && <div>
+                    <span className="block text-muted">Giá trị sử dụng</span>
+                    <span className="mt-0.5 block text-ink">{periodText(card) || '—'}</span>
+                  </div>}
+                </div>
+                {!hideHistoricalCardDetails(card) && (card.hospital_name || card.hospital_code) && (
+                  <p className="border-t border-line2 pt-2 text-xs text-slate-600">
+                    <span className="text-muted">Nơi đăng ký KCB: </span>
+                    {card.hospital_name || card.hospital_code}
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
@@ -303,7 +336,25 @@ export default function HealthInsurancePage() {
               Lịch sử đăng ký BHYT
             </h2>
           </div>
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-slate-100 md:hidden">
+            {data.registrations.map(reg => (
+              <article key={reg.id} className="space-y-3 px-4 py-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">
+                      {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} năm {reg.registration_year}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">Đăng ký lúc {new Date(reg.created_at).toLocaleString('vi-VN')}</p>
+                  </div>
+                  <InsuranceStatus status={reg.status} />
+                </div>
+                <div className="flex justify-end">
+                  <InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} />
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr>

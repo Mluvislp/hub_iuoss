@@ -1,9 +1,11 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
 const PORT = 3000;
 const projectRoot = process.cwd();
+const DEV_DIST_DIR = '.next-dev';
 
 function normalize(value) {
   return String(value || '').replaceAll('\\', '/').toLowerCase();
@@ -124,9 +126,27 @@ if (!(await canListen())) {
   }
 }
 
+// Cache dev là dữ liệu tạm. Làm sạch khi khởi động để không giữ manifest cũ
+// trỏ tới các JS/CSS chunk đã bị thay sau khi cập nhật mã nguồn.
+try {
+  rmSync(path.join(projectRoot, DEV_DIST_DIR), {
+    recursive: true,
+    force: true,
+    maxRetries: 3,
+    retryDelay: 100,
+  });
+} catch (error) {
+  console.error(`Không thể làm sạch ${DEV_DIST_DIR}:`, error.message);
+  process.exit(1);
+}
+
 const nextBin = path.join(projectRoot, 'node_modules', 'next', 'dist', 'bin', 'next');
 const child = spawn(process.execPath, [nextBin, 'dev', '--port', String(PORT)], {
   cwd: projectRoot,
+  env: {
+    ...process.env,
+    NEXT_DIST_DIR: DEV_DIST_DIR,
+  },
   stdio: 'inherit',
   windowsHide: false,
   detached: process.platform !== 'win32',
