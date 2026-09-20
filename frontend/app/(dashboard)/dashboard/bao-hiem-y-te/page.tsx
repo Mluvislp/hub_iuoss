@@ -3,14 +3,15 @@
 import { InsuranceStatus } from '@/components/insurance-status';
 import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
-import { AlertCircle, History, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, FileClock, History, Loader2, ShieldCheck, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, accentIcon } from '@/lib/ui';
 import { cn, formatDate } from '@/lib/utils';
 import { HealthValidityBadge, daysLeft, validityState } from '@/components/health-insurance';
-import type { HealthInsuranceCard, HealthInsuranceData } from '@/lib/types';
+import type { ExternalInsuranceDeclaration, HealthInsuranceCard, HealthInsuranceData } from '@/lib/types';
 
 /** Ngưỡng nhắc gia hạn — dưới mức này thì hiện dòng lưu ý. */
 const EXPIRING_SOON_DAYS = 60;
@@ -65,6 +66,75 @@ function periodText(card: HealthInsuranceCard): string {
 
 function hideHistoricalCardDetails(card: HealthInsuranceCard): boolean {
   return !!card.registration_type_code && !['DHQT', 'KTX_DHQG', 'DHQT_DN_SV', 'NGOAI_TRUONG'].includes(card.registration_type_code);
+}
+
+function ExternalDeclarationDetail({ row }: { row: ExternalInsuranceDeclaration }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = overflow; };
+  }, [open]);
+
+  return <>
+    <button
+      type="button"
+      className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      onClick={() => setOpen(true)}
+    >
+      <FileClock className="h-4 w-4" />Chi tiết
+    </button>
+    {open && createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label={`Chi tiết khai báo BHYT ngoài trường số ${row.id}`}>
+        <div className="max-h-[calc(100dvh-1.5rem)] min-w-0 w-full max-w-3xl overflow-x-hidden overflow-y-auto rounded-2xl bg-slate-50 text-left shadow-2xl ring-1 ring-black/5 sm:max-h-[calc(100dvh-3rem)]">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-7">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">BHYT tại nơi khác</p>
+              <h2 className="mt-0.5 text-lg font-bold text-slate-900">Khai báo #{row.id}</h2>
+            </div>
+            <button type="button" aria-label="Đóng" className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" onClick={() => setOpen(false)}>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="space-y-5 px-4 py-5 sm:px-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-slate-500">Trạng thái hiện tại</span>
+              <InsuranceStatus status={row.status} />
+            </div>
+            <section className={cn(
+              'rounded-xl border p-4',
+              row.status === 'rejected' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white',
+            )}>
+              <h3 className="text-sm font-semibold text-slate-900">Phản hồi của nhà trường</h3>
+              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
+                {row.review_note || (row.status === 'pending' ? 'Đơn đang chờ cán bộ kiểm tra.' : 'Không có ghi chú.')}
+              </p>
+            </section>
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin thẻ tham gia ngoài nhà trường</h3>
+              <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <DefRow label="Mã thẻ BHYT" value={row.medical_insurance_code} />
+                <DefRow label="Mã số BHXH" value={row.social_insurance_code} />
+                <DefRow label="Nơi đăng ký KCB" value={row.hospital_name || row.hospital_code} />
+                <DefRow label="Giá trị sử dụng" value={`${formatDate(row.valid_from)} — ${formatDate(row.valid_until)}`} />
+                <DefRow label="Ngày khai" value={new Date(row.created_at).toLocaleString('vi-VN')} />
+                {row.reviewed_at && <DefRow label="Ngày xử lý" value={new Date(row.reviewed_at).toLocaleString('vi-VN')} />}
+              </dl>
+            </section>
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin sinh viên đã khai</h3>
+              <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                {row.declared.map(field => <DefRow key={field.label} label={field.label} value={field.value} />)}
+              </dl>
+            </section>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    )}
+  </>;
 }
 
 export default function HealthInsurancePage() {
@@ -270,25 +340,40 @@ export default function HealthInsurancePage() {
               Lịch sử khai báo BHYT tại nơi khác
             </h2>
           </div>
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-slate-100 md:hidden">
+            {data.external_declarations.map(row => (
+              <article key={row.id} className="space-y-3 px-4 py-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-sm font-semibold text-ink">{row.medical_insurance_code}</p>
+                    <p className="mt-1 text-xs text-muted">Khai lúc {new Date(row.created_at).toLocaleString('vi-VN')}</p>
+                  </div>
+                  <InsuranceStatus status={row.status} />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-slate-600">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</p>
+                  <ExternalDeclarationDetail row={row} />
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left border-collapse">
               <thead><tr>
                 <th className="px-5 py-3">Mã thẻ</th>
-                <th className="px-5 py-3">Nơi đăng ký KCB</th>
                 <th className="px-5 py-3">Giá trị sử dụng</th>
                 <th className="px-5 py-3">Ngày khai</th>
                 <th className="px-5 py-3">Trạng thái</th>
-                <th className="px-5 py-3">Phản hồi</th>
+                <th className="px-5 py-3 text-right">Thao tác</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {data.external_declarations.map(row => (
                   <tr key={row.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3 text-[0.82rem] font-mono">{row.medical_insurance_code}</td>
-                    <td className="px-5 py-3 text-[0.82rem]">{row.hospital_name || row.hospital_code || '—'}</td>
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</td>
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3"><InsuranceStatus status={row.status} /></td>
-                    <td className="px-5 py-3 text-[0.82rem] text-slate-600">{row.review_note || '—'}</td>
+                    <td className="px-5 py-3 text-right"><ExternalDeclarationDetail row={row} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -297,26 +382,26 @@ export default function HealthInsurancePage() {
         </section>
       )}
 
-      {/* ── Đăng ký BHYT ───────────────────────────────────── */}
+      {/* ── Các cách tham gia BHYT ─────────────────────────── */}
       <section className={ui.card}>
         <div className={ui.cardHeader}>
-          <h2 className={ui.sectionTitle}>Khai thông tin tham gia BHYT tại nơi khác</h2>
+          <h2 className={ui.sectionTitle}>Tham gia Bảo hiểm Y tế</h2>
         </div>
-        <div className="p-5 space-y-4">
-          <p className="text-sm text-muted">Sinh viên đã tham gia BHYT ngoài nhà trường có thể khai báo thông tin thẻ tại đây.</p>
-          <Link href="/dashboard/bao-hiem-y-te/khai-noi-khac" className={ui.btnPrimary}>Khai thông tin tham gia BHYT tại nơi khác</Link>
-        </div>
-      </section>
-      <section className={ui.card}>
-        <div className={ui.cardHeader}>
-          <h2 className={ui.sectionTitle}>Đăng ký Bảo hiểm Y tế</h2>
-        </div>
-        <div className="p-5">
-          <p className="text-[0.85rem] text-muted mb-4">
-            Sinh viên có thể đăng ký mua mới hoặc gia hạn BHYT tại trường vào các đợt theo quy định.
-          </p>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {getVisibleInsurancePeriods(data?.periods ?? []).map((p) => {
+        <div className="p-5 space-y-6">
+          <div className="rounded-lg border border-primary-line bg-primary-soft p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Đã tham gia BHYT tại nơi khác?</h3>
+              <p className="mt-1 text-[0.82rem] text-muted">Khai thông tin thẻ để nhà trường kiểm tra và xác nhận.</p>
+            </div>
+            <Link href="/dashboard/bao-hiem-y-te/khai-noi-khac" className={cn(ui.btnOutline, "mt-3 shrink-0 sm:mt-0")}>Khai thông tin tại nơi khác</Link>
+          </div>
+          <div className="border-t border-line2 pt-5">
+            <h3 className="text-sm font-semibold text-ink">Đăng ký BHYT tại trường</h3>
+            <p className="text-[0.85rem] text-muted mb-4">
+              Sinh viên có thể đăng ký mua mới hoặc gia hạn BHYT tại trường vào các đợt theo quy định.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {getVisibleInsurancePeriods(data?.periods ?? []).map((p) => {
               const isOpen = p.status === 'open';
               // Mã đợt trong DB viết hoa ('MAIN'/'Q2'…), ở đây viết thường — so sánh cùng dạng.
               const registered = !!data?.registrations?.some(
@@ -365,7 +450,8 @@ export default function HealthInsurancePage() {
                   </div>
                 </div>
               );
-            })}
+              })}
+            </div>
           </div>
         </div>
       </section>

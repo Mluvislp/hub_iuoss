@@ -63,6 +63,10 @@ class ExternalInsuranceTests(TestCase):
         self.assertEqual(health_data['current']['id'], old.pk)
         self.assertEqual(health_data['external_declarations'][0]['status'], 'pending')
         self.assertEqual(health_data['external_declarations'][0]['medical_insurance_code'], 'GD4790123456789')
+        self.assertIn(
+            {'label': 'Số CCCD', 'value': '012345678901'},
+            health_data['external_declarations'][0]['declared'],
+        )
 
     def test_retry_and_multiple_declarations_preserve_history(self):
         key = uuid4().hex
@@ -113,7 +117,14 @@ class ExternalInsuranceTests(TestCase):
 
     def test_prefill_is_owned_by_authenticated_student(self):
         self.post()
+        declaration = ExternalInsuranceDeclaration.objects.get()
+        declaration.status = ExternalInsuranceDeclaration.STATUS_REJECTED
+        declaration.review_note = 'Cần khai lại ảnh rõ hơn.'
+        declaration.save(update_fields=['status', 'review_note', 'updated_at'])
         response = self.client.get(self.url)
+        # Đơn bị từ chối không tạo thẻ, nhưng vẫn là bản khai ngoài trường gần
+        # nhất để sinh viên không phải nhập lại toàn bộ thông tin khi sửa đơn.
+        self.assertFalse(HealthInsuranceCard.objects.exists())
         self.assertEqual(response.data['prefill']['medical_insurance_code'], 'GD4790123456789')
         self.assertEqual(response.data['prefill']['hospital_province'], '01')
         self.assertEqual(response.data['prefill']['valid_until'], '2028-12-31')

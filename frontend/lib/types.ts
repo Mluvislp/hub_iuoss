@@ -78,6 +78,7 @@ export interface ExternalInsuranceDeclaration {
   review_note: string | null;
   created_at: string;
   reviewed_at: string | null;
+  declared: { label: string; value: string }[];
 }
 
 export interface InsuranceRegistrationPrefill {

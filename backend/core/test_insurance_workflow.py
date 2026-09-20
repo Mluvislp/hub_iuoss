@@ -55,14 +55,15 @@ class HubWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.data
         self.assertEqual(data['current']['id'], old.pk)
-        self.assertEqual([card['id'] for card in data['history']], [latest.pk])
+        self.assertEqual([card['id'] for card in data['history']], [latest.pk, old.pk])
+        self.assertTrue(next(card for card in data['history'] if card['id'] == old.pk)['is_current'])
         self.assertEqual(data['current']['registration_year'], 2027)
         self.assertEqual(data['current']['valid_from'], '2027-01-01')
         self.assertEqual(data['current']['valid_until'], '2030-12-31')
         latest.delete()
         restored = self.client.get('/api/health-insurance/').data
         self.assertEqual(restored['current']['id'], old.pk)
-        self.assertEqual(restored['history'], [])
+        self.assertEqual([card['id'] for card in restored['history']], [old.pk])
 
     def test_image_append_resubmit_and_never_assess(self):
         reg=self.submit(uploads=[picture()])

@@ -50,7 +50,10 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                 'hospital_code': card.hospital_code or '',
                 'hospital_province': hospital.province_code if hospital else '',
             })
-        previous = ExternalInsuranceDeclaration.objects.filter(student=student).first()
+        # Bản khai gần nhất (kể cả bị từ chối) chỉ dùng làm dữ liệu GỢI Ý để sinh
+        # viên sửa và khai lại; nó không được ghi vào bảng thẻ nếu staff chưa xác nhận.
+        previous = (ExternalInsuranceDeclaration.objects.filter(student=student)
+                    .order_by('-created_at', '-id').first())
         if previous:
             hospital = Hospital.objects.filter(code=previous.hospital_code).first()
             prefill.update({

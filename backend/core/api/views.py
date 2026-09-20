@@ -561,9 +561,9 @@ class HealthInsuranceView(APIView):
         # Staff chọn thẻ ưu tiên bằng is_current; ngày tạo và hạn thẻ không được
         # tự ý thay quyết định đó.
         current = next((card for card in cards if card.is_current), None)
-        # Lịch sử lấy trực tiếp từng snapshot trong student_health_insurance_cards;
-        # thẻ được staff chọn đã có khu vực riêng phía trên.
-        history = [card for card in cards if card.pk != getattr(current, "pk", None)]
+        # Danh sách này cố ý giữ TẤT CẢ thẻ, kể cả thẻ đang được ưu tiên ở trên.
+        # is_current chỉ điều khiển ô nổi bật, không làm mất một dòng lịch sử.
+        history = cards
 
         regs = (
             HealthInsuranceRegistration.objects
@@ -600,6 +600,22 @@ class HealthInsuranceView(APIView):
             "review_note": row.review_note,
             "created_at": row.created_at,
             "reviewed_at": row.reviewed_at,
+            "declared": [
+                {"label": label, "value": row.snapshot.get(field, "")}
+                for field, label in (
+                    ("full_name", "Họ và tên"),
+                    ("student_code", "MSSV"),
+                    ("gender", "Giới tính"),
+                    ("dob", "Ngày sinh"),
+                    ("ethnicity", "Dân tộc"),
+                    ("phone_number", "Số điện thoại"),
+                    ("citizen_id", "Số CCCD"),
+                    ("social_insurance_number", "Mã số BHXH"),
+                    ("permanent_province", "Mã tỉnh/thành thường trú"),
+                    ("permanent_ward", "Mã phường/xã thường trú"),
+                    ("permanent_street", "Địa chỉ thường trú"),
+                )
+            ],
         } for row in external_rows]
 
         # Điều kiện mở nút đăng ký
