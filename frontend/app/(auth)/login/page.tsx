@@ -135,11 +135,12 @@ function LoginForm() {
         <div className="relative z-10 space-y-6">
           <div>
             <h1 className="text-white text-3xl font-bold leading-tight tracking-tight">
-              Cổng thông tin<br />
-              <span className="text-blue-400">sinh viên</span>
+              Cổng thông tin Sinh viên<br />
+              <span className="text-blue-400">IUOSS HUB</span>
             </h1>
             <p className="mt-3 text-slate-400 text-sm leading-relaxed">
-              Tra cứu hồ sơ, theo dõi yêu cầu và quản lý thông tin học vụ tại Trường Đại học Quốc tế HCMIU.
+              Tra cứu hồ sơ, theo dõi yêu cầu và quản lý thông tin học vụ của Sinh viên
+              Trường Đại học Quốc tế, ĐHQG-HCM.
             </p>
           </div>
 
