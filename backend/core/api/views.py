@@ -17,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core import microsoft_auth
 from core.auth import verify_ldap
 from core.login_policy import check_login
-from core.models import HubStudent, ConfirmationRequest
+from core.models import HubStudent, ConfirmationRequest, ExternalInsuranceDeclaration
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
@@ -436,7 +436,8 @@ class DashboardView(APIView):
                 health_insurance = (
                     HealthInsuranceCard.objects
                     .select_related("registration_type")
-                    .filter(student=student, is_current=True)
+                    .filter(student=student)
+                    .order_by("-id")
                     .first()
                 )
                 # Tính năng tắt → không truy vấn, không trả dữ liệu (ẩn thật, không
@@ -547,6 +548,7 @@ class HealthInsuranceView(APIView):
         if not student_id:
             return Response({
                 "is_eligible": False, "current": None, "history": [], "registrations": [],
+                "external_declarations": [],
                 "periods": periods,
             })
 
@@ -554,10 +556,14 @@ class HealthInsuranceView(APIView):
             HealthInsuranceCard.objects
             .filter(student_id=student_id)
             .select_related("registration_type")
+            .order_by("-id")
         )
-        # is_current = thẻ đang dùng (KHÔNG phải "còn hiệu lực") — xem model.
-        current = next((c for c in cards if c.is_current), None)
-        history = [c for c in cards if c is not current]
+        # Staff chọn thẻ ưu tiên bằng is_current; ngày tạo và hạn thẻ không được
+        # tự ý thay quyết định đó.
+        current = next((card for card in cards if card.is_current), None)
+        # Lịch sử lấy trực tiếp từng snapshot trong student_health_insurance_cards;
+        # thẻ được staff chọn đã có khu vực riêng phía trên.
+        history = [card for card in cards if card.pk != getattr(current, "pk", None)]
 
         regs = (
             HealthInsuranceRegistration.objects
@@ -575,6 +581,26 @@ class HealthInsuranceView(APIView):
             "rejection_reason_code": r.rejection_reason_code,
             "rejection_reason": r.rejection_reason,
         } for r in regs]
+        external_rows = list(ExternalInsuranceDeclaration.objects.filter(
+            student_id=student_id
+        ).order_by("-created_at"))
+        external_hospitals = dict(Hospital.objects.filter(
+            code__in={row.hospital_code for row in external_rows if row.hospital_code}
+        ).values_list("code", "name"))
+        external_data = [{
+            "id": row.id,
+            "medical_insurance_code": row.medical_insurance_code,
+            "social_insurance_code": row.social_insurance_code,
+            "hospital_code": row.hospital_code,
+            "hospital_name": external_hospitals.get(row.hospital_code),
+            "valid_from": row.valid_from,
+            "valid_until": row.valid_until,
+            "registration_year": row.registration_year,
+            "status": row.status,
+            "review_note": row.review_note,
+            "created_at": row.created_at,
+            "reviewed_at": row.reviewed_at,
+        } for row in external_rows]
 
         # Điều kiện mở nút đăng ký
         # Mặc định là cho phép đăng ký (Bao gồm chưa có thẻ, hoặc thẻ đánh dấu NULL)
@@ -591,6 +617,7 @@ class HealthInsuranceView(APIView):
             "current": HealthInsuranceCardSerializer(current, context=ctx).data if current else None,
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
             "registrations": reg_data,
+            "external_declarations": external_data,
             "periods": periods,
         })
 

@@ -125,6 +125,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
       addInfo: payment.reference,
     });
   }, [data?.payment]);
+  const paymentBankBin = findBank(data?.payment?.bank_name)?.bin;
   return <>
     <button className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
       onClick={() => { setOpen(true); setError(''); }}><FileClock className="h-4 w-4" />Chi tiết</button>
@@ -140,7 +141,8 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
         {!data ? <p>Đang tải…</p> : <>
           <div className="mb-5 flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">Trạng thái hiện tại</span><InsuranceStatus status={data.status} /></div>
           {rejected && <section className="rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="font-semibold">{data.reason_label}</p><p className="whitespace-pre-wrap">{data.reason_text}</p>
+            <p className="font-semibold">{data.reason_label}</p>
+            {data.reason_text && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{data.reason_text}</p>}
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' || paymentReason ?
               <button className={ui.btnOutline + " mt-3"} onClick={() => setEditing(true)}>
                 {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
@@ -194,29 +196,29 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                     <div className="min-w-0 flex-1">
                       <h3 className="mb-2 font-semibold text-ink">Thông tin chuyển khoản</h3>
                       <ul className="space-y-1.5 text-sm text-slate-600">
-                        <li>Ngân hàng: <strong className="text-ink">{data.payment.bank_name || '—'}</strong></li>
+                        <li>Ngân hàng: <strong className="text-ink">{data.payment.bank_name || '—'}</strong>{paymentBankBin && <span className="ml-1.5 text-xs text-muted">(BIN {paymentBankBin})</span>}</li>
                         <li className="flex flex-wrap items-center gap-x-2"><span>Số tài khoản: <strong className="font-mono text-ink">{data.payment.bank_account_number}</strong></span><CopyButton text={data.payment.bank_account_number} /></li>
                         <li>Chủ tài khoản: <strong className="text-ink">{data.payment.bank_account_name || '—'}</strong></li>
                         <li>Số tiền: <strong className="text-base text-primary">{money(data.payment.missing_amount_vnd)}</strong></li>
                         <li className="flex flex-wrap items-center gap-x-2"><span>Nội dung: <strong className="break-all text-ink">{data.payment.reference}</strong></span><CopyButton text={data.payment.reference} /></li>
                       </ul>
-                      <p className="mt-3 text-xs text-muted">Mã QR đã gồm sẵn số tài khoản, số tiền còn thiếu và nội dung chuyển khoản.</p>
+                      <p className="mt-3 text-xs text-muted">Mã QR đã gồm sẵn số tài khoản, số tiền còn thiếu và nội dung. Giữ nguyên nội dung chuyển khoản để Phòng KHTC đối chiếu được hóa đơn.</p>
                     </div>
                   </div> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
               </> : <p>Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
 
               <div>
-                <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 8 ảnh, 5 MB/ảnh)</span></label>
+                <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
                 <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
-                  <input className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e => {
-                    setFiles(Array.from(e.target.files || [])); pending.current = null;
+                  <input className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => {
+                    setFiles(e.target.files?.[0] ? [e.target.files[0]] : []); pending.current = null;
                   }} />
                   <div className="flex min-w-0 flex-col items-center gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 transition-transform group-hover:scale-110">
                       {files.length ? <CheckSquare size={20} /> : <Plus size={20} />}
                     </div>
-                    <span className="max-w-full break-all text-sm font-medium text-slate-700">{files.length ? `${files.length} ảnh đã chọn` : 'Tải lên minh chứng chuyển khoản'}</span>
-                    <span className="text-xs text-slate-500">JPEG, PNG hoặc WEBP · Tối đa 5MB/ảnh</span>
+                    <span className="max-w-full break-all text-sm font-medium text-slate-700">{files.length ? 'Đã chọn 1 ảnh' : 'Tải lên minh chứng chuyển khoản'}</span>
+                    <span className="text-xs text-slate-500">JPEG, PNG hoặc WEBP · Tối đa 5MB</span>
                   </div>
                 </div>
                 {!!files.length && <div className="mt-2 flex flex-wrap gap-1.5">{files.map(file => <span key={file.name + file.lastModified} className="max-w-full truncate rounded-md border border-line bg-white px-2 py-1 text-xs text-muted">{file.name}</span>)}</div>}
@@ -236,7 +238,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-slate-900">{e.label}</p><p className="mt-1 text-xs text-slate-500">Bước {index + 1} · {actorName(e.source_app)}</p></div><time className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{new Date(e.created_at).toLocaleString('vi-VN')}</time></div>
                 {e.from_status && e.to_status && e.from_status !== e.to_status && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><InsuranceStatus status={e.from_status} /><ArrowRight className="h-4 w-4 text-slate-400" /><InsuranceStatus status={e.to_status} /></div>}
-                {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="font-semibold">{e.reason_label}</span>{e.reason_text && <span>: {e.reason_text}</span>}</div>}
+                {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900">{e.reason_label && <p className="font-semibold">{e.reason_label}</p>}{e.reason_text && <p className={e.reason_label ? 'mt-1' : ''}>{e.reason_text}</p>}</div>}
                 {e.assessment && <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-2.5"><span className="block text-xs text-slate-500">Phí phải đóng</span><b>{money(e.assessment.required_amount_vnd)}</b></div><div className="rounded-lg bg-emerald-50 p-2.5"><span className="block text-xs text-emerald-700">Đã xác nhận</span><b>{money(e.assessment.confirmed_paid_total_vnd)}</b></div><div className="rounded-lg bg-amber-50 p-2.5"><span className="block text-xs text-amber-700">Còn thiếu</span><b>{money(e.assessment.missing_amount_vnd)}</b></div></div>}
                 {e.payload.before && e.payload.after && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name} · {e.payload.before.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-blue-700">{e.payload.after.hospital_name} · {e.payload.after.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
                 {!!e.evidences.length && <div className="mt-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Minh chứng thanh toán bổ sung</p><div className="flex flex-wrap gap-2">{e.evidences.map(p => <EvidenceImage key={p.id} evidence={p} />)}</div></div>}

@@ -65,6 +65,21 @@ export interface HealthInsuranceRegistration {
   rejection_reason: string | null;
 }
 
+export interface ExternalInsuranceDeclaration {
+  id: number;
+  medical_insurance_code: string;
+  social_insurance_code: string;
+  hospital_code: string;
+  hospital_name: string | null;
+  valid_from: string;
+  valid_until: string;
+  registration_year: number;
+  status: 'pending' | 'confirmed' | 'rejected';
+  review_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 export interface InsuranceRegistrationPrefill {
   full_name: string;
   student_code: string;
@@ -93,6 +108,7 @@ export interface HealthInsuranceData {
   current: HealthInsuranceCard | null;
   history: HealthInsuranceCard[];
   registrations: HealthInsuranceRegistration[];
+  external_declarations: ExternalInsuranceDeclaration[];
   periods: InsurancePeriod[];
   is_eligible: boolean;
 }

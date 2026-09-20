@@ -1,8 +1,10 @@
 from django.urls import path
 from . import views
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView
+from .external_insurance_views import ExternalInsuranceView
 
 urlpatterns = [
+    path('health-insurance/external/', ExternalInsuranceView.as_view(), name='api_external_insurance'),
     path('health-insurance/registrations/<int:pk>/', InsuranceDetailView.as_view(), name='api_insurance_detail'),
     path('health-insurance/registrations/<int:pk>/evidence/<int:evidence_id>/', InsuranceEvidenceView.as_view(), name='api_insurance_evidence'),
     # Health check (no auth) — cho monitor / load balancer

@@ -47,6 +47,8 @@ Thumbs.db
 !docs/insurance_workflow_verify.sql
 !docs/insurance_workflow_production.sql
 !docs/insurance_status_hotfix.sql
+!docs/external_insurance_upgrade.sql
+!docs/external_insurance_review_upgrade.sql
 
 # Rác build lọt vào repo
 encoded.txt

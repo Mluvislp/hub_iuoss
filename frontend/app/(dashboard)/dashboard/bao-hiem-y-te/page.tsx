@@ -63,12 +63,8 @@ function periodText(card: HealthInsuranceCard): string {
   return `${formatDate(card.valid_from)} — ${formatDate(card.valid_until)}`;
 }
 
-function outsideSchool(card: HealthInsuranceCard): boolean {
-  return !!card.registration_type_code && card.registration_type_code !== 'DHQT';
-}
-
 function hideHistoricalCardDetails(card: HealthInsuranceCard): boolean {
-  return !!card.registration_type_code && !['DHQT', 'KTX_DHQG'].includes(card.registration_type_code);
+  return !!card.registration_type_code && !['DHQT', 'KTX_DHQG', 'DHQT_DN_SV', 'NGOAI_TRUONG'].includes(card.registration_type_code);
 }
 
 export default function HealthInsurancePage() {
@@ -93,9 +89,10 @@ export default function HealthInsurancePage() {
 
   const current = data?.current ?? null;
   const history = data?.history ?? [];
-  const remaining = current ? daysLeft(current.valid_until) : null;
+  const showCoverage = current && !hideHistoricalCardDetails(current);
+  const remaining = showCoverage ? daysLeft(current.valid_until) : null;
   const expiringSoon = remaining !== null && remaining <= EXPIRING_SOON_DAYS;
-  const period = current ? periodText(current) : '';
+  const period = showCoverage ? periodText(current) : '';
 
   return (
     <div className="space-y-6">
@@ -113,14 +110,11 @@ export default function HealthInsurancePage() {
             <ShieldCheck size={16} className={accentIcon.success} />
             Thẻ bảo hiểm y tế
           </h2>
-          {current && <HealthValidityBadge validUntil={current.valid_until} />}
+          {showCoverage && <HealthValidityBadge validUntil={current.valid_until} />}
         </div>
 
         {current ? (
           <div className="px-5 py-5">
-            {outsideSchool(current) && <p className="mb-4 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
-              SV đăng ký không tham gia BHYT tại trường · Năm tham gia: {current.registration_year || 'Chưa cập nhật'} · {current.registration_type}
-            </p>}
             {/* Mã thẻ là thứ SV cần nhất khi đi khám → cho nổi lên trên cùng. */}
             <div className="rounded-lg border border-primary-line bg-[#f5f9ff] px-5 py-4">
               <div className={ui.label}>Mã thẻ BHYT</div>
@@ -149,10 +143,10 @@ export default function HealthInsurancePage() {
                   )
                 }
               />
-              <DefRow
+              {showCoverage && <DefRow
                 label="Nơi đăng ký khám chữa bệnh"
                 value={<HospitalValue card={current} />}
-              />
+              />}
               <DefRow label="Diện đăng ký" value={current.registration_type} />
               <DefRow label="Năm tham gia" value={current.registration_year} />
             </dl>
@@ -183,6 +177,7 @@ export default function HealthInsurancePage() {
               <thead>
                 <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
                   <th className="text-left font-medium px-5 py-2.5">Mã thẻ</th>
+                  <th className="text-left font-medium px-3 py-2.5">Mã số BHXH</th>
                   <th className="text-left font-medium px-3 py-2.5 hidden sm:table-cell">Nơi đăng ký KCB</th>
                   <th className="text-left font-medium px-3 py-2.5 hidden md:table-cell">Diện đăng ký</th>
                   <th className="text-left font-medium px-3 py-2.5">Năm</th>
@@ -196,8 +191,9 @@ export default function HealthInsurancePage() {
                     className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
                   >
                     <td className="px-5 py-3 text-[0.82rem] text-ink">
-                      {hideHistoricalCardDetails(card) ? null : card.medical_insurance_code || '—'}
+                      {card.medical_insurance_code || '—'}
                     </td>
+                    <td className="px-3 py-3 text-[0.82rem] text-ink">{card.social_insurance_code || '—'}</td>
                     <td className="px-3 py-3 text-slate-600 hidden sm:table-cell max-w-[220px]">
                       {!hideHistoricalCardDetails(card) && <span
                         className="line-clamp-2"
@@ -266,7 +262,51 @@ export default function HealthInsurancePage() {
         </section>
       )}
 
+      {data?.external_declarations && data.external_declarations.length > 0 && (
+        <section className={ui.card}>
+          <div className={ui.cardHeader}>
+            <h2 className={ui.sectionTitle}>
+              <History size={16} className={accentIcon.primary} />
+              Lịch sử khai báo BHYT tại nơi khác
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead><tr>
+                <th className="px-5 py-3">Mã thẻ</th>
+                <th className="px-5 py-3">Nơi đăng ký KCB</th>
+                <th className="px-5 py-3">Giá trị sử dụng</th>
+                <th className="px-5 py-3">Ngày khai</th>
+                <th className="px-5 py-3">Trạng thái</th>
+                <th className="px-5 py-3">Phản hồi</th>
+              </tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.external_declarations.map(row => (
+                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3 text-[0.82rem] font-mono">{row.medical_insurance_code}</td>
+                    <td className="px-5 py-3 text-[0.82rem]">{row.hospital_name || row.hospital_code || '—'}</td>
+                    <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</td>
+                    <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
+                    <td className="px-5 py-3"><InsuranceStatus status={row.status} /></td>
+                    <td className="px-5 py-3 text-[0.82rem] text-slate-600">{row.review_note || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* ── Đăng ký BHYT ───────────────────────────────────── */}
+      <section className={ui.card}>
+        <div className={ui.cardHeader}>
+          <h2 className={ui.sectionTitle}>Khai thông tin tham gia BHYT tại nơi khác</h2>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-muted">Sinh viên đã tham gia BHYT ngoài nhà trường có thể khai báo thông tin thẻ tại đây.</p>
+          <Link href="/dashboard/bao-hiem-y-te/khai-noi-khac" className={ui.btnPrimary}>Khai thông tin tham gia BHYT tại nơi khác</Link>
+        </div>
+      </section>
       <section className={ui.card}>
         <div className={ui.cardHeader}>
           <h2 className={ui.sectionTitle}>Đăng ký Bảo hiểm Y tế</h2>

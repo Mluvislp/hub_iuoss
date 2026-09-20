@@ -12,7 +12,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 from core.api.authentication import StudentPrincipal
 from core.models import HealthInsuranceRegistration as Registration, HealthInsuranceConfig, InsuranceEvent, InsuranceEvidence
-from students.models import Student, Hospital, VnProvince
+from students.models import Student, Hospital, VnProvince, HealthInsuranceCard
 from core.insurance_contract import WorkflowError, Conflict, assessment, safe_path, validate_transition
 from core.insurance_history import append_event, add_assessment
 from core.insurance_workflow import supplement, detail
@@ -41,12 +41,35 @@ class HubWorkflowTests(TestCase):
     def test_default_new_status(self):
         self.assertEqual(Registration().status,'iu_processing')
 
-    def test_multiple_images_append_resubmit_and_never_assess(self):
-        reg=self.submit(uploads=[picture(),picture(color='blue')])
+    def test_card_selected_by_staff_is_current_and_other_cards_are_history(self):
+        from datetime import date
+        now = timezone.now()
+        old = HealthInsuranceCard.objects.create(student=self.student, registration_year=2027,
+            valid_from=date(2027, 1, 1), valid_until=date(2030, 12, 31), is_current=True,
+            created_at=now, updated_at=now)
+        latest = HealthInsuranceCard.objects.create(student=self.student, registration_year=2027,
+            valid_from=date(2027, 4, 1), valid_until=date(2027, 12, 31),
+            social_insurance_code='0123456789', medical_insurance_code='SV4790123456789',
+            created_at=now, updated_at=now)
+        response = self.client.get('/api/health-insurance/')
+        self.assertEqual(response.status_code, 200)
+        data = response.data
+        self.assertEqual(data['current']['id'], old.pk)
+        self.assertEqual([card['id'] for card in data['history']], [latest.pk])
+        self.assertEqual(data['current']['registration_year'], 2027)
+        self.assertEqual(data['current']['valid_from'], '2027-01-01')
+        self.assertEqual(data['current']['valid_until'], '2030-12-31')
+        latest.delete()
+        restored = self.client.get('/api/health-insurance/').data
+        self.assertEqual(restored['current']['id'], old.pk)
+        self.assertEqual(restored['history'], [])
+
+    def test_image_append_resubmit_and_never_assess(self):
+        reg=self.submit(uploads=[picture()])
         self.assertEqual(reg.status,'iu_processing')
         self.assertEqual(reg.payment_receipt_image.name,'old.png')
-        self.assertEqual(reg.evidences.count(),2)
-        self.assertEqual(len(set(reg.evidences.values_list('storage_key',flat=True))),2)
+        self.assertEqual(reg.evidences.count(),1)
+        self.assertEqual(len(set(reg.evidences.values_list('storage_key',flat=True))),1)
         for evidence in reg.evidences.all(): self.assertTrue(Path(self.temp.name,evidence.storage_key).is_file())
         self.assertFalse(reg.assessments.exists())
         self.assertEqual(list(reg.events.values_list('event_type',flat=True)),['PAYMENT_EVIDENCE_SUBMITTED','RESUBMITTED'])
@@ -57,6 +80,11 @@ class HubWorkflowTests(TestCase):
         self.submit(uploads=[picture()])
         self.assertEqual(self.reg.evidences.count(),2)
         for e in self.reg.evidences.all(): self.assertTrue(Path(self.temp.name,e.storage_key).exists())
+
+    def test_each_supplement_accepts_at_most_one_image(self):
+        with self.assertRaisesRegex(WorkflowError, 'tối đa 1 ảnh'):
+            self.submit(uploads=[picture(), picture()])
+        self.assertFalse(self.reg.evidences.exists())
 
     def test_hospital_change_before_after_and_resubmit(self):
         VnProvince.objects.create(code='79',name='TP HCM',unit_type='Thành phố')
@@ -149,9 +177,9 @@ class HubWorkflowTests(TestCase):
         self.assertEqual(self.client.get(reverse('api_insurance_evidence',args=[self.reg.pk,e.pk])).status_code,404)
 
     def test_detail_timeline_in_one_request(self):
-        self.submit(uploads=[picture(),picture()])
+        self.submit(uploads=[picture()])
         result=self.client.get(reverse('api_insurance_detail',args=[self.reg.pk])).json()
-        self.assertEqual(len(result['timeline'][0]['evidences']),2)
+        self.assertEqual(len(result['timeline'][0]['evidences']),1)
         self.assertEqual(result['timeline'][1]['to_status'],'iu_processing')
 
     def test_legacy_without_history(self):

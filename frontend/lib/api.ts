@@ -276,6 +276,14 @@ export const api = {
     },
   },
 
+  externalInsurance: {
+    prefill(): Promise<{ prefill: InsuranceRegistrationPrefill; config: null }> {
+      return request('/health-insurance/external/');
+    },
+    submit(body: FormData): Promise<{ id: number; status: string }> {
+      return requestMultipart('/health-insurance/external/', body);
+    },
+  },
   insuranceRegistration: {
     detail(id:number): Promise<import('./types').InsuranceDetail> {
       return request(`/health-insurance/registrations/${id}/`);

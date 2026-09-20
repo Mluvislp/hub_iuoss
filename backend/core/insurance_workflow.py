@@ -19,8 +19,8 @@ def hospital_snapshot(code):
 
 def supplement(pk, student_id, *, key, row_version, uploads=(), hospital_code='', province_code=''):
     require_active()
-    if len(uploads) > 8:
-        raise WorkflowError('Mỗi lần gửi tối đa 8 ảnh.')
+    if len(uploads) > 1:
+        raise WorkflowError('Mỗi lần gửi tối đa 1 ảnh.')
     checked = [inspect_upload(f) for f in uploads]
     digest = fingerprint({'hospital_code': hospital_code, 'province_code': province_code,
                           'row_version': str(row_version), 'files': [c[3] for c in checked]})
@@ -89,7 +89,12 @@ def detail(reg, evidence_url):
             payment['qr_url'] = f'https://img.vietqr.io/image/{bank_bin}-{quote(account, safe="")}-compact2.png?' + urlencode({
                 'amount': payment['missing_amount_vnd'], 'addInfo': payment['reference'],
                 'accountName': payment['bank_account_name']})
+    reason_label = REASONS.get(reg.rejection_reason_code, '')
+    reason_text = (reg.rejection_reason or '').strip()
+    legacy_prefix = f'{reason_label}: '
+    if reason_label and reason_text.startswith(legacy_prefix):
+        reason_text = reason_text[len(legacy_prefix):].strip()
     return {'id': reg.pk, 'status': normalized(reg.status), 'row_version': reg.row_version,
             'hospital_code': reg.hospital_code, 'reason_code': reg.rejection_reason_code,
-            'reason_label': REASONS.get(reg.rejection_reason_code, ''),
-            'reason_text': reg.rejection_reason, 'payment': payment, 'timeline': events}
+            'reason_label': reason_label,
+            'reason_text': reason_text or None, 'payment': payment, 'timeline': events}
