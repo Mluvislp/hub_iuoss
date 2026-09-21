@@ -96,7 +96,8 @@ def normalized_upload(upload, data, ext, mime):
     ảnh vỡ, vì trình duyệt ngoài Safari không đọc được HEIC. Đã dính thật ngày
     21/09/2026 — đơn #174 có hai file CCCD lưu dạng HEIF mang đuôi .jpg.
     """
-    stem = Path(getattr(upload, 'name', 'upload').replace('\', '/')).stem[:80] or 'upload'
+    raw = getattr(upload, 'name', '') or 'upload'
+    stem = Path(raw.replace('\\', '/')).stem[:80] or 'upload'
     return SimpleUploadedFile(f'{stem}.{ext}', data, content_type=mime)
 
 
