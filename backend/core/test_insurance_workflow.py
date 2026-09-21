@@ -97,6 +97,62 @@ class HubWorkflowTests(TestCase):
         )
         self.assertEqual([row['id'] for row in data['history']], [card.pk])
 
+    def test_main_period_allows_registration_with_long_valid_card(self):
+        from datetime import timedelta
+
+        now = timezone.now()
+        HealthInsuranceCard.objects.create(
+            student=self.student,
+            registration_year=2027,
+            valid_until=timezone.localdate() + timedelta(days=61),
+            is_current=True,
+            created_at=now,
+            updated_at=now,
+        )
+        HealthInsuranceConfig.objects.create(
+            registration_period='MAIN',
+            registration_year=2028,
+            registration_opens_at=now - timedelta(days=1),
+            registration_closes_at=now + timedelta(days=1),
+            is_active=True,
+            bank_name='Bank',
+            bank_account_number='123456',
+            bank_account_name='University',
+            insurance_fee=1000000,
+        )
+
+        data = self.client.get('/api/health-insurance/').data
+
+        self.assertTrue(data['is_eligible'])
+
+    def test_later_period_blocks_registration_with_long_valid_card(self):
+        from datetime import timedelta
+
+        now = timezone.now()
+        HealthInsuranceCard.objects.create(
+            student=self.student,
+            registration_year=2027,
+            valid_until=timezone.localdate() + timedelta(days=61),
+            is_current=True,
+            created_at=now,
+            updated_at=now,
+        )
+        HealthInsuranceConfig.objects.create(
+            registration_period='Q2',
+            registration_year=2027,
+            registration_opens_at=now - timedelta(days=1),
+            registration_closes_at=now + timedelta(days=1),
+            is_active=True,
+            bank_name='Bank',
+            bank_account_number='123456',
+            bank_account_name='University',
+            insurance_fee=1000000,
+        )
+
+        data = self.client.get('/api/health-insurance/').data
+
+        self.assertFalse(data['is_eligible'])
+
     def test_image_append_resubmit_and_never_assess(self):
         reg=self.submit(uploads=[picture()])
         self.assertEqual(reg.status,'iu_processing')

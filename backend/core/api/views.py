@@ -633,14 +633,18 @@ class HealthInsuranceView(APIView):
             ],
         } for row in external_rows]
 
-        # Điều kiện mở nút đăng ký
-        # Mặc định là cho phép đăng ký (Bao gồm chưa có thẻ, hoặc thẻ đánh dấu NULL)
-        is_eligible = True 
-        
-        # Chỉ chặn lại (False) KHI VÀ CHỈ KHI có thẻ thật và hạn còn dài hơn 60 ngày
-        if current and current.valid_until:
-            if (current.valid_until - timezone.localdate()).days > 60:
-                is_eligible = False
+        # Đợt 1 (MAIN) đăng ký BHYT cho năm kế tiếp nên mọi sinh viên đều
+        # được đăng ký, bất kể thẻ hiện tại còn hạn bao lâu. Điều kiện thẻ
+        # không được còn hạn quá 60 ngày chỉ áp dụng cho các đợt 2, 3, 4.
+        is_main_period_open = any(
+            period["registration_period"] == "MAIN" and period["status"] == "open"
+            for period in periods
+        )
+        is_eligible = is_main_period_open or not (
+            current
+            and current.valid_until
+            and (current.valid_until - timezone.localdate()).days > 60
+        )
 
         ctx = {"hospital_names": hospital_names(cards)}
         return Response({
