@@ -9,3 +9,6 @@ djangorestframework-simplejwt>=5.3,<6.0
 django-cors-headers>=4.4,<5.0
 
 Pillow>=11.0,<13.0
+# Đọc ảnh HEIC/HEIF (ảnh iPhone). Thiếu gói này thì insurance_files.py vẫn chạy,
+# chỉ là HEIC bị từ chối — xem HEIF_SUPPORTED.
+pillow-heif>=0.18,<2.0
