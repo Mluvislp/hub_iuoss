@@ -247,13 +247,16 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
     def _validate_file(self, f, label):
         if f is None:
             return f
-        from core.insurance_files import inspect_upload
+        from core.insurance_files import inspect_upload, normalized_upload
         from core.insurance_contract import WorkflowError
         try:
-            inspect_upload(f)
+            data, ext, mime, _ = inspect_upload(f)
         except WorkflowError as exc:
             raise serializers.ValidationError(str(exc)) from exc
-        return f
+        # Trả về file ĐÃ chuẩn hoá chứ không phải file gốc: FileField lưu nguyên
+        # bytes nó nhận được và lấy đuôi từ tên client gửi, nên trả `f` là ảnh
+        # HEIC nằm trên đĩa dưới tên .jpg và chuyên viên mở ra thấy ảnh vỡ.
+        return normalized_upload(f, data, ext, mime)
 
     def validate_cccd_image(self, value):
         return self._validate_file(value, "Ảnh CCCD mặt trước")

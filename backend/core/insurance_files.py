@@ -4,6 +4,7 @@ from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 from .insurance_contract import WorkflowError
 from .models import InsuranceEvidence
@@ -84,6 +85,19 @@ def inspect_upload(upload):
     else:
         ext, mime = FORMATS[fmt]
     return data, ext, mime, hashlib.sha256(data).hexdigest()
+
+
+def normalized_upload(upload, data, ext, mime):
+    """Bọc lại file đã kiểm để Django lưu ĐÚNG bytes đã xác thực.
+
+    Cần thiết vì ảnh lúc nộp đơn đi qua `FileField`, mà FileField lưu nguyên
+    bytes gốc và lấy đuôi file từ TÊN DO CLIENT GỬI (`models.get_registration_filename`).
+    Không bọc lại thì ảnh HEIC nằm trên đĩa dưới tên .jpg: chuyên viên mở ra là
+    ảnh vỡ, vì trình duyệt ngoài Safari không đọc được HEIC. Đã dính thật ngày
+    21/09/2026 — đơn #174 có hai file CCCD lưu dạng HEIF mang đuôi .jpg.
+    """
+    stem = Path(getattr(upload, 'name', 'upload').replace('\', '/')).stem[:80] or 'upload'
+    return SimpleUploadedFile(f'{stem}.{ext}', data, content_type=mime)
 
 
 def store_evidence(reg, event, upload, checked, written):
