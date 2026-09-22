@@ -1,5 +1,6 @@
 """Student supplement operations. Never mutate confirmed payment assessments."""
 from urllib.parse import urlencode, quote
+import unicodedata
 from django.db import transaction
 from .models import HealthInsuranceRegistration
 from students.models import Hospital, VnProvince
@@ -7,6 +8,35 @@ from .insurance_contract import WorkflowError, Conflict, normalized, fingerprint
 from .insurance_history import (require_active, replay, check_version, ensure_legacy,
                                 append_event, save_registration, timeline)
 from .insurance_files import inspect_upload, store_evidence
+
+
+PERIOD_IN_PAYMENT_REFERENCE = {
+    'MAIN': 'dot 1',
+    'Q2': 'dot 2',
+    'Q3': 'dot 3',
+    'Q4': 'dot 4',
+}
+
+
+def payment_reference(reg):
+    """Return the same bank-transfer reference shown on the original form."""
+    student = getattr(reg, 'student', None)
+    full_name = reg.full_name or getattr(student, 'full_name', '') or ''
+    student_code = reg.student_code or getattr(student, 'current_student_code', '') or ''
+    # Bank apps handle ASCII references more consistently. NFD does not decompose
+    # Vietnamese đ/Đ, so replace those explicitly before removing combining marks.
+    full_name = full_name.replace('đ', 'd').replace('Đ', 'D')
+    full_name = ''.join(
+        char for char in unicodedata.normalize('NFD', full_name)
+        if unicodedata.category(char) != 'Mn'
+    ).upper()
+    period = PERIOD_IN_PAYMENT_REFERENCE.get(
+        str(reg.registration_period or '').upper(), 'dot chinh'
+    )
+    return (
+        f'{full_name}- {student_code}- Thanh toan phi BHYT nam '
+        f'{reg.registration_year} {period}'
+    )
 
 
 def hospital_snapshot(code):
@@ -82,7 +112,7 @@ def detail(reg, evidence_url):
             'required_amount_vnd', 'confirmed_paid_total_vnd', 'missing_amount_vnd')}
         payment.update({key: snapshot.get(key, '') for key in (
             'bank_name', 'bank_bin', 'bank_account_number', 'bank_account_name')})
-        payment['reference'] = f'BHYT {reg.pk} {reg.registration_year}'
+        payment['reference'] = payment_reference(reg)
         payment['qr_url'] = None
         bank_bin, account = str(payment['bank_bin']), str(payment['bank_account_number'])
         if bank_bin.isdigit() and len(bank_bin) == 6 and account.isdigit() and payment['missing_amount_vnd'] > 0:

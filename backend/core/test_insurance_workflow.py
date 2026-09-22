@@ -225,7 +225,14 @@ class HubWorkflowTests(TestCase):
         payload=detail(self.reg,lambda e:'/test')
         self.assertEqual(payload['payment']['missing_amount_vnd'],200000)
         self.assertIn('amount=200000',payload['payment']['qr_url'])
-        self.assertIn(f'BHYT+{self.reg.pk}+2027',payload['payment']['qr_url'])
+        self.assertEqual(
+            payload['payment']['reference'],
+            'TEST STUDENT- TEST001- Thanh toan phi BHYT nam 2027 dot 2',
+        )
+        self.assertIn(
+            'TEST+STUDENT-+TEST001-+Thanh+toan+phi+BHYT+nam+2027+dot+2',
+            payload['payment']['qr_url'],
+        )
         self.assertEqual(payload['payment']['bank_name'],'Snapshot Bank')
         e=append_event(self.reg,'PAYMENT_ASSESSED',source='Dashboard')
         add_assessment(self.reg,e,assessment(1000000,1000000))

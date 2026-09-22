@@ -715,6 +715,21 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                       {errors.social_insurance_number.message as string}
                     </p>
                   )}
+                  <p className="mt-2 text-xs leading-5 text-muted">
+                    Tra cứu mã BHYT tại{" "}
+                    <a
+                      href="https://baohiemxahoi.gov.vn/tracuu/Pages/tra-cuu-thoi-han-su-dung-the-bhyt.aspx"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      cổng tra cứu BHYT
+                    </a>
+                    .<br />
+                    <strong>Lưu ý:</strong> Điền số CCCD thay cho mã BHYT/BHXH để tra cứu.
+                    <br />
+                    Sinh viên có thể chụp ảnh này thay cho ảnh BHYT cũ và tải lên hệ thống.
+                  </p>
                 </div>
               </div>
 
@@ -1155,7 +1170,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                     <span className="text-sm font-medium text-slate-700 break-all">
                       {watch("bhyt_image")?.length > 0
                         ? watch("bhyt_image")[0].name
-                        : "Tải lên thẻ BHYT cũ"}
+                        : "Tải lên ảnh thẻ BHYT"}
                     </span>
                     <span className="text-xs text-slate-500">Tối đa 5MB</span>
                   </div>
