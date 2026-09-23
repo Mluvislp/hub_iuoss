@@ -91,6 +91,11 @@ Hiển thị dạng stat cards: MSSV, Khoa, Bậc đào tạo, Trạng thái h�
 
 ### Bảo hiểm y tế
 
+> Mục này mô tả phần **xem thẻ**. Đăng ký theo đợt, workflow duyệt đơn v2, bổ sung
+> minh chứng và **khai BHYT tại nơi khác** nằm ở [`INSURANCE.md`](INSURANCE.md); luật
+> nghiệp vụ chung ở `dashboard_iuoss/docs/HEALTH_INSURANCE.md`. Ba trang liên quan:
+> `/dashboard/bao-hiem-y-te` · `…/dang-ky` · `…/khai-noi-khac`.
+
 Lịch nhận đăng ký không còn hardcode trong frontend. Bảng `hub_insurance_configs`
 luôn có đúng bốn slot `MAIN/Q2/Q3/Q4`, staff cập nhật năm hưởng, thời gian mở/đóng,
 mô tả, mức phí và tài khoản trên Dashboard. Hub đọc cả bốn lịch để luôn hiện đúng
@@ -171,9 +176,12 @@ nhiều ô trống: thiếu mã số BHXH 74,7% · thiếu diện đăng ký 67,
 `valid_from` 73,8% · thiếu nơi KCB 43,4% · thiếu `valid_until` 41,3%. Mã thẻ chỉ
 thiếu 2,3% nên khối tint phía trên gần như luôn có nội dung. Trong 56,6% thẻ CÓ
 mã nơi KCB thì **100% tra được tên** (12.120 khớp / 0 lệch) — nên nhánh "chỉ hiện
-mã thô" hiện chưa xảy ra ở local, vẫn giữ để phòng dữ liệu prod khác. Hiện **0
-thẻ `is_current=0`** → panel lịch sử chưa bao giờ hiện, nhưng import BHYT của
-Dashboard có sinh dòng đó nên vẫn giữ.
+mã thô" hiện chưa xảy ra ở local, vẫn giữ để phòng dữ liệu prod khác.
+
+> Con số trên đo **ngày 09/08/2026 trên bản sao local**, trước khi có workflow v2 và
+> khai ngoài trường. Prod 23/09/2026 đã có **20.811 thẻ** và nhiều đường sinh thẻ
+> `is_current=0` (import BHYT, phát hành từ đơn, xác nhận khai ngoài trường) — panel
+> "Các thẻ trước đây" nay hiện thật. Muốn số mới thì đo lại, đừng trích dẫn lại đoạn này.
 
 ### Sinh hoạt công dân
 
@@ -374,10 +382,31 @@ chưa mở.
 
 ## 6. URL routing
 
-| URL | View | Auth | Mô tả |
-|---|---|---|---|
-> Django **chỉ phục vụ `/api/`**. Mọi URL giao diện (`/`, `/login`, `/dashboard/…`)
-> do Next.js đảm nhiệm; gọi thẳng vào Gunicorn `:8002` ở các đường đó sẽ trả **404**.
+> Django **chỉ phục vụ `/api/`**. Mọi URL giao diện (`/`, `/login`, `/dashboard/…`) do
+> Next.js đảm nhiệm; gọi thẳng vào Gunicorn `:8002` ở các đường đó sẽ trả **404**.
 
-| `/api/features/` | `FeaturesView` | ❌ Public | Cờ tính năng cho frontend (xem §0) |
-| `/api/health-insurance/` | `HealthInsuranceView` | ✅ Required | Thẻ BHYT hiện hành + lịch sử (§2) |
+Nguồn sự thật: `core/api/urls.py` — **27 endpoint**, tất cả dưới `/api/`.
+
+| URL | Auth | Mô tả |
+|---|---|---|
+| `health/` | ❌ | Health check cho monitor / load balancer |
+| `features/` | ❌ | Cờ tính năng cho frontend (§0) |
+| `auth/login/` | ❌ | Đăng nhập LDAP → cặp JWT |
+| `auth/logout/` | ✅ | Ghi log đăng xuất |
+| `auth/microsoft/start/` · `auth/microsoft/callback/` | ❌ | Entra ID (§1, `AUTH_FLOW.md`) |
+| `auth/token/refresh/` | refresh token | Gia hạn — **xét lại quyền vào cổng** |
+| `dashboard/` | ✅ | Dữ liệu trang chủ |
+| `health-insurance/` | ✅ | Thẻ hiện hành + lịch sử (§2) |
+| `health-insurance/registrations/` | ✅ | Danh sách + nộp đơn mới |
+| `health-insurance/registrations/<id>/` | ✅ | Chi tiết, timeline, bổ sung & gửi lại |
+| `health-insurance/registrations/<id>/evidence/<eid>/` | ✅ | Tải minh chứng, kiểm sở hữu |
+| `health-insurance/external/` | ✅ | Khai BHYT tại nơi khác |
+| `requests/` · `requests/<id>/` | ✅ | Yêu cầu giấy tờ — danh sách, chi tiết |
+| `requests/<id>/comments/` | ✅ | Trao đổi SV ↔ chuyên viên |
+| `requests/{other,deferment,thuong-binh,bank-loan,english}/form/` | ✅ | 5 biểu mẫu |
+| `offcampus/` · `offcampus/request-reopen/` | ✅ | Khai báo ngoại trú + xin mở lại |
+| `locations/{provinces,wards,ethnicities}` | ✅ | Danh mục hành chính 2025 |
+| `hospitals/` | ✅ | Danh mục cơ sở KCB |
+
+Nhóm `requests/*` trả **404** khi `FEATURE_DOCUMENT_REQUESTS` tắt — chặn ngay ở
+`initial()`, không chỉ giấu ở giao diện.

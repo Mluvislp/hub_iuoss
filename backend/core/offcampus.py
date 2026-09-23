@@ -251,17 +251,26 @@ def submit(student, data):
             addr.HCMC_PROVINCE_CODE if in_hcmc else temporary.get("province_code")
         )
         temp_warnings = street_warnings(temporary.get("street") or "")
-        try:
-            addr.save_address(
-                student, TEMPORARY,
-                province_code=province_code,
-                ward_code=temporary.get("ward_code"),
-                street=temporary.get("street"),
+        # Nhánh "Không" mà vẫn chọn TP.HCM thì hai câu trả lời chọi nhau. Không
+        # có cột nào lưu "có tạm trú ở TP.HCM" — giá trị đó suy ra từ
+        # province_code lúc đọc (build_prefill), nên nếu ghi xuống, bản ghi sẽ
+        # tự đọc ngược lại thành "Có" và mâu thuẫn im lặng.
+        if not in_hcmc and province_code == addr.HCMC_PROVINCE_CODE:
+            errors["temporary_province"] = (
+                "Nhánh “Không” không chọn được Thành phố Hồ Chí Minh."
             )
-        except StreetError as exc:
-            errors["temporary_street"] = str(exc)
-        except addr.AddressError as exc:
-            errors["temporary_location"] = str(exc)
+        else:
+            try:
+                addr.save_address(
+                    student, TEMPORARY,
+                    province_code=province_code,
+                    ward_code=temporary.get("ward_code"),
+                    street=temporary.get("street"),
+                )
+            except StreetError as exc:
+                errors["temporary_street"] = str(exc)
+            except addr.AddressError as exc:
+                errors["temporary_location"] = str(exc)
 
     if errors:
         raise DeclarationError(errors)

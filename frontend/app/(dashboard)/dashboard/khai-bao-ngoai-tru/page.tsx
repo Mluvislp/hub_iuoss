@@ -490,7 +490,8 @@ export default function OffCampusDeclarationPage() {
                 onClick={() => {
                   setInHcmc(true);
                   setTemporary((t) => ({ ...t, provinceCode: form.hcmc_province_code, wardCode: '' }));
-                  clearError('temporary_in_hcmc');
+                  ['temporary_in_hcmc', 'temporary_province', 'temporary_location']
+                    .forEach(clearError);
                 }}
               />
               <ChoiceTile
@@ -500,7 +501,8 @@ export default function OffCampusDeclarationPage() {
                 onClick={() => {
                   setInHcmc(false);
                   setTemporary((t) => ({ ...t, provinceCode: '', wardCode: '' }));
-                  clearError('temporary_in_hcmc');
+                  ['temporary_in_hcmc', 'temporary_province', 'temporary_location']
+                    .forEach(clearError);
                 }}
               />
             </div>
@@ -518,7 +520,11 @@ export default function OffCampusDeclarationPage() {
                     ['temporary_province', 'temporary_ward', 'temporary_street', 'temporary_location']
                       .forEach(clearError);
                   }}
-                  provinces={provinces}
+                  /* Nhánh "Không" không được phép chọn lại TP.HCM — để lại
+                     trong danh sách là hai câu trả lời chọi nhau. */
+                  provinces={inHcmc
+                    ? provinces
+                    : provinces.filter((p) => p.code !== form.hcmc_province_code)}
                   lockedProvinceCode={inHcmc ? form.hcmc_province_code : undefined}
                   errors={{
                     province: fieldErrors.temporary_province || fieldErrors.temporary_location,
