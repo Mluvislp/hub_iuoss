@@ -227,7 +227,10 @@ def submit(student, data):
 
     # ── 2. Địa chỉ thường trú ───────────────────────────────────────────────
     permanent = data.get("permanent") or {}
-    perm_warnings = street_warnings(permanent.get("street") or "")
+    perm_warnings = street_warnings(
+        permanent.get("street") or "",
+        **addr.location_names(permanent.get("province_code"), permanent.get("ward_code")),
+    )
     try:
         addr.save_address(
             student, PERMANENT,
@@ -250,7 +253,10 @@ def submit(student, data):
         province_code = (
             addr.HCMC_PROVINCE_CODE if in_hcmc else temporary.get("province_code")
         )
-        temp_warnings = street_warnings(temporary.get("street") or "")
+        temp_warnings = street_warnings(
+            temporary.get("street") or "",
+            **addr.location_names(province_code, temporary.get("ward_code")),
+        )
         # Nhánh "Không" mà vẫn chọn TP.HCM thì hai câu trả lời chọi nhau. Không
         # có cột nào lưu "có tạm trú ở TP.HCM" — giá trị đó suy ra từ
         # province_code lúc đọc (build_prefill), nên nếu ghi xuống, bản ghi sẽ

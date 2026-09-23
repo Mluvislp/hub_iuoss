@@ -211,6 +211,16 @@ def resolve_location(province_code, ward_code):
     return province, ward
 
 
+def location_names(province_code, ward_code):
+    """Tên đầy đủ (tỉnh, phường) cho cảnh báo mềm — mã sai thì trả None, không
+    raise: lỗi mã đã có `save_address()` báo."""
+    try:
+        province, ward = resolve_location(province_code, ward_code)
+    except AddressError:
+        return {}
+    return {"province_name": province.name, "ward_name": ward.name}
+
+
 # ── Ghi ───────────────────────────────────────────────────────────────────────
 
 @transaction.atomic
@@ -226,7 +236,7 @@ def save_address(student, address_type, *, province_code, ward_code, street,
     from .address_validators import clean_street  # tránh import vòng
 
     province, ward = resolve_location(province_code, ward_code)
-    street = clean_street(street)
+    street = clean_street(street, province_name=province.name, ward_name=ward.name)
     today = on_date or timezone.localdate()
 
     # Ghi vào bản NỀN thì bản CHUẨN HOÁ cũ phải nhường chỗ — bản chuẩn hoá đứng
