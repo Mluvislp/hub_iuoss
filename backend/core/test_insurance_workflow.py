@@ -227,10 +227,10 @@ class HubWorkflowTests(TestCase):
         self.assertIn('amount=200000',payload['payment']['qr_url'])
         self.assertEqual(
             payload['payment']['reference'],
-            'TEST STUDENT- TEST001- Thanh toan phi BHYT nam 2027 dot 2',
+            'BHYT sinh vien dot 2 2027_TEST001_Test Student',
         )
         self.assertIn(
-            'TEST+STUDENT-+TEST001-+Thanh+toan+phi+BHYT+nam+2027+dot+2',
+            'BHYT+sinh+vien+dot+2+2027_TEST001_Test+Student',
             payload['payment']['qr_url'],
         )
         self.assertEqual(payload['payment']['bank_name'],'Snapshot Bank')

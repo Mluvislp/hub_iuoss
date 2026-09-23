@@ -29,14 +29,11 @@ def payment_reference(reg):
     full_name = ''.join(
         char for char in unicodedata.normalize('NFD', full_name)
         if unicodedata.category(char) != 'Mn'
-    ).upper()
+    ).strip()
     period = PERIOD_IN_PAYMENT_REFERENCE.get(
         str(reg.registration_period or '').upper(), 'dot chinh'
     )
-    return (
-        f'{full_name}- {student_code}- Thanh toan phi BHYT nam '
-        f'{reg.registration_year} {period}'
-    )
+    return f'BHYT sinh vien {period} {reg.registration_year}_{student_code}_{full_name}'
 
 
 def hospital_snapshot(code):

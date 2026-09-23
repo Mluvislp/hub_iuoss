@@ -295,16 +295,13 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
     if (/^\d{6}$/.test(explicit)) return explicit;
     return findBank(config?.bank_name)?.bin ?? null;
   }, [config]);
-  // Mẫu Phòng CTSV quy định: "HO VA TEN- MSSV- Thanh toan phi BHYT nam <năm> <đợt>".
-  // Bỏ dấu vì nhiều app ngân hàng cắt hỏng nội dung có dấu; họ tên viết hoa cho
-  // khớp mẫu.
+  // Mẫu Phòng CTSV quy định: "BHYT sinh vien dot <đợt> <năm>_<MSSV>_<họ tên>".
+  // Bỏ dấu phần họ tên để nội dung QR tương thích với ứng dụng ngân hàng.
   const transferNote = useMemo(() => {
     const dot =
       PERIOD_IN_NOTE[(config?.registration_period ?? "").toUpperCase()] ?? "dot chinh";
-    const name = toAscii(fullName ?? "").toUpperCase();
-    return toAscii(
-      `${name}- ${studentCode ?? ""}- Thanh toan phi BHYT nam ${config?.registration_year ?? ""} ${dot}`,
-    );
+    const name = toAscii(fullName ?? "").trim();
+    return `BHYT sinh vien ${dot} ${config?.registration_year ?? ""}_${studentCode ?? ""}_${name}`;
   }, [fullName, studentCode, config]);
   const qrPayload = useMemo(() => {
     if (!bankBin || !config?.bank_account_number) return null;
