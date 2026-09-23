@@ -353,6 +353,24 @@ class HubWorkflowTests(TestCase):
         self.assertEqual(response.status_code,400,response.data)
         self.assertIn('bhyt_image',response.data)
 
+    def test_prior_period_blocks_later_period_form_and_submission(self):
+        self.prepare_submission()
+        HealthInsuranceConfig.objects.filter(registration_period='MAIN').update(
+            registration_period='Q3',
+        )
+        url = reverse('api_health_insurance_registrations')
+
+        response = self.client.get(url, {'period': 'Q3'})
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertIn('đợt 2 năm 2027', response.data['detail'])
+
+        data = self.submission_data(uuid4().hex)
+        data['registration_period'] = 'Q3'
+        response = self.client.post(url, data, format='multipart')
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertIn('đợt 2 năm 2027', response.data['detail'])
+        self.assertFalse(Registration.objects.filter(registration_period='Q3').exists())
+
     def test_new_submission_failure_rolls_back_files_and_row(self):
         self.prepare_submission()
         with patch('core.api.views.append_event',side_effect=RuntimeError('event failure')):

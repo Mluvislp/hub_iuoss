@@ -480,6 +480,34 @@ class DashboardView(APIView):
 # ── Cấu hình các đợt đăng ký BHYT ───────────────────────────────────────────
 
 _PERIOD_NUMBER = {"MAIN": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+_PERIOD_SEQUENCE = ("MAIN", "Q2", "Q3", "Q4")
+
+
+def _blocking_insurance_registration(student_id: int, year: int, period: str):
+    """Đơn cùng năm ở đợt hiện tại hoặc sớm hơn đã bao phủ các đợt sau."""
+    try:
+        period_index = _PERIOD_SEQUENCE.index(period)
+    except ValueError:
+        return None
+    return (
+        HealthInsuranceRegistration.objects
+        .filter(
+            student_id=student_id,
+            registration_year=year,
+            registration_period__in=_PERIOD_SEQUENCE[:period_index + 1],
+        )
+        .order_by("created_at", "id")
+        .first()
+    )
+
+
+def _already_covered_error(registration) -> str:
+    period_number = _PERIOD_NUMBER.get(registration.registration_period)
+    period_label = f"đợt {period_number}" if period_number else "một đợt trước"
+    return (
+        f"Bạn đã đăng ký BHYT {period_label} năm {registration.registration_year}. "
+        "Đợt đăng ký sau chỉ dành cho sinh viên chưa đăng ký ở các đợt trước."
+    )
 
 
 def _coverage_dates(period: str, year: int):
@@ -765,6 +793,14 @@ class InsuranceRegistrationView(APIView):
         error = _insurance_config_error(cfg)
         if error:
             return Response({"detail": error}, status=status.HTTP_409_CONFLICT)
+        blocking_registration = _blocking_insurance_registration(
+            student.id, cfg.registration_year, cfg.registration_period,
+        )
+        if blocking_registration:
+            return Response(
+                {"detail": _already_covered_error(blocking_registration)},
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response({
             "prefill": self._snapshot(student),
             "config": _insurance_config_payload(cfg, include_payment=True),
@@ -796,14 +832,15 @@ class InsuranceRegistrationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Bổ sung dùng ID đơn hiện tại; không tạo đơn mới khi bị từ chối.
-        if HealthInsuranceRegistration.objects.filter(
-            student_id=student.id,
-            registration_year=data["registration_year"],
-            registration_period=data["registration_period"],
-        ).exists():
+        # Đơn ở đợt trước đã có thời hạn bao phủ các đợt bổ sung sau. Kiểm tra
+        # này nằm trong transaction đã khóa student để không thể lách bằng API
+        # hoặc hai request đồng thời.
+        blocking_registration = _blocking_insurance_registration(
+            student.id, data["registration_year"], data["registration_period"],
+        )
+        if blocking_registration:
             return Response(
-                {"detail": "Bạn đã gửi yêu cầu đăng ký cho đợt này rồi."},
+                {"detail": _already_covered_error(blocking_registration)},
                 status=status.HTTP_409_CONFLICT,
             )
 
