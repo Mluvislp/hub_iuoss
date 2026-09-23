@@ -23,6 +23,7 @@ const PERIOD_LABELS: Record<string, string> = {
   Q3: 'Đợt 3',
   Q4: 'Đợt 4',
 };
+const PERIOD_SEQUENCE = ['MAIN', 'Q2', 'Q3', 'Q4'];
 
 function Empty() {
   return <span className="italic font-normal text-slate-400">Chưa cập nhật</span>;
@@ -460,12 +461,16 @@ export default function HealthInsurancePage() {
               {getVisibleInsurancePeriods(data?.periods ?? []).map((p) => {
               const isOpen = p.status === 'open';
               // Mã đợt trong DB viết hoa ('MAIN'/'Q2'…), ở đây viết thường — so sánh cùng dạng.
-              const registered = !!data?.registrations?.some(
-                (r) => r.registration_period?.toUpperCase() === p.id.toUpperCase()
-                  && r.registration_year === p.registration_year
-,
-              );
-              const blocked = !data?.is_eligible || registered;
+              const periodCode = p.registration_period.toUpperCase();
+              const periodIndex = PERIOD_SEQUENCE.indexOf(periodCode);
+              const blockingRegistration = data?.registrations?.find((r) => {
+                const registeredPeriodIndex = PERIOD_SEQUENCE.indexOf(r.registration_period?.toUpperCase());
+                return r.registration_year === p.registration_year
+                  && registeredPeriodIndex >= 0
+                  && registeredPeriodIndex <= periodIndex;
+              });
+              const blockedByEarlierRegistration = !!blockingRegistration;
+              const blocked = !data?.is_eligible || blockedByEarlierRegistration;
               return (
                 <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
                   <div>
@@ -492,7 +497,11 @@ export default function HealthInsurancePage() {
                         aria-disabled={blocked}
                         style={blocked ? { pointerEvents: 'none', opacity: 0.5 } : {}}
                       >
-                        {!data?.is_eligible ? "Không đủ điều kiện" : registered ? "Đã đăng ký" : "Đăng ký ngay"}
+                        {!data?.is_eligible
+                          ? "Không đủ điều kiện"
+                          : blockedByEarlierRegistration
+                            ? "Đã đăng ký đợt trước"
+                            : "Đăng ký ngay"}
                       </Link>
                     ) : p.status === 'expired' ? (
                       <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
