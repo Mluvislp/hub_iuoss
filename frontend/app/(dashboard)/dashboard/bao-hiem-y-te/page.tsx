@@ -176,10 +176,15 @@ export default function HealthInsurancePage() {
       {/* ── Thẻ đang dùng ─────────────────────────────────── */}
       <section className={ui.card}>
         <div className={ui.cardHeader}>
-          <h2 className={ui.sectionTitle}>
-            <ShieldCheck size={16} className={accentIcon.success} />
-            Thẻ bảo hiểm y tế
-          </h2>
+          <div>
+            <h2 className={ui.sectionTitle}>
+              <ShieldCheck size={16} className={accentIcon.success} />
+              Thẻ bảo hiểm y tế
+            </h2>
+            <p className="mt-1 text-xs font-normal text-muted">
+              Sinh viên tạo yêu cầu tại mục &quot;Tạo yêu cầu mới&quot; trong trường hợp cần cập nhật thông tin
+            </p>
+          </div>
           {showCoverage && <HealthValidityBadge validUntil={current.valid_until} />}
         </div>
 
