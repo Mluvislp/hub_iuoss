@@ -21,12 +21,9 @@ import unicodedata
 STREET_MIN = 5
 STREET_MAX = 255
 
-# Đơn vị hành chính đã chọn ở select phía trên — nhập lại vào ô chi tiết là
-# nhân đôi. Đây đúng là lỗi đang có trong 12.295 dòng dữ liệu nền.
-_ADMIN_HARD = ("phường", "quận", "huyện", "tỉnh", "thành phố", "thị xã", "thị trấn")
-
-# "Xã" chỉ cảnh báo, không chặn: có tên đường thật chứa từ này (Xã Đàn ở Hà Nội).
-_ADMIN_SOFT = ("xã",)
+# Tiền tố loại đơn vị trong `vn_provinces.name` / `vn_wards.name`. Bỏ đi để
+# lấy tên trần ("Phường Bến Nghé" → "Bến Nghé").
+_UNIT_PREFIXES = ("thành phố", "tỉnh", "phường", "xã", "đặc khu")
 
 # Viết tắt hay gặp — yêu cầu viết đủ chữ.
 _ABBREV_RE = re.compile(r"(?<![^\s,./-])(p|q|tp|tt|h|x|kp|đ)\.", re.IGNORECASE)
@@ -55,8 +52,40 @@ def normalize_street(value):
     return text.strip(" ,")
 
 
-def clean_street(value):
-    """Chuẩn hóa + kiểm tra. Trả về chuỗi sạch, hoặc raise StreetError."""
+def _fold(value):
+    """So khớp CÓ DẤU, không phân biệt hoa thường, gộp khoảng trắng."""
+    return _MULTISPACE_RE.sub(" ", unicodedata.normalize("NFC", value or "")).strip().lower()
+
+
+def _contains(haystack, needle):
+    return bool(needle) and re.search(
+        r"(?<!\w)" + re.escape(needle) + r"(?!\w)", haystack
+    ) is not None
+
+
+def _bare_name(name):
+    folded = _fold(name)
+    for prefix in _UNIT_PREFIXES:
+        if folded.startswith(prefix + " "):
+            return folded[len(prefix) + 1:]
+    return folded
+
+
+def _selected_units(province_name, ward_name):
+    return [(label, name) for label, name in
+            (("Tỉnh/Thành phố", province_name), ("Phường/Xã", ward_name)) if name]
+
+
+def clean_street(value, *, province_name=None, ward_name=None):
+    """Chuẩn hóa + kiểm tra. Trả về chuỗi sạch, hoặc raise StreetError.
+
+    `province_name` / `ward_name`: tên đầy đủ của đơn vị đã chọn ở select
+    ("Phường Bến Nghé"). Chuỗi chứa nguyên tên đó là nhập lại — chặn. Chỉ chứa
+    tên trần ("Bến Nghé") thì có thể là tên đường thật, xem `street_warnings()`.
+
+    Từng chặn mọi chuỗi có chữ phường/quận/huyện/tỉnh… (bỏ 23/09/2026): luật đó
+    so khớp sau khi BỎ DẤU nên chặn nhầm «Quan Hoa», «Hải Quan», «Tỉnh lộ 10».
+    """
     text = normalize_street(value)
 
     if not text:
@@ -74,12 +103,11 @@ def clean_street(value):
     if not any(ch.isalpha() for ch in text):
         raise StreetError("Địa chỉ chi tiết phải có tên đường/thôn/ấp, không chỉ gồm số.")
 
-    lowered = _strip_accents(text).lower()
-    for word in _ADMIN_HARD:
-        if re.search(r"(?<![a-z])" + _strip_accents(word) + r"(?![a-z])", lowered):
+    folded = _fold(text)
+    for label, name in _selected_units(province_name, ward_name):
+        if _contains(folded, _fold(name)):
             raise StreetError(
-                f"Không nhập «{word}» vào ô này — phần đó đã chọn ở mục "
-                "Tỉnh/Thành phố và Phường/Xã phía trên."
+                f"Không nhập lại «{name}» vào ô này — phần đó đã chọn ở mục {label} phía trên."
             )
 
     match = _ABBREV_RE.search(text)
@@ -113,7 +141,7 @@ _STREET_LEAD = (
 )
 
 
-def street_warnings(value):
+def street_warnings(value, *, province_name=None, ward_name=None):
     """Cảnh báo mềm — hiển thị nhưng KHÔNG chặn gửi."""
     text = normalize_street(value)
     if not text:
@@ -125,12 +153,16 @@ def street_warnings(value):
             "Địa chỉ không có số nhà. Nếu ở thôn/ấp không có số thì bỏ qua nhắc nhở này."
         )
 
-    lowered = _strip_accents(text).lower()
-    for word in _ADMIN_SOFT:
-        if re.search(r"(?<![a-z])" + _strip_accents(word) + r"(?![a-z])", lowered):
+    # Tên trần của đơn vị đã chọn — có thể là nhập lại, cũng có thể là tên
+    # đường thật (đường Hồ Chí Minh, phố Hàng Bông ở phường Hàng Bông). Bỏ qua
+    # tên một chữ ("Láng", "Chũ") hay tên số ("Phường 12" → "12"): quá dễ trùng.
+    folded = _fold(text)
+    for label, name in _selected_units(province_name, ward_name):
+        bare = _bare_name(name)
+        if len(bare.split()) >= 2 and not _contains(folded, _fold(name)) and _contains(folded, bare):
             notes.append(
-                f"Chuỗi có chứa «{word}» — kiểm tra lại xem có bị trùng với "
-                "mục Phường/Xã đã chọn phía trên không."
+                f"Chuỗi có chứa «{bare.title()}» — kiểm tra lại xem có bị trùng với "
+                f"mục {label} đã chọn phía trên không."
             )
 
     # Chữ cái đầu viết thường — chỉ NHẮC, không chặn. Bỏ qua khi từ đầu là danh
