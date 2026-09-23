@@ -86,14 +86,30 @@ LoginView (core/api/views.py)
 \0 → \00
 ```
 
-### Session Fixation
-`session.cycle_key()` được gọi sau khi set session → session ID mới được cấp sau login, tránh attacker dùng session ID cũ.
+### Vòng đời phiên — là JWT, KHÔNG phải session Django
 
-### Session Timeout
-Cookie `hub_sessionid` tự hết hạn sau **8 giờ** (`SESSION_COOKIE_AGE = 28800`).
+> ⚠️ Mục này trước đây mô tả `session.cycle_key()` và cookie `hub_sessionid`. **Đường
+> đăng nhập sinh viên không đụng session Django** — `issue_session()` chỉ ghi
+> `hub_students` rồi phát cặp token. Rà lại 23/09/2026: không chỗ nào trong
+> `core/api/views.py` gọi `request.session`.
 
-### Cookie Security (production)
-Khi `DEBUG=False`, `SESSION_COOKIE_SECURE=True` → cookie chỉ gửi qua HTTPS.
+| | Giá trị |
+|---|---|
+| Access token | **8 giờ** (`ACCESS_TOKEN_LIFETIME`) — chính là hạn của cookie `hub_token` |
+| Refresh token | **7 ngày** (`REFRESH_TOKEN_LIFETIME`), đổi qua `POST /api/auth/token/refresh/` |
+| Cookie `hub_sessionid` | vẫn khai trong settings (8 giờ) nhưng chỉ phục vụ `django.contrib.sessions`, **không mang danh tính sinh viên** |
+
+Tên cookie đặt riêng để không chọi với Dashboard trên cùng domain cha `.iuoss.com`.
+Khi `DEBUG=False`, cookie bật `Secure`.
+
+### Giới hạn số lần thử đăng nhập — ĐANG TẮT
+
+`LoginView` có sẵn `throttle_scope = "login"` (ngưỡng khai ở
+`settings.DEFAULT_THROTTLE_RATES["login"]`) nhưng **đang bị comment theo yêu cầu**.
+Bật lại chỉ cần bỏ comment một dòng trong `core/api/views.py`.
+
+> Prod chạy nhiều worker Gunicorn với `LocMemCache`, nên kể cả khi bật thì throttle
+> đếm **theo từng process**, không phải toàn hệ thống.
 
 ---
 
