@@ -24,7 +24,11 @@ FORMATS = {'JPEG': ('jpg', 'image/jpeg'), 'PNG': ('png', 'image/png'), 'WEBP': (
 # HEIC/HEIF được nhận nhưng KHÔNG lưu nguyên dạng: trình duyệt (trừ Safari) không
 # hiển thị được, mà Dashboard phục vụ ảnh inline cho chuyên viên xem. Chuyển sang
 # JPEG ngay lúc nhận để mọi khâu phía sau không phải biết HEIC là gì.
-CONVERT_TO_JPEG = {'HEIF', 'HEIC'}
+# MPO (Multi-Picture Object) vẫn là JPEG hợp lệ. Một số điện thoại ghi thêm
+# ảnh phụ (HDR/depth/burst) vào file .jpg/.jpeg và Pillow báo format là ``MPO``
+# thay vì ``JPEG``. Chỉ giữ frame đầu rồi mã hoá lại thành JPEG để trình duyệt
+# và Dashboard đọc ổn định, đồng thời loại bỏ các frame/metadata không cần thiết.
+CONVERT_TO_JPEG = {'HEIF', 'HEIC', 'MPO'}
 # iPhone Pro chụp 48 MP, vượt mốc 25 MP cũ. Nới đủ cho máy hiện hành; ảnh to hơn
 # thì thu nhỏ chứ không từ chối — xem `_to_jpeg`.
 MAX_PIXELS = 60_000_000
