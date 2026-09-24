@@ -248,6 +248,18 @@ class HubWorkflowTests(TestCase):
         with self.assertRaises(WorkflowError): inspect_upload(SimpleUploadedFile('fake.jpg',b'<script>x</script>',content_type='image/jpeg'))
         with self.assertRaises(WorkflowError): inspect_upload(SimpleUploadedFile('large.png',b'x'*(5*1024*1024+1)))
 
+    def test_phone_mpo_is_normalized_to_jpeg(self):
+        content=BytesIO();Image.new('RGB',(5,5),'blue').save(content,format='JPEG')
+        data=content.getvalue()
+        detected=Image.open(BytesIO(data));detected.format='MPO'
+        decoded=Image.open(BytesIO(data))
+        with patch('core.insurance_files.Image.open',side_effect=[detected,decoded]):
+            normalized,ext,mime,_=inspect_upload(SimpleUploadedFile(
+                'IMG_0210.jpeg',data,content_type='image/jpeg'))
+        self.assertEqual((ext,mime),('jpg','image/jpeg'))
+        with Image.open(BytesIO(normalized)) as image:
+            self.assertEqual(image.format,'JPEG')
+
     def test_file_failure_rolls_back_and_cleans_new_files(self):
         with patch.object(InsuranceEvidence.objects,'create',side_effect=RuntimeError('DB failure')):
             with self.assertRaises(RuntimeError): self.submit(uploads=[picture()])
