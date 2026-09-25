@@ -13,10 +13,11 @@ from students.models import Student, StudentCodeHistory
 
 logger = logging.getLogger(__name__)
 
-# Chỉ hai nhóm này được vào cổng (quyết định của Phòng CTSV, 2026-08-09).
-# Bị chặn: WITHDRAWN (đã nghỉ học/rút hồ sơ), SUSPENDED (tạm dừng/tạm nghỉ),
-# UNKNOWN (chưa xác định), và cả hồ sơ không có trạng thái.
-ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "GRADUATED"})
+# Các nhóm được vào cổng (quyết định của Phòng CTSV, 2026-08-09; thêm SUSPENDED
+# 2026-09-25 — SV tạm dừng/tạm nghỉ vẫn cần xin giấy tờ, theo dõi BHYT).
+# Bị chặn: WITHDRAWN (đã nghỉ học/rút hồ sơ), UNKNOWN (chưa xác định), và cả hồ
+# sơ không có trạng thái.
+ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "SUSPENDED", "GRADUATED"})
 
 # Lý do bị chặn — chỉ dùng cho log, không hiện cho sinh viên.
 REASON_OLD_CODE = "old_code"
@@ -97,7 +98,8 @@ def check_login(uid: str, *, follow_old_code: bool = False) -> LoginDecision:
             student=student,
             reason=REASON_STATUS,
             message=(
-                "Cổng thông tin chỉ dành cho sinh viên đang học hoặc đã tốt nghiệp "
+                "Cổng thông tin chỉ dành cho sinh viên đang học, tạm dừng học "
+                "hoặc đã tốt nghiệp "
                 f"(trạng thái hiện tại: {status_name}). "
                 "Vui lòng liên hệ Phòng Công tác sinh viên nếu cần hỗ trợ."
             ),
