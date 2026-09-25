@@ -209,10 +209,12 @@ Xét theo đúng thứ tự sau:
 Lý do bất đối xứng: với LDAP thì MSSV do sinh viên tự gõ nên sửa được; với Microsoft thì MSSV lấy từ tiền tố email do trường cấp, sinh viên **không** đổi được — chặn ở đó là khoá họ ra ngoài vĩnh viễn. Đo trên dữ liệu thật: 893 sinh viên đang giữ email mang mã cũ (37 người đang học).
 
 ```python
-ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "GRADUATED"})
+ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "SUSPENDED", "GRADUATED"})
 ```
 
-Chỉ **đang học** và **đã tốt nghiệp** được vào (quyết định của Phòng CTSV, 2026-08-09). Bị chặn: `WITHDRAWN` (đã nghỉ học / rút hồ sơ), `SUSPENDED` (tạm dừng / tạm nghỉ), `UNKNOWN` (chưa xác định), và cả hồ sơ không có trạng thái. Đổi chính sách = sửa đúng hằng số này.
+**Đang học**, **tạm dừng / tạm nghỉ** và **đã tốt nghiệp** được vào (quyết định của Phòng CTSV, 2026-08-09; mở thêm `SUSPENDED` ngày 2026-09-25 vì SV tạm dừng vẫn cần xin giấy tờ và theo dõi BHYT). Bị chặn: `WITHDRAWN` (đã nghỉ học / rút hồ sơ), `UNKNOWN` (chưa xác định), và cả hồ sơ không có trạng thái. Đổi chính sách = sửa đúng hằng số này.
+
+Đếm trên DB live 25/09/2026: được vào 23.793 (đang học 11.300 · tạm dừng 148 · tốt nghiệp 12.345); bị chặn 12.542 (nghỉ học 9.802 · rút hồ sơ 21 · chưa xác định 2.719).
 
 **Vì sao bước 2 phải nằm sau LDAP:** thông báo có nêu mã số hiện tại của sinh viên, nên chỉ được trả về cho người đã chứng minh danh tính bằng mật khẩu. Hệ quả: nếu tài khoản LDAP mang mã cũ đã bị xóa thì sinh viên vẫn chỉ thấy "Tài khoản hoặc mật khẩu không đúng" — thông báo "mã đã đổi" không xuất hiện. Muốn hiện cả trong trường hợp đó thì phải tra `student_code_history` ngay cả khi LDAP thất bại, và **không** được nêu mã mới.
 
