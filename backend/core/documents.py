@@ -202,9 +202,9 @@ def build_address_proposed(province_code, ward_code, street):
     """
     street = (street or "").strip()
     if not street:
-        raise ValueError("Vui lòng nhập số nhà, tên đường.")
+        raise ValueError("Vui lòng nhập địa chỉ chi tiết.")
     if len(street) > STREET_MAX:
-        raise ValueError(f"Số nhà/đường quá dài (tối đa {STREET_MAX} ký tự).")
+        raise ValueError(f"Địa chỉ chi tiết quá dài (tối đa {STREET_MAX} ký tự).")
 
     province = VnProvince.objects.filter(code=(province_code or "").strip(), is_active=True).first()
     if not province:

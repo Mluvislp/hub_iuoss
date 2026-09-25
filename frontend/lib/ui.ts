@@ -26,7 +26,7 @@ export const ui = {
   btnPrimary:
     'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg ' +
     'bg-primary hover:bg-primary-hover text-white text-sm font-semibold ' +
-    'transition-colors disabled:opacity-60 disabled:cursor-not-allowed ' +
+    'transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-primary ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2',
   btnSecondary:
     'inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-lg ' +

@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { Province, Ward } from '@/lib/types';
+import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 
 export interface AddressValue {
   provinceCode: string;
@@ -24,8 +25,6 @@ interface Props {
   hint?: string;
   idPrefix: string;
 }
-
-const STREET_PLACEHOLDER = 'Ví dụ: 123 Nguyễn Văn Cừ, Khu phố 3';
 
 export default function AddressFields({
   value, onChange, provinces, lockedProvinceCode, errors = {}, hint, idPrefix,
@@ -123,11 +122,7 @@ export default function AddressFields({
         {errors.street ? (
           <p className="mt-1 text-[0.75rem] text-danger-text">{errors.street}</p>
         ) : (
-          <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
-            <li>• Chỉ ghi <b>số nhà, tên đường, thôn/ấp/khu phố</b>.</li>
-            <li>• <b>Không</b> nhập lại phường/xã, quận/huyện, tỉnh/thành đã chọn ở trên.</li>
-            <li>• Viết hoa chữ cái đầu mỗi từ, <b>không viết tắt</b> (ghi “Khu phố 3”, không ghi “KP.3”).</li>
-          </ul>
+          <StreetHint />
         )}
       </div>
 
