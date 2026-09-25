@@ -4,8 +4,8 @@
  * Ô cam đoan dùng chung cho MỌI form yêu cầu giấy xác nhận.
  *
  * Câu cam đoan chỉ viết ở đây — các form khác nhau không được tự chế lời văn,
- * vì đây là nội dung sinh viên chịu trách nhiệm pháp lý. Chưa tích thì form
- * không hiện nút gửi (xem `ConsentGate`).
+ * vì đây là nội dung sinh viên chịu trách nhiệm pháp lý. Chưa tích thì nút gửi
+ * bị làm mờ và khoá (xem `ConsentGate`).
  */
 export function RequestConsent({
   checked,
@@ -43,10 +43,18 @@ export function RequestConsent({
   );
 }
 
-/** Chỗ của nút gửi: chưa cam đoan thì thay bằng một dòng nhắc. */
+/**
+ * Chỗ của nút gửi: chưa cam đoan thì nút vẫn hiện nhưng mờ và không bấm được.
+ * `<fieldset disabled>` vô hiệu hoá mọi nút bên trong theo chuẩn HTML — không
+ * phải truyền `disabled` vào từng nút ở 5 form. Độ mờ lấy từ `disabled:` của
+ * chính nút (`ui.btnPrimary`), fieldset không tự làm mờ để khỏi mờ chồng hai lần.
+ */
 export function ConsentGate({ checked, children }: { checked: boolean; children: React.ReactNode }) {
-  if (checked) return <>{children}</>;
-  return <span className="text-[0.8rem] text-muted">Tích vào ô cam đoan để gửi yêu cầu.</span>;
+  return (
+    <fieldset disabled={!checked} className="inline-flex">
+      {children}
+    </fieldset>
+  );
 }
 
 /** Thông báo lỗi chuẩn khi submit mà chưa tích cam đoan (chặn phím Enter). */

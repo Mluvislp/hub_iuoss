@@ -12,6 +12,7 @@ import {
   ReadonlyField, EditableField, LockedBox, RequestEditButton, CancelEditButton, ChangedTag,
 } from '@/components/editable-field';
 import { validateDob } from '@/lib/form-validators';
+import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 
 // Ba mốc thời gian học thuộc NHÓM CỨNG — chỉ xem.
 type FieldKey = 'dob';
@@ -115,7 +116,7 @@ export default function DefermentRequestPage() {
     // Địa chỉ luôn bắt buộc đủ 3 phần — backend cũng vậy, kể cả khi ô đang khóa.
     if (!provinceCode) errs.province = 'Vui lòng chọn tỉnh/thành.';
     if (!wardCode) errs.ward = 'Vui lòng chọn phường/xã.';
-    if (!street.trim()) errs.street = 'Vui lòng nhập số nhà, tên đường.';
+    if (!street.trim()) errs.street = 'Vui lòng nhập địa chỉ chi tiết.';
 
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
@@ -269,14 +270,16 @@ export default function DefermentRequestPage() {
                   </div>
                 </div>
                 <div className="mt-3">
-                  <label className={ui.fieldLabel}>Số nhà, tên đường <span className="text-red-500">*</span></label>
+                  <label className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-red-500">*</span></label>
                   <input
                     type="text" value={street} maxLength={255}
                     onChange={(e) => { setStreet(e.target.value); setFieldErrors((f) => ({ ...f, street: undefined })); }}
-                    placeholder="Ví dụ: 123 Lê Lợi, Khu phố 4…"
+                    placeholder={STREET_PLACEHOLDER}
                     className={cn(ui.input, fieldErrors.street && 'border-danger-line')}
                   />
-                  {fieldErrors.street && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.street}</p>}
+                  {fieldErrors.street
+                    ? <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.street}</p>
+                    : <StreetHint />}
                 </div>
                 {addressLockable && <CancelEditButton onClick={cancelAddress} />}
                 <p className="mt-2 text-[0.78rem] text-muted">
@@ -298,7 +301,7 @@ export default function DefermentRequestPage() {
                   </div>
                 </div>
                 <div className="mt-3">
-                  <div className={ui.label}>Số nhà, tên đường</div>
+                  <div className={ui.label}>Địa chỉ chi tiết</div>
                   <div className="mt-1"><LockedBox value={p.street} /></div>
                 </div>
                 <RequestEditButton onClick={() => setAddressOpen(true)} />
