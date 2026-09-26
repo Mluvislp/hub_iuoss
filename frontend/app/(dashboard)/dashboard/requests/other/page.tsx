@@ -9,9 +9,8 @@ import { ui } from '@/lib/ui';
 import type { OtherRequestFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
-import { validateDob, validateCccd } from '@/lib/form-validators';
+import { validateDob, validateCccd, isValidDob, isValidCccd } from '@/lib/form-validators';
 
-const CCCD12 = /^\d{12}$/;
 
 // Hai ô sinh viên có thể xin sửa. Giữ trùng key với payload.editable của backend.
 // Niên khóa / thời gian đào tạo tối đa thuộc NHÓM CỨNG — chỉ xem.
@@ -43,18 +42,18 @@ export default function OtherRequestPage() {
         const pf = data.prefill;
         setForm(data);
         setValues({ dob: pf.dob, citizen_id: pf.citizen_id });
-        // Hồ sơ trống thì không có gì để khóa → mở sẵn. CCCD không đủ 12 số
-        // cũng mở sẵn vì backend buộc phải nhập mới.
+        // Trống hoặc không hợp lệ ⇒ mở sẵn cho SV nhập lại (CCCD không đủ 12 số
+        // thì backend cũng buộc nhập mới).
         setOpenFields({
-          dob: !pf.dob.trim(),
-          citizen_id: !CCCD12.test(pf.citizen_id.trim()),
+          dob: !isValidDob(pf.dob),
+          citizen_id: !isValidCccd(pf.citizen_id),
         });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
 
   const isProgram = form ? purposeCode === form.program_purpose_code : false;
-  const cccdMustRenew = form ? !CCCD12.test(form.prefill.citizen_id.trim()) : false;
+  const cccdMustRenew = form ? !isValidCccd(form.prefill.citizen_id) : false;
 
   function setValue(key: FieldKey, v: string) {
     setValues((s) => ({ ...s, [key]: v }));
@@ -138,7 +137,7 @@ export default function OtherRequestPage() {
 
   const p = form.prefill;
   const originals: Record<FieldKey, string> = { dob: p.dob, citizen_id: p.citizen_id };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim(), citizen_id: !cccdMustRenew };
+  const lockable: Record<FieldKey, boolean> = { dob: isValidDob(p.dob), citizen_id: !cccdMustRenew };
   const editCount = FIELD_KEYS.filter((k) => values[k].trim() !== originals[k].trim()).length;
 
   return (
