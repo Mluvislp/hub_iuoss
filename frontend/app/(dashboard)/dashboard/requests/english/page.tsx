@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { EnglishFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
 import { validateDob, isValidDob } from '@/lib/form-validators';
 
@@ -209,14 +210,8 @@ export default function EnglishRequestPage() {
             </p>
           </div>
 
-          {/* Ghi chú */}
-          <div>
-            <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
-            <textarea
-              value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000}
-              placeholder="Số bản in, yêu cầu đặc biệt…" className={ui.textarea}
-            />
-          </div>
+          {/* Ghi chú — component dùng chung cho 5 form */}
+          <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
           <RequestConsent

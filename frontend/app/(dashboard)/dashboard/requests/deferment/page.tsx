@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { DefermentFormData, Province, Ward } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { RequestNoteField } from '@/components/request-note';
 import {
   ReadonlyField, EditableField, LockedBox, RequestEditButton, CancelEditButton, ChangedTag,
 } from '@/components/editable-field';
@@ -310,18 +311,8 @@ export default function DefermentRequestPage() {
             )}
           </div>
 
-          {/* Ghi chú */}
-          <div>
-            <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
-            <textarea
-              value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000}
-              className={ui.textarea}
-            />
-            <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
-              <li>• Thông tin sinh viên có sai sót: ghi rõ thông tin sai và thông tin đúng vào đây.</li>
-              <li>• Nếu có yêu cầu đặc biệt, vui lòng ghi rõ nội dung.</li>
-            </ul>
-          </div>
+          {/* Ghi chú — component dùng chung cho 5 form */}
+          <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
           <RequestConsent
