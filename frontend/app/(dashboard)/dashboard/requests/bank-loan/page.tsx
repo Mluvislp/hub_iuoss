@@ -6,7 +6,7 @@ import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } 
 import { api, ApiError } from '@/lib/api';
 import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
-import { validateDob, validateCccd, validateIssueDate } from '@/lib/form-validators';
+import { validateDob, validateCccd, validateIssueDate, isValidDob, isValidIssueDate } from '@/lib/form-validators';
 import { ui } from '@/lib/ui';
 import type { BankLoanFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
@@ -44,13 +44,15 @@ export default function BankLoanRequestPage() {
         // Mã lớp đã có trong hồ sơ thì điền sẵn, SV chỉ gõ khi hồ sơ còn trống.
         setClassCode(pf.class_code ?? '');
         setValues({ dob: pf.dob });
-        // Hồ sơ đã có ngày sinh thì khóa sẵn; trống thì mở sẵn.
-        setOpenFields({ dob: !pf.dob.trim() });
+        // Hồ sơ đã có ngày sinh hợp lệ thì khóa sẵn; trống hoặc không hợp lệ ⇒ mở sẵn.
+        setOpenFields({ dob: !isValidDob(pf.dob) });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
 
   const cccdLocked = !!form?.prefill.cccd_locked;
+  // Số CCCD khóa cứng nhưng ngày cấp trống / không hợp lệ ⇒ mở riêng ô ngày cấp.
+  const issueOpen = cccdLocked && !isValidIssueDate(form?.prefill.citizen_id_issue_date ?? '');
   // Hồ sơ đã có mã lớp ⇒ khoá ô. Mã lớp trên hồ sơ do phòng đào tạo cập nhật hàng
   // loạt, không để SV gõ đè lên giấy tờ nhà trường cấp.
   const classLocked = !!form?.prefill.class_code_locked;
@@ -75,6 +77,8 @@ export default function BankLoanRequestPage() {
     const de = validateDob(values.dob); if (de) errs.dob = de;
     if (!cccdLocked) {
       const ce = validateCccd(citizenId, pf.citizen_id); if (ce) errs.citizen_id = ce;
+    }
+    if (!cccdLocked || issueOpen) {
       const ie = validateIssueDate(issueDate); if (ie) errs.citizen_id_issue_date = ie;
     }
     if (!classLocked && !classCode.trim()) errs.class_code = 'Vui lòng nhập mã lớp.';
@@ -128,9 +132,10 @@ export default function BankLoanRequestPage() {
 
   const p = form.prefill;
   const originals: Record<FieldKey, string> = { dob: p.dob };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const lockable: Record<FieldKey, boolean> = { dob: isValidDob(p.dob) };
   const editCount = (values.dob.trim() !== originals.dob.trim() ? 1 : 0)
-    + (cccdLocked ? 0 : 2) + (classLocked ? 0 : 1);
+    + (cccdLocked ? (issueOpen && issueDate.trim() !== p.citizen_id_issue_date.trim() ? 1 : 0) : 2)
+    + (classLocked ? 0 : 1);
 
   return (
     <div className="max-w-[760px] space-y-4">
@@ -217,7 +222,22 @@ export default function BankLoanRequestPage() {
             {cccdLocked ? (
               <div className="grid sm:grid-cols-2 gap-3">
                 <ReadonlyField label="Số CCCD" value={p.citizen_id} />
-                <ReadonlyField label="Ngày cấp" value={p.citizen_id_issue_date} />
+                {issueOpen ? (
+                  <div>
+                    <label className={ui.fieldLabel}>Ngày cấp <span className="text-red-500">*</span></label>
+                    <input
+                      type="date" value={toDateInput(issueDate)}
+                      min={DATE_INPUT_MIN} max={todayInput()}
+                      onChange={(e) => { setIssueDate(fromDateInput(e.target.value)); setFieldErrors((f) => ({ ...f, citizen_id_issue_date: undefined })); }}
+                      className={cn(ui.input, fieldErrors.citizen_id_issue_date && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
+                    />
+                    {fieldErrors.citizen_id_issue_date
+                      ? <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id_issue_date}</p>
+                      : <p className="mt-1 text-[0.75rem] text-warning-text">Hồ sơ chưa có ngày cấp hợp lệ — vui lòng nhập.</p>}
+                  </div>
+                ) : (
+                  <ReadonlyField label="Ngày cấp" value={p.citizen_id_issue_date} />
+                )}
               </div>
             ) : (
               <>

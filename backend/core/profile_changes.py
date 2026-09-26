@@ -20,6 +20,7 @@ from datetime import date, datetime
 from django.db import transaction
 from django.utils import timezone
 
+from core import cccd_rules
 from students.models import (
     ProfileChangeRequest, StudentContactPoint, StudentIdentityDocument,
 )
@@ -113,13 +114,19 @@ def _clean_cccd(value, student):
     place = " ".join((value.get("issue_place") or "").split())
     if len(place) > 255:
         raise ChangeError("Nơi cấp quá dài (tối đa 255 ký tự).")
-
     issued = _parse_date(value.get("issue_date"), "Ngày cấp")
-    # Cùng luật với validate_issue_date của luồng giấy xác nhận.
-    if issued and issued > date.today():
-        raise ChangeError("Ngày cấp CCCD không được ở tương lai.")
-    if issued and issued.year < 1990:
-        raise ChangeError("Ngày cấp CCCD không hợp lệ.")
+
+    # Luật `cccd_rules` chỉ áp cho giá trị SV nhập MỚI — dữ liệu cũ giữ nguyên
+    # không được chặn SV gửi. Cùng module với luồng giấy xác nhận: đừng đẻ ra cách
+    # hiểu thứ hai cho cùng một cột.
+    current = _current_cccd(student)
+    try:
+        if text != current["number"]:
+            cccd_rules.check_number(text)
+        if issued and _fmt_date(issued) != current["issue_date"]:
+            cccd_rules.check_issue_date(issued)
+    except ValueError as exc:
+        raise ChangeError(str(exc))
 
     return {"number": text, "issue_place": place, "issue_date": _fmt_date(issued)}
 

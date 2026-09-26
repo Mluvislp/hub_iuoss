@@ -9,7 +9,7 @@ import { ui } from '@/lib/ui';
 import type { EnglishFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
-import { validateDob } from '@/lib/form-validators';
+import { validateDob, isValidDob } from '@/lib/form-validators';
 
 // Mốc nhập học / ra trường thuộc NHÓM CỨNG — chỉ xem.
 type FieldKey = 'dob';
@@ -39,7 +39,8 @@ export default function EnglishRequestPage() {
         const pf = data.prefill;
         setForm(data);
         setValues({ dob: pf.dob });
-        setOpenFields({ dob: !pf.dob.trim() });
+        // Trống hoặc không hợp lệ ⇒ mở sẵn cho SV nhập lại.
+        setOpenFields({ dob: !isValidDob(pf.dob) });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
@@ -115,7 +116,7 @@ export default function EnglishRequestPage() {
 
   const p = form.prefill;
   const originals: Record<FieldKey, string> = { dob: p.dob };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const lockable: Record<FieldKey, boolean> = { dob: isValidDob(p.dob) };
   const editCount = FIELD_KEYS.filter((k) => values[k].trim() !== originals[k].trim()).length;
 
   return (

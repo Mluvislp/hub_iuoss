@@ -11,7 +11,7 @@ import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/
 import {
   ReadonlyField, EditableField, LockedBox, RequestEditButton, CancelEditButton, ChangedTag,
 } from '@/components/editable-field';
-import { validateDob } from '@/lib/form-validators';
+import { validateDob, isValidDob } from '@/lib/form-validators';
 import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 
 // Ba mốc thời gian học thuộc NHÓM CỨNG — chỉ xem.
@@ -50,7 +50,8 @@ export default function DefermentRequestPage() {
         setForm(data);
         setValues({ dob: pf.dob });
         // Ô nào hồ sơ đã có dữ liệu thì khóa sẵn; trống thì mở sẵn (không có gì để khóa).
-        setOpenFields({ dob: !pf.dob.trim() });
+        // Trống hoặc không hợp lệ ⇒ mở sẵn cho SV nhập lại.
+        setOpenFields({ dob: !isValidDob(pf.dob) });
         setStreet(pf.street);
         pendingWardRef.current = pf.ward_code || '';
         setProvinceCode(pf.province_code || '');   // trigger nạp xã + pre-select
@@ -168,7 +169,7 @@ export default function DefermentRequestPage() {
 
   const p = form.prefill;
   const originals: Record<FieldKey, string> = { dob: p.dob };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const lockable: Record<FieldKey, boolean> = { dob: isValidDob(p.dob) };
   const addressLockable = !!(p.address_standardized && p.province_code && p.ward_code && p.street.trim());
   const addressChanged =
     provinceCode !== p.province_code || wardCode !== p.ward_code || street.trim() !== p.street.trim();

@@ -8,7 +8,7 @@ import re
 import unicodedata
 from datetime import date, datetime
 
-from core import address_service
+from core import address_service, cccd_rules
 from students.models import StudentIdentityDocument, StudentAddress, VnProvince, VnWard
 from students.timeline import (
     course_year_label,
@@ -37,14 +37,25 @@ OTHER_PURPOSE_MAP = {c["code"]: c["label"] for c in OTHER_PURPOSE_CHOICES}
 PROGRAM_PURPOSE_CODE = "program"
 
 
-def get_current_cccd(student):
-    doc = (
+def get_current_cccd_row(student):
+    """Dòng CCCD ĐANG DÙNG (`is_current=True`), nhiều dòng thì id lớn thắng.
+
+    Không lùi về dòng đã hạ: duyệt đổi CCCD ghi dòng mới và hạ dòng cũ xuống
+    `is_current=False` để ẩn đi — đọc lại dòng cũ là in số CCCD đã bị thay.
+    Cùng cách chọn với `profile_changes._cccd_row`.
+    """
+    return (
         StudentIdentityDocument.objects
-        .filter(student=student, document_type=StudentIdentityDocument.TYPE_CCCD)
-        .order_by("-is_current", "-id")
+        .filter(student=student, document_type=StudentIdentityDocument.TYPE_CCCD,
+                is_current=True)
+        .order_by("-id")
         .first()
     )
-    return doc.document_number if doc else ""
+
+
+def get_current_cccd(student):
+    doc = get_current_cccd_row(student)
+    return (doc.document_number or "") if doc else ""
 
 
 PROGRAM_NAME_MAX = 200
@@ -107,22 +118,21 @@ def validate_dob(dob):
 
 
 def validate_citizen_id(value, original=""):
-    """CCCD trên giấy PHẢI là 12 chữ số.
+    """CCCD trên giấy PHẢI là 12 chữ số (`core/cccd_rules.py`).
 
-    Nếu hồ sơ gốc trống hoặc là CMND cũ (không phải 12 số) thì bắt buộc SV nhập
-    CCCD mới 12 số — không chấp nhận giữ nguyên giá trị cũ.
+    - Giữ nguyên số trong hồ sơ (đã đủ 12 số) ⇒ qua.
+    - Hồ sơ trống hoặc là CMND cũ ⇒ bắt buộc nhập CCCD mới.
     """
     value = (value or "").strip()
-    if CCCD_RE.match(value):
+    original = (original or "").strip()
+    if value and value == original and CCCD_RE.match(value):
         return
-    if not value:
-        raise ValueError("Vui lòng nhập số CCCD (12 chữ số).")
-    if not CCCD_RE.match((original or "").strip()):
+    if not value and not CCCD_RE.match(original):
         raise ValueError(
             "Hồ sơ chưa có CCCD hợp lệ (đang trống hoặc CMND cũ) — "
             "vui lòng nhập số CCCD mới gồm 12 chữ số."
         )
-    raise ValueError("Số CCCD phải gồm 12 chữ số.")
+    cccd_rules.check_number(value)
 
 
 def build_other_payload(student, *, purpose_code, program_name, dob, citizen_id):
@@ -433,28 +443,33 @@ def build_deferment_payload(student, *, dob, province_code, ward_code, street):
 
 def get_current_cccd_doc(student):
     """Trả (số CCCD, ngày cấp dd/mm/yyyy) từ record CCCD hiện hành."""
-    doc = (
-        StudentIdentityDocument.objects
-        .filter(student=student, document_type=StudentIdentityDocument.TYPE_CCCD)
-        .order_by("-is_current", "-id")
-        .first()
-    )
+    doc = get_current_cccd_row(student)
     if not doc:
         return "", ""
     issue = doc.issue_date.strftime("%d/%m/%Y") if doc.issue_date else ""
     return (doc.document_number or ""), issue
 
 
+def _issue_date_ok(value):
+    """Ngày cấp trong hồ sơ dùng được không — không ⇒ form mở sẵn ô cho SV nhập lại.
+    Cùng định nghĩa với `isValidIssueDate` bên frontend."""
+    try:
+        validate_issue_date(value)
+    except ValueError:
+        return False
+    return True
+
+
 def validate_issue_date(value):
+    """Ngày cấp CCCD SV nhập mới — luật của `core/cccd_rules.py`."""
     value = (value or "").strip()
     if not value:
         raise ValueError("Vui lòng nhập ngày cấp CCCD.")
     try:
-        d = datetime.strptime(value, "%d/%m/%Y").date()
+        d = cccd_rules.parse_date(value)
     except ValueError:
         raise ValueError("Ngày cấp CCCD phải theo định dạng dd/mm/yyyy.")
-    if d > date.today():
-        raise ValueError("Ngày cấp CCCD không được ở tương lai.")
+    cccd_rules.check_issue_date(d)
 
 
 def _thuongbinh_snapshot(student):
@@ -474,11 +489,16 @@ def _thuongbinh_snapshot(student):
 
 
 def build_thuongbinh_prefill(student):
-    """Prefill form thương binh. CCCD/ngày cấp chỉ cho sửa khi chưa có CCCD 12 số."""
+    """Prefill form thương binh.
+
+    CCCD + ngày cấp là ô XIN SỬA (khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở), cùng
+    khuôn ngày sinh / địa chỉ của giấy hoãn NVQS. `cccd_valid=False` (hồ sơ trống
+    hoặc CMND cũ) ⇒ form mở sẵn và bắt buộc nhập.
+    """
     num, issue = get_current_cccd_doc(student)
     snap = _thuongbinh_snapshot(student)
     snap.update({
-        "cccd_locked": bool(CCCD_RE.match(num)),   # đã có CCCD 12 số → khóa
+        "cccd_valid": bool(CCCD_RE.match(num)),
         "citizen_id": num,
         "citizen_id_issue_date": issue,
     })
@@ -493,17 +513,15 @@ def build_thuongbinh_payload(student, *, citizen_id, citizen_id_issue_date):
     """
     snap0 = _thuongbinh_snapshot(student)
     num, issue = get_current_cccd_doc(student)
-    if CCCD_RE.match(num):
-        # Đã có CCCD 12 số → khóa, dùng thẳng
-        cid_field = {"original": num, "proposed": num, "changed": False, "review": None}
-        issue_field = {"original": issue, "proposed": issue, "changed": False, "review": None}
-    else:
-        cid_val = (citizen_id or "").strip()
-        validate_citizen_id(cid_val, num)          # buộc 12 số
-        issue_val = (citizen_id_issue_date or "").strip()
-        validate_issue_date(issue_val)
-        cid_field = {"original": num, "proposed": cid_val, "changed": True, "review": "pending"}
-        issue_field = {"original": issue, "proposed": issue_val, "changed": True, "review": "pending"}
+
+    # SV xin sửa ⇒ `changed` + `review=pending`, chuyên viên duyệt ở Dashboard. Duyệt
+    # thì Dashboard GHI DÒNG CCCD MỚI và hạ dòng cũ (không sửa đè), số + ngày cấp đi
+    # chung một lần duyệt.
+    cid_field = _editable_field(num, citizen_id)
+    issue_field = _editable_field(issue, citizen_id_issue_date)
+    validate_citizen_id(cid_field["proposed"], cid_field["original"])
+    if cid_field["changed"] or issue_field["changed"] or not _issue_date_ok(issue):
+        validate_issue_date(issue_field["proposed"])
 
     purpose_label = "Xác nhận ưu đãi giáo dục (thương binh)"
     payload = {
@@ -593,7 +611,13 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
     num, issue = get_current_cccd_doc(student)
     if CCCD_RE.match(num):
         cid_field = {"original": num, "proposed": num, "changed": False, "review": None}
-        issue_field = {"original": issue, "proposed": issue, "changed": False, "review": None}
+        if _issue_date_ok(issue):
+            issue_field = {"original": issue, "proposed": issue, "changed": False, "review": None}
+        else:
+            # Số khóa cứng nhưng ngày cấp trống / không hợp lệ ⇒ form mở riêng ô
+            # này; ngày SV nhập đi qua duyệt như mọi ô xin sửa.
+            issue_field = _editable_field(issue, citizen_id_issue_date)
+            validate_issue_date(issue_field["proposed"])
     else:
         cid_val = (citizen_id or "").strip()
         validate_citizen_id(cid_val, num)

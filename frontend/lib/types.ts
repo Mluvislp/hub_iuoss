@@ -219,8 +219,8 @@ export interface ThuongBinhPrefill {
   course_year: string;
   course_year_number: string;
   max_year_number: string;
-  // CCCD chỉ cho sửa khi chưa có CCCD 12 số
-  cccd_locked: boolean;
+  /** Hồ sơ đã có CCCD 12 số ⇒ ô khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở. false ⇒ bắt buộc nhập. */
+  cccd_valid: boolean;
   citizen_id: string;
   citizen_id_issue_date: string;
 }

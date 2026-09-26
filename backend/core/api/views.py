@@ -753,11 +753,13 @@ class InsuranceRegistrationView(APIView):
             contact_type=StudentContactPoint.TYPE_MOBILE_PHONE,
             is_current=True,
         ).first()
+        # Nhiều dòng is_current thì id lớn thắng — cùng cách chọn với
+        # documents.get_current_cccd_row / profile_changes._cccd_row.
         cccd_row = StudentIdentityDocument.objects.filter(
             student_id=student.id,
             document_type=StudentIdentityDocument.TYPE_CCCD,
             is_current=True,
-        ).first()
+        ).order_by("-id").first()
         addresses = {a.address_type: a for a in student.addresses.filter(is_current=True)}
         # Ưu tiên bản thường trú đã chuẩn hóa 2025; chưa có thì lùi về bản cũ.
         # Thứ tự do address_service.PERMANENT_TYPES giữ — đừng chép tay lại.
