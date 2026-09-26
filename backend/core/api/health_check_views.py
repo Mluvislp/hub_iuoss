@@ -1,8 +1,10 @@
 """API "Khám sức khỏe định kỳ" — nghiệp vụ ở `core/health_check.py`."""
 import logging
 
+from django.conf import settings
 from django.http import FileResponse, Http404
 from rest_framework import status
+from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,6 +15,16 @@ from students.models import Student
 from .authentication import IsHubAuthenticated
 
 logger = logging.getLogger(__name__)
+
+
+class HealthCheckRequiredMixin:
+    """404 cho mọi method khi FEATURE_HEALTH_CHECK tắt — cùng cách với
+    `DocumentRequestsRequiredMixin`: tính năng chưa mở thì endpoint biến mất."""
+
+    def initial(self, request, *args, **kwargs):
+        if not settings.FEATURE_HEALTH_CHECK:
+            raise NotFound("Chức năng khám sức khỏe đang tạm ngưng.")
+        super().initial(request, *args, **kwargs)
 
 
 def _student(request):
@@ -39,7 +51,7 @@ def _error(exc):
     return Response(body, status=code)
 
 
-class HealthCheckView(APIView):
+class HealthCheckView(HealthCheckRequiredMixin, APIView):
     """GET — trạng thái đợt + phản hồi của SV + dữ liệu form khai báo."""
 
     permission_classes = [IsHubAuthenticated]
@@ -51,7 +63,7 @@ class HealthCheckView(APIView):
         return Response(health_check.build_state(student))
 
 
-class HealthCheckEvidenceView(APIView):
+class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
     """POST multipart `files` (1–3 ảnh) — nhánh "Đã khám rồi" / nộp lại."""
 
     permission_classes = [IsHubAuthenticated]
@@ -70,7 +82,7 @@ class HealthCheckEvidenceView(APIView):
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 
-class HealthCheckRegisterView(APIView):
+class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
     """POST JSON {declaration?, consent} — nhánh "Chưa khám"."""
 
     permission_classes = [IsHubAuthenticated]
@@ -91,7 +103,7 @@ class HealthCheckRegisterView(APIView):
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 
-class HealthCheckEvidenceFileView(APIView):
+class HealthCheckEvidenceFileView(HealthCheckRequiredMixin, APIView):
     """GET ảnh minh chứng của CHÍNH SV — chỉ đọc theo chỉ số, không nhận đường dẫn."""
 
     permission_classes = [IsHubAuthenticated]

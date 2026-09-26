@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   FilePlus2,
-  HeartPulse,
   Home,
   LogOut,
   ShieldCheck,
@@ -65,7 +64,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         feature: 'document_requests',
       },
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
-      { href: '/dashboard/kham-suc-khoe', icon: HeartPulse, label: 'Khám sức khỏe' },
+      featureItem('health_check'),
     ],
   },
 ];
