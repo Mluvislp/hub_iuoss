@@ -347,8 +347,7 @@ export default function DefermentRequestPage() {
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Giấy sẽ dùng thông tin đã xác nhận ở trên. Thời gian xử lý thông thường:{' '}
-          <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>
     </div>
