@@ -63,3 +63,15 @@ export function validateIssueDate(v: string): string | null {
 export const isValidDob = (v: string): boolean => validateDob(v) === null;
 export const isValidCccd = (v: string): boolean => /^\d{12}$/.test((v || '').trim());
 export const isValidIssueDate = (v: string): boolean => validateIssueDate(v) === null;
+
+// ── Mã lớp ────────────────────────────────────────────────────────────────────
+// Soi gương build_bankloan_payload (backend/core/documents.py): bắt buộc, ≤ 64 ký tự.
+// Backend tự viết hoa khi lưu (normalize_class_code).
+
+export function validateClassCode(v: string): string | null {
+  const s = v.trim();
+  if (!s) return 'Vui lòng nhập mã lớp.';
+  if (s.length > 64) return 'Mã lớp quá dài (tối đa 64 ký tự).';
+  return null;
+}
+export const isValidClassCode = (v: string): boolean => validateClassCode(v || '') === null;

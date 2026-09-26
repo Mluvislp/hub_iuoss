@@ -562,28 +562,32 @@ def _bankloan_snapshot(student, class_code):
     }
 
 
+CLASS_CODE_MAX = 64
+
+
+def normalize_class_code(value):
+    """Mã lớp SV gõ → dạng lưu: bỏ khoảng trắng hai đầu, VIẾT HOA — cùng cách chuẩn
+    hóa với đồng bộ lớp bằng file (Dashboard class_sync_service)."""
+    return (value or "").strip().upper()
+
+
 def build_bankloan_prefill(student):
-    """Prefill form vay vốn. CCCD/ngày cấp và MÃ LỚP khóa lại khi hồ sơ đã có.
+    """Prefill form vay vốn.
 
-    `students.class_code` là **nguồn chuẩn** — được cập nhật hàng loạt từ file của
-    phòng đào tạo (Dashboard `/students/class-sync/`). Hồ sơ đã có mã lớp thì khóa
-    ô lại, đúng khuôn `cccd_locked` ngay bên cạnh: giấy tờ nhà trường cấp không
-    được lấy chữ SV tự gõ khi hồ sơ đã có dữ liệu chuẩn.
-
-    Chỉ hồ sơ CHƯA có mã lớp mới để SV tự điền, và giá trị đó **không** ghi ngược
-    vào hồ sơ — nó chỉ nằm trong snapshot của đơn.
+    Mã lớp, số CCCD, ngày cấp là ô XIN SỬA (khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới
+    mở; trống / không hợp lệ thì mở sẵn) — cùng khuôn form thương binh. Giá trị SV
+    đề xuất chỉ vào hồ sơ khi chuyên viên DUYỆT ở Dashboard (từ 26/09/2026; trước
+    đó mã lớp + CCCD khóa cứng khi hồ sơ đã có).
     """
     num, issue = get_current_cccd_doc(student)
     snap = _bankloan_snapshot(student, "")
     snap.pop("class_code", None)
-    profile_class = (student.class_code or "").strip()
     snap.update({
         "dob": format_student_birth_date(student),
-        "cccd_locked": bool(CCCD_RE.match(num)),
+        "cccd_valid": bool(CCCD_RE.match(num)),
         "citizen_id": num,
         "citizen_id_issue_date": issue,
-        "class_code": profile_class,
-        "class_code_locked": bool(profile_class),
+        "class_code": (student.class_code or "").strip(),
     })
     return snap
 
@@ -593,39 +597,33 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
 
     Các nhãn tiến độ học (niên khóa, học kỳ, mốc nhập học/ra trường, số năm–tháng
     đào tạo) là NHÓM CỨNG: chỉ nằm trong `snapshot`, SV không sửa được.
+
+    Mã lớp / số CCCD / ngày cấp: SV sửa ⇒ `changed` + `review=pending`, chuyên viên
+    duyệt ở Dashboard (mã lớp mở chặng mới trong lịch sử lớp; CCCD ghi dòng mới).
+    `snapshot.class_code` giữ mã lớp HỒ SƠ lúc tạo; giấy in theo `editable.class_code`.
     """
-    # HỒ SƠ THẮNG. Trước đây lấy giá trị SV gửi lên trước, nên SV sửa được mã lớp
-    # in trên giấy xác nhận của nhà trường — kể cả khi hồ sơ đã có mã chuẩn từ
-    # file phòng đào tạo. Chỉ khi hồ sơ trống mới dùng chữ SV nhập.
     profile_class = (student.class_code or "").strip()
-    class_code = profile_class or (class_code or "").strip()
-    if not class_code:
+    submitted_class = normalize_class_code(class_code)
+    if submitted_class == normalize_class_code(profile_class):
+        submitted_class = profile_class        # chỉ khác hoa/thường ⇒ coi như không sửa
+    class_field = _editable_field(profile_class, submitted_class)
+    if not class_field["proposed"]:
         raise ValueError("Vui lòng nhập mã lớp.")
-    if len(class_code) > 64:
-        raise ValueError("Mã lớp quá dài (tối đa 64 ký tự).")
+    if len(class_field["proposed"]) > CLASS_CODE_MAX:
+        raise ValueError(f"Mã lớp quá dài (tối đa {CLASS_CODE_MAX} ký tự).")
 
     dob_field = _editable_field(format_student_birth_date(student), dob)
     if dob_field["changed"]:
         validate_dob(dob_field["proposed"])
 
     num, issue = get_current_cccd_doc(student)
-    if CCCD_RE.match(num):
-        cid_field = {"original": num, "proposed": num, "changed": False, "review": None}
-        if _issue_date_ok(issue):
-            issue_field = {"original": issue, "proposed": issue, "changed": False, "review": None}
-        else:
-            # Số khóa cứng nhưng ngày cấp trống / không hợp lệ ⇒ form mở riêng ô
-            # này; ngày SV nhập đi qua duyệt như mọi ô xin sửa.
-            issue_field = _editable_field(issue, citizen_id_issue_date)
-            validate_issue_date(issue_field["proposed"])
-    else:
-        cid_val = (citizen_id or "").strip()
-        validate_citizen_id(cid_val, num)
-        issue_val = (citizen_id_issue_date or "").strip()
-        validate_issue_date(issue_val)
-        cid_field = {"original": num, "proposed": cid_val, "changed": True, "review": "pending"}
-        issue_field = {"original": issue, "proposed": issue_val, "changed": True, "review": "pending"}
+    cid_field = _editable_field(num, citizen_id)
+    issue_field = _editable_field(issue, citizen_id_issue_date)
+    validate_citizen_id(cid_field["proposed"], cid_field["original"])
+    if cid_field["changed"] or issue_field["changed"] or not _issue_date_ok(issue):
+        validate_issue_date(issue_field["proposed"])
 
+    class_code = profile_class
     snap0 = _bankloan_snapshot(student, class_code)
 
     purpose_label = "Xác nhận vay vốn ngân hàng"
@@ -637,6 +635,7 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
             "dob": dob_field,
             "citizen_id": cid_field,
             "citizen_id_issue_date": issue_field,
+            "class_code": class_field,
         },
     }
     return payload, purpose_label
