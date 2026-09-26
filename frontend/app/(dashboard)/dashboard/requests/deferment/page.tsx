@@ -314,8 +314,12 @@ export default function DefermentRequestPage() {
             <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
             <textarea
               value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000}
-              placeholder="Số bản in, yêu cầu đặc biệt…" className={ui.textarea}
+              className={ui.textarea}
             />
+            <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
+              <li>• Thông tin sinh viên có sai sót: ghi rõ thông tin sai và thông tin đúng vào đây.</li>
+              <li>• Nếu có yêu cầu đặc biệt, vui lòng ghi rõ nội dung.</li>
+            </ul>
           </div>
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
