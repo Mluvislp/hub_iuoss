@@ -245,13 +245,12 @@ export interface BankLoanPrefill {
   max_year_number: string;
   max_month_number: string;
   dob: string;
-  cccd_locked: boolean;
+  /** Hồ sơ đã có CCCD 12 số ⇒ ô khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở. false ⇒ bắt buộc nhập. */
+  cccd_valid: boolean;
   citizen_id: string;
   citizen_id_issue_date: string;
-  /** Mã lớp lấy từ hồ sơ; rỗng thì sinh viên tự điền. */
+  /** Mã lớp hồ sơ; rỗng ⇒ ô mở sẵn, bắt buộc nhập. SV sửa thì chuyên viên duyệt. */
   class_code: string;
-  /** Hồ sơ đã có mã lớp ⇒ khoá ô, không cho sinh viên sửa (giống cccd_locked). */
-  class_code_locked: boolean;
 }
 
 export interface BankLoanFormData {
