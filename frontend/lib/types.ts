@@ -363,6 +363,7 @@ export interface OffCampusResult {
 export interface FeatureFlags {
   document_requests: boolean;
   civic_activities: boolean;
+  health_check: boolean;
 }
 
 /**
