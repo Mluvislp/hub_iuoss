@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import health_check_views, views
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView
 from .external_insurance_views import ExternalInsuranceView
 
@@ -39,6 +39,15 @@ urlpatterns = [
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
     path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
          name="api_offcampus_request_reopen"),
+
+    # Khám sức khỏe định kỳ
+    path("health-check/", health_check_views.HealthCheckView.as_view(), name="api_health_check"),
+    path("health-check/evidence/", health_check_views.HealthCheckEvidenceView.as_view(),
+         name="api_health_check_evidence"),
+    path("health-check/evidence/<int:index>/", health_check_views.HealthCheckEvidenceFileView.as_view(),
+         name="api_health_check_evidence_file"),
+    path("health-check/register/", health_check_views.HealthCheckRegisterView.as_view(),
+         name="api_health_check_register"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

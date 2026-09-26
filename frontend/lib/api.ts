@@ -273,6 +273,27 @@ export const api = {
     },
   },
 
+  healthCheck: {
+    state(): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/');
+    },
+    submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
+      return requestMultipart('/health-check/evidence/', body);
+    },
+    register(data: { declaration?: OffCampusSubmit; consent: boolean }):
+      Promise<import('./types').HealthCheckState> {
+      return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
+    },
+    /** Ảnh minh chứng của chính SV — cần token nên phải tải qua fetch, không dùng <img src>. */
+    async evidence(index: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/health-check/evidence/${index}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được ảnh.');
+      return res.blob();
+    },
+  },
+
   locations: {
     provinces(): Promise<Province[]> {
       return request('/locations/provinces/');

@@ -171,3 +171,53 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
 
 -- BHYT workflow v2: after this base schema and the card/bank upgrade, run
 -- docs/insurance_workflow_upgrade.sql (idempotent expand; no data deletion).
+
+-- ── Khám sức khỏe định kỳ (26/09/2026) — nguồn: dashboard_iuoss/docs/sql/20260926_health_check.sql
+-- Mỗi năm học MỘT đợt. Hub chỉ nhận phản hồi khi opens_at <= now <= closes_at;
+-- hết hạn là form tự khóa, năm sau tạo đợt mới trên Dashboard (không sửa code).
+-- Nội dung gói khám lưu theo đợt vì đổi theo năm (thông tư, thời gian, địa điểm).
+CREATE TABLE `health_check_rounds` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `academic_year` varchar(9) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'VD 2026-2027',
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `opens_at` datetime(6) NOT NULL,
+  `closes_at` datetime(6) NOT NULL COMMENT 'Hạn chót; sau mốc này Hub khóa form',
+  `package_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `package_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mỗi dòng một ý; dòng mở đầu bằng "+" là gạch đầu dòng',
+  `schedule_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Thời gian và địa điểm dự kiến',
+  `created_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hcr_academic_year` (`academic_year`),
+  KEY `idx_hcr_window` (`opens_at`, `closes_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Mỗi SV một dòng mỗi đợt. `choice` là câu trả lời, `status` là tiến trình xử lý;
+-- giá trị status KHÔNG trùng giữa hai nhánh nên đọc một cột là biết đủ:
+--   choice='examined' (đã khám, nộp minh chứng): pending → approved | rejected
+--                                                 rejected → pending (SV nộp lại)
+--   choice='register' (chưa khám, đăng ký khám tại trường): registered → attended | absent
+CREATE TABLE `health_check_responses` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `round_id` bigint NOT NULL,
+  `student_id` bigint NOT NULL,
+  `choice` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `evidence` json DEFAULT NULL COMMENT '[{storage_key, mime_type, size, sha256, original_filename}]',
+  `residence` json DEFAULT NULL COMMENT 'Ảnh chụp địa chỉ lúc đăng ký: căn cứ thuộc diện TP.HCM',
+  `consent_at` datetime(6) DEFAULT NULL COMMENT 'Lúc SV tích đồng ý tham gia khám tập trung',
+  `submit_count` smallint unsigned NOT NULL DEFAULT '1' COMMENT 'Số lần nộp (nộp lại minh chứng sau khi bị từ chối)',
+  `submitted_at` datetime(6) NOT NULL,
+  `review_note` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reviewed_by_id` int DEFAULT NULL,
+  `reviewed_at` datetime(6) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hcresp_round_student` (`round_id`, `student_id`),
+  KEY `idx_hcresp_round_state` (`round_id`, `choice`, `status`),
+  KEY `idx_hcresp_student` (`student_id`),
+  CONSTRAINT `fk_hcresp_round` FOREIGN KEY (`round_id`) REFERENCES `health_check_rounds` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_hcresp_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

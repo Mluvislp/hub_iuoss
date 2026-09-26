@@ -363,6 +363,7 @@ export interface OffCampusResult {
 export interface FeatureFlags {
   document_requests: boolean;
   civic_activities: boolean;
+  health_check: boolean;
 }
 
 /**
@@ -438,4 +439,58 @@ export interface InsuranceDetail {
   id:number; status:string; row_version:number; reason_code:string|null; reason_label:string; reason_text:string|null;
   timeline:InsuranceTimelineItem[];
   payment:(InsuranceAssessment & {qr_url:string|null; bank_name:string; bank_account_number:string; bank_account_name:string; reference:string})|null;
+}
+
+// ── Khám sức khỏe định kỳ (/api/health-check/) ──────────────────────────────
+
+export type HealthCheckRoundState = 'upcoming' | 'open' | 'closed';
+
+export interface HealthCheckRound {
+  id: number;
+  academic_year: string;
+  title: string;
+  opens_at: string;
+  closes_at: string;
+  state: HealthCheckRoundState;
+  package_name: string;
+  /** Dòng `bullet` là gạch đầu dòng con của dòng thường đứng trước nó. */
+  package_lines: { bullet: boolean; text: string }[];
+  schedule_note: string;
+}
+
+export interface HealthCheckResidence {
+  eligible: boolean;
+  permanent_hcm: boolean;
+  temporary_hcm: boolean;
+  permanent: string;
+  temporary: string;
+  declared_with_registration?: boolean;
+}
+
+export type HealthCheckStatus =
+  | 'pending' | 'approved' | 'rejected'        // choice = examined
+  | 'registered' | 'attended' | 'absent';      // choice = register
+
+export interface HealthCheckResponse {
+  id: number;
+  choice: 'examined' | 'register';
+  status: HealthCheckStatus;
+  status_label: string;
+  submitted_at: string;
+  submit_count: number;
+  consent_at: string | null;
+  review_note: string;
+  reviewed_at: string | null;
+  evidence: { index: number; name: string }[];
+  residence: HealthCheckResidence | null;
+}
+
+export interface HealthCheckState {
+  round: HealthCheckRound | null;
+  response: HealthCheckResponse | null;
+  can_submit: boolean;
+  can_resubmit: boolean;
+  max_evidence_files: number;
+  offcampus: OffCampusForm;
+  residence: HealthCheckResidence;
 }
