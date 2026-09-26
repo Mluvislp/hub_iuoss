@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from .external_insurance_models import ExternalInsuranceDeclaration  # noqa: F401
+from .health_check_models import HealthCheckResponse, HealthCheckRound  # noqa: F401
 
 
 class ConfirmationRequest(models.Model):
