@@ -1,25 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, CalendarClock, Check, ChevronRight, ClipboardCheck,
-  ExternalLink, FileImage, HeartPulse, ImagePlus, Loader2, Lock, MapPin, Stethoscope, Upload, X,
+  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { accentIcon, badge, ui } from '@/lib/ui';
+import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { HealthCheckResponse, HealthCheckState, Province } from '@/lib/types';
 import {
   ChoiceTile, DeclarationFields, DeclarationSummary, useDeclarationDraft,
 } from '../khai-bao-ngoai-tru/DeclarationForm';
 import { FormBusy } from '@/components/form-busy';
-
-const GUIDE_APP_URL =
-  'https://medinet.hochiminhcity.gov.vn/kham-suc-khoe/so-y-te-tphcm-hay-cai-dat-va-theo-doi-suc-khoe-tron-doi-tren-ung-dung-cong-dan-cmobile16680-75572.aspx';
-const GUIDE_VIDEO_URL = 'https://drive.google.com/file/d/15CmO2LdHQ47uKVma65nE_0z0mBJ-3hSb/view';
-const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif';
-const MAX_BYTES = 5 * 1024 * 1024;
+import { EvidenceThumbs } from './Evidence';
+import ExaminedWizard from './ExaminedWizard';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -54,127 +50,6 @@ function ErrorBox({ text }: { text: string }) {
   return (
     <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
       <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{text}
-    </div>
-  );
-}
-
-/** Hướng dẫn tra cứu kết quả khám trên ứng dụng Công dân số. */
-function EvidenceGuide() {
-  const link = 'inline-flex items-center gap-1 font-medium text-primary-text hover:underline';
-  return (
-    <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-3 text-[0.84rem] text-ink space-y-2">
-      <p>
-        Sinh viên kiểm tra thông tin kết quả khám sức khỏe theo Chương trình khám sức khỏe
-        toàn dân của Thành phố trên ứng dụng Công dân số Thành phố theo hướng dẫn của Sở Y tế
-        Thành phố Hồ Chí Minh:{' '}
-        <a href={GUIDE_APP_URL} target="_blank" rel="noopener noreferrer" className={link}>
-          Xem hướng dẫn tại đây <ExternalLink size={12} />
-        </a>
-      </p>
-      <p>
-        Đối với sinh viên đã khám nhưng kết quả chưa hiển thị trên ứng dụng Công dân số, sinh
-        viên thực hiện cập nhật kết quả đã khám theo video hướng dẫn:{' '}
-        <a href={GUIDE_VIDEO_URL} target="_blank" rel="noopener noreferrer" className={link}>
-          Xem video hướng dẫn <ExternalLink size={12} />
-        </a>
-      </p>
-    </div>
-  );
-}
-
-/** Ô chọn ảnh + xem trước. Kiểm dung lượng ở client cho nhanh; định dạng thật do server quyết. */
-function EvidencePicker({
-  files, onChange, max, error,
-}: { files: File[]; onChange: (f: File[]) => void; max: number; error?: string }) {
-  const input = useRef<HTMLInputElement>(null);
-  const [localError, setLocalError] = useState('');
-  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
-
-  function add(list: FileList | null) {
-    if (!list) return;
-    setLocalError('');
-    const next = [...files];
-    for (const f of Array.from(list)) {
-      if (f.size > MAX_BYTES) { setLocalError(`“${f.name}” vượt quá 5 MB.`); continue; }
-      if (next.length >= max) { setLocalError(`Tối đa ${max} ảnh.`); break; }
-      next.push(f);
-    }
-    onChange(next);
-    if (input.current) input.current.value = '';
-  }
-
-  return (
-    <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {files.map((f, i) => (
-          <div key={previews[i]} className="relative rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
-            <button type="button" aria-label="Bỏ ảnh"
-                    onClick={() => onChange(files.filter((_, j) => j !== i))}
-                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md bg-white/95 border border-line flex items-center justify-center text-muted hover:text-danger-text">
-              <X size={14} />
-            </button>
-            <div className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-line px-2 py-1 text-[0.7rem] text-muted truncate">
-              {f.name}
-            </div>
-          </div>
-        ))}
-        {files.length < max && (
-          <button type="button" onClick={() => input.current?.click()}
-                  className={cn(
-                    'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed aspect-[3/4] text-muted hover:bg-slate-50 hover:text-ink transition-colors',
-                    error || localError ? 'border-danger-line' : 'border-slate-300',
-                  )}>
-            <ImagePlus size={22} />
-            <span className="text-[0.8rem] font-medium">Thêm ảnh</span>
-            <span className="text-[0.7rem]">{files.length}/{max}</span>
-          </button>
-        )}
-      </div>
-      <input ref={input} type="file" accept={ACCEPT} multiple className="hidden"
-             onChange={(e) => add(e.target.files)} />
-      <p className="mt-2 text-[0.75rem] text-muted">
-        Ảnh chụp màn hình kết quả khám trên ứng dụng Công dân số. JPG, PNG, WebP hoặc HEIC; tối đa {max} ảnh, mỗi ảnh không quá 5 MB.
-      </p>
-      {(error || localError) && (
-        <p className="mt-1 text-[0.75rem] text-danger-text">{error || localError}</p>
-      )}
-    </div>
-  );
-}
-
-/** Ảnh minh chứng đã nộp — tải qua fetch vì cần token. */
-function EvidenceThumbs({ response }: { response: HealthCheckResponse }) {
-  const [urls, setUrls] = useState<(string | null)[]>([]);
-  useEffect(() => {
-    let alive = true;
-    const made: string[] = [];
-    Promise.all(response.evidence.map((e) =>
-      api.healthCheck.evidence(e.index).then((b) => {
-        const u = URL.createObjectURL(b); made.push(u); return u;
-      }).catch(() => null),
-    )).then((list) => { if (alive) setUrls(list); });
-    return () => { alive = false; made.forEach((u) => URL.revokeObjectURL(u)); };
-  }, [response.id, response.submit_count, response.evidence]);
-
-  if (!response.evidence.length) return null;
-  return (
-    <div className="grid grid-cols-3 gap-3">
-      {response.evidence.map((e, i) => (
-        <a key={e.index} href={urls[i] || undefined} target="_blank" rel="noopener noreferrer"
-           className="block rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
-          {urls[i] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={urls[i]!} alt={e.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="flex h-full items-center justify-center text-slate-400">
-              <FileImage size={20} />
-            </span>
-          )}
-        </a>
-      ))}
     </div>
   );
 }
@@ -214,15 +89,41 @@ function PackageInfo({ state }: { state: HealthCheckState }) {
   );
 }
 
+/** Tóm tắt kết quả khám SV đã khai — các chỉ số chính, đủ để tự kiểm lại. */
+function ResultSummary({ response }: { response: HealthCheckResponse }) {
+  const r = response.result || {};
+  if (!Object.keys(r).length) return null;
+  const rows: [string, string][] = [
+    ['Ngày khám', r.exam_date ? new Date(r.exam_date).toLocaleDateString('vi-VN') : ''],
+    ['Nơi khám', r.exam_place],
+    ['Chiều cao · cân nặng · BMI', [r.height_cm && `${r.height_cm} cm`, r.weight_kg && `${r.weight_kg} kg`, r.bmi && `BMI ${r.bmi}`].filter(Boolean).join(' · ')],
+    ['Mạch · huyết áp', [r.pulse && `${r.pulse} lần/phút`, r.bp_systolic && `${r.bp_systolic}/${r.bp_diastolic} mmHg`].filter(Boolean).join(' · ')],
+    ['Phân loại thể lực · sức khỏe', [r.physical_class, r.health_class].filter(Boolean).join(' · ')],
+    ['Kết luận bệnh', r.disease_conclusion],
+  ];
+  return (
+    <div>
+      <div className="text-[0.82rem] font-medium text-ink mb-2">Kết quả khám đã khai</div>
+      <div className="rounded-lg border border-line px-4 py-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className={ui.dtRow}>
+            <span className={ui.dtLabel}>{k}</span>
+            <span className={ui.dtValue}>{v || '—'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function HealthCheckPage() {
   const [state, setState] = useState<HealthCheckState | null>(null);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [loadError, setLoadError] = useState('');
   const [choice, setChoice] = useState<'examined' | 'register' | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState('');
-  const [fieldError, setFieldError] = useState<Record<string, string>>({});
+  const [resubmitting, setResubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const draft = useDeclarationDraft(state?.offcampus ?? null);
@@ -293,7 +194,28 @@ export default function HealthCheckPage() {
     );
   }
 
-  // ── Đã có phản hồi: xem lại (+ nộp lại minh chứng nếu bị từ chối) ──
+  const done = (next: HealthCheckState) => {
+    setState(next); setJustSubmitted(true); setResubmitting(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // ── Nộp lại sau khi bị từ chối: đi lại toàn bộ các bước, nạp sẵn lần khai trước ──
+  if (response && resubmitting && state.can_resubmit) {
+    return (
+      <div className="max-w-[860px] space-y-4">
+        <Breadcrumb />
+        {response.review_note && (
+          <div className="rounded-lg border px-4 py-3 text-sm bg-danger-soft border-danger-line text-danger-text">
+            <div className="font-semibold mb-0.5">Lý do chưa hợp lệ</div>{response.review_note}
+          </div>
+        )}
+        <ExaminedWizard state={state} provinces={provinces} resubmit onDone={done}
+                        onCancel={() => setResubmitting(false)} />
+      </div>
+    );
+  }
+
+  // ── Đã có phản hồi: xem lại (+ nộp lại nếu bị từ chối) ──
   if (response) {
     return (
       <div className="max-w-[860px] space-y-4">
@@ -301,7 +223,7 @@ export default function HealthCheckPage() {
         {justSubmitted && (
           <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-success-soft border border-success-line text-success-text text-sm">
             <Check size={16} className="flex-shrink-0 mt-0.5" />
-            {response.choice === 'register' ? 'Đã ghi nhận đăng ký khám sức khỏe.' : 'Đã ghi nhận minh chứng.'}
+            {response.choice === 'register' ? 'Đã ghi nhận đăng ký khám sức khỏe.' : 'Đã ghi nhận kết quả khám và minh chứng.'}
           </div>
         )}
         <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
@@ -369,6 +291,8 @@ export default function HealthCheckPage() {
 
             {response.choice === 'register' && <PackageInfo state={state} />}
 
+            {response.choice === 'examined' && <ResultSummary response={response} />}
+
             {response.choice === 'examined' && (
               <div>
                 <div className="text-[0.82rem] font-medium text-ink mb-2">Minh chứng đã nộp</div>
@@ -377,37 +301,11 @@ export default function HealthCheckPage() {
             )}
 
             {state.can_resubmit && (
-              <form
-                className="pt-4 border-t border-line2 space-y-4"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!files.length) { setFieldError({ evidence: 'Chưa có ảnh nào.' }); return; }
-                  setSaving(true); setError(''); setFieldError({});
-                  try {
-                    const fd = new FormData();
-                    files.forEach((f) => fd.append('files', f));
-                    setState(await api.healthCheck.submitEvidence(fd));
-                    setFiles([]); setJustSubmitted(true);
-                  } catch (err) {
-                    setError(err instanceof ApiError ? err.message : 'Không gửi được minh chứng.');
-                  } finally { setSaving(false); }
-                }}
-              >
-                <FormBusy busy={saving} label="Đang tải ảnh lên…" className="space-y-4">
-                  <h2 className={ui.sectionTitle}>
-                    <Upload size={16} className={accentIcon.primary} /> Nộp lại minh chứng
-                  </h2>
-                  {error && <ErrorBox text={error} />}
-                  <EvidenceGuide />
-                  <EvidencePicker files={files} onChange={(f) => { setFiles(f); setFieldError({}); }}
-                                  max={state.max_evidence_files} error={fieldError.evidence} />
-                  <div className="flex justify-end">
-                    <button type="submit" disabled={saving} className={ui.btnPrimary}>
-                      {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</> : 'Gửi lại minh chứng'}
-                    </button>
-                  </div>
-                </FormBusy>
-              </form>
+              <div className="flex justify-end pt-4 border-t border-line2">
+                <button type="button" className={ui.btnPrimary} onClick={() => setResubmitting(true)}>
+                  <PencilLine size={15} /> Sửa kết quả và nộp lại minh chứng
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -433,23 +331,6 @@ export default function HealthCheckPage() {
   }
 
   // ── Đợt đang mở, chưa trả lời ──
-  async function submitEvidence(e: React.FormEvent) {
-    e.preventDefault();
-    setError(''); setFieldError({});
-    if (!files.length) { setFieldError({ evidence: 'Chưa có ảnh nào.' }); return; }
-    setSaving(true);
-    try {
-      const fd = new FormData();
-      files.forEach((f) => fd.append('files', f));
-      setState(await api.healthCheck.submitEvidence(fd));
-      setFiles([]); setJustSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      if (err instanceof ApiError && err.data?.errors) setFieldError(err.data.errors as Record<string, string>);
-      setError(err instanceof ApiError ? err.message : 'Không gửi được minh chứng.');
-    } finally { setSaving(false); }
-  }
-
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(''); draft.setFieldErrors({});
@@ -492,7 +373,7 @@ export default function HealthCheckPage() {
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
             <ChoiceTile active={choice === 'examined'} title="Đã khám rồi"
-                        desc="Nộp ảnh minh chứng kết quả khám"
+                        desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
                         onClick={() => { setChoice('examined'); setError(''); }} />
             <ChoiceTile active={choice === 'register'} title="Chưa khám"
                         desc="Đăng ký khám sức khỏe tập trung tại trường"
@@ -503,22 +384,7 @@ export default function HealthCheckPage() {
 
       {/* ── Nhánh "Đã khám rồi" ── */}
       {choice === 'examined' && (
-        <form onSubmit={submitEvidence} className={ui.card}>
-          <FormBusy busy={saving} label="Đang tải ảnh lên…" className="px-6 py-5 space-y-4">
-            <h2 className={ui.sectionTitle}>
-              <Upload size={16} className={accentIcon.primary} /> Nộp minh chứng đã khám
-            </h2>
-            {error && <ErrorBox text={error} />}
-            <EvidencePicker files={files} onChange={(f) => { setFiles(f); setFieldError({}); }}
-                            max={state.max_evidence_files} error={fieldError.evidence} />
-            <EvidenceGuide />
-            <div className="flex items-center justify-end gap-2 pt-1 border-t border-line2">
-              <button type="submit" disabled={saving} className={cn(ui.btnPrimary, 'mt-3')}>
-                {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</> : 'Gửi minh chứng'}
-              </button>
-            </div>
-          </FormBusy>
-        </form>
+        <ExaminedWizard state={state} provinces={provinces} onDone={done} />
       )}
 
       {/* ── Nhánh "Chưa khám": phần 1 khai báo + phần 2 đăng ký ── */}

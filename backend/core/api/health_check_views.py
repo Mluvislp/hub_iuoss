@@ -1,4 +1,5 @@
 """API "Khám sức khỏe định kỳ" — nghiệp vụ ở `core/health_check.py`."""
+import json
 import logging
 
 from django.conf import settings
@@ -36,6 +37,17 @@ def _student(request):
     )
 
 
+def _json_field(raw):
+    """Multipart không chở được object lồng nhau — frontend gửi JSON dạng chuỗi."""
+    if isinstance(raw, dict):
+        return raw
+    try:
+        value = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def _no_student():
     return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
                     status=status.HTTP_400_BAD_REQUEST)
@@ -64,7 +76,8 @@ class HealthCheckView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
-    """POST multipart `files` (1–3 ảnh) — nhánh "Đã khám rồi" / nộp lại."""
+    """POST multipart: `files` (1–3 ảnh) + `result` + `declaration` (JSON dạng chuỗi) —
+    nhánh "Đã khám rồi" / nộp lại."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -74,7 +87,11 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
         if student is None:
             return _no_student()
         try:
-            resp = health_check.submit_evidence(student, request.FILES.getlist("files"))
+            resp = health_check.submit_evidence(
+                student, request.FILES.getlist("files"),
+                result_raw=_json_field(request.data.get("result")),
+                declaration=_json_field(request.data.get("declaration")),
+            )
         except health_check.HealthCheckError as exc:
             return _error(exc)
         logger.info("HEALTH_CHECK_EVIDENCE | uid=%s | student_id=%s | round=%s | count=%s",
