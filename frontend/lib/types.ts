@@ -482,7 +482,49 @@ export interface HealthCheckResponse {
   review_note: string;
   reviewed_at: string | null;
   evidence: { index: number; name: string }[];
+  /** Kết quả khám SV tự khai (nhánh "Đã khám rồi"). */
+  result: Record<string, string>;
   residence: HealthCheckResidence | null;
+}
+
+/** Danh mục trường kết quả khám — backend `core/health_check_result.py` là nguồn duy nhất. */
+export interface ResultField {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'class' | 'choice' | 'computed';
+  col: string | null;
+  default: string;
+  required: boolean;
+  unit: string;
+  min: number | null;
+  max: number | null;
+  choices: string[] | null;
+  placeholder: string;
+  hint: string;
+  female_default: string | null;
+}
+
+export interface ResultOrgan {
+  key: string;
+  label: string;
+  result: ResultField;
+  class: ResultField;
+}
+
+export interface ResultGroup {
+  title: string;
+  layout: 'grid' | 'organ';
+  cols?: number;
+  collapsible?: boolean;
+  fields?: ResultField[];
+  organs?: ResultOrgan[];
+}
+
+export interface ResultSection {
+  key: string;
+  title: string;
+  desc: string;
+  groups: ResultGroup[];
 }
 
 export interface HealthCheckState {
@@ -491,6 +533,9 @@ export interface HealthCheckState {
   can_submit: boolean;
   can_resubmit: boolean;
   max_evidence_files: number;
+  result_schema: ResultSection[];
+  result_defaults: Record<string, string>;
+  female: boolean;
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
 }

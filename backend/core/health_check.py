@@ -27,6 +27,7 @@ from django.utils import timezone
 from students.models import Student
 
 from . import address_service as addr
+from . import health_check_result as result_spec
 from . import offcampus
 from .health_check_models import HealthCheckResponse as Response_
 from .health_check_models import HealthCheckRound
@@ -125,6 +126,23 @@ def residence_snapshot(student):
 
 # ── Đọc ─────────────────────────────────────────────────────────────────────
 
+def evidence_files(evidence):
+    """Danh sách file minh chứng. Cột `evidence` là `{"files": [...], "result": {...}}`;
+    bản đầu (chỉ có ảnh) lưu thẳng danh sách — vẫn đọc được."""
+    if isinstance(evidence, list):
+        return evidence
+    return (evidence or {}).get("files") or []
+
+
+def evidence_result(evidence):
+    """Kết quả khám SV tự khai (nhánh "Đã khám rồi"); {} nếu không có."""
+    return (evidence or {}).get("result") or {} if isinstance(evidence, dict) else {}
+
+
+def is_female(student):
+    return (student.sex or "").strip().lower() in ("nữ", "nu", "female", "f")
+
+
 def _serialize_response(resp):
     if resp is None:
         return None
@@ -141,8 +159,9 @@ def _serialize_response(resp):
         "reviewed_at": local(resp.reviewed_at).isoformat() if resp.reviewed_at else None,
         "evidence": [
             {"index": i, "name": item.get("original_filename") or f"Ảnh {i + 1}"}
-            for i, item in enumerate(resp.evidence or [])
+            for i, item in enumerate(evidence_files(resp.evidence))
         ],
+        "result": evidence_result(resp.evidence),
         "residence": resp.residence or None,
     }
 
@@ -164,6 +183,10 @@ def build_state(student):
             and resp.status == Response_.STATUS_REJECTED
         ),
         "max_evidence_files": MAX_EVIDENCE_FILES,
+        # Form kết quả khám dựng hoàn toàn từ đây — xem core/health_check_result.py.
+        "result_schema": result_spec.SCHEMA,
+        "result_defaults": result_spec.defaults(female=is_female(student)),
+        "female": is_female(student),
         # Phần 1 của nhánh "Chưa khám" dựng lại đúng form ngoại trú.
         "offcampus": offcampus.build_prefill(student),
         # Điều kiện theo địa chỉ ĐÃ LƯU — dùng khi form ngoại trú đang khóa.
@@ -178,7 +201,7 @@ def evidence_path(student, index):
     if round_ is None:
         return None, None
     resp = Response_.objects.filter(round=round_, student_id=student.pk).first()
-    items = (resp.evidence or []) if resp else []
+    items = evidence_files(resp.evidence) if resp else []
     if index < 0 or index >= len(items):
         return None, None
     item = items[index]
@@ -192,12 +215,20 @@ def _lock_student(student):
     Student.objects.select_for_update().filter(pk=student.pk).first()
 
 
-def submit_evidence(student, uploads):
-    """Nhánh "Đã khám rồi": lưu ảnh minh chứng, chờ chuyên viên xác nhận.
+def submit_evidence(student, uploads, result_raw=None, declaration=None):
+    """Nhánh "Đã khám rồi": khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu
+    + ảnh minh chứng, chờ chuyên viên xác nhận.
 
-    Kiểm định dạng/dung lượng TRƯỚC transaction (đọc file chậm), ghi file trong
-    transaction; lỗi ở bất kỳ bước nào thì xóa sạch file đã ghi.
+    Kiểm kết quả khám và định dạng ảnh TRƯỚC transaction (đọc file chậm), ghi file
+    trong transaction; lỗi ở bất kỳ bước nào thì rollback cả khai báo ngoại trú và
+    xóa sạch file đã ghi. Lỗi trả về theo từng ô: ô kết quả mang tiền tố `result.`.
     """
+    result, result_errors = result_spec.clean(result_raw)
+    if result_errors:
+        raise HealthCheckError(
+            "Vui lòng kiểm tra lại các ô kết quả khám được đánh dấu.",
+            errors={f"result.{k}": v for k, v in result_errors.items()},
+        )
     uploads = [u for u in uploads if u]
     if not uploads:
         raise HealthCheckError("Vui lòng tải lên ít nhất một ảnh minh chứng.",
@@ -226,6 +257,19 @@ def submit_evidence(student, uploads):
             if resp is None and round_state(round_) != "open":
                 raise HealthCheckError(_closed_message(round_), code="closed")
 
+            # Như nhánh đăng ký khám: chưa khai ngoại trú thì khai luôn ở đây.
+            locked, _ = offcampus.lock_state(student)
+            declared_now = False
+            if not locked:
+                try:
+                    offcampus.submit(student, declaration or {})
+                except offcampus.DeclarationError as exc:
+                    raise HealthCheckError("Vui lòng kiểm tra lại phần khai báo thông tin.",
+                                           errors=exc.errors) from exc
+                declared_now = True
+            residence = residence_snapshot(student)
+            residence["declared_with_registration"] = declared_now
+
             root = Path(settings.MEDIA_ROOT).resolve()
             items = []
             for upload, (data, ext, mime, digest) in checked:
@@ -245,19 +289,21 @@ def submit_evidence(student, uploads):
                 resp = Response_.objects.create(
                     round=round_, student_id=student.pk,
                     choice=Response_.CHOICE_EXAMINED, status=Response_.STATUS_PENDING,
-                    evidence=items, submit_count=1, submitted_at=now,
+                    evidence={"files": items, "result": result}, residence=residence,
+                    submit_count=1, submitted_at=now,
                 )
             else:
                 # Nộp lại sau khi bị từ chối: thay bộ ảnh, đưa về hàng chờ. Lý do
                 # từ chối cũ giữ lại để chuyên viên biết lần trước sai ở đâu.
-                resp.evidence = items
+                resp.evidence = {"files": items, "result": result}
+                resp.residence = residence
                 resp.status = Response_.STATUS_PENDING
                 resp.submit_count += 1
                 resp.submitted_at = now
                 resp.reviewed_by_id = None
                 resp.reviewed_at = None
                 resp.save(update_fields=[
-                    "evidence", "status", "submit_count", "submitted_at",
+                    "evidence", "residence", "status", "submit_count", "submitted_at",
                     "reviewed_by_id", "reviewed_at", "updated_at",
                 ])
         return resp
