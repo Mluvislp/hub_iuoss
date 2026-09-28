@@ -134,6 +134,7 @@ def build_prefill(student):
         "student": {
             "full_name": student.full_name or "",
             "student_code": student.current_student_code or "",
+            "sex": student.sex or "",
             "department": student.current_department.name_vi if student.current_department else "",
             "university_email": pc.current_university_email(student),
         },
@@ -227,6 +228,11 @@ def submit(student, data):
                 field_results[key] = "applied" if applied else "pending"
         except pc.ChangeError as exc:
             errors[key] = str(exc)
+
+    # Luồng khám sức khỏe cần CCCD (cột C của file gửi PYT): hồ sơ chưa có CCCD hợp
+    # lệ mà SV không nhập thì chặn. Trang khai báo ngoại trú riêng không bật cờ này.
+    if data.get("require_citizen_id") is True and citizen is None and pc.cccd_missing(student):
+        errors["citizen_id"] = "Bắt buộc nhập số CCCD để khai báo khám sức khỏe."
 
     # ── 2. Địa chỉ thường trú ───────────────────────────────────────────────
     permanent = data.get("permanent") or {}

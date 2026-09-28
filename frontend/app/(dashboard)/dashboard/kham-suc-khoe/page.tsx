@@ -16,6 +16,8 @@ import {
 import { FormBusy } from '@/components/form-busy';
 import { EvidenceThumbs } from './Evidence';
 import ExaminedWizard from './ExaminedWizard';
+import CccdForm from './CccdForm';
+import ConsentBox from './ConsentBox';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -97,9 +99,10 @@ function ResultSummary({ response }: { response: HealthCheckResponse }) {
     ['Ngày khám', r.exam_date ? new Date(r.exam_date).toLocaleDateString('vi-VN') : ''],
     ['Nơi khám', r.exam_place],
     ['Chiều cao · cân nặng · BMI', [r.height_cm && `${r.height_cm} cm`, r.weight_kg && `${r.weight_kg} kg`, r.bmi && `BMI ${r.bmi}`].filter(Boolean).join(' · ')],
-    ['Mạch · huyết áp', [r.pulse && `${r.pulse} lần/phút`, r.bp_systolic && `${r.bp_systolic}/${r.bp_diastolic} mmHg`].filter(Boolean).join(' · ')],
-    ['Phân loại thể lực · sức khỏe', [r.physical_class, r.health_class].filter(Boolean).join(' · ')],
-    ['Kết luận bệnh', r.disease_conclusion],
+    ['Nhịp tim · huyết áp', [r.pulse && `${r.pulse} lần/phút`, r.blood_pressure && `${r.blood_pressure} mmHg`].filter(Boolean).join(' · ')],
+    ['Phân loại thể lực · sức khỏe', [r.physical_class && `Loại ${r.physical_class}`, r.health_class].filter(Boolean).join(' · ')],
+    ['Kết luận của bác sĩ', r.doctor_conclusion],
+    ['Các bệnh, tật', r.diseases],
   ];
   return (
     <div>
@@ -122,6 +125,7 @@ export default function HealthCheckPage() {
   const [loadError, setLoadError] = useState('');
   const [choice, setChoice] = useState<'examined' | 'register' | null>(null);
   const [consent, setConsent] = useState(false);
+  const [dataConsent, setDataConsent] = useState(false);
   const [error, setError] = useState('');
   const [resubmitting, setResubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -269,6 +273,12 @@ export default function HealthCheckPage() {
                   </div>
                 </>
               )}
+              {response.data_consent_at && (
+                <div className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Cam kết, đồng ý cung cấp thông tin</span>
+                  <span className={ui.dtValue}>{fmtDateTime(response.data_consent_at)}</span>
+                </div>
+              )}
               {response.reviewed_at && (
                 <div className={ui.dtRow}>
                   <span className={ui.dtLabel}>Thời điểm xử lý</span>
@@ -334,8 +344,12 @@ export default function HealthCheckPage() {
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(''); draft.setFieldErrors({});
+    if (declarationLocked && state?.cccd_missing) {
+      setError('Bổ sung số CCCD ở phần 1 trước khi gửi đăng ký.');
+      return;
+    }
     if (!declarationLocked) {
-      const local = draft.validate();
+      const local = draft.validate({ requireCccd: true });
       if (Object.keys(local).length) {
         draft.setFieldErrors(local);
         setError('Vui lòng kiểm tra lại các ô được đánh dấu ở phần 1.');
@@ -344,11 +358,13 @@ export default function HealthCheckPage() {
     }
     if (!eligible) { setError('Phần đăng ký khám chưa được mở.'); return; }
     if (!consent) { setError('Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.'); return; }
+    if (!dataConsent) { setError('Vui lòng tích xác nhận cam kết và đồng ý cung cấp thông tin.'); return; }
     setSaving(true);
     try {
       setState(await api.healthCheck.register({
-        declaration: declarationLocked ? undefined : draft.payload(),
+        declaration: declarationLocked ? undefined : draft.payload({ requireCccd: true }),
         consent: true,
+        data_consent: true,
       }));
       setJustSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -368,14 +384,14 @@ export default function HealthCheckPage() {
         {header}
         <div className="px-6 py-5">
           <p className="text-[0.9rem] font-semibold text-ink mb-3">
-            Sinh viên đã khám sức khỏe định kỳ theo chỉ thị của Ủy ban Nhân dân Thành phố
+            Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
             Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
-            <ChoiceTile active={choice === 'examined'} title="Đã khám rồi"
+            <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
                         desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
                         onClick={() => { setChoice('examined'); setError(''); }} />
-            <ChoiceTile active={choice === 'register'} title="Chưa khám"
+            <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
                         desc="Đăng ký khám sức khỏe tập trung tại trường"
                         onClick={() => { setChoice('register'); setError(''); }} />
           </div>
@@ -406,6 +422,9 @@ export default function HealthCheckPage() {
                 </p>
               </div>
               <div className="px-6 py-5 space-y-7">
+                {declarationLocked && state.cccd_missing && (
+                  <CccdForm onSaved={(next) => { setState(next); setError(''); }} />
+                )}
                 {declarationLocked
                   ? <DeclarationSummary form={state.offcampus} />
                   : <DeclarationFields form={state.offcampus} draft={draft} provinces={provinces} />}
@@ -468,12 +487,14 @@ export default function HealthCheckPage() {
                       Đồng ý tham gia khám sức khỏe tập trung theo kế hoạch của Nhà trường
                     </span>
                   </label>
+                  <ConsentBox checked={dataConsent} onChange={setDataConsent}
+                              text={state.data_consent_text.register} />
                 </div>
               )}
 
               <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-line2">
                 <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>
-                <button type="submit" disabled={saving || !eligible || !consent} className={ui.btnPrimary}>
+                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent} className={ui.btnPrimary}>
                   {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
                           : <><ClipboardCheck size={15} /> Gửi đăng ký khám</>}
                 </button>

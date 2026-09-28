@@ -12,11 +12,8 @@ import type { ResultField, ResultGroup, ResultSection } from '@/lib/types';
 
 export type ResultValues = Record<string, string>;
 
-const CLASSES = ['I', 'II', 'III', 'IV', 'V'];
-const INTERNAL_ORGANS = ['circulation', 'respiratory', 'digestive', 'urinary', 'endocrine',
-  'musculoskeletal', 'neurology', 'psychiatry'];
-const HEALTH_SOURCES = ['internal_class', 'surgery_class', 'eye_class', 'ent_class',
-  'dental_class', 'physical_class'];
+const ROMANS = ['I', 'II', 'III', 'IV', 'V'];
+const HEALTH_KEY = 'health_class';
 
 const num = (v: string | undefined) => {
   const n = Number(String(v ?? '').trim().replace(',', '.'));
@@ -28,13 +25,16 @@ export function computeBmi(v: ResultValues): string {
   return h && w ? (w / ((h / 100) ** 2)).toFixed(2) : '';
 }
 
-const maxClass = (values: (string | undefined)[]) =>
-  CLASSES[Math.max(0, ...values.map((x) => CLASSES.indexOf(x ?? '')))];
+/** "Loại III" / "III" → 2; không phải phân loại → -1 (cùng luật backend `class_rank`). */
+const classRank = (value: string | undefined) =>
+  ROMANS.indexOf(String(value ?? '').replace('Loại', '').trim());
 
-/** Phân loại sức khỏe gợi ý = phân loại cao nhất ở các chuyên khoa + thể lực. */
-export function suggestHealthClass(v: ResultValues): string {
-  const internal = maxClass(INTERNAL_ORGANS.map((k) => v[`${k}_class`]));
-  return maxClass([internal, ...HEALTH_SOURCES.map((k) => v[k])]);
+/** Phân loại sức khỏe gợi ý = loại cao nhất trong MỌI ô phân loại khác của danh mục. */
+export function suggestHealthClass(schema: ResultSection[], v: ResultValues): string {
+  const ranks = schema.flatMap(sectionFields)
+    .filter((f) => f.type === 'class' && f.key !== HEALTH_KEY)
+    .map((f) => classRank(v[f.key]));
+  return `Loại ${ROMANS[Math.max(0, ...ranks)]}`;
 }
 
 export function sectionFields(section: ResultSection): ResultField[] {
@@ -61,14 +61,24 @@ export function validateSection(section: ResultSection, v: ResultValues): Record
         errors[f.key] = `Ngoài khoảng hợp lệ ${f.min}–${f.max}.`;
     }
     if (f.type === 'date' && value > todayInput()) errors[f.key] = 'Ngày khám không được ở tương lai.';
+    if (f.type === 'pressure') {
+      // Như trên phiếu: "110/70", "110 / 70", "110/70 mmHg".
+      const m = /^\s*(\d{2,3})\s*\/\s*(\d{2,3})\s*(mmhg)?\s*$/i.exec(value);
+      if (!m) errors[f.key] = 'Nhập theo dạng tâm thu/tâm trương, VD 110/70.';
+      else if (Number(m[2]) >= Number(m[1])) errors[f.key] = 'Số sau (tâm trương) phải nhỏ hơn số trước (tâm thu).';
+    }
+    if (f.type === 'vision') {
+      // Như trên phiếu: "10/10" hoặc "8".
+      const m = /^\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:\/\s*10)?\s*$/.exec(value);
+      const n = m ? num(m[1]) : null;
+      if (n === null || n < 0 || n > 10) errors[f.key] = 'Nhập điểm thang 10, VD 10/10 hoặc 8.';
+    }
   }
-  const sys = num(v.bp_systolic), dia = num(v.bp_diastolic);
-  if (section.key === 'visit' && sys !== null && dia !== null && dia >= sys && !errors.bp_diastolic)
-    errors.bp_diastolic = 'Huyết áp tâm trương phải thấp hơn tâm thu.';
   return errors;
 }
 
 const GRID: Record<number, string> = {
+  1: 'grid gap-3',
   2: 'grid sm:grid-cols-2 gap-3',
   3: 'grid sm:grid-cols-3 gap-3',
   4: 'grid sm:grid-cols-2 lg:grid-cols-4 gap-3',

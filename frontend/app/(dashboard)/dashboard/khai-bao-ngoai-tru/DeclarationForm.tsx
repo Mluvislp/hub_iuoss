@@ -122,9 +122,15 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
   const clearError = (key: string) =>
     setFieldErrors((f) => { const next = { ...f }; delete next[key]; return next; });
 
-  /** Chặn sớm ở client các ô bắt buộc; trả về map lỗi (rỗng = qua). */
-  function validate(): Record<string, string> {
+  /** Chặn sớm ở client các ô bắt buộc; trả về map lỗi (rỗng = qua).
+   *  `requireCccd`: luồng khám sức khỏe — hồ sơ chưa có CCCD 12 số thì bắt nhập. */
+  function validate({ requireCccd = false } = {}): Record<string, string> {
     const local: Record<string, string> = {};
+    if (requireCccd && form) {
+      const onFile = ((form.fields['student.citizen_id']?.value ?? {}) as CccdValue).number || '';
+      if (!/^\d{12}$/.test(onFile) && !drafts['student.citizen_id']?.trim())
+        local.citizen_id = 'Bắt buộc nhập số CCCD để khai báo khám sức khỏe.';
+    }
     if (!permanent.provinceCode) local.permanent_province = 'Vui lòng chọn tỉnh/thành.';
     if (!permanent.wardCode) local.permanent_ward = 'Vui lòng chọn phường/xã.';
     if (!permanent.street.trim()) local.permanent_street = 'Vui lòng nhập địa chỉ chi tiết.';
@@ -139,8 +145,9 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
     return local;
   }
 
-  function payload(): OffCampusSubmit {
+  function payload({ requireCccd = false } = {}): OffCampusSubmit {
     return {
+      require_citizen_id: requireCccd || undefined,
       citizen_id: drafts['student.citizen_id']?.trim()
         ? {
             number: drafts['student.citizen_id']!.trim(),
@@ -203,6 +210,7 @@ export function DeclarationFields({
         <div className="grid sm:grid-cols-2 gap-4">
           <ReadonlyField label="Họ và tên" value={form.student.full_name} />
           <ReadonlyField label="Mã số sinh viên" value={form.student.student_code} />
+          <ReadonlyField label="Giới tính" value={form.student.sex} />
           <ReadonlyField
             label="Email trường cấp"
             value={form.student.university_email}
@@ -388,6 +396,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
         <div className="rounded-lg border border-line px-4 py-1">
           {row('Họ và tên', form.student.full_name)}
           {row('Mã số sinh viên', form.student.student_code)}
+          {row('Giới tính', form.student.sex)}
           {row('Email trường cấp', form.student.university_email)}
           {Object.entries(form.fields).map(([key, f]) => row(
             f.label,

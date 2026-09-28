@@ -326,6 +326,7 @@ export interface OffCampusForm {
   student: {
     full_name: string;
     student_code: string;
+    sex: string;
     department: string;
     university_email: string;
   };
@@ -352,6 +353,8 @@ export interface OffCampusSubmit {
   temporary_in_hcmc: boolean | null;
   temporary_none?: boolean;
   temporary?: OffCampusAddressInput;
+  /** Luồng khám sức khỏe: chặn nếu hồ sơ chưa có CCCD mà không nhập. */
+  require_citizen_id?: boolean;
 }
 
 export interface OffCampusResult {
@@ -487,6 +490,8 @@ export interface HealthCheckResponse {
   evidence: { index: number; name: string }[];
   /** Kết quả khám SV tự khai (nhánh "Đã khám rồi"). */
   result: Record<string, string>;
+  /** Thời điểm tích cam kết + đồng ý cung cấp thông tin. */
+  data_consent_at: string | null;
   residence: HealthCheckResidence | null;
 }
 
@@ -494,7 +499,7 @@ export interface HealthCheckResponse {
 export interface ResultField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'date' | 'class' | 'choice' | 'computed';
+  type: 'text' | 'number' | 'date' | 'class' | 'choice' | 'computed' | 'pressure' | 'vision';
   col: string | null;
   default: string;
   required: boolean;
@@ -539,6 +544,10 @@ export interface HealthCheckState {
   result_schema: ResultSection[];
   result_defaults: Record<string, string>;
   female: boolean;
+  /** Hồ sơ chưa có CCCD 12 số — luồng khám sức khỏe bắt buộc bổ sung. */
+  cccd_missing: boolean;
+  /** Câu cam kết + đồng ý cung cấp thông tin ở cuối form, theo từng lựa chọn. */
+  data_consent_text: { examined: string; register: string };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
 }
