@@ -10,6 +10,7 @@ export interface InsurancePeriod {
   coverage_end: string;
   status: 'expired' | 'open' | 'upcoming';
   is_active: boolean;
+  freshman_warning?: string;
 }
 
 /**

@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Building2, Check, CheckSquare, Clock3, Copy, CreditCard, FileClock, ImageIcon, Plus, X } from 'lucide-react';
-import { createPortal } from 'react-dom';
+import { AlertTriangle, ArrowRight, Building2, Check, CheckSquare, Clock3, Copy, CreditCard, FileClock, ImageIcon, Loader2, Plus } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import SearchableSelect from '@/components/searchable-select';
 import { InsuranceStatus } from '@/components/insurance-status';
 import { ui } from '@/lib/ui';
+import { INSURANCE_FIELD_LABELS, SubmittedInsuranceInfo, changeText } from '@/components/submitted-insurance-info';
+import { InsuranceModal } from '@/components/insurance-modal';
 import { api } from '@/lib/api';
 import { buildVietQrPayload, findBank } from '@/lib/vietqr';
 import type { InsuranceDetail, InsuranceEvidence, Province } from '@/lib/types';
@@ -39,9 +40,9 @@ function EvidenceImage({ evidence }: { evidence: InsuranceEvidence }) {
     }).catch(() => { if (active) setError(true); });
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [evidence.url]);
-  if (error) return <span className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Không tải được minh chứng.</span>;
+  if (error) return <span className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger-text">Không tải được minh chứng.</span>;
   if (!url) return <span className="animate-pulse rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">Đang tải ảnh…</span>;
-  return <a href={url} target="_blank" rel="noreferrer" className="group block w-36 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md">
+  return <a href={url} target="_blank" rel="noreferrer" className="group block w-36 overflow-hidden rounded-lg border border-line bg-white transition-colors hover:border-primary-line">
     {/* eslint-disable-next-line @next/next/no-img-element */}
     <img src={url} alt="Minh chứng thanh toán bổ sung" className="h-24 w-full bg-slate-50 object-contain" />
     <span className="flex items-center gap-1.5 truncate border-t border-slate-100 px-2.5 py-2 text-xs text-slate-600"><ImageIcon className="h-3.5 w-3.5 shrink-0" />{evidence.filename}</span>
@@ -63,12 +64,6 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
   const [files, setFiles] = useState<File[]>([]);
   const [hospitalsLoading, setHospitalsLoading] = useState(false);
   const pending = useRef<FormData | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = overflow; };
-  }, [open]);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -127,28 +122,25 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
   }, [data?.payment]);
   const paymentBankBin = findBank(data?.payment?.bank_name)?.bin;
   return <>
-    <button className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+    <button className={ui.btnSecondary}
       onClick={() => { setOpen(true); setError(''); }}><FileClock className="h-4 w-4" />Chi tiết</button>
-    {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="Chi tiết đơn BHYT">
-      <div className="max-h-[calc(100dvh-1.5rem)] min-w-0 w-full max-w-4xl overflow-x-hidden overflow-y-auto overscroll-contain whitespace-normal break-words sm:max-h-[calc(100dvh-3rem)] rounded-2xl bg-slate-50 text-left shadow-2xl ring-1 ring-black/5">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7">
-          <div><p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Hồ sơ bảo hiểm y tế</p><h2 className="mt-0.5 text-lg font-bold text-slate-900">Đơn BHYT #{id}</h2></div>
-          <button aria-label="Đóng" className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" disabled={busy} onClick={() => { setOpen(false); setEditing(false); }}><X className="h-5 w-5" /></button></div>
-        <div className="px-3 py-4 sm:px-7 sm:py-5">
-        {error && <p role="alert" className="my-3 text-red-700">{error} <button className="underline" onClick={async () => {
-          pending.current = null; setData(await api.insuranceRegistration.detail(id)); setError('');
-        }}>Tải lại đơn</button></p>}
-        {!data ? <p>Đang tải…</p> : <>
-          <div className="mb-5 flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">Trạng thái hiện tại</span><InsuranceStatus status={data.status} /></div>
-          {rejected && <section className="rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="font-semibold">{data.reason_label}</p>
+    {open && <InsuranceModal eyebrow="Hồ sơ bảo hiểm y tế" title={'Đơn BHYT #' + id} closeDisabled={busy} onClose={() => { setOpen(false); setEditing(false); }}>
+        {error && <div role="alert" className="mb-4 flex flex-wrap items-start gap-2 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{error}</span>
+          <button type="button" className="font-medium underline" onClick={async () => {
+            pending.current = null; setData(await api.insuranceRegistration.detail(id)); setError('');
+          }}>Tải lại đơn</button></div>}
+        {!data ? !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Đang tải…</p> : <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={data.status} /></div>
+          {rejected && <section className="rounded-lg border border-danger-line bg-danger-soft p-4 text-danger-text">
+            <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 shrink-0" />{data.reason_label || 'Đơn bị từ chối'}</p>
             {data.reason_text && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{data.reason_text}</p>}
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' || paymentReason ?
-              <button className={ui.btnOutline + " mt-3"} onClick={() => setEditing(true)}>
+              !editing && <button type="button" className={ui.btnPrimary + " mt-3 w-full sm:w-auto"} onClick={() => setEditing(true)}>
                 {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
-              : <p className="mt-2">Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
+              : <p className="mt-2 text-sm text-slate-700">Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
           </section>}
-          {rejected && editing && <section className="my-4 space-y-3 rounded-lg border p-4">
+          {rejected && editing && <section className="space-y-4 rounded-lg border border-line bg-white p-4 sm:p-5">
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? <>
               <div className="space-y-2">
                 <label className={ui.fieldLabel} htmlFor={'supplement-province-' + id}>Tỉnh/Thành phố</label>
@@ -205,7 +197,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                       <p className="mt-3 text-xs text-muted">Mã QR đã gồm sẵn số tài khoản, số tiền còn thiếu và nội dung. Giữ nguyên nội dung chuyển khoản để Phòng KHTC đối chiếu được hóa đơn.</p>
                     </div>
                   </div> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
-              </> : <p>Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
+              </> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
 
               <div>
                 <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
@@ -225,30 +217,35 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
               </div>
               <p className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><CreditCard className="mt-0.5 h-4 w-4 shrink-0" />Ảnh gửi lên chưa đồng nghĩa tiền đã được xác nhận. Các ảnh cũ được giữ nguyên.</p>
             </>}
-            <button disabled={busy || hospitalsLoading || (data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? !hospital : !files.length)}
-              className={ui.btnPrimary + " w-full whitespace-normal sm:w-auto disabled:opacity-50"} onClick={submit}>
-              {busy ? 'Đang gửi…' : data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? 'Lưu và gửi lại' : 'Gửi minh chứng bổ sung và gửi lại'}</button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className={ui.btnGhost} disabled={busy} onClick={() => { setEditing(false); pending.current = null; }}>Hủy</button>
+              <button type="button" disabled={busy || hospitalsLoading || (data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? !hospital : !files.length)}
+                className={ui.btnPrimary + " h-auto min-h-10 whitespace-normal py-2"} onClick={submit}>
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                {busy ? 'Đang gửi…' : data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? 'Lưu và gửi lại' : 'Gửi minh chứng bổ sung và gửi lại'}</button>
+            </div>
           </section>}
-          <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="mb-5 flex items-center gap-3"><span className="rounded-xl bg-blue-50 p-2 text-blue-700"><Clock3 className="h-5 w-5" /></span><div><h3 className="font-bold text-slate-900">Lịch sử xử lý và bổ sung</h3><p className="text-sm text-slate-500">Các hoạt động được sắp xếp theo thời gian</p></div></div>
-            {!data.timeline.length && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Đơn cũ chưa có lịch sử chi tiết.</p>}
-            <div className="relative ml-2 border-l-2 border-blue-100 pl-6 sm:ml-3 sm:pl-8">
+          <SubmittedInsuranceInfo data={data} />
+          <section className="rounded-lg border border-line bg-white p-4 sm:p-6">
+            <div className="mb-5 flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 text-primary" /><div><h3 className="font-semibold text-ink">Lịch sử xử lý và bổ sung</h3><p className="text-sm text-muted">Các hoạt động được sắp xếp theo thời gian</p></div></div>
+            {!data.timeline.length && <p className="rounded-lg bg-slate-50 p-4 text-sm text-muted">Đơn cũ chưa có lịch sử chi tiết.</p>}
+            <div className="relative ml-2 border-l-2 border-primary-line pl-6 sm:ml-3 sm:pl-8">
             {data.timeline.map((e, index) => <article className="relative pb-6 last:pb-0" key={e.id}>
-              <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-4 border-white bg-blue-500 shadow-sm sm:-left-[39px]" />
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold text-slate-900">{e.label}</p><p className="mt-1 text-xs text-slate-500">Bước {index + 1} · {actorName(e.source_app)}</p></div><time className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{new Date(e.created_at).toLocaleString('vi-VN')}</time></div>
+              <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-4 border-white bg-primary shadow-sm sm:-left-[39px]" />
+              <div className="rounded-lg border border-line bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold text-ink">{e.label}</p><p className="mt-1 text-xs text-slate-500">Bước {index + 1} · {actorName(e.source_app)}</p></div><time className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{new Date(e.created_at).toLocaleString('vi-VN')}</time></div>
                 {e.from_status && e.to_status && e.from_status !== e.to_status && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><InsuranceStatus status={e.from_status} /><ArrowRight className="h-4 w-4 text-slate-400" /><InsuranceStatus status={e.to_status} /></div>}
-                {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900">{e.reason_label && <p className="font-semibold">{e.reason_label}</p>}{e.reason_text && <p className={e.reason_label ? 'mt-1' : ''}>{e.reason_text}</p>}</div>}
-                {e.assessment && <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-2.5"><span className="block text-xs text-slate-500">Phí phải đóng</span><b>{money(e.assessment.required_amount_vnd)}</b></div><div className="rounded-lg bg-emerald-50 p-2.5"><span className="block text-xs text-emerald-700">Đã xác nhận</span><b>{money(e.assessment.confirmed_paid_total_vnd)}</b></div><div className="rounded-lg bg-amber-50 p-2.5"><span className="block text-xs text-amber-700">Còn thiếu</span><b>{money(e.assessment.missing_amount_vnd)}</b></div></div>}
-                {e.payload.before && e.payload.after && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name} · {e.payload.before.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-blue-700">{e.payload.after.hospital_name} · {e.payload.after.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
+                {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-text">{e.reason_label && <p className="font-semibold">{e.reason_label}</p>}{e.reason_text && <p className={e.reason_label ? 'mt-1' : ''}>{e.reason_text}</p>}</div>}
+                {e.assessment && <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-2.5"><span className="block text-xs text-slate-500">Phí phải đóng</span><b>{money(e.assessment.required_amount_vnd)}</b></div><div className="rounded-lg bg-success-soft p-2.5"><span className="block text-xs text-success-text">Đã xác nhận</span><b>{money(e.assessment.confirmed_paid_total_vnd)}</b></div><div className="rounded-lg bg-warning-soft p-2.5"><span className="block text-xs text-warning-text">Còn thiếu</span><b>{money(e.assessment.missing_amount_vnd)}</b></div></div>}
+                {e.payload.previous_rejection && <p className="mt-3 text-sm text-danger-text">Phản hồi từ chối trước: {e.payload.previous_rejection}</p>}
+                {e.payload.changes && <dl className="mt-3 space-y-1 rounded-lg bg-slate-50 p-3 text-sm">{Object.entries(e.payload.changes).map(([field,change]) => <div key={field} className="flex flex-wrap gap-x-1.5"><dt className="text-muted">{INSURANCE_FIELD_LABELS[field] || field}:</dt><dd className="min-w-0"><span className="text-slate-400 line-through">{changeText(field, change.before)}</span> → <span className="font-medium text-ink">{changeText(field, change.after)}</span></dd></div>)}</dl>}
+                {e.payload.before && e.payload.after && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name} · {e.payload.before.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-primary-text">{e.payload.after.hospital_name} · {e.payload.after.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
                 {!!e.evidences.length && <div className="mt-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Minh chứng thanh toán bổ sung</p><div className="flex flex-wrap gap-2">{e.evidences.map(p => <EvidenceImage key={p.id} evidence={p} />)}</div></div>}
               </div>
             </article>)}
             </div>
           </section>
-        </>}
-        </div>
-      </div>
-    </div>, document.body)}
+        </div>}
+    </InsuranceModal>}
   </>;
 }

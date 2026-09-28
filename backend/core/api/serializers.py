@@ -161,17 +161,17 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
         "invalid": "Ngày sinh không hợp lệ (yyyy-mm-dd).",
         "required": "Vui lòng nhập ngày sinh.",
     })
-    ethnicity = serializers.CharField(max_length=255, error_messages={
+    ethnicity = serializers.CharField(max_length=64, error_messages={
         "blank": "Vui lòng chọn dân tộc.", "required": "Vui lòng chọn dân tộc.",
     })
-    phone_number = serializers.CharField(max_length=32, error_messages={
+    phone_number = serializers.CharField(max_length=20, error_messages={
         "blank": "Vui lòng nhập số điện thoại.",
         "required": "Vui lòng nhập số điện thoại.",
     })
     social_insurance_number = serializers.CharField(
-        max_length=32, required=False, allow_blank=True,
+        max_length=20, required=False, allow_blank=True,
     )
-    citizen_id = serializers.CharField(max_length=32, error_messages={
+    citizen_id = serializers.CharField(max_length=20, error_messages={
         "blank": "Vui lòng nhập số CCCD.",
         "required": "Vui lòng nhập số CCCD.",
     })

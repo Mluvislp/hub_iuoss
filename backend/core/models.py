@@ -264,6 +264,10 @@ class HealthInsuranceRegistration(models.Model):
     
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="iu_processing")
     workflow_version = models.PositiveSmallIntegerField(default=2)
+    note = models.TextField(null=True, blank=True)
+    supplement_pending = models.BooleanField(default=False)
+    supplemented_at = models.DateTimeField(null=True, blank=True)
+    supplement_reviewed_at = models.DateTimeField(null=True, blank=True)
     row_version = models.PositiveIntegerField(default=0)
     fee_amount_vnd = models.BigIntegerField(null=True, blank=True)
     rejection_reason_code = models.CharField(max_length=32, null=True, blank=True)
@@ -354,6 +358,7 @@ class HealthInsuranceConfig(models.Model):
         null=True,
     )
     description = models.TextField(blank=True, null=True)
+    freshman_warning = models.TextField(blank=True, null=True)
     bank_name = models.CharField(max_length=255)
     # Mã BIN 6 số của Napas, dùng dựng VietQR. Bỏ trống thì frontend dò theo
     # `bank_name`; điền vào đây thì khỏi phải đoán.

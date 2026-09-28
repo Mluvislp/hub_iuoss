@@ -86,7 +86,12 @@ def supplement(pk, student_id, *, key, row_version, uploads=(), hospital_code=''
                 for upload, content in zip(uploads, checked):
                     store_evidence(reg, event, upload, content, written)
             append_event(reg, 'RESUBMITTED', source='Hub', actor_id=student_id, key=key,
-                old='rejected', new='iu_processing', payload={'request_digest': digest})
+                old='rejected', new='iu_processing', payload={'request_digest': digest,
+                    'previous_rejection': reg.rejection_reason,
+                    'previous_reason_code': reg.rejection_reason_code})
+            from django.utils import timezone
+            reg.supplement_pending = True
+            reg.supplemented_at = timezone.now()
             reg.status = 'iu_processing'
             reg.rejection_reason = None
             reg.rejection_reason_code = None
@@ -121,7 +126,8 @@ def detail(reg, evidence_url):
     legacy_prefix = f'{reason_label}: '
     if reason_label and reason_text.startswith(legacy_prefix):
         reason_text = reason_text[len(legacy_prefix):].strip()
-    return {'id': reg.pk, 'status': normalized(reg.status), 'row_version': reg.row_version,
+    from .insurance_editing import registration_data
+    return {**registration_data(reg), 'id': reg.pk, 'status': normalized(reg.status), 'row_version': reg.row_version,
             'hospital_code': reg.hospital_code, 'reason_code': reg.rejection_reason_code,
             'reason_label': reason_label,
             'reason_text': reason_text or None, 'payment': payment, 'timeline': events}

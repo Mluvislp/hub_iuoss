@@ -95,12 +95,17 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_registrations` (
   `config_snapshot` JSON NULL COMMENT 'Cấu hình phí/ngân hàng tại thời điểm nộp',
   `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
   `rejection_reason` TEXT NULL,
+  `note` TEXT NULL,
+  `supplement_pending` BOOLEAN NOT NULL DEFAULT 0,
+  `supplemented_at` DATETIME(6) NULL,
+  `supplement_reviewed_at` DATETIME(6) NULL,
   `created_at` DATETIME(6) NOT NULL,
   `updated_at` DATETIME(6) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_hir_student_id` (`student_id`),
   KEY `idx_hir_period_year` (`registration_year`, `registration_period`),
-  KEY `idx_hir_status` (`status`)
+  KEY `idx_hir_status` (`status`),
+  KEY `ix_supplement_queue` (`supplement_pending`, `supplemented_at`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Dữ liệu đọc từ mã QR trên thẻ CCCD. Bảng DÙNG CHUNG cho mọi luồng có thu
@@ -150,6 +155,7 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `is_active` TINYINT(1) NOT NULL DEFAULT 0,
   `bank_account_id` BIGINT NULL,
   `description` TEXT NULL,
+  `freshman_warning` TEXT NULL COMMENT 'Cảnh báo khi academic_entry_year trùng registration_year',
   `bank_name` VARCHAR(255) NOT NULL,
   `bank_bin` VARCHAR(6) NULL COMMENT 'Mã BIN 6 số của Napas, dùng dựng VietQR',
   `bank_account_number` VARCHAR(64) NOT NULL,
@@ -171,3 +177,62 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
 
 -- BHYT workflow v2: after this base schema and the card/bank upgrade, run
 -- docs/insurance_workflow_upgrade.sql (idempotent expand; no data deletion).
+
+
+-- Fresh-schema definitions. Existing databases: use insurance_edit_preflight.sql,
+-- insurance_edit_upgrade.sql, insurance_edit_verify.sql; do not recreate records.
+-- Chạy một lần trên database chung trước khi triển khai Hub và Dashboard.
+-- Các model managed=False: migrate không tạo bảng này.
+-- Không thay đổi hay xóa dữ liệu thẻ/đơn hiện có.
+CREATE TABLE IF NOT EXISTS student_external_health_insurance_declarations (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    student_id BIGINT NOT NULL,
+    card_id BIGINT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    student_code VARCHAR(64) NOT NULL,
+    social_insurance_code VARCHAR(15) NOT NULL,
+    medical_insurance_code VARCHAR(64) NOT NULL,
+    hospital_code VARCHAR(16) NOT NULL,
+    registration_type_id BIGINT NULL,
+    valid_from DATE NOT NULL,
+    valid_until DATE NOT NULL,
+    registration_year INT NOT NULL,
+    intake_year INT NULL,
+    intake_period VARCHAR(32) COLLATE utf8mb4_unicode_ci NULL,
+    intake_snapshot JSON NULL,
+    row_version INT UNSIGNED NOT NULL DEFAULT 0,
+    supplement_pending BOOLEAN NOT NULL DEFAULT 0,
+    supplemented_at DATETIME(6) NULL,
+    supplement_reviewed_at DATETIME(6) NULL,
+    snapshot JSON NOT NULL,
+    images JSON NOT NULL,
+    request_key VARCHAR(80) NOT NULL,
+    request_digest VARCHAR(64) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    review_note TEXT NULL,
+    reviewed_by_id BIGINT NULL,
+    reviewed_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_external_student_request (student_id, request_key),
+    KEY idx_external_student_created (student_id, created_at),
+    KEY idx_external_card (card_id),
+    KEY idx_external_student_code (student_code),
+    KEY idx_external_status_created (status, created_at),
+    KEY ix_supplement_queue (supplement_pending, supplemented_at, id),
+    KEY ix_external_intake (student_id, intake_year, intake_period)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_external_insurance_events (
+ id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ declaration_id BIGINT NOT NULL,
+ event_type VARCHAR(40) NOT NULL,
+ actor_id BIGINT NULL,
+ source_app VARCHAR(16) NOT NULL,
+ request_key VARCHAR(96) NULL,
+ payload JSON NULL,
+ created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ UNIQUE KEY uq_external_event_request (declaration_id, request_key),
+ KEY ix_external_event_timeline (declaration_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

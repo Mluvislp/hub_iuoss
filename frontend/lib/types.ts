@@ -78,7 +78,6 @@ export interface ExternalInsuranceDeclaration {
   review_note: string | null;
   created_at: string;
   reviewed_at: string | null;
-  declared: { label: string; value: string }[];
 }
 
 export interface InsuranceRegistrationPrefill {
@@ -432,9 +431,21 @@ export interface HospitalSnapshot { hospital_code:string; hospital_name:string; 
 export interface InsuranceTimelineItem {
   id:number; label:string; created_at:string; source_app:string; from_status:string|null; to_status:string|null;
   reason_label:string; reason_text:string|null; assessment:InsuranceAssessment|null; evidences:InsuranceEvidence[];
-  payload:{before?:HospitalSnapshot; after?:HospitalSnapshot};
+  payload:{before?:HospitalSnapshot; after?:HospitalSnapshot; previous_rejection?:string; changes?:Record<string,{before:string;after:string}>};
 }
-export interface InsuranceDetail {
+export interface SubmittedInsurance {
+  legacy_changes?:Record<string,{from:unknown;to:unknown}>;
+  id?:number; row_version?:number; status?:string; can_edit?:boolean; can_resubmit?:boolean;
+  prefill: InsuranceRegistrationPrefill & Record<string,string>;
+  display?:Record<string,string>;
+  config: InsurancePeriodConfig | null;
+  registration_year?:number; registration_period?:string;
+  window?:{start_date:string|null; end_date:string|null; status:string; can_edit:boolean};
+  created_at?:string; updated_at?:string; edited_at?:string|null; review_note?:string|null;
+  history?:{event_type:string; created_at:string; source_app:string; payload:{changes?:Record<string,{before:unknown;after:unknown}>;previous_rejection?:string}}[];
+  images?:{field:string; filename:string; url:string}[];
+}
+export interface InsuranceDetail extends SubmittedInsurance {
   hospital_code: string;
   id:number; status:string; row_version:number; reason_code:string|null; reason_label:string; reason_text:string|null;
   timeline:InsuranceTimelineItem[];

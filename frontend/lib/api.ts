@@ -293,7 +293,9 @@ export const api = {
   },
 
   externalInsurance: {
-    prefill(): Promise<{ prefill: InsuranceRegistrationPrefill; config: null }> {
+    detail(id:number): Promise<import('./types').SubmittedInsurance> { return request('/health-insurance/external/' + id + '/'); },
+    update(id:number, body:FormData): Promise<{id:number; status:string}> { return requestMultipart('/health-insurance/external/' + id + '/', body); },
+    prefill(): Promise<import("./types").SubmittedInsurance> {
       return request('/health-insurance/external/');
     },
     submit(body: FormData): Promise<{ id: number; status: string }> {
@@ -308,7 +310,7 @@ export const api = {
       return requestMultipart(`/health-insurance/registrations/${id}/`, body);
     },
     async evidence(path:string): Promise<Blob> {
-      if (!/^\/api\/health-insurance\/registrations\/\d+\/evidence\/\d+\/$/.test(path)) throw new Error('Đường dẫn ảnh không hợp lệ.');
+      if (!/^\/api\/health-insurance\/(?:registrations|external)\/\d+\/(?:evidence\/\d+|images\/[a-z_]+)\/(?:\?v=\d+)?$/.test(path)) throw new Error('Đường dẫn ảnh không hợp lệ.');
       const res = await fetch(`${API_BASE}${path.slice(4)}`, {headers:{Authorization:`Bearer ${getToken()}`}});
       if (!res.ok) throw new Error('Không tải được ảnh.');
       return res.blob();

@@ -1,12 +1,13 @@
 'use client';
 
+import { SubmittedInsuranceInfo } from '@/components/submitted-insurance-info';
 import { InsuranceStatus } from '@/components/insurance-status';
 import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { InsuranceModal } from '@/components/insurance-modal';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
-import { AlertCircle, FileClock, History, Loader2, ShieldCheck, X } from 'lucide-react';
+import { AlertCircle, FileClock, History, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, accentIcon } from '@/lib/ui';
 import { cn, formatDate } from '@/lib/utils';
@@ -24,6 +25,10 @@ const PERIOD_LABELS: Record<string, string> = {
   Q4: 'Đợt 4',
 };
 const PERIOD_SEQUENCE = ['MAIN', 'Q2', 'Q3', 'Q4'];
+
+/** Tiêu đề cột dùng chung cho mọi bảng trên trang. */
+const TH = 'px-5 py-2.5 text-left text-[0.78rem] font-medium text-muted';
+const THEAD_ROW = 'border-b border-line bg-[#f8fafc]';
 
 function Empty() {
   return <span className="italic font-normal text-slate-400">Chưa cập nhật</span>;
@@ -71,70 +76,29 @@ function hideHistoricalCardDetails(card: HealthInsuranceCard): boolean {
 
 function ExternalDeclarationDetail({ row }: { row: ExternalInsuranceDeclaration }) {
   const [open, setOpen] = useState(false);
-
+  const [detail, setDetail] = useState<import('@/lib/types').SubmittedInsurance | null>(null);
+  const [error, setError] = useState('');
   useEffect(() => {
     if (!open) return;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = overflow; };
-  }, [open]);
-
+    let active = true;
+    api.externalInsurance.detail(row.id).then(d => { if (active) setDetail(d); }).catch(e => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [open, row.id]);
+  const status = detail?.status || row.status;
   return <>
-    <button
-      type="button"
-      className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-      onClick={() => setOpen(true)}
-    >
+    <button type="button" className={ui.btnSecondary} onClick={() => { setError(''); setOpen(true); }}>
       <FileClock className="h-4 w-4" />Chi tiết
     </button>
-    {open && createPortal(
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label={`Chi tiết khai báo BHYT ngoài trường số ${row.id}`}>
-        <div className="max-h-[calc(100dvh-1.5rem)] min-w-0 w-full max-w-3xl overflow-x-hidden overflow-y-auto rounded-2xl bg-slate-50 text-left shadow-2xl ring-1 ring-black/5 sm:max-h-[calc(100dvh-3rem)]">
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-7">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">BHYT tại nơi khác</p>
-              <h2 className="mt-0.5 text-lg font-bold text-slate-900">Khai báo #{row.id}</h2>
-            </div>
-            <button type="button" aria-label="Đóng" className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" onClick={() => setOpen(false)}>
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="space-y-5 px-4 py-5 sm:px-7">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-slate-500">Trạng thái hiện tại</span>
-              <InsuranceStatus status={row.status} />
-            </div>
-            <section className={cn(
-              'rounded-xl border p-4',
-              row.status === 'rejected' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white',
-            )}>
-              <h3 className="text-sm font-semibold text-slate-900">Phản hồi của nhà trường</h3>
-              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">
-                {row.review_note || (row.status === 'pending' ? 'Đơn đang chờ cán bộ kiểm tra.' : 'Không có ghi chú.')}
-              </p>
-            </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin thẻ tham gia ngoài nhà trường</h3>
-              <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                <DefRow label="Mã thẻ BHYT" value={row.medical_insurance_code} />
-                <DefRow label="Mã số BHXH" value={row.social_insurance_code} />
-                <DefRow label="Nơi đăng ký KCB" value={row.hospital_name || row.hospital_code} />
-                <DefRow label="Giá trị sử dụng" value={`${formatDate(row.valid_from)} — ${formatDate(row.valid_until)}`} />
-                <DefRow label="Ngày khai" value={new Date(row.created_at).toLocaleString('vi-VN')} />
-                {row.reviewed_at && <DefRow label="Ngày xử lý" value={new Date(row.reviewed_at).toLocaleString('vi-VN')} />}
-              </dl>
-            </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin sinh viên đã khai</h3>
-              <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                {row.declared.map(field => <DefRow key={field.label} label={field.label} value={field.value} />)}
-              </dl>
-            </section>
-          </div>
-        </div>
-      </div>,
-      document.body,
-    )}
+    {open && <InsuranceModal eyebrow="Khai báo BHYT tại nơi khác" title={'Bản khai #' + row.id} onClose={() => setOpen(false)}>
+      {error && <p role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">{error}</p>}
+      {detail ? <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={status} /></div>
+        {detail.review_note && <p className={cn('rounded-lg border px-4 py-3 text-sm', status === 'rejected' ? 'border-danger-line bg-danger-soft text-danger-text' : 'border-line bg-white text-slate-700')}>
+          <strong className="font-semibold">Phản hồi của cán bộ:</strong> {detail.review_note}
+        </p>}
+        <SubmittedInsuranceInfo data={detail} external />
+      </div> : !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 size={16} className="animate-spin" />Đang tải…</p>}
+    </InsuranceModal>}
   </>;
 }
 
@@ -142,6 +106,7 @@ export default function HealthInsurancePage() {
   const [data, setData] = useState<HealthInsuranceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [registrationWarning, setRegistrationWarning] = useState<{message:string; href:string} | null>(null);
 
   useEffect(() => {
     api.healthInsurance.get()
@@ -167,6 +132,17 @@ export default function HealthInsurancePage() {
 
   return (
     <div className="space-y-6">
+      {registrationWarning && (
+        <InsuranceModal size="sm" title="Lưu ý dành cho tân sinh viên" onClose={() => setRegistrationWarning(null)}>
+          <p className="flex items-start gap-2.5 text-sm leading-6 text-slate-700">
+            <AlertCircle size={16} className={cn(accentIcon.warning, 'mt-1 shrink-0')} />{registrationWarning.message}
+          </p>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className={ui.btnGhost} onClick={() => setRegistrationWarning(null)}>Quay lại</button>
+            <Link href={registrationWarning.href} className={ui.btnPrimary}>Tôi đã hiểu, tiếp tục</Link>
+          </div>
+        </InsuranceModal>
+      )}
       {error && (
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
           <AlertCircle size={16} className="flex-shrink-0" />
@@ -248,7 +224,7 @@ export default function HealthInsurancePage() {
             </h2>
             <span className="text-xs text-muted">{history.length} thẻ</span>
           </div>
-          <div className="divide-y divide-slate-100 md:hidden">
+          <div className="divide-y divide-line2 md:hidden">
             {history.map(card => (
               <article key={card.id} className="space-y-3 px-4 py-4">
                 <div className="flex min-w-0 items-start justify-between gap-3">
@@ -284,13 +260,13 @@ export default function HealthInsurancePage() {
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
-                  <th className="text-left font-medium px-5 py-2.5">Mã thẻ</th>
-                  <th className="text-left font-medium px-3 py-2.5">Mã số BHXH</th>
-                  <th className="text-left font-medium px-3 py-2.5 hidden sm:table-cell">Nơi đăng ký KCB</th>
-                  <th className="text-left font-medium px-3 py-2.5 hidden md:table-cell">Diện đăng ký</th>
-                  <th className="text-left font-medium px-3 py-2.5">Năm</th>
-                  <th className="text-left font-medium px-5 py-2.5">Giá trị sử dụng</th>
+                <tr className={THEAD_ROW}>
+                  <th className={TH}>Mã thẻ</th>
+                  <th className={cn(TH, 'px-3')}>Mã số BHXH</th>
+                  <th className={cn(TH, 'px-3')}>Nơi đăng ký KCB</th>
+                  <th className={cn(TH, 'px-3')}>Diện đăng ký</th>
+                  <th className={cn(TH, 'px-3')}>Năm</th>
+                  <th className={TH}>Giá trị sử dụng</th>
                 </tr>
               </thead>
               <tbody>
@@ -303,7 +279,7 @@ export default function HealthInsurancePage() {
                       {card.medical_insurance_code || '—'}
                     </td>
                     <td className="px-3 py-3 text-[0.82rem] text-ink">{card.social_insurance_code || '—'}</td>
-                    <td className="px-3 py-3 text-slate-600 hidden sm:table-cell max-w-[220px]">
+                    <td className="px-3 py-3 text-slate-600 max-w-[220px]">
                       {!hideHistoricalCardDetails(card) && <span
                         className="line-clamp-2"
                         title={[card.hospital_name, card.hospital_code].filter(Boolean).join(' — ') || undefined}
@@ -311,7 +287,7 @@ export default function HealthInsurancePage() {
                         {card.hospital_name || card.hospital_code || '—'}
                       </span>}
                     </td>
-                    <td className="px-3 py-3 text-slate-600 hidden md:table-cell max-w-[220px]">
+                    <td className="px-3 py-3 text-slate-600 max-w-[220px]">
                       <span className="line-clamp-2" title={card.registration_type ?? undefined}>
                         {card.registration_type || '—'}
                       </span>
@@ -342,7 +318,7 @@ export default function HealthInsurancePage() {
               Lịch sử đăng ký BHYT
             </h2>
           </div>
-          <div className="divide-y divide-slate-100 md:hidden">
+          <div className="divide-y divide-line2 md:hidden">
             {data.registrations.map(reg => (
               <article key={reg.id} className="space-y-3 px-4 py-4">
                 <div className="flex min-w-0 items-start justify-between gap-3">
@@ -354,25 +330,25 @@ export default function HealthInsurancePage() {
                   </div>
                   <InsuranceStatus status={reg.status} />
                 </div>
-                <div className="flex justify-end">
+                <div className="flex [&>button]:w-full">
                   <InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} />
                 </div>
               </article>
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
-                  <th className="px-5 py-3 w-[20%]">Mã đợt</th>
-                  <th className="px-5 py-3 w-[25%]">Ngày đăng ký</th>
-                  <th className="px-5 py-3 w-[25%]">Trạng thái</th>
-                  <th className="px-5 py-3">Phản hồi</th>
+                <tr className={THEAD_ROW}>
+                  <th className={cn(TH, 'w-[28%]')}>Đợt</th>
+                  <th className={cn(TH, 'w-[28%]')}>Ngày đăng ký</th>
+                  <th className={cn(TH, 'w-[24%]')}>Trạng thái</th>
+                  <th className={cn(TH, 'text-right')}>Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line2">
                 {data.registrations.map(reg => (
-                  <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={reg.id} className="hover:bg-[#f9fafb] transition-colors">
                     <td className="px-5 py-3 font-medium text-[0.85rem] text-ink">
                       {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} năm {reg.registration_year}
                     </td>
@@ -380,7 +356,7 @@ export default function HealthInsurancePage() {
                     <td className="px-5 py-3">
                       <InsuranceStatus status={reg.status} />
                     </td>
-                    <td className="px-5 py-3 text-[0.82rem] text-slate-600"><InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} /></td>
+                    <td className="px-5 py-3 text-right"><InsuranceSupplement id={reg.id} onUpdated={() => { api.healthInsurance.get().then(setData).catch(e => setError(e.message)); }} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -397,7 +373,7 @@ export default function HealthInsurancePage() {
               Lịch sử khai báo BHYT tại nơi khác
             </h2>
           </div>
-          <div className="divide-y divide-slate-100 md:hidden">
+          <div className="divide-y divide-line2 md:hidden">
             {data.external_declarations.map(row => (
               <article key={row.id} className="space-y-3 px-4 py-4">
                 <div className="flex min-w-0 items-start justify-between gap-3">
@@ -415,17 +391,17 @@ export default function HealthInsurancePage() {
             ))}
           </div>
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-left border-collapse">
-              <thead><tr>
-                <th className="px-5 py-3">Mã thẻ</th>
-                <th className="px-5 py-3">Giá trị sử dụng</th>
-                <th className="px-5 py-3">Ngày khai</th>
-                <th className="px-5 py-3">Trạng thái</th>
-                <th className="px-5 py-3 text-right">Thao tác</th>
+            <table className="w-full text-sm">
+              <thead><tr className={THEAD_ROW}>
+                <th className={TH}>Mã thẻ</th>
+                <th className={TH}>Giá trị sử dụng</th>
+                <th className={TH}>Ngày khai</th>
+                <th className={TH}>Trạng thái</th>
+                <th className={cn(TH, 'text-right')}>Thao tác</th>
               </tr></thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line2">
                 {data.external_declarations.map(row => (
-                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={row.id} className="hover:bg-[#f9fafb] transition-colors">
                     <td className="px-5 py-3 text-[0.82rem] font-mono">{row.medical_insurance_code}</td>
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</td>
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
@@ -493,7 +469,17 @@ export default function HealthInsurancePage() {
                       <Link
                         href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
                         className={cn(ui.btnPrimary, "w-full text-center")}
-                        onClick={(e) => { if (blocked) e.preventDefault(); }}
+                        onClick={(e) => {
+                          if (blocked) {
+                            e.preventDefault();
+                          } else if (p.freshman_warning) {
+                            e.preventDefault();
+                            setRegistrationWarning({
+                              message: p.freshman_warning,
+                              href: `/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`,
+                            });
+                          }
+                        }}
                         aria-disabled={blocked}
                         style={blocked ? { pointerEvents: 'none', opacity: 0.5 } : {}}
                       >

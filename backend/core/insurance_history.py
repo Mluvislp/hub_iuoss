@@ -50,7 +50,7 @@ def save_registration(reg):
     reg.workflow_version = 2
     reg.updated_at = timezone.now()
     reg.save(update_fields=['status', 'rejection_reason', 'rejection_reason_code',
-                           'hospital_code', 'fee_amount_vnd', 'workflow_version', 'row_version', 'updated_at'])
+                           'hospital_code', 'fee_amount_vnd', 'workflow_version', 'row_version', 'updated_at', 'supplement_pending', 'supplemented_at', 'supplement_reviewed_at'])
 
 
 def add_assessment(reg, event, values, note=''):

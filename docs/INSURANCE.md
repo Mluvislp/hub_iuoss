@@ -8,6 +8,9 @@
 > **Luật nghiệp vụ, trạng thái, event, bảng, thư từ chối** mô tả một lần ở
 > `dashboard_iuoss/docs/HEALTH_INSURANCE.md`. File này chỉ nói phần Hub làm.
 
+> Cập nhật 25/09/2026: [Chỉnh sửa tại chỗ, hạn khai báo và hàng đợi bổ sung](INSURANCE_EDIT_ROLLOUT.md).
+> SQL trong tài liệu mới chưa chạy trên production; cần nâng cấp trước deploy.
+
 ## 1. Sinh viên làm được gì
 
 | Trang | API |
@@ -28,8 +31,13 @@ cùng SV/năm/đợt**, kể cả khi đơn cũ đang `rejected`.
 **Xem minh chứng:** xác thực JWT + kiểm tra sở hữu. Frontend tải blob qua header
 `Authorization`, **không** đưa token vào URL.
 
-**Khai BHYT nơi khác:** mọi SV đã đăng nhập đều khai được — không phụ thuộc đợt đăng
-ký, trạng thái học hay hạn thẻ. Mỗi lần gửi tạo một snapshot `pending`; chưa tạo thẻ.
+**Khai BHYT nơi khác:** tạo mới và sửa trong cùng thời gian đợt đăng ký BHYT.
+Năm/đợt tiếp nhận lưu riêng với năm thẻ. Chỉnh sửa và gửi lại sau từ chối cập nhật
+chính bản khai cũ; không tạo snapshot thay thế. Chi tiết triển khai/backfill ở tài liệu trên.
+
+**Chỉnh sửa:** mỗi đơn/bản khai chỉ được sửa thông thường một lần. Detail API trả
+`edited_at`, `can_edit`, tên tỉnh/phường/bệnh viện và URL ảnh riêng tư để frontend
+hiển thị đúng hồ sơ đã nộp. Gửi form không có thay đổi thực tế bị từ chối.
 
 ## 2. Lịch đợt nằm ở hai nơi — nhớ kỹ
 
@@ -39,6 +47,9 @@ giờ ở **cả GET form lẫn POST**, nên không truy cập thẳng hay nộp
 Frontend còn `lib/insurance-periods.ts` để hiển thị: trang BHYT hiện **đợt đang mở +
 đợt kế tiếp**; không có đợt mở thì hiện đợt vừa hết hạn + kế tiếp. Đợt đang mở luôn
 hiện hạn cuối.
+
+Nếu `academic_entry_year` của sinh viên trùng `registration_year`, Hub hiển thị
+`freshman_warning` của slot trước khi đi tiếp vào form đăng ký.
 
 > ⚠️ Mức phí và tài khoản nhận tiền chỉ sửa được bằng **SQL trên
 > `hub_insurance_configs`** hoặc trang quản lý đợt của Dashboard — Hub không có UI sửa.

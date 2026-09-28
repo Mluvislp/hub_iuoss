@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from core.api.authentication import StudentPrincipal
-from core.models import ExternalInsuranceDeclaration, HealthInsuranceRegistration
+from core.models import ExternalInsuranceDeclaration, HealthInsuranceRegistration, HealthInsuranceConfig
 from core.test_insurance_workflow import picture
 from students.models import Student, Hospital, VnProvince, VnWard, VnEthnicity, HealthInsuranceCard
 
@@ -22,6 +22,9 @@ class ExternalInsuranceTests(TestCase):
         override.enable()
         self.addCleanup(override.disable)
         self.student = Student.objects.create(current_student_code='TEST001', full_name='Test Student')
+        self.cfg = HealthInsuranceConfig.objects.create(registration_period='MAIN', registration_year=2027,
+            registration_opens_at=timezone.now()-timedelta(days=1), registration_closes_at=timezone.now()+timedelta(days=1),
+            is_active=True, insurance_fee=100, bank_name='', bank_account_number='', bank_account_name='')
         self.client = APIClient()
         self.client.force_authenticate(StudentPrincipal({'ldap_uid': 'TEST001', 'student_id': self.student.pk}))
         VnProvince.objects.create(code='01', name='Hà Nội', unit_type='Thành phố')
@@ -44,7 +47,7 @@ class ExternalInsuranceTests(TestCase):
     def post(self, data=None):
         return self.client.post(self.url, data or self.payload(), format='multipart')
 
-    def test_no_period_or_payment_gate_and_stays_pending_without_card(self):
+    def test_open_intake_without_payment_stays_pending_without_card(self):
         old = HealthInsuranceCard.objects.create(student=self.student, is_current=True,
             valid_until=date(2030, 12, 31), created_at=timezone.now(), updated_at=timezone.now())
         self.assertEqual(self.client.get(self.url).status_code, 200)
@@ -65,10 +68,26 @@ class ExternalInsuranceTests(TestCase):
         self.assertEqual(health_data['current']['id'], old.pk)
         self.assertEqual(health_data['external_declarations'][0]['status'], 'pending')
         self.assertEqual(health_data['external_declarations'][0]['medical_insurance_code'], 'GD4790123456789')
-        self.assertIn(
-            {'label': 'Số CCCD', 'value': '012345678901'},
-            health_data['external_declarations'][0]['declared'],
-        )
+        detail = self.client.get(self.url + str(row.pk) + '/').data
+        self.assertEqual(detail['prefill']['citizen_id'], '012345678901')
+        self.assertEqual(detail['display']['permanent_province'], 'Hà Nội')
+        self.assertEqual(detail['display']['permanent_ward'], 'Ward')
+        self.assertEqual(detail['display']['hospital_code'], 'Hospital')
+
+    def test_freshman_warning_only_for_matching_entry_year(self):
+        self.cfg.freshman_warning = 'Tân sinh viên đã đăng ký mua BHYT trước đó.'
+        self.cfg.save(update_fields=['freshman_warning'])
+        self.student.academic_entry_year = self.cfg.registration_year
+        self.student.save(update_fields=['academic_entry_year'])
+        response = self.client.get('/api/health-insurance/')
+        self.assertEqual(response.data['periods'][0]['freshman_warning'], self.cfg.freshman_warning)
+        response = self.client.get(self.url)
+        self.assertEqual(response.data['config']['freshman_warning'], self.cfg.freshman_warning)
+
+        self.student.academic_entry_year -= 1
+        self.student.save(update_fields=['academic_entry_year'])
+        response = self.client.get('/api/health-insurance/')
+        self.assertEqual(response.data['periods'][0]['freshman_warning'], '')
 
     def test_retry_and_multiple_declarations_preserve_history(self):
         key = uuid4().hex
@@ -79,10 +98,10 @@ class ExternalInsuranceTests(TestCase):
         conflict = self.post(self.payload(key, valid_until='2029-12-31'))
         self.assertEqual(conflict.status_code, 409)
         second = self.post(self.payload(valid_until='2029-12-31'))
-        self.assertEqual(second.status_code, 201)
-        self.assertEqual(ExternalInsuranceDeclaration.objects.count(), 2)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(ExternalInsuranceDeclaration.objects.count(), 1)
         self.assertFalse(HealthInsuranceCard.objects.exists())
-        self.assertEqual(len(list(Path(self.temp.name).rglob('*.png'))), 6)
+        self.assertEqual(len(list(Path(self.temp.name).rglob('*.png'))), 3)
 
     def test_all_three_images_required_and_content_validated(self):
         for field in ('cccd_image', 'cccd_image_back', 'bhyt_image'):

@@ -542,7 +542,7 @@ def _insurance_config_error(cfg):
     return ""
 
 
-def _insurance_config_payload(cfg, *, include_payment):
+def _insurance_config_payload(cfg, *, include_payment, student=None):
     coverage_start, coverage_end = _coverage_dates(
         cfg.registration_period, cfg.registration_year,
     )
@@ -557,6 +557,11 @@ def _insurance_config_payload(cfg, *, include_payment):
         "coverage_end": coverage_end.isoformat(),
         "status": _insurance_config_status(cfg),
         "is_active": cfg.is_active,
+        "freshman_warning": (
+            cfg.freshman_warning or ""
+            if student and student.academic_entry_year == cfg.registration_year
+            else ""
+        ),
     }
     if include_payment:
         account = cfg.bank_account
@@ -579,8 +584,9 @@ class HealthInsuranceView(APIView):
 
     def get(self, request):
         student_id = request.user.student_id
+        student = Student.objects.filter(pk=student_id).first() if student_id else None
         periods = [
-            _insurance_config_payload(cfg, include_payment=False)
+            _insurance_config_payload(cfg, include_payment=False, student=student)
             for cfg in HealthInsuranceConfig.objects.select_related("bank_account").all()
         ]
         if not student_id:
@@ -611,7 +617,7 @@ class HealthInsuranceView(APIView):
         regs = (
             HealthInsuranceRegistration.objects
             .filter(student_id=student_id)
-            .defer("change_log")
+            .defer("change_log", "config_snapshot", "cccd_image", "cccd_image_back", "bhyt_image", "payment_receipt_image")
             .order_by("-created_at")
         )
         reg_data = [{
@@ -626,7 +632,7 @@ class HealthInsuranceView(APIView):
         } for r in regs]
         external_rows = list(ExternalInsuranceDeclaration.objects.filter(
             student_id=student_id
-        ).order_by("-created_at"))
+        ).defer("snapshot", "images", "intake_snapshot").order_by("-created_at"))
         external_hospitals = dict(Hospital.objects.filter(
             code__in={row.hospital_code for row in external_rows if row.hospital_code}
         ).values_list("code", "name"))
@@ -643,22 +649,7 @@ class HealthInsuranceView(APIView):
             "review_note": row.review_note,
             "created_at": row.created_at,
             "reviewed_at": row.reviewed_at,
-            "declared": [
-                {"label": label, "value": row.snapshot.get(field, "")}
-                for field, label in (
-                    ("full_name", "Họ và tên"),
-                    ("student_code", "MSSV"),
-                    ("gender", "Giới tính"),
-                    ("dob", "Ngày sinh"),
-                    ("ethnicity", "Dân tộc"),
-                    ("phone_number", "Số điện thoại"),
-                    ("citizen_id", "Số CCCD"),
-                    ("social_insurance_number", "Mã số BHXH"),
-                    ("permanent_province", "Mã tỉnh/thành thường trú"),
-                    ("permanent_ward", "Mã phường/xã thường trú"),
-                    ("permanent_street", "Địa chỉ thường trú"),
-                )
-            ],
+
         } for row in external_rows]
 
         # Đợt 1 (MAIN) đăng ký BHYT cho năm kế tiếp nên mọi sinh viên đều
@@ -803,7 +794,7 @@ class InsuranceRegistrationView(APIView):
             )
         return Response({
             "prefill": self._snapshot(student),
-            "config": _insurance_config_payload(cfg, include_payment=True),
+            "config": _insurance_config_payload(cfg, include_payment=True, student=student),
         })
 
     @submission
@@ -888,8 +879,9 @@ class InsuranceRegistrationView(APIView):
             # ----------------------------------------
             
             hospital_code=data["hospital_code"],
+            note=data.get("note", ""),
             change_log=change_log, # Giữ lại change_log để tiện xem chênh lệch
-            config_snapshot=_insurance_config_payload(cfg, include_payment=True),
+            config_snapshot=_insurance_config_payload(cfg, include_payment=True, student=student),
             status="iu_processing",
             fee_amount_vnd=integer(cfg.insurance_fee),
             workflow_version=2,
