@@ -115,12 +115,14 @@ def residence_snapshot(student):
     temp = addr.get_effective(student, offcampus.TEMPORARY)
     perm_hcm = bool(perm and perm.province_code == addr.HCMC_PROVINCE_CODE)
     temp_hcm = bool(temp and temp.province_code == addr.HCMC_PROVINCE_CODE)
+    temp_none = addr.is_declared_empty(temp)
     return {
         "eligible": perm_hcm or temp_hcm,
         "permanent_hcm": perm_hcm,
         "temporary_hcm": temp_hcm,
+        "temporary_none": temp_none,
         "permanent": addr.format_address(perm),
-        "temporary": addr.format_address(temp),
+        "temporary": "Không có tạm trú" if temp_none else addr.format_address(temp),
     }
 
 

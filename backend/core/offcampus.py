@@ -115,8 +115,9 @@ def build_prefill(student):
     temporary = _address_block(student, TEMPORARY)
 
     temp_current = addr.get_effective(student, TEMPORARY)
+    temporary_none = addr.is_declared_empty(temp_current)
     in_hcmc = None
-    if temp_current is not None and temp_current.effective_from:
+    if temp_current is not None and temp_current.effective_from and not temporary_none:
         in_hcmc = temp_current.province_code == addr.HCMC_PROVINCE_CODE
 
     locked, declared_on = lock_state(student)
@@ -140,6 +141,8 @@ def build_prefill(student):
         "permanent": permanent,
         "temporary": temporary,
         "temporary_in_hcmc": in_hcmc,
+        # Đã khai "không có tạm trú" (chỉ chọn được khi thường trú ở TP.HCM).
+        "temporary_none": temporary_none,
         "hcmc_province_code": addr.HCMC_PROVINCE_CODE,
     }
 
@@ -245,7 +248,18 @@ def submit(student, data):
 
     # ── 3. Địa chỉ tạm trú ──────────────────────────────────────────────────
     in_hcmc = data.get("temporary_in_hcmc")
-    if in_hcmc is None:
+    temporary_none = data.get("temporary_none") is True
+    if temporary_none:
+        # "Không có tạm trú" chỉ hợp lệ khi thường trú ở TP.HCM — SV ở ngay tại
+        # nhà. Kiểm lại ở server, không tin client. Ghi một dòng rỗng có ngày khai
+        # (`declare_empty`) để phân biệt với "chưa khai bao giờ".
+        if permanent.get("province_code") != addr.HCMC_PROVINCE_CODE:
+            errors["temporary_in_hcmc"] = (
+                "Chỉ chọn “Không có tạm trú” khi thường trú tại Thành phố Hồ Chí Minh."
+            )
+        elif "permanent_location" not in errors and "permanent_street" not in errors:
+            addr.declare_empty(student, TEMPORARY)
+    elif in_hcmc is None:
         errors["temporary_in_hcmc"] = "Vui lòng chọn có hoặc không."
     else:
         temporary = data.get("temporary") or {}
@@ -296,6 +310,6 @@ def submit(student, data):
         "fields": field_results,
         "warnings": {
             "permanent_street": perm_warnings,
-            "temporary_street": temp_warnings if in_hcmc is not None else [],
+            "temporary_street": temp_warnings if in_hcmc is not None and not temporary_none else [],
         },
     }

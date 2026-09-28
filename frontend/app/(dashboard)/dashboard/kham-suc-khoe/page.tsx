@@ -210,7 +210,7 @@ export default function HealthCheckPage() {
           </div>
         )}
         <ExaminedWizard state={state} provinces={provinces} resubmit onDone={done}
-                        onCancel={() => setResubmitting(false)} />
+                        onStateChange={setState} onCancel={() => setResubmitting(false)} />
       </div>
     );
   }
@@ -384,7 +384,7 @@ export default function HealthCheckPage() {
 
       {/* ── Nhánh "Đã khám rồi" ── */}
       {choice === 'examined' && (
-        <ExaminedWizard state={state} provinces={provinces} onDone={done} />
+        <ExaminedWizard state={state} provinces={provinces} onDone={done} onStateChange={setState} />
       )}
 
       {/* ── Nhánh "Chưa khám": phần 1 khai báo + phần 2 đăng ký ── */}

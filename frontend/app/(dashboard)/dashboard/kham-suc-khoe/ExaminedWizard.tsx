@@ -1,7 +1,9 @@
 'use client';
 
 /* Nhánh "Đã khám rồi": khai lại kết quả khám theo mẫu KSK, chia 5 bước.
-     1. Thông tin cá nhân — form khai báo ngoại trú (đã khai thì chỉ xem)
+     1. Thông tin cá nhân — form khai báo ngoại trú (đã khai thì chỉ xem). Bấm
+        "Lưu và tiếp tục" là GỬI khai báo ngay qua /api/offcampus/, không đợi
+        tới bước cuối — khai xong form ngoại trú khóa lại như khai ở trang riêng.
      2–4. Lần khám · Khám lâm sàng · Cận lâm sàng — dựng từ result_schema
      5. Kết luận + ảnh minh chứng
    Chống nản: điền sẵn mọi giá trị mặc định được, xét nghiệm chi tiết gập lại và
@@ -26,6 +28,8 @@ interface Props {
   /** Nộp lại sau khi bị từ chối: nạp kết quả đã khai lần trước. */
   resubmit?: boolean;
   onDone: (next: HealthCheckState) => void;
+  /** Cập nhật state trang mà không coi là đã nộp — dùng sau khi lưu khai báo ở bước 1. */
+  onStateChange: (next: HealthCheckState) => void;
   onCancel?: () => void;
 }
 
@@ -38,7 +42,9 @@ function readDraft(key: string): Draft | null {
   } catch { return null; }
 }
 
-export default function ExaminedWizard({ state, provinces, resubmit, onDone, onCancel }: Props) {
+export default function ExaminedWizard({
+  state, provinces, resubmit, onDone, onStateChange, onCancel,
+}: Props) {
   const schema = state.result_schema;
   const locked = state.offcampus.locked;
   const draftKey = `hc-draft:${state.round?.id}:${state.offcampus.student.student_code}`;
@@ -61,6 +67,7 @@ export default function ExaminedWizard({ state, provinces, resubmit, onDone, onC
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [busyLabel, setBusyLabel] = useState('');
   const top = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -100,12 +107,35 @@ export default function ExaminedWizard({ state, provinces, resubmit, onDone, onC
     return true;
   }
 
+  /** Bước 1 chưa khai: gửi khai báo ngoại trú ngay rồi mới sang bước 2. */
+  async function saveDeclaration() {
+    if (!validateStep(0)) return;
+    setSaving(true); setBusyLabel('Đang lưu thông tin khai báo…'); setError('');
+    try {
+      await api.offcampus.submit(declaration.payload());
+      onStateChange(await api.healthCheck.state());
+      goTo(1);
+    } catch (e) {
+      if (e instanceof ApiError && e.data?.errors) {
+        declaration.setFieldErrors(e.data.errors as Record<string, string>);
+        setError('Vui lòng kiểm tra lại các ô được đánh dấu.');
+      } else {
+        setError(e instanceof ApiError ? e.message : 'Không lưu được thông tin khai báo.');
+      }
+    } finally { setSaving(false); }
+  }
+
+  function next() {
+    if (step === 0 && !locked) { saveDeclaration(); return; }
+    if (validateStep(step)) goTo(step + 1);
+  }
+
   async function submit() {
     for (let i = 0; i < steps.length; i++) {
       if (!validateStep(i)) { goTo(i); return; }
     }
     if (!files.length) { setErrors((e) => ({ ...e, evidence: 'Chưa có ảnh nào.' })); setError('Vui lòng tải lên ảnh minh chứng.'); return; }
-    setSaving(true); setError('');
+    setSaving(true); setBusyLabel('Đang gửi kết quả khám…'); setError('');
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append('files', f));
@@ -154,7 +184,7 @@ export default function ExaminedWizard({ state, provinces, resubmit, onDone, onC
             const done = i < step || (i <= reached && i !== step);
             return (
               <li key={s.key}>
-                <button type="button" disabled={i > reached || saving}
+                <button type="button" disabled={i > reached || saving || (step === 0 && !locked && i > 0)}
                         onClick={() => { if (i < step || validateStep(step)) goTo(i); }}
                         className="w-full text-left disabled:cursor-default group" title={s.title}>
                   <span className={cn('block h-1.5 rounded-full transition-colors',
@@ -170,7 +200,7 @@ export default function ExaminedWizard({ state, provinces, resubmit, onDone, onC
         </ol>
       </div>
 
-      <FormBusy busy={saving} label="Đang gửi kết quả khám…" className="px-6 py-5 space-y-5">
+      <FormBusy busy={saving} label={busyLabel} className="px-6 py-5 space-y-5">
         {error && (
           <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
             <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -179,10 +209,14 @@ export default function ExaminedWizard({ state, provinces, resubmit, onDone, onC
 
         {step === 0 && (
           <div className="space-y-6">
-            <p className="text-[0.8rem] text-muted">
-              {locked ? 'Thông tin đã khai báo ngoại trú, không chỉnh sửa tại đây.'
-                : 'Thông tin gửi kèm kết quả khám được ghi nhận là khai báo ngoại trú.'}
-            </p>
+            {locked ? (
+              <p className="text-[0.8rem] text-muted">Thông tin đã khai báo ngoại trú, không chỉnh sửa tại đây.</p>
+            ) : (
+              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-2.5 text-[0.8rem] text-ink">
+                Bấm <b>Lưu và tiếp tục</b> là thông tin được ghi nhận ngay thành khai báo ngoại trú.
+                Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo ngoại trú.
+              </div>
+            )}
             {locked ? <DeclarationSummary form={state.offcampus} />
               : <DeclarationFields form={state.offcampus} draft={declaration} provinces={provinces} />}
           </div>
@@ -214,8 +248,9 @@ export default function ExaminedWizard({ state, provinces, resubmit, onDone, onC
                 : <><Send size={15} /> {resubmit ? 'Gửi lại kết quả khám' : 'Gửi kết quả khám'}</>}
             </button>
           ) : (
-            <button type="button" className={ui.btnPrimary} onClick={() => { if (validateStep(step)) goTo(step + 1); }}>
-              Tiếp tục <ArrowRight size={15} />
+            <button type="button" className={ui.btnPrimary} disabled={saving} onClick={next}>
+              {saving ? <><Loader2 size={15} className="animate-spin" /> Đang lưu…</>
+                : <>{step === 0 && !locked ? 'Lưu và tiếp tục' : 'Tiếp tục'} <ArrowRight size={15} /></>}
             </button>
           )}
         </div>
