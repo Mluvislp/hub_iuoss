@@ -75,6 +75,8 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
   const [permanent, setPermanent] = useState<AddressValue>(EMPTY_ADDRESS);
   const [temporary, setTemporary] = useState<AddressValue>(EMPTY_ADDRESS);
   const [inHcmc, setInHcmc] = useState<boolean | null>(null);
+  // "Không có tạm trú" — chỉ mở khi thường trú ở TP.HCM (SV ở ngay tại nhà).
+  const [noTemp, setNoTemp] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Nạp giá trị ban đầu MỘT lần khi form về — tải lại form (sau khi gửi yêu cầu
@@ -93,6 +95,7 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
       street: form.temporary.prefill.street,
     });
     setInHcmc(form.temporary_in_hcmc);
+    setNoTemp(!!form.temporary_none);
     const cccd = (form.fields['student.citizen_id']?.value ?? {}) as CccdValue;
     setCccdExtra({
       issue_place: cccd.issue_place || '',
@@ -109,6 +112,13 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formKey]);
 
+  // Thường trú đổi khỏi TP.HCM thì lựa chọn "Không có tạm trú" hết hợp lệ —
+  // bỏ chọn để SV phải trả lời lại câu hỏi tạm trú.
+  const permanentInHcmc = !!form && permanent.provinceCode === form.hcmc_province_code;
+  useEffect(() => {
+    if (noTemp && !permanentInHcmc) setNoTemp(false);
+  }, [noTemp, permanentInHcmc]);
+
   const clearError = (key: string) =>
     setFieldErrors((f) => { const next = { ...f }; delete next[key]; return next; });
 
@@ -118,7 +128,9 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
     if (!permanent.provinceCode) local.permanent_province = 'Vui lòng chọn tỉnh/thành.';
     if (!permanent.wardCode) local.permanent_ward = 'Vui lòng chọn phường/xã.';
     if (!permanent.street.trim()) local.permanent_street = 'Vui lòng nhập địa chỉ chi tiết.';
-    if (inHcmc === null) local.temporary_in_hcmc = 'Vui lòng chọn có hoặc không.';
+    if (noTemp) {
+      if (!permanentInHcmc) local.temporary_in_hcmc = 'Chỉ chọn “Không có tạm trú” khi thường trú tại TP.HCM.';
+    } else if (inHcmc === null) local.temporary_in_hcmc = 'Vui lòng chọn một phương án.';
     else {
       if (!inHcmc && !temporary.provinceCode) local.temporary_province = 'Vui lòng chọn tỉnh/thành.';
       if (!temporary.wardCode) local.temporary_ward = 'Vui lòng chọn phường/xã.';
@@ -143,8 +155,9 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
         ward_code: permanent.wardCode,
         street: permanent.street,
       },
-      temporary_in_hcmc: inHcmc,
-      temporary: {
+      temporary_in_hcmc: noTemp ? null : inHcmc,
+      temporary_none: noTemp,
+      temporary: noTemp ? undefined : {
         province_code: inHcmc ? (form?.hcmc_province_code ?? '') : temporary.provinceCode,
         ward_code: temporary.wardCode,
         street: temporary.street,
@@ -155,6 +168,7 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
   return {
     drafts, setDrafts, cccdExtra, setCccdExtra,
     permanent, setPermanent, temporary, setTemporary, inHcmc, setInHcmc,
+    noTemp, setNoTemp, permanentInHcmc,
     fieldErrors, setFieldErrors, clearError, validate, payload,
   };
 }
@@ -167,7 +181,8 @@ export function DeclarationFields({
 }: { form: OffCampusForm; draft: DeclarationDraft; provinces: Province[] }) {
   const {
     drafts, setDrafts, cccdExtra, setCccdExtra, permanent, setPermanent,
-    temporary, setTemporary, inHcmc, setInHcmc, fieldErrors, clearError,
+    temporary, setTemporary, inHcmc, setInHcmc, noTemp, setNoTemp, permanentInHcmc,
+    fieldErrors, clearError,
   } = draft;
   const cccdCurrent = (form.fields['student.citizen_id']?.value ?? {}) as CccdValue;
   const setDraft = (key: string, value: string | undefined) =>
@@ -282,12 +297,13 @@ export function DeclarationFields({
           <span className="text-red-500"> *</span>
         </p>
 
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className={cn('grid gap-3', permanentInHcmc ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
           <ChoiceTile
-            active={inHcmc === true}
+            active={!noTemp && inHcmc === true}
             title="Có"
             desc="Đang tạm trú tại TP. Hồ Chí Minh"
             onClick={() => {
+              setNoTemp(false);
               setInHcmc(true);
               setTemporary((t) => ({ ...t, provinceCode: form.hcmc_province_code, wardCode: '' }));
               ['temporary_in_hcmc', 'temporary_province', 'temporary_location']
@@ -295,22 +311,36 @@ export function DeclarationFields({
             }}
           />
           <ChoiceTile
-            active={inHcmc === false}
+            active={!noTemp && inHcmc === false}
             title="Không"
             desc="Đang ở tỉnh/thành phố khác"
             onClick={() => {
+              setNoTemp(false);
               setInHcmc(false);
               setTemporary((t) => ({ ...t, provinceCode: '', wardCode: '' }));
               ['temporary_in_hcmc', 'temporary_province', 'temporary_location']
                 .forEach(clearError);
             }}
           />
+          {permanentInHcmc && (
+            <ChoiceTile
+              active={noTemp}
+              title="Không có tạm trú"
+              desc="Đang ở tại địa chỉ thường trú"
+              onClick={() => {
+                setNoTemp(true);
+                setInHcmc(null);
+                ['temporary_in_hcmc', 'temporary_province', 'temporary_ward', 'temporary_street', 'temporary_location']
+                  .forEach(clearError);
+              }}
+            />
+          )}
         </div>
         {fieldErrors.temporary_in_hcmc && (
           <p className="mt-1.5 text-[0.75rem] text-danger-text">{fieldErrors.temporary_in_hcmc}</p>
         )}
 
-        {inHcmc !== null && (
+        {!noTemp && inHcmc !== null && (
           <div className="mt-4">
             <AddressFields
               idPrefix="temp"
@@ -378,8 +408,8 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
         </h2>
         <div className="rounded-lg border border-line px-4 py-1">
           {row('Thường trú', form.permanent.display)}
-          {row('Tạm trú', form.temporary.display)}
-          {row('Tạm trú tại TP.HCM', form.temporary_in_hcmc ? 'Có' : 'Không')}
+          {row('Tạm trú', form.temporary_none ? 'Không có tạm trú' : form.temporary.display)}
+          {!form.temporary_none && row('Tạm trú tại TP.HCM', form.temporary_in_hcmc ? 'Có' : 'Không')}
         </div>
       </section>
     </>

@@ -333,6 +333,8 @@ export interface OffCampusForm {
   permanent: OffCampusAddressBlock;
   temporary: OffCampusAddressBlock;
   temporary_in_hcmc: boolean | null;
+  /** Đã khai "không có tạm trú" — chỉ hợp lệ khi thường trú ở TP.HCM. */
+  temporary_none: boolean;
   hcmc_province_code: string;
 }
 
@@ -348,7 +350,8 @@ export interface OffCampusSubmit {
   mobile_phone?: string;
   permanent: OffCampusAddressInput;
   temporary_in_hcmc: boolean | null;
-  temporary: OffCampusAddressInput;
+  temporary_none?: boolean;
+  temporary?: OffCampusAddressInput;
 }
 
 export interface OffCampusResult {
