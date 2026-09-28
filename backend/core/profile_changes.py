@@ -341,6 +341,12 @@ def load_value(conf, raw):
 
 
 @transaction.atomic
+def cccd_missing(student):
+    """Hồ sơ chưa có CCCD 12 số (CMND 9 số cũ cũng tính là chưa có)."""
+    conf = spec("student.citizen_id")
+    return conf["is_blank"](conf["read"](student))
+
+
 def submit_change(student, target, value, *, source, group_key=None):
     """Trả về (ProfileChangeRequest, applied_ngay) hoặc (None, False) nếu không đổi."""
     conf = spec(target)

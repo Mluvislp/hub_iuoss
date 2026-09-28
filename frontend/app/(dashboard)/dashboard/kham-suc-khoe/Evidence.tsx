@@ -14,26 +14,50 @@ const GUIDE_VIDEO_URL = 'https://drive.google.com/file/d/15CmO2LdHQ47uKVma65nE_0
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif';
 const MAX_BYTES = 5 * 1024 * 1024;
 
-/** Hướng dẫn tra cứu kết quả khám trên ứng dụng Công dân số. */
-export function EvidenceGuide() {
+/** Hướng dẫn chuẩn bị ảnh minh chứng — LUÔN hiện đủ 2 loại theo nơi cư trú:
+ *  1. Có thường trú hoặc tạm trú tại TP.HCM: tra cứu trên ứng dụng Công dân số (2 hướng dẫn).
+ *  2. Ngoại tỉnh: chụp giấy chứng nhận kết quả khám sức khỏe của năm.
+ *  Khối đúng diện của SV (theo địa chỉ đã khai ở bước 1) được làm nổi. */
+export function EvidenceGuide({ hcmc, year }: { hcmc: boolean; year: string }) {
   const link = 'inline-flex items-center gap-1 font-medium text-primary-text hover:underline';
+  const box = (active: boolean) => cn(
+    'rounded-lg border px-4 py-3 text-[0.84rem] text-ink',
+    active ? 'border-primary-line border-l-4 border-l-primary bg-primary-soft' : 'border-line bg-slate-50',
+  );
   return (
-    <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-3 text-[0.84rem] text-ink space-y-2">
-      <p>
-        Sinh viên kiểm tra thông tin kết quả khám sức khỏe theo Chương trình khám sức khỏe
-        toàn dân của Thành phố trên ứng dụng Công dân số Thành phố theo hướng dẫn của Sở Y tế
-        Thành phố Hồ Chí Minh:{' '}
-        <a href={GUIDE_APP_URL} target="_blank" rel="noopener noreferrer" className={link}>
-          Xem hướng dẫn tại đây <ExternalLink size={12} />
-        </a>
-      </p>
-      <p>
-        Đối với sinh viên đã khám nhưng kết quả chưa hiển thị trên ứng dụng Công dân số, sinh
-        viên thực hiện cập nhật kết quả đã khám theo video hướng dẫn:{' '}
-        <a href={GUIDE_VIDEO_URL} target="_blank" rel="noopener noreferrer" className={link}>
-          Xem video hướng dẫn <ExternalLink size={12} />
-        </a>
-      </p>
+    <div className="space-y-2.5">
+      <div className="text-[0.82rem] font-semibold text-ink">Hướng dẫn chuẩn bị ảnh minh chứng</div>
+
+      <div className={box(hcmc)}>
+        <div className="font-semibold mb-1.5">
+          1. Sinh viên có thường trú hoặc tạm trú tại Thành phố Hồ Chí Minh
+        </div>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>
+            Sinh viên kiểm tra thông tin kết quả khám sức khỏe theo Chương trình khám sức khỏe
+            toàn dân của Thành phố trên ứng dụng Công dân số Thành phố theo hướng dẫn của Sở Y tế
+            Thành phố Hồ Chí Minh:{' '}
+            <a href={GUIDE_APP_URL} target="_blank" rel="noopener noreferrer" className={link}>
+              Xem hướng dẫn tại đây <ExternalLink size={12} />
+            </a>
+          </li>
+          <li>
+            Đối với sinh viên đã khám nhưng kết quả chưa hiển thị trên ứng dụng Công dân số, sinh
+            viên thực hiện cập nhật kết quả đã khám theo video hướng dẫn:{' '}
+            <a href={GUIDE_VIDEO_URL} target="_blank" rel="noopener noreferrer" className={link}>
+              Xem video hướng dẫn <ExternalLink size={12} />
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div className={box(!hcmc)}>
+        <div className="font-semibold mb-1.5">2. Sinh viên ngoại tỉnh</div>
+        <p>
+          Sinh viên có thể chụp ảnh <b>Giấy chứng nhận kết quả khám sức khỏe năm {year}</b> để tải
+          lên làm minh chứng. Ảnh cần rõ nét, đủ các trang có kết quả khám và kết luận.
+        </p>
+      </div>
     </div>
   );
 }
@@ -62,7 +86,7 @@ export function EvidencePicker({
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
         {files.map((f, i) => (
           <div key={previews[i]} className="relative rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
             {/* eslint-disable-next-line @next/next/no-img-element */}

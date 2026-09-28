@@ -18,6 +18,8 @@ import type { HealthCheckState, Province } from '@/lib/types';
 import { DeclarationFields, DeclarationSummary, useDeclarationDraft } from '../khai-bao-ngoai-tru/DeclarationForm';
 import { FormBusy } from '@/components/form-busy';
 import { EvidenceGuide, EvidencePicker } from './Evidence';
+import CccdForm from './CccdForm';
+import ConsentBox from './ConsentBox';
 import ResultSectionFields, {
   ResultValues, sectionFields, suggestHealthClass, validateSection,
 } from './ResultFields';
@@ -33,7 +35,9 @@ interface Props {
   onCancel?: () => void;
 }
 
-interface Draft { values: ResultValues; healthTouched: boolean }
+/** Nháp chỉ giữ ô SV đã TỰ SỬA (khác mặc định lúc gõ). Lưu cả mặc định thì mỗi lần
+ *  đổi mặc định ở backend, nháp cũ lại nạp ngược giá trị cũ — đã dính với thị lực 10. */
+interface Draft { edited: ResultValues; healthTouched: boolean }
 
 function readDraft(key: string): Draft | null {
   try {
@@ -47,7 +51,9 @@ export default function ExaminedWizard({
 }: Props) {
   const schema = state.result_schema;
   const locked = state.offcampus.locked;
-  const draftKey = `hc-draft:${state.round?.id}:${state.offcampus.student.student_code}`;
+  // Có phiên bản danh mục trong khóa: đổi mẫu (KSK → PYT) thì nháp cũ tự bị bỏ, không
+  // nạp giá trị cũ sai kiểu vào ô mới (đã dính: thị lực "10/10" → lỗi "Phải là số").
+  const draftKey = `hc-draft:pyt3:${state.round?.id}:${state.offcampus.student.student_code}`;
   const steps = useMemo(() => [
     { key: 'declaration', title: 'Thông tin cá nhân' },
     ...schema.map((s) => ({ key: s.key, title: s.title })),
@@ -59,26 +65,33 @@ export default function ExaminedWizard({
   const [values, setValues] = useState<ResultValues>(() => {
     const saved = readDraft(draftKey);
     const previous = resubmit ? state.response?.result ?? {} : {};
-    return { ...state.result_defaults, ...previous, ...(saved?.values ?? {}) };
+    // Chỉ nhận các khóa còn trong danh mục hiện hành.
+    const known = (v: ResultValues) => Object.fromEntries(
+      Object.entries(v).filter(([k]) => k in state.result_defaults));
+    return { ...state.result_defaults, ...known(previous), ...known(saved?.edited ?? {}) };
   });
   // Phân loại sức khỏe tự theo phân loại cao nhất — cho tới khi SV tự chọn tay.
   const [healthTouched, setHealthTouched] = useState(() => readDraft(draftKey)?.healthTouched ?? !!resubmit);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<File[]>([]);
+  // Cam kết + đồng ý cung cấp thông tin — không lưu vào nháp, mỗi lần gửi phải tích lại.
+  const [dataConsent, setDataConsent] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyLabel, setBusyLabel] = useState('');
   const top = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try { localStorage.setItem(draftKey, JSON.stringify({ values, healthTouched })); } catch { /* bộ nhớ bị chặn */ }
-  }, [draftKey, values, healthTouched]);
+    const edited = Object.fromEntries(
+      Object.entries(values).filter(([k, v]) => v !== (state.result_defaults[k] ?? '')));
+    try { localStorage.setItem(draftKey, JSON.stringify({ edited, healthTouched })); } catch { /* bộ nhớ bị chặn */ }
+  }, [draftKey, values, healthTouched, state.result_defaults]);
 
   useEffect(() => {
     if (healthTouched) return;
-    const suggested = suggestHealthClass(values);
+    const suggested = suggestHealthClass(schema, values);
     if (values.health_class !== suggested) setValues((v) => ({ ...v, health_class: suggested }));
-  }, [values, healthTouched]);
+  }, [schema, values, healthTouched]);
 
   const set = (k: string, v: string) => {
     if (k === 'health_class') setHealthTouched(true);
@@ -95,8 +108,11 @@ export default function ExaminedWizard({
 
   function validateStep(i: number): boolean {
     if (i === 0) {
-      if (locked) return true;
-      const local = declaration.validate();
+      if (locked) {
+        if (state.cccd_missing) { setError('Bổ sung số CCCD trước khi tiếp tục.'); return false; }
+        return true;
+      }
+      const local = declaration.validate({ requireCccd: true });
       declaration.setFieldErrors(local);
       if (Object.keys(local).length) { setError('Vui lòng kiểm tra lại các ô được đánh dấu.'); return false; }
       return true;
@@ -112,7 +128,7 @@ export default function ExaminedWizard({
     if (!validateStep(0)) return;
     setSaving(true); setBusyLabel('Đang lưu thông tin khai báo…'); setError('');
     try {
-      await api.offcampus.submit(declaration.payload());
+      await api.offcampus.submit(declaration.payload({ requireCccd: true }));
       onStateChange(await api.healthCheck.state());
       goTo(1);
     } catch (e) {
@@ -135,11 +151,17 @@ export default function ExaminedWizard({
       if (!validateStep(i)) { goTo(i); return; }
     }
     if (!files.length) { setErrors((e) => ({ ...e, evidence: 'Chưa có ảnh nào.' })); setError('Vui lòng tải lên ảnh minh chứng.'); return; }
+    if (!dataConsent) {
+      setErrors((e) => ({ ...e, data_consent: 'Chưa xác nhận.' }));
+      setError('Vui lòng tích xác nhận cam kết và đồng ý cung cấp thông tin.');
+      return;
+    }
     setSaving(true); setBusyLabel('Đang gửi kết quả khám…'); setError('');
     try {
       const fd = new FormData();
       files.forEach((f) => fd.append('files', f));
       fd.append('result', JSON.stringify(values));
+      fd.append('data_consent', 'true');
       if (!locked) fd.append('declaration', JSON.stringify(declaration.payload()));
       const next = await api.healthCheck.submitEvidence(fd);
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
@@ -151,7 +173,7 @@ export default function ExaminedWizard({
         const declErrs: Record<string, string> = {};
         Object.entries(errs).forEach(([k, v]) => {
           if (k.startsWith('result.')) resultErrs[k.slice(7)] = v;
-          else if (k === 'evidence') resultErrs.evidence = v;
+          else if (k === 'evidence' || k === 'data_consent') resultErrs[k] = v;
           else declErrs[k] = v;
         });
         setErrors((cur) => ({ ...cur, ...resultErrs }));
@@ -217,6 +239,7 @@ export default function ExaminedWizard({
                 Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo ngoại trú.
               </div>
             )}
+            {locked && state.cccd_missing && <CccdForm onSaved={(next) => { onStateChange(next); setError(''); }} />}
             {locked ? <DeclarationSummary form={state.offcampus} />
               : <DeclarationFields form={state.offcampus} draft={declaration} provinces={provinces} />}
           </div>
@@ -234,8 +257,15 @@ export default function ExaminedWizard({
             <h3 className="text-[0.84rem] font-semibold text-ink">Ảnh minh chứng<span className="text-red-500"> *</span></h3>
             <EvidencePicker files={files} max={state.max_evidence_files} error={errors.evidence}
                             onChange={(f) => { setFiles(f); setErrors(({ evidence: _, ...rest }) => rest); }} />
-            <EvidenceGuide />
+            <EvidenceGuide hcmc={state.residence.eligible}
+                           year={(state.round?.academic_year ?? '').split('-')[0]} />
           </section>
+        )}
+
+        {last && (
+          <ConsentBox checked={dataConsent} text={state.data_consent_text.examined}
+                      error={errors.data_consent}
+                      onChange={(v) => { setDataConsent(v); setErrors(({ data_consent: _, ...rest }) => rest); }} />
         )}
 
         <div className="flex items-center justify-between gap-2 pt-4 border-t border-line2">
@@ -243,7 +273,7 @@ export default function ExaminedWizard({
             ? <button type="button" className={ui.btnGhost} onClick={() => goTo(step - 1)}><ArrowLeft size={15} /> Quay lại</button>
             : <span className="text-[0.72rem] text-muted">Nháp được lưu tự động trên thiết bị này.</span>}
           {last ? (
-            <button type="button" className={ui.btnPrimary} disabled={saving} onClick={submit}>
+            <button type="button" className={ui.btnPrimary} disabled={saving || !dataConsent} onClick={submit}>
               {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
                 : <><Send size={15} /> {resubmit ? 'Gửi lại kết quả khám' : 'Gửi kết quả khám'}</>}
             </button>

@@ -280,9 +280,14 @@ export const api = {
     submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
       return requestMultipart('/health-check/evidence/', body);
     },
-    register(data: { declaration?: OffCampusSubmit; consent: boolean }):
+    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
+    },
+    /** Bổ sung CCCD khi hồ sơ chưa có (form khai báo đã khóa). */
+    addCitizenId(data: { number: string; issue_place: string; issue_date: string }):
+      Promise<import('./types').HealthCheckState> {
+      return request('/health-check/citizen-id/', { method: 'POST', body: JSON.stringify(data) });
     },
     /** Ảnh minh chứng của chính SV — cần token nên phải tải qua fetch, không dùng <img src>. */
     async evidence(index: number): Promise<Blob> {

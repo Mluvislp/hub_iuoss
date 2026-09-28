@@ -24,17 +24,52 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from students.models import Student
+from students.models import ProfileChangeRequest, Student
 
 from . import address_service as addr
 from . import health_check_result as result_spec
 from . import offcampus
+from . import profile_changes as pc
 from .health_check_models import HealthCheckResponse as Response_
 from .health_check_models import HealthCheckRound
 from .insurance_contract import WorkflowError, safe_path
 from .insurance_files import inspect_upload
 
-MAX_EVIDENCE_FILES = 3
+# Cam kết + đồng ý cung cấp thông tin ở cuối form của CẢ HAI lựa chọn. Kết quả khám
+# là dữ liệu sức khỏe — dữ liệu cá nhân nhạy cảm theo Nghị định 13/2023/NĐ-CP — nên
+# lưu lại đúng câu chữ SV đã đồng ý + thời điểm (trong cột `evidence`, không thêm
+# cột). Đổi câu chữ thì TĂNG phiên bản để phân biệt người đồng ý bản cũ.
+DATA_CONSENT_VERSION = "2026-09-28"
+DATA_CONSENT_TEXT = {
+    "examined": (
+        "Cam kết các thông tin đã khai và minh chứng đã tải lên là trung thực, chính xác; "
+        "đồng ý để Trường Đại học Quốc tế – ĐHQG-HCM thu thập, lưu trữ và sử dụng thông tin "
+        "cá nhân và kết quả khám sức khỏe nêu trên phục vụ công tác quản lý, chăm sóc sức khỏe "
+        "sinh viên và báo cáo cơ quan y tế có thẩm quyền, theo quy định về bảo vệ dữ liệu cá nhân."
+    ),
+    "register": (
+        "Cam kết các thông tin đã khai là trung thực, chính xác; đồng ý để Trường Đại học Quốc "
+        "tế – ĐHQG-HCM thu thập, lưu trữ và sử dụng thông tin cá nhân nêu trên phục vụ việc tổ "
+        "chức khám sức khỏe, quản lý, chăm sóc sức khỏe sinh viên và báo cáo cơ quan y tế có "
+        "thẩm quyền, theo quy định về bảo vệ dữ liệu cá nhân."
+    ),
+}
+
+
+def _data_consent(choice):
+    return {"version": DATA_CONSENT_VERSION, "text": DATA_CONSENT_TEXT[choice],
+            "at": timezone.now().isoformat()}
+
+
+def _require_data_consent(value):
+    if value not in (True, "true", "1", "on"):
+        raise HealthCheckError(
+            "Vui lòng tích xác nhận cam kết và đồng ý cung cấp thông tin.",
+            errors={"data_consent": "Chưa xác nhận."}, code="data_consent",
+        )
+
+
+MAX_EVIDENCE_FILES = 10   # nginx hub: client_max_body_size 64m ≥ 10 × 5 MB
 EVIDENCE_DIR = "health_check"
 
 
@@ -164,6 +199,8 @@ def _serialize_response(resp):
             for i, item in enumerate(evidence_files(resp.evidence))
         ],
         "result": evidence_result(resp.evidence),
+        "data_consent_at": ((resp.evidence or {}).get("data_consent") or {}).get("at")
+        if isinstance(resp.evidence, dict) else None,
         "residence": resp.residence or None,
     }
 
@@ -189,6 +226,9 @@ def build_state(student):
         "result_schema": result_spec.SCHEMA,
         "result_defaults": result_spec.defaults(female=is_female(student)),
         "female": is_female(student),
+        "data_consent_text": DATA_CONSENT_TEXT,
+        # Luồng khám sức khỏe BẮT BUỘC có CCCD (cột C file gửi PYT).
+        "cccd_missing": pc.cccd_missing(student),
         # Phần 1 của nhánh "Chưa khám" dựng lại đúng form ngoại trú.
         "offcampus": offcampus.build_prefill(student),
         # Điều kiện theo địa chỉ ĐÃ LƯU — dùng khi form ngoại trú đang khóa.
@@ -212,12 +252,42 @@ def evidence_path(student, index):
 
 # ── Ghi ─────────────────────────────────────────────────────────────────────
 
+def _require_cccd(student):
+    if pc.cccd_missing(student):
+        raise HealthCheckError(
+            "Hồ sơ chưa có số CCCD. Bổ sung CCCD ở bước Thông tin cá nhân.",
+            errors={"citizen_id": "Bắt buộc nhập số CCCD để khai báo khám sức khỏe."},
+            code="missing_cccd",
+        )
+
+
+def add_citizen_id(student, data):
+    """Bổ sung CCCD khi hồ sơ CHƯA có — dùng cho SV đã khai ngoại trú (form khóa)
+    nhưng thiếu CCCD. Đi qua đúng đường sửa CCCD của khai báo ngoại trú (không cần
+    duyệt, ghi nhật ký), nguồn "kham_suc_khoe". Đã có CCCD thì không cho sửa ở đây."""
+    if not pc.cccd_missing(student):
+        raise HealthCheckError("Hồ sơ đã có số CCCD.", code="exists")
+    value = {
+        "number": (data.get("number") or "").strip(),
+        "issue_place": (data.get("issue_place") or "").strip(),
+        "issue_date": (data.get("issue_date") or "").strip(),
+    }
+    if not value["number"]:
+        raise HealthCheckError("Vui lòng nhập số CCCD.", errors={"citizen_id": "Không được để trống."})
+    try:
+        with transaction.atomic():
+            pc.submit_change(student, "student.citizen_id", value,
+                             source=ProfileChangeRequest.SOURCE_HEALTH_CHECK)
+    except pc.ChangeError as exc:
+        raise HealthCheckError(str(exc), errors={"citizen_id": str(exc)}) from exc
+
+
 def _lock_student(student):
     # Khóa dòng SV để 2 lần bấm gửi song song không cùng lọt qua bước kiểm tra.
     Student.objects.select_for_update().filter(pk=student.pk).first()
 
 
-def submit_evidence(student, uploads, result_raw=None, declaration=None):
+def submit_evidence(student, uploads, result_raw=None, declaration=None, data_consent=None):
     """Nhánh "Đã khám rồi": khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu
     + ảnh minh chứng, chờ chuyên viên xác nhận.
 
@@ -225,6 +295,7 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None):
     trong transaction; lỗi ở bất kỳ bước nào thì rollback cả khai báo ngoại trú và
     xóa sạch file đã ghi. Lỗi trả về theo từng ô: ô kết quả mang tiền tố `result.`.
     """
+    _require_data_consent(data_consent)
     result, result_errors = result_spec.clean(result_raw)
     if result_errors:
         raise HealthCheckError(
@@ -269,6 +340,7 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None):
                     raise HealthCheckError("Vui lòng kiểm tra lại phần khai báo thông tin.",
                                            errors=exc.errors) from exc
                 declared_now = True
+            _require_cccd(student)
             residence = residence_snapshot(student)
             residence["declared_with_registration"] = declared_now
 
@@ -291,13 +363,16 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None):
                 resp = Response_.objects.create(
                     round=round_, student_id=student.pk,
                     choice=Response_.CHOICE_EXAMINED, status=Response_.STATUS_PENDING,
-                    evidence={"files": items, "result": result}, residence=residence,
+                    evidence={"files": items, "result": result,
+                              "data_consent": _data_consent(Response_.CHOICE_EXAMINED)},
+                    residence=residence,
                     submit_count=1, submitted_at=now,
                 )
             else:
                 # Nộp lại sau khi bị từ chối: thay bộ ảnh, đưa về hàng chờ. Lý do
                 # từ chối cũ giữ lại để chuyên viên biết lần trước sai ở đâu.
-                resp.evidence = {"files": items, "result": result}
+                resp.evidence = {"files": items, "result": result,
+                                 "data_consent": _data_consent(Response_.CHOICE_EXAMINED)}
                 resp.residence = residence
                 resp.status = Response_.STATUS_PENDING
                 resp.submit_count += 1
@@ -324,6 +399,7 @@ def register(student, data):
             "Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.",
             errors={"consent": "Chưa xác nhận đồng ý."},
         )
+    _require_data_consent(data.get("data_consent"))
     try:
         with transaction.atomic():
             _lock_student(student)
@@ -337,11 +413,13 @@ def register(student, data):
             declared_now = False
             if not locked:
                 try:
-                    offcampus.submit(student, data.get("declaration") or {})
+                    offcampus.submit(student, {**(data.get("declaration") or {}),
+                                               "require_citizen_id": True})
                 except offcampus.DeclarationError as exc:
                     raise HealthCheckError("Vui lòng kiểm tra lại phần khai báo thông tin.",
                                            errors=exc.errors) from exc
                 declared_now = True
+            _require_cccd(student)
 
             # Tính lại từ địa chỉ vừa ghi (hoặc đã có) — không tin client.
             residence = residence_snapshot(student)
@@ -358,6 +436,7 @@ def register(student, data):
                 round=round_, student_id=student.pk,
                 choice=Response_.CHOICE_REGISTER, status=Response_.STATUS_REGISTERED,
                 residence=residence, consent_at=now, submit_count=1, submitted_at=now,
+                evidence={"data_consent": _data_consent(Response_.CHOICE_REGISTER)},
             )
     except IntegrityError as exc:
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc

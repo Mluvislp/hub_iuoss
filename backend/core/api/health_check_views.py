@@ -76,7 +76,7 @@ class HealthCheckView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
-    """POST multipart: `files` (1–3 ảnh) + `result` + `declaration` (JSON dạng chuỗi) —
+    """POST multipart: `files` (1–10 ảnh) + `result` + `declaration` (JSON dạng chuỗi) —
     nhánh "Đã khám rồi" / nộp lại."""
 
     permission_classes = [IsHubAuthenticated]
@@ -91,6 +91,7 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
                 student, request.FILES.getlist("files"),
                 result_raw=_json_field(request.data.get("result")),
                 declaration=_json_field(request.data.get("declaration")),
+                data_consent=request.data.get("data_consent"),
             )
         except health_check.HealthCheckError as exc:
             return _error(exc)
@@ -118,6 +119,26 @@ class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
                     request.user.ldap_uid, student.pk, resp.round_id,
                     (resp.residence or {}).get("declared_with_registration"))
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
+
+
+class HealthCheckCitizenIdView(HealthCheckRequiredMixin, APIView):
+    """POST JSON {number, issue_place, issue_date(dd/mm/yyyy)} — bổ sung CCCD khi hồ sơ
+    chưa có (SV đã khai ngoại trú nên form khai báo đang khóa)."""
+
+    permission_classes = [IsHubAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        student = _student(request)
+        if student is None:
+            return _no_student()
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            health_check.add_citizen_id(student, data)
+        except health_check.HealthCheckError as exc:
+            return _error(exc)
+        logger.info("HEALTH_CHECK_CITIZEN_ID | uid=%s | student_id=%s", request.user.ldap_uid, student.pk)
+        return Response(health_check.build_state(student))
 
 
 class HealthCheckEvidenceFileView(HealthCheckRequiredMixin, APIView):

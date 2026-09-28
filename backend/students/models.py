@@ -355,6 +355,7 @@ class ProfileChangeRequest(models.Model):
     STATUS_CANCELLED = "cancelled"
 
     SOURCE_OFFCAMPUS = "ngoai_tru"
+    SOURCE_HEALTH_CHECK = "kham_suc_khoe"   # bổ sung CCCD trong luồng khám sức khỏe
 
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,
