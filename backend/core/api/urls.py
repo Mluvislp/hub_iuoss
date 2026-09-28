@@ -48,6 +48,8 @@ urlpatterns = [
          name="api_health_check_evidence_file"),
     path("health-check/register/", health_check_views.HealthCheckRegisterView.as_view(),
          name="api_health_check_register"),
+    path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
+         name="api_health_check_citizen_id"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),
