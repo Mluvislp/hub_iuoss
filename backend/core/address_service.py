@@ -147,6 +147,16 @@ def get_state(address):
     return STATE_STANDARD if address.effective_from else STATE_LEGACY
 
 
+def is_declared_empty(address):
+    """Dòng do `declare_empty()` ghi: SV đã khai là KHÔNG CÓ địa chỉ loại này
+    (vd "không có tạm trú" khi thường trú ở TP.HCM). Khác "chưa khai" ở chỗ có
+    `effective_from`; khác dòng thật ở chỗ không có mã tỉnh lẫn số nhà."""
+    return bool(
+        address is not None and address.effective_from
+        and not address.province_code and not (address.full_address or "").strip()
+    )
+
+
 def format_address(address):
     """Chuỗi hiển thị.
 
