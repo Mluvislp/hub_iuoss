@@ -188,16 +188,32 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** Link chữ nhỏ "Chỉnh sửa / Hủy sửa" ở góc phải tiêu đề thẻ. */
-function EditLink({ active, label = "Chỉnh sửa", onClick }: { active: boolean; label?: string; onClick: () => void }) {
+/**
+ * Link chữ nhỏ "Chỉnh sửa / Hủy sửa" ở góc phải tiêu đề thẻ.
+ *
+ * Cố ý KHÔNG dùng <button>: các thẻ nằm trong <fieldset disabled> của form, mà
+ * fieldset khóa mọi <button>/<input> con — hồ sơ đã nộp mở ở chế độ chỉ xem
+ * (fieldset đang khóa) thì nút mở khóa sẽ chết. Thẻ span role="button" không
+ * bị fieldset ảnh hưởng; `disabled` chỉ dùng khi đang gửi.
+ */
+function EditLink({ active, label = "Chỉnh sửa", onClick, disabled = false }: { active: boolean; label?: string; onClick: () => void; disabled?: boolean }) {
+  const run = () => { if (!disabled) onClick(); };
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+    <span
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      onClick={run}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); }
+      }}
+      className={cn(
+        "inline-flex shrink-0 cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary hover:underline",
+        disabled && "pointer-events-none opacity-50",
+      )}
     >
       <Pencil size={12} /> {active ? "Hủy sửa" : label}
-    </button>
+    </span>
   );
 }
 
@@ -873,6 +889,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
               </h2>
               {prefill && !editingRecord && (
                 <EditLink
+                  disabled={saving}
                   active={infoEditable}
                   onClick={() => {
                     // Đang mở mà bấm Hủy → khôi phục dữ liệu gốc từ hồ sơ.
@@ -881,23 +898,22 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                   }}
                 />
               )}
+              {/* Mở khóa / hủy chỉnh sửa hồ sơ đã nộp: góc phải, cùng hàng tiêu đề */}
+              {editingRecord && submitted && canSubmit && (
+                <EditLink
+                  disabled={saving}
+                  active={unlocked}
+                  label={resubmitting ? "Gửi lại bản khai" : "Chỉnh sửa"}
+                  onClick={() => {
+                    setNotice("");
+                    if (unlocked) cancelEdit();
+                    else setUnlocked(true);
+                  }}
+                />
+              )}
             </div>
 
             <div className="space-y-6 p-4 sm:p-5">
-              {/* Mở khóa / hủy chỉnh sửa hồ sơ đã nộp: góc trên bên trái của phần thông tin cá nhân */}
-              {editingRecord && submitted && canSubmit && (
-                <div className="-mb-2 flex justify-start">
-                  <EditLink
-                    active={unlocked}
-                    label={resubmitting ? "Gửi lại bản khai" : "Chỉnh sửa"}
-                    onClick={() => {
-                      setNotice("");
-                      if (unlocked) cancelEdit();
-                      else setUnlocked(true);
-                    }}
-                  />
-                </div>
-              )}
               <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
                 <div className="min-w-0">
                   <label className={ui.fieldLabel}>Họ và tên</label>
