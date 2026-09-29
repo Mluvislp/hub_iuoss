@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, MessageSquare, Send,
+  AlertCircle, ArrowLeft, Loader2, Lock, MessageSquare, Send,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, accentIcon } from '@/lib/ui';
@@ -71,7 +71,6 @@ export default function TicketDetailPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [confirmClose, setConfirmClose] = useState(false);
   const [freshIds, setFreshIds] = useState<number[]>([]);
   const [notice, setNotice] = useState(false);
 
@@ -190,22 +189,6 @@ export default function TicketDetailPage() {
     }
   }
 
-  async function closeTicket() {
-    setSending(true);
-    setSendError(null);
-    try {
-      const res = await api.tickets.close(id);
-      const { message, ...rest } = res;
-      merge([message], rest);
-      setConfirmClose(false);
-      window.setTimeout(scrollToEnd, 0);
-    } catch (err) {
-      setSendError(err instanceof ApiError ? err.message : 'Không đóng được ticket.');
-    } finally {
-      setSending(false);
-    }
-  }
-
   if (error) {
     return (
       <div className="space-y-4">
@@ -301,34 +284,18 @@ export default function TicketDetailPage() {
                   Gửi
                 </button>
                 <span className="text-[0.78rem] text-muted">Ctrl + Enter để gửi</span>
-                <span className="ml-auto">
-                  {confirmClose ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="text-[0.8rem] text-muted">Đóng ticket?</span>
-                      <button type="button" onClick={closeTicket} disabled={sending} className={ui.btnSecondary}>
-                        Đóng
-                      </button>
-                      <button type="button" onClick={() => setConfirmClose(false)} className={ui.btnGhost}>
-                        Huỷ
-                      </button>
-                    </span>
-                  ) : (
-                    <button type="button" onClick={() => setConfirmClose(true)} disabled={sending} className={ui.btnSecondary}>
-                      <CheckCircle2 size={15} />
-                      Đã được giải đáp
-                    </button>
-                  )}
-                </span>
               </div>
             </>
           ) : (
             <p className="flex items-start gap-2 text-[0.85rem] text-muted">
               <Lock size={14} className="mt-0.5 shrink-0" />
-              Ticket đã đóng. Cần hỏi tiếp thì
-              <Link href="/dashboard/hoi-dap/new" className="font-medium text-primary-text hover:underline">
-                đặt câu hỏi mới
-              </Link>
-              .
+              <span>
+                Ticket đã được đóng. Trường hợp cần trao đổi thêm, đề nghị sinh viên{' '}
+                <Link href="/dashboard/hoi-dap/new" className="font-medium text-primary-text hover:underline">
+                  đặt câu hỏi mới
+                </Link>
+                .
+              </span>
             </p>
           )}
         </div>

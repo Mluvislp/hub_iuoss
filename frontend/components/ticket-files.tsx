@@ -5,10 +5,11 @@
  * file đã gửi. Kiểm ở đây chỉ để báo sớm — backend kiểm lại bằng nội dung thật.
  */
 
-import { useRef, useState } from 'react';
-import { FileText, ImageIcon, Loader2, Paperclip, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, FileText, ImageIcon, Loader2, Paperclip, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { ui } from '@/lib/ui';
 import type { TicketAttachment } from '@/lib/types';
 
 export const TICKET_MAX_FILES = 2;
@@ -124,44 +125,108 @@ export function FilePicker({
   );
 }
 
-/** File đã gửi: bấm để mở (tải bằng token qua fetch rồi mở blob). */
+/**
+ * File đã gửi: bấm để XEM NGAY TRÊN TRANG (ảnh hiện thẳng, PDF trong khung) —
+ * không mở tab mới. File cần token nên tải qua fetch rồi dựng blob URL.
+ */
 export function AttachmentChip({ ticketId, att }: { ticketId: number; att: TicketAttachment }) {
   const [busy, setBusy] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function open() {
     if (busy) return;
     setBusy(true);
-    // Mở tab trước khi await: trình duyệt chặn window.open gọi sau một lời hứa.
-    const tab = window.open('', '_blank');
+    setError(null);
     try {
       const blob = await api.tickets.attachment(ticketId, att.id);
-      const url = URL.createObjectURL(blob);
-      if (tab) tab.location.href = url;
-      else window.location.href = url;
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      // Gán đúng kiểu để trình duyệt hiển thị PDF trong khung thay vì tải xuống.
+      setUrl(URL.createObjectURL(new Blob([blob], { type: att.mime_type })));
     } catch {
-      tab?.close();
+      setError('Không tải được file.');
     } finally {
       setBusy(false);
     }
   }
 
+  function close() {
+    if (url) URL.revokeObjectURL(url);
+    setUrl(null);
+  }
+
+  useEffect(() => {
+    if (!url) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+    // close() đọc `url` hiện tại — gắn lại mỗi khi url đổi là đủ.
+  }, [url]);
+
   return (
-    <button
-      type="button"
-      onClick={open}
-      className="inline-flex max-w-[260px] items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-1.5
-                 text-left text-[0.8rem] text-ink transition-colors hover:border-primary-line"
-    >
-      {busy ? (
-        <Loader2 size={14} className="shrink-0 animate-spin text-muted" />
-      ) : att.is_pdf ? (
-        <FileText size={14} className="shrink-0 text-danger-text" />
-      ) : (
-        <ImageIcon size={14} className="shrink-0 text-primary" />
+    <>
+      <button
+        type="button"
+        onClick={open}
+        title={error ?? 'Xem file'}
+        className={cn(
+          'inline-flex max-w-[260px] items-center gap-2 rounded-lg border bg-white px-2.5 py-1.5',
+          'cursor-zoom-in text-left text-[0.8rem] text-ink transition-colors hover:border-primary-line',
+          error ? 'border-danger-line' : 'border-line',
+        )}
+      >
+        {busy ? (
+          <Loader2 size={14} className="shrink-0 animate-spin text-muted" />
+        ) : att.is_pdf ? (
+          <FileText size={14} className="shrink-0 text-danger-text" />
+        ) : (
+          <ImageIcon size={14} className="shrink-0 text-primary" />
+        )}
+        <span className="truncate">{att.name}</span>
+        <span className="shrink-0 text-[0.72rem] text-muted">{formatSize(att.size)}</span>
+      </button>
+
+      {url && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={att.name}
+          onClick={close}
+        >
+          <div
+            className="flex h-full max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-line bg-white shadow-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{att.name}</span>
+              <a href={url} download={att.name} className={ui.btnSecondary}>
+                <Download size={14} />
+                Tải xuống
+              </a>
+              <button
+                type="button"
+                onClick={close}
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-ink"
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-100">
+              {att.is_pdf ? (
+                <iframe src={url} title={att.name} className="h-full w-full border-0 bg-white" />
+              ) : (
+                <img src={url} alt={att.name} className="max-h-full max-w-full object-contain" />
+              )}
+            </div>
+          </div>
+        </div>
       )}
-      <span className="truncate">{att.name}</span>
-      <span className="shrink-0 text-[0.72rem] text-muted">{formatSize(att.size)}</span>
-    </button>
+    </>
   );
 }

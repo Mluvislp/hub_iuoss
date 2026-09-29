@@ -284,9 +284,6 @@ export const api = {
     reply(id: number, body: FormData): Promise<TicketSummary & { message: TicketMessage; can_reply: boolean }> {
       return requestMultipart(`/tickets/${id}/messages/`, body);
     },
-    close(id: number): Promise<TicketSummary & { message: TicketMessage; can_reply: boolean }> {
-      return request(`/tickets/${id}/close/`, { method: 'POST' });
-    },
     unread(): Promise<{ count: number }> {
       return request('/tickets/unread/');
     },

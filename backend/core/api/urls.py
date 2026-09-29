@@ -57,7 +57,6 @@ urlpatterns = [
     path("tickets/unread/",          ticket_views.TicketUnreadView.as_view(),  name="api_ticket_unread"),
     path("tickets/<int:pk>/",        ticket_views.TicketDetailView.as_view(),  name="api_ticket_detail"),
     path("tickets/<int:pk>/messages/", ticket_views.TicketMessagesView.as_view(), name="api_ticket_messages"),
-    path("tickets/<int:pk>/close/",  ticket_views.TicketCloseView.as_view(),   name="api_ticket_close"),
     path("tickets/<int:pk>/attachments/<int:att_id>/", ticket_views.TicketAttachmentView.as_view(),
          name="api_ticket_attachment"),
 

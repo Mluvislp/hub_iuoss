@@ -1,8 +1,7 @@
 """API "Hỏi đáp" (ticket) — nghiệp vụ ở `core/tickets.py`.
 
 Mọi truy vấn lọc theo `student_id` lấy từ JWT do server ký ⇒ id trên URL không mở
-được ticket của người khác. Lượt `is_internal` (ghi chú nội bộ chuyên viên) không
-bao giờ rời DB.
+được ticket của người khác. Sinh viên không tự đóng ticket — chỉ chuyên viên đóng.
 
 "Realtime" = polling: trang chi tiết gọi `GET tickets/<id>/?after=<id lượt cuối>`
 mỗi 5 giây khi tab đang mở; sidebar gọi `tickets/unread/` mỗi phút. Hai endpoint này
@@ -11,7 +10,7 @@ không throttle và chỉ chạy một truy vấn có chỉ mục.
 import logging
 
 from django.conf import settings
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.http import FileResponse, Http404
 from rest_framework import status
 from rest_framework.exceptions import NotFound
@@ -90,8 +89,8 @@ def _ticket_summary(ticket):
 
 
 def _visible_messages(ticket, after=0):
-    return (TicketMessage.visible_qs().filter(ticket=ticket, id__gt=after)
-            .prefetch_related("attachments"))
+    return (TicketMessage.objects.filter(ticket=ticket, id__gt=after)
+            .prefetch_related("attachments").order_by("id"))
 
 
 def _detail(ticket, messages):
@@ -124,7 +123,7 @@ class TicketsView(TicketsRequiredMixin, APIView):
     def get(self, request):
         rows = (SupportTicket.objects.filter(student_id=request.user.student_id)
                 .select_related("topic")
-                .annotate(message_count=Count("messages", filter=Q(messages__is_internal=False)))
+                .annotate(message_count=Count("messages"))
                 .order_by("-updated_at", "-id")[:200])
         data = []
         for t in rows:
@@ -188,25 +187,12 @@ class TicketMessagesView(TicketsRequiredMixin, APIView):
                          "can_reply": True}, status=status.HTTP_201_CREATED)
 
 
-class TicketCloseView(TicketsRequiredMixin, APIView):
-    throttle_scope = "ticket_message"
-
-    def post(self, request, pk):
-        ticket = self.own_ticket(request, pk)
-        try:
-            ticket, message = tickets.student_close(request.user, ticket)
-        except tickets.TicketError as exc:
-            return _error(exc)
-        return Response({"message": _message(message), **_ticket_summary(ticket), "can_reply": False})
-
-
 class TicketAttachmentView(TicketsRequiredMixin, APIView):
     """File đính kèm của CHÍNH sinh viên — cần token nên frontend tải qua fetch."""
 
     def get(self, request, pk, att_id):
         ticket = self.own_ticket(request, pk)
-        att = (TicketAttachment.objects.filter(pk=att_id, ticket=ticket, message__is_internal=False)
-               .first())
+        att = TicketAttachment.objects.filter(pk=att_id, ticket=ticket).first()
         path = safe_path(settings.MEDIA_ROOT, att.storage_key) if att else None
         if path is None:
             raise Http404

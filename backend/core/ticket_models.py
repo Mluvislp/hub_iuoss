@@ -4,8 +4,8 @@ Bốn bảng dùng chung với Dashboard (`support/models.py` bên đó), manage
 DDL: dashboard_iuoss/docs/sql/20260929_support_tickets.sql. Nghiệp vụ:
 dashboard_iuoss/docs/SUPPORT_TICKETS.md.
 
-Hub chỉ GHI: tạo ticket, lượt trao đổi của sinh viên, file đính kèm, đóng ticket,
-mốc `student_read_at`. Không bao giờ đọc/trả `is_internal=1` ra API.
+Hub chỉ GHI: tạo ticket, lượt trao đổi của sinh viên, file đính kèm, mốc
+`student_read_at`. Đóng / mở lại ticket là việc của chuyên viên (Dashboard).
 """
 
 import re
@@ -60,7 +60,6 @@ class SupportTicket(models.Model):
     student_code = models.CharField(max_length=32)
     subject = models.CharField(max_length=200)
     status = models.CharField(max_length=16)
-    assignee_id = models.IntegerField(null=True, blank=True)
     last_student_message_at = models.DateTimeField(null=True, blank=True)
     last_staff_message_at = models.DateTimeField(null=True, blank=True)
     student_read_at = models.DateTimeField(null=True, blank=True)
@@ -96,18 +95,12 @@ class TicketMessage(models.Model):
     author_user_id = models.IntegerField(null=True, blank=True)
     author_name = models.CharField(max_length=255)
     body = models.TextField()
-    is_internal = models.BooleanField(default=False)
     created_at = models.DateTimeField()
 
     class Meta:
         managed = False
         db_table = "support_ticket_messages"
         ordering = ["id"]
-
-    @classmethod
-    def visible_qs(cls):
-        """Những lượt sinh viên được thấy — lọc ở truy vấn, không ở serializer."""
-        return cls.objects.filter(is_internal=False).order_by("id")
 
 
 class TicketAttachment(models.Model):

@@ -51,7 +51,7 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
-  core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn, đóng, xếp email người phụ trách
+  core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách
   core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
   core/address_service.py · address_validators.py   ← BẢN SAO của Dashboard, sửa cả hai
@@ -64,7 +64,7 @@ backend/
   core/external_insurance_models.py ← khai BHYT tại nơi khác
   core/management/commands/backfill_insurance_workflow.py   ← dựng timeline cho đơn cũ
 
-  core/api/urls.py          ← 38 endpoint
+  core/api/urls.py          ← 37 endpoint
   core/api/views.py         ← phần lớn view (1.480 dòng)
   core/api/insurance_views.py · external_insurance_views.py
   core/api/serializers.py · authentication.py · throttling.py · tokens.py
@@ -103,7 +103,7 @@ frontend/
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
 
-### 38 endpoint — `core/api/urls.py`
+### 37 endpoint — `core/api/urls.py`
 
 `health/` · `features/` (không cần auth) · `auth/{login,logout,token/refresh}` ·
 `auth/microsoft/{start,callback}` · `dashboard/` · `health-insurance/` ·
@@ -111,7 +111,7 @@ frontend/
 `health-insurance/external/` · `requests/` + `<id>/` + `<id>/comments/` +
 5 endpoint `requests/<loại>/form/` · `offcampus/` + `offcampus/request-reopen/` ·
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
-`tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` + `<id>/close/` +
+`tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` +
 `<id>/attachments/<id>/` · `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---

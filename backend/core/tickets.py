@@ -3,7 +3,7 @@
 Luật trạng thái giữ khớp Dashboard `support/services.py`:
   tạo ticket / sinh viên nhắn      → open      (chờ Phòng CTSV)
   chuyên viên trả lời (Dashboard)  → answered  (chờ sinh viên)
-  đóng (một trong hai bên)         → closed    (sinh viên không nhắn thêm được)
+  chuyên viên đóng (Dashboard)     → closed    (sinh viên không nhắn thêm được)
 
 Email: Hub KHÔNG gửi thư. Hub chỉ INSERT vào hàng đợi dùng chung `email_messages`;
 timer `send_emails` của Dashboard gửi đi và tự đính file (tra theo `object_id`).
@@ -111,7 +111,7 @@ def _cleanup(paths):
 
 def email_subject(ticket):
     """PHẢI giống hệt Dashboard `support/services.py::email_subject` — để Gmail gom luồng."""
-    return f"Ticket #{ticket.pk} - {ticket.student_code} - {ticket.topic.name}"
+    return f"Hub-Ticket #{ticket.pk} - {ticket.student_code} - {ticket.topic.name}"
 
 
 def dashboard_ticket_url(ticket):
@@ -203,7 +203,7 @@ def create_ticket(principal, *, topic_id, subject, body, uploads):
             message = TicketMessage.objects.create(
                 ticket=ticket, author_role=TicketMessage.ROLE_STUDENT, author_user_id=None,
                 author_name=(principal.full_name or principal.ldap_uid)[:255],
-                body=body, is_internal=False, created_at=now,
+                body=body, created_at=now,
             )
             _store_files(ticket, message, checked, written, now)
             _queue_staff_mail(ticket, message, event_key=EVENT_CREATED, student=student,
@@ -233,7 +233,7 @@ def student_reply(principal, ticket, *, body, uploads):
             message = TicketMessage.objects.create(
                 ticket=ticket, author_role=TicketMessage.ROLE_STUDENT, author_user_id=None,
                 author_name=(principal.full_name or principal.ldap_uid)[:255],
-                body=body, is_internal=False, created_at=now,
+                body=body, created_at=now,
             )
             _store_files(ticket, message, checked, written, now)
             ticket.status = SupportTicket.STATUS_OPEN
@@ -250,24 +250,6 @@ def student_reply(principal, ticket, *, body, uploads):
     except Exception:
         _cleanup(written)
         raise
-    return ticket, message
-
-
-@transaction.atomic
-def student_close(principal, ticket):
-    ticket = SupportTicket.objects.select_for_update().get(pk=ticket.pk, student_id=principal.student_id)
-    if ticket.status == SupportTicket.STATUS_CLOSED:
-        raise TicketError("Ticket đã đóng.")
-    now = timezone.now()
-    ticket.status = SupportTicket.STATUS_CLOSED
-    ticket.closed_at = now
-    ticket.student_read_at = now
-    ticket.updated_at = now
-    ticket.save(update_fields=["status", "closed_at", "student_read_at", "updated_at"])
-    message = TicketMessage.objects.create(
-        ticket=ticket, author_role=TicketMessage.ROLE_SYSTEM, author_user_id=None,
-        author_name="Hệ thống", body="Sinh viên đã đóng ticket.", is_internal=False, created_at=now,
-    )
     return ticket, message
 
 

@@ -255,8 +255,9 @@ CREATE TABLE `support_ticket_topics` (
 --   open      chờ Phòng CTSV trả lời (vừa tạo, hoặc sinh viên vừa nhắn thêm)
 --   answered  Phòng CTSV đã trả lời, chờ sinh viên
 --   closed    đã đóng — sinh viên không nhắn thêm được, cần hỏi tiếp thì tạo ticket mới
--- Hai mốc last_*_message_at chỉ tính lượt CÔNG KHAI (ghi chú nội bộ không tính) và cùng
--- với *_read_at cho biết "có tin mới chưa đọc" ở cả hai phía mà không cần bảng riêng.
+-- Hai mốc last_*_message_at cùng với *_read_at cho biết "có tin mới chưa đọc" ở cả hai
+-- phía mà không cần bảng riêng. Không có cột người phụ trách: người xử lý chính là người
+-- phản hồi, đã lưu ở từng lượt (support_ticket_messages.author_user_id).
 CREATE TABLE `support_tickets` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `topic_id` int NOT NULL,
@@ -264,7 +265,6 @@ CREATE TABLE `support_tickets` (
   `student_code` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'MSSV lúc tạo ticket (đi vào tiêu đề email)',
   `subject` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `assignee_id` int DEFAULT NULL COMMENT 'auth_user.id — chuyên viên nhận xử lý',
   `last_student_message_at` datetime(6) DEFAULT NULL,
   `last_staff_message_at` datetime(6) DEFAULT NULL,
   `student_read_at` datetime(6) DEFAULT NULL,
@@ -282,8 +282,8 @@ CREATE TABLE `support_tickets` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=10001;
 
 -- Dòng trao đổi phẳng theo thời gian (không phân cấp).
---   author_role: student | staff | system (đóng/mở lại/nhận xử lý — để dòng thời gian không thủng)
---   is_internal: ghi chú nội bộ của chuyên viên, Hub không bao giờ trả về
+--   author_role: student | staff | system (đóng/mở lại — để dòng thời gian không thủng)
+--   author_user_id + author_name: chuyên viên nào phản hồi lượt nào
 CREATE TABLE `support_ticket_messages` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `ticket_id` bigint NOT NULL,
@@ -291,7 +291,6 @@ CREATE TABLE `support_ticket_messages` (
   `author_user_id` int DEFAULT NULL COMMENT 'auth_user.id khi là chuyên viên',
   `author_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Chụp tên lúc gửi',
   `body` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `is_internal` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_stm_ticket` (`ticket_id`, `id`),
