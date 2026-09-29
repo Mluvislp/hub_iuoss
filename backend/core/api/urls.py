@@ -1,5 +1,5 @@
 from django.urls import path
-from . import health_check_views, views
+from . import health_check_views, ticket_views, views
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
 
@@ -53,6 +53,15 @@ urlpatterns = [
          name="api_health_check_register"),
     path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
          name="api_health_check_citizen_id"),
+
+    # Hỏi đáp (ticket) — core/tickets.py
+    path("tickets/",                 ticket_views.TicketsView.as_view(),       name="api_tickets"),
+    path("tickets/topics/",          ticket_views.TicketTopicsView.as_view(),  name="api_ticket_topics"),
+    path("tickets/unread/",          ticket_views.TicketUnreadView.as_view(),  name="api_ticket_unread"),
+    path("tickets/<int:pk>/",        ticket_views.TicketDetailView.as_view(),  name="api_ticket_detail"),
+    path("tickets/<int:pk>/messages/", ticket_views.TicketMessagesView.as_view(), name="api_ticket_messages"),
+    path("tickets/<int:pk>/attachments/<int:att_id>/", ticket_views.TicketAttachmentView.as_view(),
+         name="api_ticket_attachment"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

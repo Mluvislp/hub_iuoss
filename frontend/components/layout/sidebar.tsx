@@ -13,6 +13,7 @@ import {
 import { cn, getInitials } from '@/lib/utils';
 import { clearAuth } from '@/lib/auth';
 import { clearFeatureCache, FEATURE_META, type FeatureKey } from '@/lib/features';
+import { useTicketUnread } from '@/lib/ticket-unread';
 import type { FeatureFlags, StudentSession } from '@/lib/types';
 
 interface SidebarProps {
@@ -65,12 +66,14 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       },
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
       featureItem('health_check'),
+      featureItem('support_tickets'),
     ],
   },
 ];
 
 export default function Sidebar({ session, features, open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const ticketUnread = useTicketUnread(features.support_tickets);
 
   // Mục sáng = href khớp DÀI NHẤT với URL hiện tại. So khớp tuyệt đối thì vào
   // trang con là menu tắt hết; so khớp tiền tố đơn thuần thì ở /requests/new sẽ
@@ -162,6 +165,15 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                           title="Đang phát triển"
                           aria-label="Đang phát triển"
                         />
+                      )}
+                      {item.feature === 'support_tickets' && !pending && ticketUnread > 0 && (
+                        <span
+                          className="min-w-[20px] h-5 px-1.5 rounded-full border border-danger-line bg-danger-soft
+                                     text-danger-text text-[0.7rem] font-semibold leading-[18px] text-center"
+                          aria-label={`${ticketUnread} ticket có phản hồi mới`}
+                        >
+                          {ticketUnread > 9 ? '9+' : ticketUnread}
+                        </span>
                       )}
                     </Link>
                   );

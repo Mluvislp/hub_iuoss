@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { ClipboardList, FileText, HeartPulse } from 'lucide-react';
+import { ClipboardList, FileText, HeartPulse, MessagesSquare } from 'lucide-react';
 import { api } from './api';
 import type { FeatureFlags } from './types';
 
@@ -42,6 +42,11 @@ export const FEATURE_META: Record<FeatureKey, FeatureMeta> = {
     href: '/dashboard/kham-suc-khoe',
     icon: HeartPulse,
   },
+  support_tickets: {
+    label: 'Hỏi đáp',
+    href: '/dashboard/hoi-dap',
+    icon: MessagesSquare,
+  },
 };
 
 /** Tiền tố URL → tính năng chi phối nó. Khớp theo tiền tố nên bao cả route con. */
@@ -49,6 +54,7 @@ const FEATURE_ROUTES: { prefix: string; feature: FeatureKey }[] = [
   { prefix: '/dashboard/requests', feature: 'document_requests' },
   { prefix: '/dashboard/sinh-hoat-cong-dan', feature: 'civic_activities' },
   { prefix: '/dashboard/kham-suc-khoe', feature: 'health_check' },
+  { prefix: '/dashboard/hoi-dap', feature: 'support_tickets' },
 ];
 
 /** Tính năng chi phối route này (null nếu route không bị cờ nào chi phối). */
@@ -60,6 +66,7 @@ const ALL_OFF: FeatureFlags = {
   document_requests: false,
   civic_activities: false,
   health_check: false,
+  support_tickets: false,
 };
 
 const CACHE_KEY = 'hub_features';
@@ -69,6 +76,7 @@ function normalize(raw: Partial<FeatureFlags>): FeatureFlags {
     document_requests: raw.document_requests === true,
     civic_activities: raw.civic_activities === true,
     health_check: raw.health_check === true,
+    support_tickets: raw.support_tickets === true,
   };
 }
 
