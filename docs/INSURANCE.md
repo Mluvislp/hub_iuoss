@@ -48,8 +48,9 @@ Frontend còn `lib/insurance-periods.ts` để hiển thị: trang BHYT hiện *
 đợt kế tiếp**; không có đợt mở thì hiện đợt vừa hết hạn + kế tiếp. Đợt đang mở luôn
 hiện hạn cuối.
 
-Nếu `academic_entry_year` của sinh viên trùng `registration_year`, Hub hiển thị
-`freshman_warning` của slot trước khi đi tiếp vào form đăng ký.
+Nếu `academic_entry_year` của sinh viên trùng năm hiện tại (`timezone.localdate().year`), Hub hiển thị
+`freshman_warning` của slot trong popup đỏ nhạt cùng tông RejectionNotice (`components/freshman-warning-modal.tsx`,
+bottom sheet trên mobile) ngay khi mở form đăng ký; sinh viên phải bấm xác nhận để đóng.
 
 > ⚠️ Mức phí và tài khoản nhận tiền chỉ sửa được bằng **SQL trên
 > `hub_insurance_configs`** hoặc trang quản lý đợt của Dashboard — Hub không có UI sửa.
