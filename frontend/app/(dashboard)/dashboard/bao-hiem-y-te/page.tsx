@@ -5,6 +5,7 @@ import { InsuranceStatus } from '@/components/insurance-status';
 import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
 import { InsuranceModal } from '@/components/insurance-modal';
+import { RejectionNotice } from '@/components/rejection-notice';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
 import { AlertCircle, FileClock, History, Loader2, ShieldCheck } from 'lucide-react';
@@ -93,9 +94,7 @@ function ExternalDeclarationDetail({ row }: { row: ExternalInsuranceDeclaration 
       {error && <p role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">{error}</p>}
       {detail ? <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={status} /></div>
-        {detail.review_note && <p className={cn('rounded-lg border px-4 py-3 text-sm', status === 'rejected' ? 'border-danger-line bg-danger-soft text-danger-text' : 'border-line bg-white text-slate-700')}>
-          <strong className="font-semibold">Phản hồi của cán bộ:</strong> {detail.review_note}
-        </p>}
+        <RejectionNotice rejected={status === 'rejected'} eyebrow="Bản khai bị từ chối" note={detail.review_note} />
         <SubmittedInsuranceInfo data={detail} external />
       </div> : !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 size={16} className="animate-spin" />Đang tải…</p>}
     </InsuranceModal>}

@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { PrivateImage, formatDateTime } from "@/components/submitted-insurance-info";
 import { InsuranceStatus } from "@/components/insurance-status";
+import { RejectionNotice } from "@/components/rejection-notice";
 import { api, ApiError } from "@/lib/api";
 import { badge, ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -199,6 +200,11 @@ function EditLink({ active, label = "Chỉnh sửa", onClick }: { active: boolea
   );
 }
 
+/** Mã BHYT dán vào có thể dài 15 số (hoặc kèm khoảng trắng/chữ) → chỉ giữ chữ số, lấy 10 số cuối. */
+function lastTenDigits(raw: string): string {
+  return raw.replace(/\D/g, "").slice(-10);
+}
+
 function FieldError({ message }: { message?: unknown }) {
   if (!message) return null;
   return <p data-field-error className="mt-1 text-xs text-danger-text">{String(message)}</p>;
@@ -352,6 +358,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
     resolver: ((values, context, options) =>
       zodResolver(activeSchema.current as typeof schema)(values as never, context, options as never)) as Resolver<FormData>,
   });
+  const sinField = register("social_insurance_number");
 
   useEffect(() => {
     const subscription = watch(() => { requestKey.current = null; });
@@ -766,7 +773,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         </div>
       )}
 
-      {/* Trạng thái hồ sơ đã nộp; link mở khóa chỉnh sửa ở góc phải tiêu đề */}
+      {/* Trạng thái hồ sơ đã nộp; nút mở khóa chỉnh sửa nằm ở thẻ Thông tin cá nhân */}
       {editingRecord && submitted ? (
         <section className={ui.card}>
           <div className={cn(ui.cardHeader, "px-4 sm:px-5")}>
@@ -777,17 +784,6 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
               </h2>
               {submitted.status && <InsuranceStatus status={submitted.status} />}
             </div>
-            {canSubmit && (
-              <EditLink
-                active={unlocked}
-                label={resubmitting ? "Gửi lại bản khai" : "Chỉnh sửa"}
-                onClick={() => {
-                  setNotice("");
-                  if (unlocked) cancelEdit();
-                  else setUnlocked(true);
-                }}
-              />
-            )}
           </div>
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3.5 text-sm sm:grid-cols-3 sm:px-5">
@@ -812,8 +808,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           </dl>
 
           {submitted.review_note && (
-            <div className={cn("border-t border-l-4 px-4 py-2.5 text-sm sm:px-5", submitted.status === "rejected" ? "border-t-danger-line border-l-danger-text bg-danger-soft text-danger-text" : "border-t-line2 border-l-slate-300 bg-slate-50 text-slate-700")}>
-              <strong className="font-semibold">Phản hồi của cán bộ:</strong> {submitted.review_note}
+            <div className="border-t border-line2 p-4 sm:p-5">
+              <RejectionNotice rejected={submitted.status === "rejected"} eyebrow={external ? "Bản khai bị từ chối" : "Đơn bị từ chối"} note={submitted.review_note} />
             </div>
           )}
           {(() => {
@@ -889,6 +885,20 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
             </div>
 
             <div className="space-y-6 p-4 sm:p-5">
+              {/* Mở khóa / hủy chỉnh sửa hồ sơ đã nộp: góc trên bên trái của phần thông tin cá nhân */}
+              {editingRecord && submitted && canSubmit && (
+                <div className="-mb-2 flex justify-start">
+                  <EditLink
+                    active={unlocked}
+                    label={resubmitting ? "Gửi lại bản khai" : "Chỉnh sửa"}
+                    onClick={() => {
+                      setNotice("");
+                      if (unlocked) cancelEdit();
+                      else setUnlocked(true);
+                    }}
+                  />
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
                 <div className="min-w-0">
                   <label className={ui.fieldLabel}>Họ và tên</label>
@@ -971,28 +981,46 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                     Số sổ BHXH (10 số cuối của BHYT)
                   </label>
                   <input
-                    {...register("social_insurance_number")}
+                    {...sinField}
                     inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="Dán mã BHYT 15 số, hệ thống tự lấy 10 số cuối"
+                    onChange={(e) => {
+                      e.target.value = lastTenDigits(e.target.value);
+                      void sinField.onChange(e);
+                    }}
                     disabled={personalLocked(prefill?.social_insurance_number)}
                     className={fieldCls(personalLocked(prefill?.social_insurance_number), !!errors.social_insurance_number)}
                   />
                   <FieldError message={errors.social_insurance_number?.message} />
                   {!editLocked && (
-                    <p className="mt-2 text-xs leading-5 text-muted">
-                      Tra cứu mã BHYT tại{" "}
-                      <a
-                        href="https://baohiemxahoi.gov.vn/tracuu/Pages/tra-cuu-thoi-han-su-dung-the-bhyt.aspx"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-primary hover:underline"
-                      >
-                        cổng tra cứu BHYT
-                      </a>
-                      .<br />
-                      <strong>Lưu ý:</strong> Điền số CCCD thay cho mã BHYT/BHXH để tra cứu.
-                      <br />
-                      Sinh viên có thể chụp ảnh này thay cho ảnh BHYT cũ và tải lên hệ thống.
-                    </p>
+                    <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        <Info size={14} className="shrink-0" /> Cách lấy số sổ BHXH
+                      </p>
+                      <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-slate-700">
+                        <li>
+                          Mở{" "}
+                          <a
+                            href="https://baohiemxahoi.gov.vn/tracuu/Pages/tra-cuu-thoi-han-su-dung-the-bhyt.aspx"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-primary hover:underline"
+                          >
+                            cổng tra cứu BHYT
+                          </a>{" "}
+                          và nhập <strong>số CCCD</strong> để tra cứu.
+                        </li>
+                        <li>
+                          Sao chép <strong>mã thẻ BHYT (15 ký tự)</strong> rồi dán vào ô trên,
+                          hệ thống tự lấy <strong>10 số cuối</strong>.
+                        </li>
+                        <li>
+                          Chụp màn hình kết quả tra cứu và tải lên ở mục ảnh BHYT
+                          (dùng được thay cho ảnh thẻ cũ).
+                        </li>
+                      </ol>
+                    </div>
                   )}
                 </div>
               </div>

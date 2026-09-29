@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowRight, Building2, Check, CheckSquare, Clock3, Copy, CreditCard, FileClock, ImageIcon, Loader2, Plus } from 'lucide-react';
+import { RejectionNotice } from '@/components/rejection-notice';
+import { AlertTriangle, ArrowRight, Building2, Check, CheckSquare, Clock3, Copy, CreditCard, FileClock, ImageIcon, Info, Loader2, Plus } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import SearchableSelect from '@/components/searchable-select';
 import { InsuranceStatus } from '@/components/insurance-status';
@@ -132,14 +133,15 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
           }}>Tải lại đơn</button></div>}
         {!data ? !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />Đang tải…</p> : <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={data.status} /></div>
-          {rejected && <section className="rounded-lg border border-danger-line bg-danger-soft p-4 text-danger-text">
-            <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 shrink-0" />{data.reason_label || 'Đơn bị từ chối'}</p>
-            {data.reason_text && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{data.reason_text}</p>}
-            {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' || paymentReason ?
-              !editing && <button type="button" className={ui.btnPrimary + " mt-3 w-full sm:w-auto"} onClick={() => setEditing(true)}>
-                {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
-              : <p className="mt-2 text-sm text-slate-700">Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
-          </section>}
+          {rejected && <RejectionNotice eyebrow="Đơn bị từ chối" title={data.reason_label || 'Đơn bị từ chối'} note={data.reason_text}>
+              {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' || paymentReason ?
+                !editing && <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-primary-text">{paymentReason ? 'Bổ sung minh chứng chuyển khoản để cán bộ xem xét lại đơn.' : 'Chọn lại bệnh viện khám chữa bệnh để gửi lại đơn.'}</p>
+                  <button type="button" className={ui.btnPrimary + " w-full shrink-0 sm:w-auto"} onClick={() => setEditing(true)}>
+                    {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
+                </div>
+              : <p className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
+          </RejectionNotice>}
           {rejected && editing && <section className="space-y-4 rounded-lg border border-line bg-white p-4 sm:p-5">
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? <>
               <div className="space-y-2">
