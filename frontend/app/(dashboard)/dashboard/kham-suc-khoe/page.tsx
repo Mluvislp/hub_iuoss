@@ -1,5 +1,6 @@
 'use client';
 
+import { RejectionNotice } from '@/components/rejection-notice';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -287,17 +288,12 @@ export default function HealthCheckPage() {
               )}
             </div>
 
-            {response.review_note && (
-              <div className={cn(
-                'rounded-lg border px-4 py-3 text-sm',
-                response.status === 'rejected'
-                  ? 'bg-danger-soft border-danger-line text-danger-text'
-                  : 'bg-slate-50 border-line text-ink',
-              )}>
-                <div className="font-semibold mb-0.5">Ghi chú của Phòng Công tác Sinh viên</div>
-                {response.review_note}
-              </div>
-            )}
+            <RejectionNotice
+              rejected={response.status === 'rejected'}
+              eyebrow="Hồ sơ bị từ chối"
+              noteLabel="Ghi chú của Phòng Công tác Sinh viên"
+              note={response.review_note}
+            />
 
             {response.choice === 'register' && <PackageInfo state={state} />}
 
