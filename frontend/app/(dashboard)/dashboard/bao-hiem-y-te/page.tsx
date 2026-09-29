@@ -105,7 +105,6 @@ export default function HealthInsurancePage() {
   const [data, setData] = useState<HealthInsuranceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [registrationWarning, setRegistrationWarning] = useState<{message:string; href:string} | null>(null);
 
   useEffect(() => {
     api.healthInsurance.get()
@@ -131,17 +130,6 @@ export default function HealthInsurancePage() {
 
   return (
     <div className="space-y-6">
-      {registrationWarning && (
-        <InsuranceModal size="sm" title="Lưu ý dành cho tân sinh viên" onClose={() => setRegistrationWarning(null)}>
-          <p className="flex items-start gap-2.5 text-sm leading-6 text-slate-700">
-            <AlertCircle size={16} className={cn(accentIcon.warning, 'mt-1 shrink-0')} />{registrationWarning.message}
-          </p>
-          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" className={ui.btnGhost} onClick={() => setRegistrationWarning(null)}>Quay lại</button>
-            <Link href={registrationWarning.href} className={ui.btnPrimary}>Tôi đã hiểu, tiếp tục</Link>
-          </div>
-        </InsuranceModal>
-      )}
       {error && (
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
           <AlertCircle size={16} className="flex-shrink-0" />
@@ -469,15 +457,7 @@ export default function HealthInsurancePage() {
                         href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
                         className={cn(ui.btnPrimary, "w-full text-center")}
                         onClick={(e) => {
-                          if (blocked) {
-                            e.preventDefault();
-                          } else if (p.freshman_warning) {
-                            e.preventDefault();
-                            setRegistrationWarning({
-                              message: p.freshman_warning,
-                              href: `/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`,
-                            });
-                          }
+                          if (blocked) e.preventDefault();
                         }}
                         aria-disabled={blocked}
                         style={blocked ? { pointerEvents: 'none', opacity: 0.5 } : {}}

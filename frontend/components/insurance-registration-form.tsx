@@ -33,6 +33,7 @@ import {
 import { PrivateImage, formatDateTime } from "@/components/submitted-insurance-info";
 import { InsuranceStatus } from "@/components/insurance-status";
 import { RejectionNotice } from "@/components/rejection-notice";
+import { FreshmanWarningModal } from "@/components/freshman-warning-modal";
 import { api, ApiError } from "@/lib/api";
 import { badge, ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
@@ -316,6 +317,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [freshmanAck, setFreshmanAck] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const [prefill, setPrefill] = useState<InsuranceRegistrationPrefill | null>(
@@ -754,11 +756,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         )}
       </div>
 
-      {!external && !editingRecord && config?.freshman_warning && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-text">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          <div><strong className="font-semibold">Lưu ý dành cho tân sinh viên:</strong> {config.freshman_warning}</div>
-        </div>
+      {!external && !editingRecord && config?.freshman_warning && !freshmanAck && (
+        <FreshmanWarningModal message={config.freshman_warning} onConfirm={() => setFreshmanAck(true)} />
       )}
 
       {notice && (

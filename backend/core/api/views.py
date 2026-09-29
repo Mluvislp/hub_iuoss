@@ -560,7 +560,7 @@ def _insurance_config_payload(cfg, *, include_payment, student=None):
         "is_active": cfg.is_active,
         "freshman_warning": (
             cfg.freshman_warning or ""
-            if student and student.academic_entry_year == cfg.registration_year
+            if student and student.academic_entry_year == timezone.localdate().year
             else ""
         ),
     }

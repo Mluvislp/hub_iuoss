@@ -77,7 +77,7 @@ class ExternalInsuranceTests(TestCase):
     def test_freshman_warning_only_for_matching_entry_year(self):
         self.cfg.freshman_warning = 'Tân sinh viên đã đăng ký mua BHYT trước đó.'
         self.cfg.save(update_fields=['freshman_warning'])
-        self.student.academic_entry_year = self.cfg.registration_year
+        self.student.academic_entry_year = timezone.localdate().year
         self.student.save(update_fields=['academic_entry_year'])
         response = self.client.get('/api/health-insurance/')
         self.assertEqual(response.data['periods'][0]['freshman_warning'], self.cfg.freshman_warning)
