@@ -16,6 +16,12 @@ _EMAIL_SPLIT_RE = re.compile(r"[,;\s]+")
 
 
 class TicketTopic(models.Model):
+    """Hai cấp: mảng (`parent=None`) → mục con. Luật giữ khớp Dashboard `support.TicketTopic`."""
+
+    SEPARATOR = " - "
+
+    parent = models.ForeignKey("self", on_delete=models.PROTECT, db_column="parent_id",
+                               null=True, blank=True, related_name="children")
     code = models.CharField(max_length=32, unique=True)
     name = models.CharField(max_length=128)
     description = models.CharField(max_length=500, blank=True, null=True)
@@ -40,6 +46,15 @@ class TicketTopic(models.Model):
                 seen.add(value)
                 out.append(value)
         return out
+
+    @property
+    def recipients(self):
+        """Email nhận thư: của chính mục, rỗng thì lấy của mảng cha."""
+        return self.email_list or (self.parent.email_list if self.parent_id else [])
+
+    @property
+    def full_name(self):
+        return f"{self.parent.name}{self.SEPARATOR}{self.name}" if self.parent_id else self.name
 
 
 class SupportTicket(models.Model):

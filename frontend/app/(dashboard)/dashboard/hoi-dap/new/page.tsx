@@ -22,6 +22,7 @@ export default function NewTicketPage() {
   const router = useRouter();
   const [topics, setTopics] = useState<TicketTopic[] | null>(null);
   const [topicId, setTopicId] = useState<number | null>(null);
+  const [subtopicId, setSubtopicId] = useState<number | null>(null);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -39,14 +40,17 @@ export default function NewTicketPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!topicId) errs.topic_id = 'Chọn mảng cần trao đổi.';
+    const topic = (topics ?? []).find((t) => t.id === topicId);
+    if (!topic) errs.topic_id = 'Chọn mảng cần trao đổi.';
+    else if (topic.children.length && !subtopicId) errs.topic_id = 'Chọn nội dung cụ thể trong mảng đã chọn.';
     if (subject.trim().length < 5) errs.subject = 'Tiêu đề tối thiểu 5 ký tự.';
     if (!body.trim()) errs.body = 'Nhập nội dung.';
     setFieldErrors(errs);
     if (Object.keys(errs).length) return;
 
     const form = new FormData();
-    form.set('topic_id', String(topicId));
+    // Mảng có mục con thì gửi id mục con — ticket gắn thẳng với mục cụ thể.
+    form.set('topic_id', String(subtopicId ?? topicId));
     form.set('subject', subject.trim());
     form.set('body', body.trim());
     files.forEach((f) => form.append('files', f));
@@ -106,6 +110,7 @@ export default function NewTicketPage() {
                       aria-checked={active}
                       disabled={sending}
                       onClick={() => {
+                        if (topicId !== t.id) setSubtopicId(null);
                         setTopicId(t.id);
                         setFieldErrors((p) => ({ ...p, topic_id: '' }));
                       }}
@@ -131,12 +136,61 @@ export default function NewTicketPage() {
                         {t.description && (
                           <span className="mt-0.5 block text-[0.78rem] leading-snug text-muted">{t.description}</span>
                         )}
+                        {t.children.length > 0 && (
+                          <span className="mt-1 block text-[0.72rem] text-muted">{t.children.length} nội dung cụ thể</span>
+                        )}
                       </span>
                     </button>
                   );
                 })}
               </div>
             )}
+
+            {(() => {
+              const picked = (topics ?? []).find((t) => t.id === topicId);
+              if (!picked || picked.children.length === 0) return null;
+              return (
+                <div className="mt-4 rounded-lg border border-primary-line bg-[#f8fbff] px-4 py-3">
+                  <p className="mb-2 text-[0.82rem] font-medium text-ink">
+                    Nội dung cụ thể — {picked.name}
+                  </p>
+                  <div className="space-y-1.5" role="radiogroup" aria-label={`Nội dung cụ thể — ${picked.name}`}>
+                    {picked.children.map((c) => {
+                      const on = subtopicId === c.id;
+                      return (
+                        <label
+                          key={c.id}
+                          className={cn(
+                            'flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 transition-colors',
+                            on ? 'border-primary bg-white' : 'border-transparent hover:bg-white',
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="subtopic"
+                            className="mt-0.5 accent-[#2563eb]"
+                            checked={on}
+                            disabled={sending}
+                            onChange={() => {
+                              setSubtopicId(c.id);
+                              setFieldErrors((p) => ({ ...p, topic_id: '' }));
+                            }}
+                          />
+                          <span className="min-w-0">
+                            <span className={cn('block text-sm', on ? 'font-medium text-primary-text' : 'text-ink')}>
+                              {c.name}
+                            </span>
+                            {c.description && (
+                              <span className="block text-[0.76rem] text-muted">{c.description}</span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {fieldErrors.topic_id && <p className="mt-2 text-[0.82rem] text-danger-text">{fieldErrors.topic_id}</p>}
           </div>
         </section>

@@ -111,7 +111,7 @@ def _cleanup(paths):
 
 def email_subject(ticket):
     """PHẢI giống hệt Dashboard `support/services.py::email_subject` — để Gmail gom luồng."""
-    return f"Hub-Ticket #{ticket.pk} - {ticket.student_code} - {ticket.topic.name}"
+    return f"Hub-Ticket #{ticket.pk} - {ticket.student_code} - {ticket.topic.full_name}"
 
 
 def dashboard_ticket_url(ticket):
@@ -120,7 +120,7 @@ def dashboard_ticket_url(ticket):
 
 def _queue_staff_mail(ticket, message, *, event_key, student, attachments):
     """Xếp một thư cho MỖI địa chỉ phụ trách. Lỗi xếp thư không làm hỏng ticket."""
-    recipients = ticket.topic.email_list
+    recipients = ticket.topic.recipients
     if not recipients:
         logger.warning("Mảng %s chưa có email phụ trách — ticket #%s không báo ai", ticket.topic.code, ticket.pk)
         return 0
@@ -129,7 +129,7 @@ def _queue_staff_mail(ticket, message, *, event_key, student, attachments):
     body = render_to_string("emails/ticket_staff.html", {
         "is_new": event_key == EVENT_CREATED,
         "ticket": ticket,
-        "topic_name": ticket.topic.name,
+        "topic_name": ticket.topic.full_name,
         "student": student,
         "department": getattr(getattr(student, "current_department", None), "name_vi", "") if student else "",
         "message": message,
@@ -168,14 +168,38 @@ def _clean_text(value, *, field, label, max_len, min_len=1):
 
 
 def active_topics():
-    return TicketTopic.objects.filter(is_active=True).order_by("sort_order", "id")
+    """Mảng + mục con đang nhận. Mục con của mảng đã ngừng nhận cũng bị loại."""
+    return (TicketTopic.objects.filter(is_active=True)
+            .exclude(parent__is_active=False)
+            .select_related("parent").order_by("sort_order", "id"))
 
 
-def create_ticket(principal, *, topic_id, subject, body, uploads):
+def topic_tree():
+    """[{id, name, description, children: [...]}] cho form tạo ticket (hai cấp)."""
+    rows = list(active_topics())
+    children = {}
+    for t in rows:
+        if t.parent_id:
+            children.setdefault(t.parent_id, []).append(
+                {"id": t.id, "name": t.name, "description": t.description or ""})
+    return [{"id": t.id, "name": t.name, "description": t.description or "",
+             "children": children.get(t.id, [])}
+            for t in rows if not t.parent_id]
+
+
+def _pick_topic(topic_id):
+    """Mục sinh viên chọn phải là mục "lá": mảng không có mục con, hoặc một mục con."""
     try:
         topic = active_topics().get(pk=int(topic_id))
     except (TypeError, ValueError, TicketTopic.DoesNotExist):
         raise TicketError("Chọn mảng cần trao đổi.", "topic_id")
+    if topic.parent_id is None and active_topics().filter(parent=topic).exists():
+        raise TicketError("Chọn nội dung cụ thể trong mảng đã chọn.", "topic_id")
+    return topic
+
+
+def create_ticket(principal, *, topic_id, subject, body, uploads):
+    topic = _pick_topic(topic_id)
     subject = _clean_text(subject, field="subject", label="tiêu đề", max_len=MAX_SUBJECT, min_len=MIN_SUBJECT)
     body = _clean_text(body, field="body", label="nội dung", max_len=MAX_BODY)
     checked = check_files(uploads)
@@ -224,7 +248,7 @@ def student_reply(principal, ticket, *, body, uploads):
     written = []
     try:
         with transaction.atomic():
-            ticket = (SupportTicket.objects.select_for_update().select_related("topic")
+            ticket = (SupportTicket.objects.select_for_update().select_related("topic__parent")
                       .get(pk=ticket.pk, student_id=principal.student_id))
             if ticket.status == SupportTicket.STATUS_CLOSED:
                 raise TicketError("Ticket đã đóng. Tạo ticket mới nếu cần hỏi tiếp.")

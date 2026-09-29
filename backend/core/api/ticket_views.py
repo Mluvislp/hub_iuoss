@@ -38,7 +38,7 @@ class TicketsRequiredMixin:
         super().initial(request, *args, **kwargs)
 
     def own_ticket(self, request, pk):
-        ticket = (SupportTicket.objects.select_related("topic")
+        ticket = (SupportTicket.objects.select_related("topic__parent")
                   .filter(pk=pk, student_id=request.user.student_id).first())
         if ticket is None:
             raise NotFound("Không tìm thấy ticket.")
@@ -78,7 +78,7 @@ def _ticket_summary(ticket):
     return {
         "id": ticket.id,
         "subject": ticket.subject,
-        "topic": {"id": ticket.topic_id, "name": ticket.topic.name},
+        "topic": {"id": ticket.topic_id, "name": ticket.topic.full_name},
         "status": ticket.status,
         "status_label": ticket.status_label,
         "unread": ticket.unread_for_student,
@@ -106,10 +106,7 @@ class TicketTopicsView(TicketsRequiredMixin, APIView):
     """Các mảng đang nhận ticket (form tạo mới)."""
 
     def get(self, request):
-        return Response([
-            {"id": t.id, "name": t.name, "description": t.description or ""}
-            for t in tickets.active_topics()
-        ])
+        return Response(tickets.topic_tree())
 
 
 class TicketsView(TicketsRequiredMixin, APIView):
@@ -122,7 +119,7 @@ class TicketsView(TicketsRequiredMixin, APIView):
 
     def get(self, request):
         rows = (SupportTicket.objects.filter(student_id=request.user.student_id)
-                .select_related("topic")
+                .select_related("topic__parent")
                 .annotate(message_count=Count("messages"))
                 .order_by("-updated_at", "-id")[:200])
         data = []

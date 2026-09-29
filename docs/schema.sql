@@ -234,21 +234,26 @@ CREATE TABLE `health_check_responses` (
 --   support_ticket_messages     dòng trao đổi phẳng: sinh viên / chuyên viên / hệ thống
 --   support_ticket_attachments  file đính kèm theo từng lượt (tối đa 2, PDF hoặc ảnh)
 
--- Mảng công việc. `notify_emails` nhận nhiều địa chỉ, phân cách bằng dấu phẩy hoặc
--- xuống dòng; ticket mới + sinh viên trả lời đều gửi tới toàn bộ danh sách này.
--- Đổi người phụ trách = sửa dòng này trên Dashboard, không sửa code.
+-- Mảng công việc, tối đa HAI cấp: mảng (parent_id NULL) → mục con (parent_id = mảng).
+-- `notify_emails` nhận nhiều địa chỉ, phân cách bằng dấu phẩy hoặc xuống dòng; ticket
+-- mới + sinh viên nhắn thêm gửi tới toàn bộ danh sách. Mục con để trống = dùng email
+-- của mảng cha. Mảng có mục con thì sinh viên BẮT BUỘC chọn một mục con.
+-- Đổi người phụ trách = sửa trên Dashboard (Hỏi đáp sinh viên → Mảng công việc).
 CREATE TABLE `support_ticket_topics` (
   `id` int NOT NULL AUTO_INCREMENT,
+  `parent_id` int DEFAULT NULL COMMENT 'NULL = mảng cấp 1; có giá trị = mục con của mảng đó',
   `code` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Gợi ý hiện cho sinh viên khi chọn mảng',
-  `notify_emails` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email người phụ trách, phân cách bằng dấu phẩy/xuống dòng',
+  `notify_emails` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email người phụ trách, phân cách bằng dấu phẩy/xuống dòng; mục con để rỗng = dùng email mảng cha',
   `sort_order` smallint NOT NULL DEFAULT '0',
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_stt_code` (`code`)
+  UNIQUE KEY `uq_stt_code` (`code`),
+  KEY `idx_stt_parent` (`parent_id`, `sort_order`),
+  CONSTRAINT `fk_stt_parent` FOREIGN KEY (`parent_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Một câu hỏi. Trạng thái nói "đang chờ ai":

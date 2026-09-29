@@ -564,10 +564,15 @@ export const TICKET_STATUS_STYLES: Record<TicketStatus, string> = {
   closed: 'bg-slate-50 text-slate-600 border-slate-200',
 };
 
-export interface TicketTopic {
+export interface TicketSubtopic {
   id: number;
   name: string;
   description: string;
+}
+
+/** Mảng công việc; `children` rỗng = chọn thẳng mảng, có mục con = bắt buộc chọn một mục con. */
+export interface TicketTopic extends TicketSubtopic {
+  children: TicketSubtopic[];
 }
 
 export interface TicketAttachment {
