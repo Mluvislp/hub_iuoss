@@ -11,7 +11,7 @@ import type { SubmittedInsurance } from '@/lib/types';
 export const INSURANCE_FIELD_LABELS: Record<string,string> = {
   full_name:'Họ tên', student_code:'MSSV', gender:'Giới tính', dob:'Ngày sinh',
   ethnicity:'Dân tộc', phone_number:'Số điện thoại', citizen_id:'CCCD',
-  social_insurance_number:'Mã số BHXH', permanent_province:'Tỉnh/thành thường trú',
+  social_insurance_number:'Mã số BHXH', permanent_address:'Thường trú', permanent_province:'Tỉnh/thành thường trú',
   permanent_ward:'Phường/xã thường trú', permanent_street:'Địa chỉ thường trú',
   hospital_code:'Nơi khám chữa bệnh', note:'Ghi chú', medical_insurance_code:'Mã thẻ BHYT',
   valid_from:'Thẻ có hiệu lực từ', valid_until:'Thẻ có hiệu lực đến',
@@ -19,13 +19,29 @@ export const INSURANCE_FIELD_LABELS: Record<string,string> = {
   payment_receipt_image:'Biên lai chuyển khoản',
 };
 const labels = INSURANCE_FIELD_LABELS;
-const IMAGE_FIELDS = new Set(['cccd_image', 'cccd_image_back', 'bhyt_image', 'payment_receipt_image']);
 
-/** Giá trị trước/sau trong lịch sử: ảnh chỉ nói có/không, không lộ đường dẫn lưu trữ. */
-export function changeText(field: string, value: unknown) {
+/** Giá trị trước/sau trong lịch sử. Server đã đổi mã tỉnh/phường/bệnh viện sang tên. */
+export function changeText(value: unknown) {
   if (value === null || value === undefined || value === '') return '—';
-  if (IMAGE_FIELDS.has(field)) return 'Ảnh đã tải lên';
   return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
+/** Các trường sinh viên sửa và danh sách ảnh đã thay (server tách ảnh khỏi `changes`). */
+export function ChangeList({changes, images, submitted = false, className}:{
+  changes?: Record<string,{before:unknown; after:unknown}>; images?: string[]; submitted?: boolean; className?: string;
+}) {
+  const entries = Object.entries(changes || {});
+  if (!entries.length && !images?.length) return null;
+  return <dl className={className}>
+    {entries.map(([field,change]) => <div key={field} className="flex flex-wrap gap-x-1.5">
+      <dt className="text-muted">{labels[field] || field}:</dt>
+      <dd className="min-w-0"><span className="text-slate-400 line-through">{changeText(change.before)}</span> → <span className="font-medium text-ink">{changeText(change.after)}</span></dd>
+    </div>)}
+    {!!images?.length && <div className="flex flex-wrap gap-x-1.5">
+      <dt className="text-muted">{submitted ? 'Ảnh đã tải lên' : 'Ảnh đã thay mới'}:</dt>
+      <dd className="min-w-0 font-medium text-ink">{images.map(field => labels[field] || field).join(', ')}</dd>
+    </div>}
+  </dl>;
 }
 
 const eventLabels: Record<string,string> = {
@@ -116,13 +132,13 @@ export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{da
 
       {!!Object.keys(data.legacy_changes || {}).length && <details className="rounded-lg border border-line p-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink">So sánh với hồ sơ tại lần lưu gần nhất</summary>
-        <div className="mt-2 space-y-1 text-slate-600">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(key, value.from)} → <span className="font-medium text-ink">{changeText(key, value.to)}</span></p>)}</div>
+        <div className="mt-2 space-y-1 text-slate-600">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
       </details>}
       {data.history?.map((event, index) => <details key={index} className="rounded-lg border border-line p-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink">{eventLabels[event.event_type] || event.event_type} · {formatDateTime(event.created_at)}</summary>
         <div className="mt-2 space-y-1 text-slate-600">
           {event.payload?.previous_rejection && <p>Phản hồi từ chối trước: {event.payload.previous_rejection}</p>}
-          {Object.entries(event.payload?.changes || {}).map(([field,change]) => <p key={field}><span className="text-muted">{labels[field] || field}:</span> <span className="text-slate-400 line-through">{changeText(field, change.before)}</span> → <span className="font-medium text-ink">{changeText(field, change.after)}</span></p>)}
+          <ChangeList changes={event.payload?.changes} images={event.payload?.images} submitted={event.event_type === 'SUBMITTED'} className="space-y-1" />
         </div>
       </details>)}
       {!!data.images?.length && <div>

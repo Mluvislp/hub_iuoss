@@ -47,4 +47,7 @@ assert.ok(html.includes('không thể chỉnh sửa thêm') && !html.includes('?
 html = render({ ...current, history: [{ event_type:'RESUBMITTED', created_at:current.updated_at,
   payload:{previous_rejection:'Ảnh chưa rõ', changes:{full_name:{before:'Cũ', after:'Mới'}}} }] });
 assert.ok(html.includes('Ảnh chưa rõ') && html.includes('Cũ') && html.includes('Mới'));
-console.log('PASS: current values, legacy view, open/closed edit links, resubmission, edit-mode preview, audit history (6 cases)');
+html = render({ ...current, history: [{ event_type:'STUDENT_UPDATED', created_at:current.updated_at,
+  payload:{changes:{hospital_code:{before:'Bệnh viện A', after:'Bệnh viện B'}}, images:['cccd_image', 'bhyt_image']} }] });
+assert.ok(html.includes('Ảnh đã thay mới') && html.includes('CCCD mặt trước, Thẻ BHYT cũ') && !html.includes('Ảnh đã tải lên'));
+console.log('PASS: current values, legacy view, open/closed edit links, resubmission, edit-mode preview, audit history, replaced images (7 cases)');

@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from students.models import Hospital, Student, VnProvince, VnWard
 from core.models import ExternalInsuranceDeclaration
 from core.insurance_contract import WorkflowError, Conflict, fingerprint, request_key
-from core.insurance_files import inspect_upload
+from core.insurance_files import inspect_uploads
 from .serializers import InsuranceRegistrationSerializer
 from .views import InsuranceRegistrationView
 
@@ -18,19 +18,29 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
     registration_year = None
     registration_period = None
     payment_receipt_image = None
-    medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$', max_length=64)
-    social_insurance_number = serializers.RegexField(r'^[0-9]{10}$', max_length=15)
-    valid_from = serializers.DateField()
-    valid_until = serializers.DateField()
+    medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$', max_length=64, error_messages={
+        'invalid': 'Mã thẻ gồm 10 số hoặc 2 chữ cái và 13 số.', 'blank': 'Vui lòng nhập mã thẻ BHYT.',
+        'required': 'Vui lòng nhập mã thẻ BHYT.'})
+    social_insurance_number = serializers.RegexField(r'^[0-9]{10}$', max_length=15, error_messages={
+        'invalid': 'Mã BHXH phải bao gồm đúng 10 chữ số cuối của mã BHYT.', 'blank': 'Vui lòng nhập mã số BHXH.',
+        'required': 'Vui lòng nhập mã số BHXH.'})
+    valid_from = serializers.DateField(error_messages={
+        'invalid': 'Ngày bắt đầu không hợp lệ.', 'required': 'Vui lòng nhập ngày bắt đầu.'})
+    valid_until = serializers.DateField(error_messages={
+        'invalid': 'Ngày hết hạn không hợp lệ.', 'required': 'Vui lòng nhập ngày hết hạn.'})
 
     def validate(self, attrs):
+        # Lỗi gắn tên trường để form tô đỏ đúng ô, không chỉ báo lỗi chung.
+        errors = {}
         if attrs['valid_until'] < attrs['valid_from']:
-            raise serializers.ValidationError('Ngày hết hạn phải từ ngày bắt đầu trở đi.')
+            errors['valid_until'] = 'Ngày hết hạn phải từ ngày bắt đầu trở đi.'
         if not attrs['medical_insurance_code'].endswith(attrs['social_insurance_number']):
-            raise serializers.ValidationError('Mã thẻ BHYT phải khớp mã số BHXH.')
+            errors['medical_insurance_code'] = 'Mã thẻ BHYT phải khớp mã số BHXH.'
         if not VnWard.objects.filter(code=attrs['permanent_ward'],
                                      province_code=attrs['permanent_province'], is_active=True).exists():
-            raise serializers.ValidationError('Phường/xã không thuộc tỉnh/thành đã chọn.')
+            errors['permanent_ward'] = 'Phường/xã không thuộc tỉnh/thành đã chọn.'
+        if errors:
+            raise serializers.ValidationError(errors)
         return attrs
 
 
@@ -40,7 +50,7 @@ from django.utils import timezone
 from core.models import HealthInsuranceConfig
 from core.external_insurance_models import ExternalInsuranceEvent
 from core.insurance_editing import window
-from core.insurance_history import check_version, require_active
+from core.insurance_history import check_version, readable_payloads, require_active
 from core.insurance_contract import safe_path
 from .views import _insurance_config_payload
 
@@ -52,6 +62,13 @@ def active_config():
     rows = list(HealthInsuranceConfig.objects.select_related('bank_account').filter(
         is_active=True, registration_opens_at__lte=now, registration_closes_at__gte=now)[:2])
     return rows[0] if len(rows) == 1 else None
+
+
+def readable_history(events):
+    events = list(events)
+    for event, payload in zip(events, readable_payloads([e['payload'] for e in events])):
+        event['payload'] = payload
+    return events
 
 
 def external_detail(row):
@@ -78,7 +95,7 @@ def external_detail(row):
         images=[{'field': field, 'filename': field,
                  'url': f'/api/health-insurance/external/{row.pk}/images/{field}/?v={row.row_version}'}
                 for field in EXTERNAL_IMAGES if (row.images or {}).get(field)],
-        history=list(row.events.values('event_type', 'created_at', 'source_app', 'payload')))
+        history=readable_history(row.events.values('event_type', 'created_at', 'source_app', 'payload')))
 
 
 class ExternalInsuranceView(InsuranceRegistrationView):
@@ -114,7 +131,7 @@ class ExternalInsuranceView(InsuranceRegistrationView):
             require_active()
             key = request_key(request.data.get('request_key'))
             payload = {k: request.data.get(k) for k in request.data if k not in request.FILES and k != 'request_key'}
-            checked = {k: inspect_upload(upload) for k, upload in request.FILES.items() if k in EXTERNAL_IMAGES}
+            checked = inspect_uploads(request.FILES, EXTERNAL_IMAGES)
             payload.update({k: value[3] for k, value in checked.items()})
             digest = fingerprint(payload)
             with transaction.atomic():

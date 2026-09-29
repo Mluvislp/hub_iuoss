@@ -5,8 +5,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from .models import HealthInsuranceRegistration, HealthInsuranceConfig
 from .insurance_contract import Conflict, WorkflowError, fingerprint
-from .insurance_history import require_active, replay, check_version, ensure_legacy, append_event
-from .insurance_files import inspect_upload, store_evidence
+from .insurance_history import (require_active, replay, check_version, ensure_legacy, append_event,
+                                readable_changes)
+from .insurance_files import inspect_uploads, store_evidence
 
 FIELDS = ('full_name', 'gender', 'dob', 'ethnicity', 'phone_number', 'citizen_id',
           'social_insurance_number', 'permanent_province', 'permanent_ward',
@@ -58,7 +59,7 @@ def registration_data(reg):
                 display={'permanent_province': province.name if province else 'Chưa xác định',
                          'permanent_ward': ward.name if ward else 'Chưa xác định',
                          'hospital_code': hospital.name if hospital else 'Chưa xác định'},
-                legacy_changes=reg.change_log or {},
+                legacy_changes=readable_changes([reg.change_log or {}])[0][0],
                 registration_year=reg.registration_year, registration_period=reg.registration_period,
                 created_at=reg.created_at, updated_at=reg.updated_at, edited_at=edited.created_at if edited else None,
                 can_edit=edit_window['can_edit'] and edited is None, window=edit_window,
@@ -71,7 +72,7 @@ def edit_registration(pk, student_id, data, files):
     from students.models import VnWard
     from rest_framework.exceptions import ValidationError
     require_active()
-    checked = {name: inspect_upload(upload) for name, upload in files.items() if name in IMAGES}
+    checked = inspect_uploads(files, IMAGES)
     digest = fingerprint({'action': 'edit', 'data': {k: data.get(k) for k in data if k not in files and k != 'request_key'},
                           'files': {k: v[3] for k, v in checked.items()}})
     written = []

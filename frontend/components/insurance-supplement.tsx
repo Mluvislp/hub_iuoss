@@ -6,7 +6,7 @@ import QRCode from 'react-qr-code';
 import SearchableSelect from '@/components/searchable-select';
 import { InsuranceStatus } from '@/components/insurance-status';
 import { ui } from '@/lib/ui';
-import { INSURANCE_FIELD_LABELS, SubmittedInsuranceInfo, changeText } from '@/components/submitted-insurance-info';
+import { ChangeList, SubmittedInsuranceInfo } from '@/components/submitted-insurance-info';
 import { InsuranceModal } from '@/components/insurance-modal';
 import { api } from '@/lib/api';
 import { buildVietQrPayload, findBank } from '@/lib/vietqr';
@@ -49,7 +49,7 @@ function EvidenceImage({ evidence }: { evidence: InsuranceEvidence }) {
   </a>;
 }
 
-const actorName = (source: string) => source === 'Hub' ? 'Sinh viên' : source === 'Dashboard' ? 'Nhân viên' : 'Hệ thống';
+const actorName = (source: string) => source === 'Hub' ? 'Sinh viên' : source === 'Dashboard' ? 'Chuyên viên' : 'Hệ thống';
 
 export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: () => void }) {
   const [open, setOpen] = useState(false);
@@ -238,8 +238,8 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                 {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-text">{e.reason_label && <p className="font-semibold">{e.reason_label}</p>}{e.reason_text && <p className={e.reason_label ? 'mt-1' : ''}>{e.reason_text}</p>}</div>}
                 {e.assessment && <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-2.5"><span className="block text-xs text-slate-500">Phí phải đóng</span><b>{money(e.assessment.required_amount_vnd)}</b></div><div className="rounded-lg bg-success-soft p-2.5"><span className="block text-xs text-success-text">Đã xác nhận</span><b>{money(e.assessment.confirmed_paid_total_vnd)}</b></div><div className="rounded-lg bg-warning-soft p-2.5"><span className="block text-xs text-warning-text">Còn thiếu</span><b>{money(e.assessment.missing_amount_vnd)}</b></div></div>}
                 {e.payload.previous_rejection && <p className="mt-3 text-sm text-danger-text">Phản hồi từ chối trước: {e.payload.previous_rejection}</p>}
-                {e.payload.changes && <dl className="mt-3 space-y-1 rounded-lg bg-slate-50 p-3 text-sm">{Object.entries(e.payload.changes).map(([field,change]) => <div key={field} className="flex flex-wrap gap-x-1.5"><dt className="text-muted">{INSURANCE_FIELD_LABELS[field] || field}:</dt><dd className="min-w-0"><span className="text-slate-400 line-through">{changeText(field, change.before)}</span> → <span className="font-medium text-ink">{changeText(field, change.after)}</span></dd></div>)}</dl>}
-                {e.payload.before && e.payload.after && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name} · {e.payload.before.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-primary-text">{e.payload.after.hospital_name} · {e.payload.after.hospital_code}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
+                <ChangeList changes={e.payload.changes} images={e.payload.images} submitted={e.event_type === 'SUBMITTED'} className="mt-3 space-y-1 rounded-lg bg-slate-50 p-3 text-sm" />
+                {e.payload.before && e.payload.after && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name || '—'}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-primary-text">{e.payload.after.hospital_name || '—'}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
                 {!!e.evidences.length && <div className="mt-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Minh chứng thanh toán bổ sung</p><div className="flex flex-wrap gap-2">{e.evidences.map(p => <EvidenceImage key={p.id} evidence={p} />)}</div></div>}
               </div>
             </article>)}

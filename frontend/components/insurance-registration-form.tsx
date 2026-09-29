@@ -116,19 +116,33 @@ const schema = z.object({
   }),
 });
 
-const externalSchema = schema.extend({
+const externalBase = schema.extend({
   payment_receipt_image: z.any().optional(),
   medical_insurance_code: z.string().regex(/^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$/, "Mã thẻ gồm 10 số hoặc 2 chữ cái và 13 số"),
   valid_from: z.string().min(1, "Vui lòng nhập ngày bắt đầu"),
   valid_until: z.string().min(1, "Vui lòng nhập ngày hết hạn"),
 });
+type ExternalValues = Pick<z.infer<typeof externalBase>, "valid_from" | "valid_until" | "medical_insurance_code" | "social_insurance_number">;
+/**
+ * Kiểm tra chéo giống `ExternalInsuranceSerializer.validate` bên backend, báo ngay
+ * trên đúng ô. `when` cho chạy cả khi ô khác đang lỗi để sinh viên thấy mọi lỗi một lượt.
+ */
+const withExternalRules = <T extends z.ZodType<ExternalValues>>(base: T) => base
+  .refine((v) => !v.valid_from || !v.valid_until || v.valid_until >= v.valid_from, {
+    message: "Ngày hết hạn phải từ ngày bắt đầu trở đi", path: ["valid_until"], when: () => true,
+  })
+  .refine((v) => !/^\d{10}$/.test(v.social_insurance_number ?? "") || !v.medical_insurance_code
+    || v.medical_insurance_code.endsWith(v.social_insurance_number), {
+    message: "Mã thẻ BHYT phải khớp mã số BHXH (10 số cuối)", path: ["medical_insurance_code"], when: () => true,
+  });
+const externalSchema = withExternalRules(externalBase);
 // Sửa hồ sơ đã nộp: ảnh cũ được giữ, chỉ gửi ảnh khi sinh viên chọn ảnh thay thế.
 const keptImages = {
   cccd_image: z.any().optional(), cccd_image_back: z.any().optional(),
   bhyt_image: z.any().optional(), payment_receipt_image: z.any().optional(),
 };
 const editSchema = schema.extend(keptImages);
-const externalEditSchema = externalSchema.extend(keptImages);
+const externalEditSchema = withExternalRules(externalBase.extend(keptImages));
 type FormData = z.infer<typeof schema> | z.infer<typeof externalSchema>;
 
 type ImageName = "cccd_image" | "cccd_image_back" | "bhyt_image" | "payment_receipt_image";
@@ -219,7 +233,8 @@ function ImageField({
         <>
           <PrivateImage url={existingUrl} label={label} caption={false} />
           {!disabled && input ? (
-            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs", file && "border-success-line bg-success-soft text-success-text")}>
+            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs",
+              error ? "border-red-500 bg-red-50 text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
               <input type="file" accept="image/*" {...input} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
               {file ? <CheckSquare size={14} className="shrink-0" /> : <Upload size={14} className="shrink-0" />}
               <span className="truncate">{file ? file.name : "Thay ảnh khác"}</span>
@@ -620,15 +635,17 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       let message = err instanceof ApiError ? err.message : "Đã có lỗi xảy ra";
       if (err instanceof ApiError && err.status === 400) {
         // Lỗi theo từng trường của DRF: gắn vào đúng ô để sinh viên thấy ngay chỗ sai.
+        // Khai nơi khác bọc lỗi trong `errors`, đăng ký tại trường trả thẳng ở gốc.
+        const fieldErrors = (err.data.errors && typeof err.data.errors === "object" ? err.data.errors : err.data) as Record<string, unknown>;
         let mapped = 0;
-        for (const [key, value] of Object.entries(err.data)) {
+        for (const [key, value] of Object.entries(fieldErrors)) {
           const field = BACKEND_FIELD[key] ?? (FORM_FIELDS.has(key) ? key : null);
           const text = Array.isArray(value) ? value[0] : value;
           if (!field || typeof text !== "string") continue;
           setFieldError(field as never, { type: "server", message: text });
           mapped++;
         }
-        if (mapped && message.startsWith("HTTP ")) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu.";
+        if (mapped) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu đỏ.";
       }
       setError(message);
       setScrollTick((t) => t + 1);
