@@ -18,7 +18,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core import tickets
+from core import richtext, tickets
 from core.insurance_contract import safe_path
 from core.ticket_models import SupportTicket, TicketAttachment, TicketMessage
 
@@ -69,6 +69,9 @@ def _message(msg):
         # Chuyên viên hiện tên thật (sinh viên cần biết ai đang trả lời mình).
         "author_name": msg.author_name,
         "body": msg.body,
+        # Tin chuyên viên soạn bằng editor ⇒ HTML. Lọc lại ở đây (lớp phòng thủ thứ hai) —
+        # frontend chỉ render `body_html`, không bao giờ render `body` như HTML.
+        "body_html": richtext.sanitize(msg.body) if msg.author_role == TicketMessage.ROLE_STAFF else "",
         "created_at": msg.created_at,
         "attachments": [_attachment(a) for a in msg.attachments.all()],
     }
