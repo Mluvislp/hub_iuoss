@@ -64,6 +64,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         feature: 'document_requests',
       },
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
+      featureItem('health_check'),
     ],
   },
 ];

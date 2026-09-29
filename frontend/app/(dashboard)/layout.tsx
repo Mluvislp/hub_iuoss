@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/bao-hiem-y-te': 'Bảo hiểm y tế',
   '/dashboard/sinh-hoat-cong-dan': 'Sinh hoạt công dân',
   '/dashboard/khai-bao-ngoai-tru': 'Khai báo ngoại trú',
+  '/dashboard/kham-suc-khoe': 'Khám sức khỏe',
   '/dashboard/requests/new': 'Yêu cầu giấy tờ',
   '/dashboard/requests/other': 'Yêu cầu giấy tờ',
   '/dashboard/requests/deferment': 'Yêu cầu giấy tờ',

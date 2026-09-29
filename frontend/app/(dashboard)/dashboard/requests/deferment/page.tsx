@@ -8,10 +8,11 @@ import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { DefermentFormData, Province, Ward } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { RequestNoteField } from '@/components/request-note';
 import {
   ReadonlyField, EditableField, LockedBox, RequestEditButton, CancelEditButton, ChangedTag,
 } from '@/components/editable-field';
-import { validateDob } from '@/lib/form-validators';
+import { validateDob, isValidDob } from '@/lib/form-validators';
 import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 
 // Ba mốc thời gian học thuộc NHÓM CỨNG — chỉ xem.
@@ -50,7 +51,8 @@ export default function DefermentRequestPage() {
         setForm(data);
         setValues({ dob: pf.dob });
         // Ô nào hồ sơ đã có dữ liệu thì khóa sẵn; trống thì mở sẵn (không có gì để khóa).
-        setOpenFields({ dob: !pf.dob.trim() });
+        // Trống hoặc không hợp lệ ⇒ mở sẵn cho SV nhập lại.
+        setOpenFields({ dob: !isValidDob(pf.dob) });
         setStreet(pf.street);
         pendingWardRef.current = pf.ward_code || '';
         setProvinceCode(pf.province_code || '');   // trigger nạp xã + pre-select
@@ -168,7 +170,7 @@ export default function DefermentRequestPage() {
 
   const p = form.prefill;
   const originals: Record<FieldKey, string> = { dob: p.dob };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const lockable: Record<FieldKey, boolean> = { dob: isValidDob(p.dob) };
   const addressLockable = !!(p.address_standardized && p.province_code && p.ward_code && p.street.trim());
   const addressChanged =
     provinceCode !== p.province_code || wardCode !== p.ward_code || street.trim() !== p.street.trim();
@@ -309,14 +311,8 @@ export default function DefermentRequestPage() {
             )}
           </div>
 
-          {/* Ghi chú */}
-          <div>
-            <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
-            <textarea
-              value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000}
-              placeholder="Số bản in, yêu cầu đặc biệt…" className={ui.textarea}
-            />
-          </div>
+          {/* Ghi chú — component dùng chung cho 5 form */}
+          <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
           <RequestConsent
@@ -343,8 +339,7 @@ export default function DefermentRequestPage() {
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Giấy sẽ dùng thông tin đã xác nhận ở trên. Thời gian xử lý thông thường:{' '}
-          <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>
     </div>

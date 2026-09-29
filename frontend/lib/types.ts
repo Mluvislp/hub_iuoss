@@ -218,8 +218,8 @@ export interface ThuongBinhPrefill {
   course_year: string;
   course_year_number: string;
   max_year_number: string;
-  // CCCD chỉ cho sửa khi chưa có CCCD 12 số
-  cccd_locked: boolean;
+  /** Hồ sơ đã có CCCD 12 số ⇒ ô khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở. false ⇒ bắt buộc nhập. */
+  cccd_valid: boolean;
   citizen_id: string;
   citizen_id_issue_date: string;
 }
@@ -244,13 +244,12 @@ export interface BankLoanPrefill {
   max_year_number: string;
   max_month_number: string;
   dob: string;
-  cccd_locked: boolean;
+  /** Hồ sơ đã có CCCD 12 số ⇒ ô khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở. false ⇒ bắt buộc nhập. */
+  cccd_valid: boolean;
   citizen_id: string;
   citizen_id_issue_date: string;
-  /** Mã lớp lấy từ hồ sơ; rỗng thì sinh viên tự điền. */
+  /** Mã lớp hồ sơ; rỗng ⇒ ô mở sẵn, bắt buộc nhập. SV sửa thì chuyên viên duyệt. */
   class_code: string;
-  /** Hồ sơ đã có mã lớp ⇒ khoá ô, không cho sinh viên sửa (giống cccd_locked). */
-  class_code_locked: boolean;
 }
 
 export interface BankLoanFormData {
@@ -326,6 +325,7 @@ export interface OffCampusForm {
   student: {
     full_name: string;
     student_code: string;
+    sex: string;
     department: string;
     university_email: string;
   };
@@ -333,6 +333,8 @@ export interface OffCampusForm {
   permanent: OffCampusAddressBlock;
   temporary: OffCampusAddressBlock;
   temporary_in_hcmc: boolean | null;
+  /** Đã khai "không có tạm trú" — chỉ hợp lệ khi thường trú ở TP.HCM. */
+  temporary_none: boolean;
   hcmc_province_code: string;
 }
 
@@ -348,7 +350,10 @@ export interface OffCampusSubmit {
   mobile_phone?: string;
   permanent: OffCampusAddressInput;
   temporary_in_hcmc: boolean | null;
-  temporary: OffCampusAddressInput;
+  temporary_none?: boolean;
+  temporary?: OffCampusAddressInput;
+  /** Luồng khám sức khỏe: chặn nếu hồ sơ chưa có CCCD mà không nhập. */
+  require_citizen_id?: boolean;
 }
 
 export interface OffCampusResult {
@@ -363,6 +368,7 @@ export interface OffCampusResult {
 export interface FeatureFlags {
   document_requests: boolean;
   civic_activities: boolean;
+  health_check: boolean;
 }
 
 /**
@@ -451,4 +457,109 @@ export interface InsuranceDetail extends SubmittedInsurance {
   id:number; status:string; row_version:number; reason_code:string|null; reason_label:string; reason_text:string|null;
   timeline:InsuranceTimelineItem[];
   payment:(InsuranceAssessment & {qr_url:string|null; bank_name:string; bank_account_number:string; bank_account_name:string; reference:string})|null;
+}
+
+// ── Khám sức khỏe định kỳ (/api/health-check/) ──────────────────────────────
+
+export type HealthCheckRoundState = 'upcoming' | 'open' | 'closed';
+
+export interface HealthCheckRound {
+  id: number;
+  academic_year: string;
+  title: string;
+  opens_at: string;
+  closes_at: string;
+  state: HealthCheckRoundState;
+  package_name: string;
+  /** Dòng `bullet` là gạch đầu dòng con của dòng thường đứng trước nó. */
+  package_lines: { bullet: boolean; text: string }[];
+  schedule_note: string;
+}
+
+export interface HealthCheckResidence {
+  eligible: boolean;
+  permanent_hcm: boolean;
+  temporary_hcm: boolean;
+  permanent: string;
+  temporary: string;
+  declared_with_registration?: boolean;
+}
+
+export type HealthCheckStatus =
+  | 'pending' | 'approved' | 'rejected'        // choice = examined
+  | 'registered' | 'attended' | 'absent';      // choice = register
+
+export interface HealthCheckResponse {
+  id: number;
+  choice: 'examined' | 'register';
+  status: HealthCheckStatus;
+  status_label: string;
+  submitted_at: string;
+  submit_count: number;
+  consent_at: string | null;
+  review_note: string;
+  reviewed_at: string | null;
+  evidence: { index: number; name: string }[];
+  /** Kết quả khám SV tự khai (nhánh "Đã khám rồi"). */
+  result: Record<string, string>;
+  /** Thời điểm tích cam kết + đồng ý cung cấp thông tin. */
+  data_consent_at: string | null;
+  residence: HealthCheckResidence | null;
+}
+
+/** Danh mục trường kết quả khám — backend `core/health_check_result.py` là nguồn duy nhất. */
+export interface ResultField {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'class' | 'choice' | 'computed' | 'pressure' | 'vision';
+  col: string | null;
+  default: string;
+  required: boolean;
+  unit: string;
+  min: number | null;
+  max: number | null;
+  choices: string[] | null;
+  placeholder: string;
+  hint: string;
+  female_default: string | null;
+}
+
+export interface ResultOrgan {
+  key: string;
+  label: string;
+  result: ResultField;
+  class: ResultField;
+}
+
+export interface ResultGroup {
+  title: string;
+  layout: 'grid' | 'organ';
+  cols?: number;
+  collapsible?: boolean;
+  fields?: ResultField[];
+  organs?: ResultOrgan[];
+}
+
+export interface ResultSection {
+  key: string;
+  title: string;
+  desc: string;
+  groups: ResultGroup[];
+}
+
+export interface HealthCheckState {
+  round: HealthCheckRound | null;
+  response: HealthCheckResponse | null;
+  can_submit: boolean;
+  can_resubmit: boolean;
+  max_evidence_files: number;
+  result_schema: ResultSection[];
+  result_defaults: Record<string, string>;
+  female: boolean;
+  /** Hồ sơ chưa có CCCD 12 số — luồng khám sức khỏe bắt buộc bổ sung. */
+  cccd_missing: boolean;
+  /** Câu cam kết + đồng ý cung cấp thông tin ở cuối form, theo từng lựa chọn. */
+  data_consent_text: { examined: string; register: string };
+  offcampus: OffCampusForm;
+  residence: HealthCheckResidence;
 }

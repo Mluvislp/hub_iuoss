@@ -50,6 +50,7 @@ backend/
   core/models.py            ← HubStudent, ConfirmationRequest, ConfirmationRequestComment…
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
+  core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
   core/address_service.py · address_validators.py   ← BẢN SAO của Dashboard, sửa cả hai
   core/cccd.py              ← đọc QR căn cước
@@ -61,7 +62,7 @@ backend/
   core/external_insurance_models.py ← khai BHYT tại nơi khác
   core/management/commands/backfill_insurance_workflow.py   ← dựng timeline cho đơn cũ
 
-  core/api/urls.py          ← 27 endpoint
+  core/api/urls.py          ← 31 endpoint
   core/api/views.py         ← phần lớn view (1.480 dòng)
   core/api/insurance_views.py · external_insurance_views.py
   core/api/serializers.py · authentication.py · throttling.py · tokens.py
@@ -72,7 +73,7 @@ backend/
 frontend/
   app/(auth)/login                         ← split-screen, có nút Microsoft
   app/auth/microsoft/callback              ← đổi code lấy JWT
-  app/(dashboard)/dashboard/               ← 9 trang (xem bảng dưới)
+  app/(dashboard)/dashboard/               ← 10 trang (xem bảng dưới)
   components/                              ← health-insurance · insurance-registration-form
                                              insurance-status · insurance-supplement
                                              civic-activities · editable-field · form-busy
@@ -84,7 +85,7 @@ frontend/
   ecosystem.config.js       ← PM2 **của production** (sandbox dùng file ngoài repo)
 ```
 
-### 9 trang sinh viên thấy
+### 10 trang sinh viên thấy
 
 | URL | Việc |
 |---|---|
@@ -92,19 +93,21 @@ frontend/
 | `/dashboard/bao-hiem-y-te` | xem thẻ BHYT + lịch sử thẻ |
 | `/dashboard/bao-hiem-y-te/dang-ky` | đăng ký BHYT theo đợt (trang nặng nhất) |
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
-| `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT |
+| `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
+| `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
 
-### 27 endpoint — `core/api/urls.py`
+### 31 endpoint — `core/api/urls.py`
 
 `health/` · `features/` (không cần auth) · `auth/{login,logout,token/refresh}` ·
 `auth/microsoft/{start,callback}` · `dashboard/` · `health-insurance/` ·
 `health-insurance/registrations/` + `<id>/` + `<id>/evidence/<id>/` ·
 `health-insurance/external/` · `requests/` + `<id>/` + `<id>/comments/` +
 5 endpoint `requests/<loại>/form/` · `offcampus/` + `offcampus/request-reopen/` ·
+`health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
 `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
@@ -114,6 +117,7 @@ frontend/
 | Muốn biết | Đọc |
 |---|---|
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
+| Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |
 | Quan hệ với Dashboard và WordPress | `docs/ECOSYSTEM.md` |
@@ -162,7 +166,7 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK   # mặc định TẮT ở production
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```
 

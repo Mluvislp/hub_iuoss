@@ -130,7 +130,7 @@ export default function NewRequestPage() {
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
           Sau khi gửi biểu mẫu, theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
-          Thời gian xử lý thông thường: <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>
     </div>

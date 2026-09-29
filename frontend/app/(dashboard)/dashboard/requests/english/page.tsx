@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import type { EnglishFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
-import { validateDob } from '@/lib/form-validators';
+import { validateDob, isValidDob } from '@/lib/form-validators';
 
 // Mốc nhập học / ra trường thuộc NHÓM CỨNG — chỉ xem.
 type FieldKey = 'dob';
@@ -39,7 +40,8 @@ export default function EnglishRequestPage() {
         const pf = data.prefill;
         setForm(data);
         setValues({ dob: pf.dob });
-        setOpenFields({ dob: !pf.dob.trim() });
+        // Trống hoặc không hợp lệ ⇒ mở sẵn cho SV nhập lại.
+        setOpenFields({ dob: !isValidDob(pf.dob) });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
@@ -115,7 +117,7 @@ export default function EnglishRequestPage() {
 
   const p = form.prefill;
   const originals: Record<FieldKey, string> = { dob: p.dob };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
+  const lockable: Record<FieldKey, boolean> = { dob: isValidDob(p.dob) };
   const editCount = FIELD_KEYS.filter((k) => values[k].trim() !== originals[k].trim()).length;
 
   return (
@@ -208,14 +210,8 @@ export default function EnglishRequestPage() {
             </p>
           </div>
 
-          {/* Ghi chú */}
-          <div>
-            <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
-            <textarea
-              value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000}
-              placeholder="Số bản in, yêu cầu đặc biệt…" className={ui.textarea}
-            />
-          </div>
+          {/* Ghi chú — component dùng chung cho 5 form */}
+          <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
           <RequestConsent
@@ -242,7 +238,7 @@ export default function EnglishRequestPage() {
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Thời gian xử lý thông thường: <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>
     </div>

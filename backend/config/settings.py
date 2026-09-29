@@ -33,6 +33,7 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 # Backend là nguồn sự thật duy nhất; frontend đọc qua GET /api/features/.
 FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS_PRODUCTION)
 FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
+FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
 
 # Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
 FRONTEND_ORIGINS = env_list(

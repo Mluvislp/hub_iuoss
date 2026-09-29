@@ -4,28 +4,32 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
-import { validateDob, validateCccd, validateIssueDate } from '@/lib/form-validators';
+import {
+  validateDob, validateCccd, validateIssueDate, validateClassCode,
+  isValidDob, isValidCccd, isValidIssueDate, isValidClassCode,
+} from '@/lib/form-validators';
 import { ui } from '@/lib/ui';
 import type { BankLoanFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
+import { RequestNoteField } from '@/components/request-note';
 
-// Chỉ ngày sinh dùng cơ chế khóa/mở. Các nhãn tiến độ học thuộc NHÓM CỨNG — chỉ xem.
-type FieldKey = 'dob';
-const FIELD_KEYS: FieldKey[] = ['dob'];
+// Ô XIN SỬA (khóa sẵn, "Yêu cầu chỉnh sửa"; trống / không hợp lệ thì mở sẵn) —
+// chuyên viên duyệt ở Dashboard. Các nhãn tiến độ học thuộc NHÓM CỨNG — chỉ xem.
+type FieldKey = 'dob' | 'class_code' | 'citizen_id' | 'citizen_id_issue_date';
+const FIELD_KEYS: FieldKey[] = ['dob', 'class_code', 'citizen_id', 'citizen_id_issue_date'];
+const EMPTY: Record<FieldKey, string> = { dob: '', class_code: '', citizen_id: '', citizen_id_issue_date: '' };
 
-type FErr = Partial<Record<FieldKey | 'citizen_id' | 'citizen_id_issue_date' | 'class_code', string>>;
+type FErr = Partial<Record<FieldKey, string>>;
 
 export default function BankLoanRequestPage() {
   const [form, setForm] = useState<BankLoanFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
-  const [values, setValues] = useState<Record<FieldKey, string>>({ dob: '' });
-  const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>({ dob: false });
-  const [citizenId, setCitizenId] = useState('');
-  const [issueDate, setIssueDate] = useState('');
-  const [classCode, setClassCode] = useState('');
+  const [values, setValues] = useState<Record<FieldKey, string>>(EMPTY);
+  const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>(
+    { dob: false, class_code: false, citizen_id: false, citizen_id_issue_date: false });
   const [note, setNote] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
@@ -39,21 +43,22 @@ export default function BankLoanRequestPage() {
       .then((data) => {
         const pf = data.prefill;
         setForm(data);
-        setCitizenId(pf.citizen_id);
-        setIssueDate(pf.citizen_id_issue_date);
-        // Mã lớp đã có trong hồ sơ thì điền sẵn, SV chỉ gõ khi hồ sơ còn trống.
-        setClassCode(pf.class_code ?? '');
-        setValues({ dob: pf.dob });
-        // Hồ sơ đã có ngày sinh thì khóa sẵn; trống thì mở sẵn.
-        setOpenFields({ dob: !pf.dob.trim() });
+        setValues({
+          dob: pf.dob,
+          class_code: pf.class_code ?? '',
+          citizen_id: pf.citizen_id,
+          citizen_id_issue_date: pf.citizen_id_issue_date,
+        });
+        // Hồ sơ có giá trị hợp lệ thì khóa sẵn; trống hoặc không hợp lệ ⇒ mở sẵn.
+        setOpenFields({
+          dob: !isValidDob(pf.dob),
+          class_code: !isValidClassCode(pf.class_code ?? ''),
+          citizen_id: !pf.cccd_valid,
+          citizen_id_issue_date: !pf.cccd_valid || !isValidIssueDate(pf.citizen_id_issue_date),
+        });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
   }, []);
-
-  const cccdLocked = !!form?.prefill.cccd_locked;
-  // Hồ sơ đã có mã lớp ⇒ khoá ô. Mã lớp trên hồ sơ do phòng đào tạo cập nhật hàng
-  // loạt, không để SV gõ đè lên giấy tờ nhà trường cấp.
-  const classLocked = !!form?.prefill.class_code_locked;
 
   function setValue(key: FieldKey, v: string) {
     setValues((s) => ({ ...s, [key]: v }));
@@ -73,11 +78,15 @@ export default function BankLoanRequestPage() {
     const pf = form.prefill;
     const errs: FErr = {};
     const de = validateDob(values.dob); if (de) errs.dob = de;
-    if (!cccdLocked) {
-      const ce = validateCccd(citizenId, pf.citizen_id); if (ce) errs.citizen_id = ce;
-      const ie = validateIssueDate(issueDate); if (ie) errs.citizen_id_issue_date = ie;
+    const le = validateClassCode(values.class_code); if (le) errs.class_code = le;
+    const ce = validateCccd(values.citizen_id, pf.citizen_id); if (ce) errs.citizen_id = ce;
+    // Ngày cấp soi khi SV đổi số / đổi ngày, hoặc ngày trong hồ sơ không dùng được —
+    // cùng điều kiện với build_bankloan_payload bên backend.
+    const cidChanged = values.citizen_id.trim() !== pf.citizen_id.trim();
+    const issueChanged = values.citizen_id_issue_date.trim() !== pf.citizen_id_issue_date.trim();
+    if (cidChanged || issueChanged || !isValidIssueDate(pf.citizen_id_issue_date)) {
+      const ie = validateIssueDate(values.citizen_id_issue_date); if (ie) errs.citizen_id_issue_date = ie;
     }
-    if (!classLocked && !classCode.trim()) errs.class_code = 'Vui lòng nhập mã lớp.';
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
@@ -85,9 +94,9 @@ export default function BankLoanRequestPage() {
     try {
       await api.requests.createBankLoan({
         dob: values.dob.trim(),
-        citizen_id: citizenId.trim(),
-        citizen_id_issue_date: issueDate.trim(),
-        class_code: classCode.trim(),
+        citizen_id: values.citizen_id.trim(),
+        citizen_id_issue_date: values.citizen_id_issue_date.trim(),
+        class_code: values.class_code.trim(),
         note: note.trim() || undefined,
       });
       setSuccess(true);
@@ -127,10 +136,23 @@ export default function BankLoanRequestPage() {
   }
 
   const p = form.prefill;
-  const originals: Record<FieldKey, string> = { dob: p.dob };
-  const lockable: Record<FieldKey, boolean> = { dob: !!p.dob.trim() };
-  const editCount = (values.dob.trim() !== originals.dob.trim() ? 1 : 0)
-    + (cccdLocked ? 0 : 2) + (classLocked ? 0 : 1);
+  const originals: Record<FieldKey, string> = {
+    dob: p.dob,
+    class_code: p.class_code ?? '',
+    citizen_id: p.citizen_id,
+    citizen_id_issue_date: p.citizen_id_issue_date,
+  };
+  // Giá trị gốc hợp lệ thì có chỗ để quay về ⇒ khóa được + có nút hủy.
+  const lockable: Record<FieldKey, boolean> = {
+    dob: isValidDob(p.dob),
+    class_code: isValidClassCode(p.class_code ?? ''),
+    citizen_id: p.cccd_valid,
+    citizen_id_issue_date: p.cccd_valid && isValidIssueDate(p.citizen_id_issue_date),
+  };
+  // Mã lớp so sau khi viết hoa — backend coi khác hoa/thường là không sửa.
+  const editCount = FIELD_KEYS.filter((k) => (k === 'class_code'
+    ? values[k].trim().toUpperCase() !== originals[k].trim().toUpperCase()
+    : values[k].trim() !== originals[k].trim())).length;
 
   return (
     <div className="max-w-[760px] space-y-4">
@@ -148,7 +170,7 @@ export default function BankLoanRequestPage() {
             <FileText size={17} className="text-primary" />
             Giấy xác nhận sinh viên — Vay vốn ngân hàng
           </h1>
-          <p className="text-sm text-muted mt-1">Thông tin lấy từ hồ sơ. Kiểm tra, bổ sung mã lớp / CCCD nếu cần rồi gửi.</p>
+          <p className="text-sm text-muted mt-1">Thông tin lấy từ hồ sơ. Kiểm tra, yêu cầu chỉnh sửa mã lớp / CCCD nếu sai rồi gửi.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
@@ -177,25 +199,18 @@ export default function BankLoanRequestPage() {
             </div>
           </div>
 
-          {/* Mã lớp — lấy từ hồ sơ, chỉ cho gõ khi hồ sơ còn trống */}
+          {/* Mã lớp — ô xin sửa, chuyên viên duyệt */}
           <div className="sm:max-w-[320px]">
-            {classLocked ? (
-              <ReadonlyField label="Mã lớp hiện tại" value={p.class_code} />
-            ) : (
-              <>
-                <label className={ui.fieldLabel}>Mã lớp hiện tại <span className="text-red-500">*</span></label>
-                <input
-                  type="text" value={classCode} maxLength={64}
-                  onChange={(e) => { setClassCode(e.target.value); setFieldErrors((f) => ({ ...f, class_code: undefined })); }}
-                  placeholder="Ví dụ: ITITIU20A1"
-                  className={cn(ui.input, fieldErrors.class_code && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
-                />
-                {fieldErrors.class_code && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.class_code}</p>}
-                <p className="mt-1 text-[0.75rem] text-muted">
-                  Hồ sơ chưa có mã lớp, vui lòng nhập.
-                </p>
-              </>
-            )}
+            <EditableField
+              label="Mã lớp hiện tại"
+              value={values.class_code} original={originals.class_code}
+              open={openFields.class_code} lockable={lockable.class_code}
+              error={fieldErrors.class_code} maxLength={64}
+              placeholder="Ví dụ: ITITIU20A1"
+              onChange={(v) => setValue('class_code', v)}
+              onOpen={() => openField('class_code')}
+              onCancel={() => cancelField('class_code', originals)}
+            />
           </div>
 
           {/* Ngày sinh */}
@@ -211,51 +226,41 @@ export default function BankLoanRequestPage() {
             />
           </div>
 
-          {/* CCCD */}
+          {/* CCCD — ô xin sửa, chuyên viên duyệt */}
           <div>
             <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Căn cước công dân</h2>
-            {cccdLocked ? (
-              <div className="grid sm:grid-cols-2 gap-3">
-                <ReadonlyField label="Số CCCD" value={p.citizen_id} />
-                <ReadonlyField label="Ngày cấp" value={p.citizen_id_issue_date} />
-              </div>
-            ) : (
-              <>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className={ui.fieldLabel}>Số CCCD <span className="text-red-500">*</span></label>
-                    <input
-                      type="text" value={citizenId} maxLength={12} inputMode="numeric"
-                      onChange={(e) => { setCitizenId(e.target.value); setFieldErrors((f) => ({ ...f, citizen_id: undefined })); }}
-                      placeholder="12 chữ số"
-                      className={cn(ui.input, fieldErrors.citizen_id && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
-                    />
-                    {fieldErrors.citizen_id && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id}</p>}
-                  </div>
-                  <div>
-                    <label className={ui.fieldLabel}>Ngày cấp <span className="text-red-500">*</span></label>
-                    <input
-                      type="date" value={toDateInput(issueDate)}
-                      min={DATE_INPUT_MIN} max={todayInput()}
-                      onChange={(e) => { setIssueDate(fromDateInput(e.target.value)); setFieldErrors((f) => ({ ...f, citizen_id_issue_date: undefined })); }}
-                      className={cn(ui.input, fieldErrors.citizen_id_issue_date && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
-                    />
-                    {fieldErrors.citizen_id_issue_date && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.citizen_id_issue_date}</p>}
-                  </div>
-                </div>
-                <p className="mt-2 text-[0.78rem] text-muted">Hồ sơ chưa có CCCD hợp lệ — vui lòng nhập; sẽ gửi Phòng CTSV duyệt.</p>
-              </>
-            )}
+            <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
+              <EditableField
+                label="Số CCCD"
+                value={values.citizen_id} original={originals.citizen_id}
+                open={openFields.citizen_id} lockable={lockable.citizen_id}
+                error={fieldErrors.citizen_id}
+                maxLength={12} inputMode="numeric" placeholder="12 chữ số"
+                onChange={(v) => setValue('citizen_id', v)}
+                onOpen={() => openField('citizen_id')}
+                onCancel={() => cancelField('citizen_id', originals)}
+              />
+              <EditableField
+                label="Ngày cấp"
+                kind="date"
+                value={values.citizen_id_issue_date} original={originals.citizen_id_issue_date}
+                open={openFields.citizen_id_issue_date} lockable={lockable.citizen_id_issue_date}
+                error={fieldErrors.citizen_id_issue_date}
+                maxLength={10}
+                onChange={(v) => setValue('citizen_id_issue_date', v)}
+                onOpen={() => openField('citizen_id_issue_date')}
+                onCancel={() => cancelField('citizen_id_issue_date', originals)}
+              />
+            </div>
+            <p className="mt-2 text-[0.78rem] text-muted">
+              {p.cccd_valid
+                ? 'Mã lớp và thông tin CCCD mới được Phòng Công tác Sinh viên duyệt trước khi cập nhật vào hồ sơ.'
+                : 'Hồ sơ chưa có CCCD hợp lệ (đang trống hoặc CMND cũ) — vui lòng nhập; thông tin được Phòng Công tác Sinh viên duyệt trước khi cập nhật vào hồ sơ.'}
+            </p>
           </div>
 
-          {/* Ghi chú */}
-          <div>
-            <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
-            <textarea
-              value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000}
-              placeholder="Số bản in, yêu cầu đặc biệt…" className={ui.textarea}
-            />
-          </div>
+          {/* Ghi chú — component dùng chung cho 5 form */}
+          <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
           <RequestConsent
@@ -282,7 +287,7 @@ export default function BankLoanRequestPage() {
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-[0.85rem] text-slate-600 leading-relaxed">
-          Thời gian xử lý thông thường: <strong className="text-ink font-medium">1–3 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>
     </div>
