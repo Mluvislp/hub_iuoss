@@ -384,3 +384,22 @@ CREATE TABLE `support_ticket_attachments` (
   KEY `idx_sta_ticket` (`ticket_id`),
   CONSTRAINT `fk_sta_message` FOREIGN KEY (`message_id`) REFERENCES `support_ticket_messages` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════ Phản hồi chung (mẫu trả lời soạn sẵn) — thêm 30/09/2026 ════════
+-- Mỗi mảng/mục con có danh sách mẫu riêng. Ticket thuộc mục con thấy mẫu của mục con + của
+-- mảng cha. `body` là HTML ĐÃ LÀM SẠCH (support/richtext.py) do CKEditor soạn.
+-- Chuyên viên thêm/sửa/xoá ngay trong ngăn "Phản hồi chung" ở trang chi tiết ticket.
+CREATE TABLE `support_canned_responses` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `topic_id` int NOT NULL,
+  `title` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Tên ngắn để chuyên viên tìm/chọn',
+  `body` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'HTML đã làm sạch',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `created_by_id` int DEFAULT NULL,
+  `updated_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_scr_topic` (`topic_id`, `sort_order`),
+  CONSTRAINT `fk_scr_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

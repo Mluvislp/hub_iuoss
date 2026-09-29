@@ -600,6 +600,8 @@ export interface TicketMessage {
   author_role: 'student' | 'staff' | 'system';
   author_name: string;
   body: string;
+  /** Chỉ tin chuyên viên: HTML đã được server lọc (đậm/nghiêng/link/danh sách/trích dẫn). */
+  body_html: string;
   created_at: string;
   attachments: TicketAttachment[];
 }

@@ -74,6 +74,15 @@ function PendingBubble({ p, onRetry }: { p: PendingMessage; onRetry: () => void 
   );
 }
 
+/** Kiểu chữ cho tin chuyên viên soạn bằng editor (không dùng plugin typography). */
+const RICH =
+  'break-words text-[0.87rem] leading-relaxed text-ink ' +
+  '[&_p]:mb-1.5 [&>*:last-child]:mb-0 [&_strong]:font-semibold [&_b]:font-semibold [&_em]:italic ' +
+  '[&_ul]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 ' +
+  '[&_blockquote]:mb-1.5 [&_blockquote]:border-l-[3px] [&_blockquote]:border-primary-line ' +
+  '[&_blockquote]:bg-slate-50 [&_blockquote]:px-3 [&_blockquote]:py-1 ' +
+  '[&_a]:text-primary-text [&_a]:underline';
+
 const POLL_VISIBLE_MS = 5_000;
 const POLL_HIDDEN_MS = 30_000;
 const MAX_BODY = 5000;
@@ -103,7 +112,15 @@ function Bubble({ m, ticketId, fresh }: { m: TicketMessage; ticketId: number; fr
           {!mine && <span className={cn(badge.base, badge.neutral, 'py-0')}>Phòng CTSV</span>}
           <span className="ml-auto text-[0.72rem] text-muted">{formatDateTime(m.created_at)}</span>
         </div>
-        <p className="whitespace-pre-wrap break-words text-[0.87rem] leading-relaxed text-ink">{m.body}</p>
+        {!mine && m.body_html ? (
+          // HTML đã được backend lọc theo danh sách thẻ cho phép (core/richtext.py).
+          <div
+            className={RICH}
+            dangerouslySetInnerHTML={{ __html: m.body_html }}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap break-words text-[0.87rem] leading-relaxed text-ink">{m.body}</p>
+        )}
         {m.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {m.attachments.map((a) => <AttachmentChip key={a.id} ticketId={ticketId} att={a} />)}
