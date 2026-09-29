@@ -21,6 +21,59 @@ import { refreshTicketUnread } from '@/lib/ticket-unread';
 import { AttachmentChip, FilePicker } from '@/components/ticket-files';
 import { TICKET_STATUS_STYLES, type TicketDetail, type TicketMessage } from '@/lib/types';
 
+/** Lượt đang gửi (gửi lạc quan): hiện ngay, chờ server xác nhận. id âm để không đụng id thật. */
+interface PendingMessage {
+  tempId: number;
+  body: string;
+  files: File[];
+  state: 'sending' | 'failed';
+  error?: string;
+}
+
+function PendingBubble({ p, onRetry }: { p: PendingMessage; onRetry: () => void }) {
+  const failed = p.state === 'failed';
+  return (
+    <div className="flex flex-col items-end">
+      <div
+        className={cn(
+          'max-w-[85%] rounded-lg border px-3.5 py-2.5',
+          failed ? 'border-danger-line bg-danger-soft' : 'border-primary-line bg-primary-soft opacity-70',
+        )}
+      >
+        <p className="whitespace-pre-wrap break-words text-[0.87rem] leading-relaxed text-ink">{p.body}</p>
+        {p.files.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {p.files.map((f, i) => (
+              <span key={i} className="rounded-md border border-line bg-white px-2 py-1 text-[0.75rem] text-muted">
+                {f.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className={cn('mt-1 flex items-center gap-1.5 text-[0.72rem]', failed ? 'text-danger-text' : 'text-muted')}>
+        {failed ? (
+          <>
+            {p.error ?? 'Không gửi được.'}
+            <button type="button" onClick={onRetry} className="font-semibold text-primary-text underline">
+              Gửi lại
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="inline-flex gap-[3px]" aria-hidden>
+              <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-delay:0ms]" />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-delay:150ms]" />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-delay:300ms]" />
+            </span>
+            Đang gửi…
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const POLL_VISIBLE_MS = 5_000;
 const POLL_HIDDEN_MS = 30_000;
 const MAX_BODY = 5000;
@@ -69,8 +122,8 @@ export default function TicketDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingMessage[]>([]);
+  const tempSeq = useRef(-1);
   const [freshIds, setFreshIds] = useState<number[]>([]);
   const [notice, setNotice] = useState(false);
 
@@ -167,26 +220,39 @@ export default function TicketDetailPage() {
     // Chỉ khởi động một lần khi đã có dữ liệu — `data` đổi liên tục do chính polling.
   }, [id, data !== null]);
 
-  async function send() {
-    const text = body.trim();
-    if (!text || sending) return;
+  /** Gửi một lượt đã hiện sẵn trên khung chat; thành công thì thay bằng bản chính thức. */
+  async function deliver(item: PendingMessage) {
     const form = new FormData();
-    form.set('body', text);
-    files.forEach((f) => form.append('files', f));
-    setSending(true);
-    setSendError(null);
+    form.set('body', item.body);
+    item.files.forEach((f) => form.append('files', f));
     try {
       const res = await api.tickets.reply(id, form);
       const { message, ...rest } = res;
+      setPending((list) => list.filter((p) => p.tempId !== item.tempId));
       merge([message], rest);
-      setBody('');
-      setFiles([]);
       window.setTimeout(scrollToEnd, 0);
     } catch (err) {
-      setSendError(err instanceof ApiError ? err.message : 'Không gửi được. Vui lòng thử lại.');
-    } finally {
-      setSending(false);
+      const msg = err instanceof ApiError ? err.message : 'Không gửi được.';
+      setPending((list) => list.map((p) => (p.tempId === item.tempId ? { ...p, state: 'failed', error: msg } : p)));
     }
+  }
+
+  function send() {
+    const text = body.trim();
+    if (!text) return;
+    // Gửi lạc quan: xoá ô nhập + hiện bong bóng "Đang gửi…" NGAY, không chờ server.
+    const item: PendingMessage = { tempId: tempSeq.current--, body: text, files, state: 'sending' };
+    setPending((list) => [...list, item]);
+    setBody('');
+    setFiles([]);
+    window.setTimeout(scrollToEnd, 0);
+    deliver(item);
+  }
+
+  function retry(item: PendingMessage) {
+    const again: PendingMessage = { ...item, state: 'sending', error: undefined };
+    setPending((list) => list.map((p) => (p.tempId === item.tempId ? again : p)));
+    deliver(again);
   }
 
   if (error) {
@@ -252,6 +318,9 @@ export default function TicketDetailPage() {
           {data.messages.map((m) => (
             <Bubble key={m.id} m={m} ticketId={data.id} fresh={freshIds.includes(m.id)} />
           ))}
+          {pending.map((p) => (
+            <PendingBubble key={p.tempId} p={p} onRetry={() => retry(p)} />
+          ))}
         </div>
 
         <div className="border-t border-line px-5 py-4">
@@ -263,7 +332,6 @@ export default function TicketDetailPage() {
                 rows={3}
                 maxLength={MAX_BODY}
                 value={body}
-                disabled={sending}
                 onChange={(e) => setBody(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -275,12 +343,11 @@ export default function TicketDetailPage() {
                 placeholder="Nội dung trao đổi thêm…"
               />
               <div className="mt-2">
-                <FilePicker files={files} onChange={setFiles} disabled={sending} max={data.max_files} />
+                <FilePicker files={files} onChange={setFiles} max={data.max_files} />
               </div>
-              {sendError && <p className="mt-1.5 text-[0.82rem] text-danger-text">{sendError}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button type="button" onClick={send} disabled={sending || !body.trim()} className={ui.btnPrimary}>
-                  {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                <button type="button" onClick={send} disabled={!body.trim()} className={ui.btnPrimary}>
+                  <Send size={15} />
                   Gửi
                 </button>
                 <span className="text-[0.78rem] text-muted">Ctrl + Enter để gửi</span>
