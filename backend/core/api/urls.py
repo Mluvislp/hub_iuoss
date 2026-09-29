@@ -1,9 +1,12 @@
 from django.urls import path
 from . import health_check_views, views
-from .insurance_views import InsuranceDetailView, InsuranceEvidenceView
-from .external_insurance_views import ExternalInsuranceView
+from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
+from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
 
 urlpatterns = [
+    path('health-insurance/external/<int:pk>/', ExternalInsuranceView.as_view(), name='api_external_insurance_detail'),
+    path('health-insurance/external/<int:pk>/images/<str:field>/', ExternalInsuranceImageView.as_view(), name='api_external_insurance_image'),
+    path('health-insurance/registrations/<int:pk>/images/<str:field>/', InsuranceImageView.as_view(), name='api_insurance_image'),
     path('health-insurance/external/', ExternalInsuranceView.as_view(), name='api_external_insurance'),
     path('health-insurance/registrations/<int:pk>/', InsuranceDetailView.as_view(), name='api_insurance_detail'),
     path('health-insurance/registrations/<int:pk>/evidence/<int:evidence_id>/', InsuranceEvidenceView.as_view(), name='api_insurance_evidence'),

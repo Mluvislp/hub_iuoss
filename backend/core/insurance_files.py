@@ -91,6 +91,22 @@ def inspect_upload(upload):
     return data, ext, mime, hashlib.sha256(data).hexdigest()
 
 
+def inspect_uploads(files, names):
+    """`inspect_upload` cho từng ảnh; lỗi gắn đúng tên trường để form tô đỏ đúng ô."""
+    from rest_framework.exceptions import ValidationError
+    checked, errors = {}, {}
+    for name, upload in files.items():
+        if name not in names:
+            continue
+        try:
+            checked[name] = inspect_upload(upload)
+        except WorkflowError as exc:
+            errors[name] = [str(exc)]
+    if errors:
+        raise ValidationError(errors)
+    return checked
+
+
 def normalized_upload(upload, data, ext, mime):
     """Bọc lại file đã kiểm để Django lưu ĐÚNG bytes đã xác thực.
 

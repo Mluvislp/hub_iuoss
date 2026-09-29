@@ -50,7 +50,7 @@ def save_registration(reg):
     reg.workflow_version = 2
     reg.updated_at = timezone.now()
     reg.save(update_fields=['status', 'rejection_reason', 'rejection_reason_code',
-                           'hospital_code', 'fee_amount_vnd', 'workflow_version', 'row_version', 'updated_at'])
+                           'hospital_code', 'fee_amount_vnd', 'workflow_version', 'row_version', 'updated_at', 'supplement_pending', 'supplemented_at', 'supplement_reviewed_at'])
 
 
 def add_assessment(reg, event, values, note=''):
@@ -59,9 +59,74 @@ def add_assessment(reg, event, values, note=''):
         note=note, **values)
 
 
+CODE_FIELDS = {'permanent_province': 'province', 'permanent_ward': 'ward', 'hospital_code': 'hospital'}
+IMAGE_FIELDS = ('cccd_image', 'cccd_image_back', 'bhyt_image', 'payment_receipt_image')
+
+
+def _code_names(changes_list):
+    """{loại: {mã: tên}} cho mọi mã tỉnh/phường/bệnh viện có trong các `changes`."""
+    from students.models import Hospital, VnProvince, VnWard
+    seen = {'province': set(), 'ward': set(), 'hospital': set()}
+    for changes in changes_list:
+        for field, change in (changes or {}).items():
+            for value in change.values() if isinstance(change, dict) else ():
+                if field in CODE_FIELDS:
+                    seen[CODE_FIELDS[field]].add(str(value or ''))
+                elif field.endswith('_address') and isinstance(value, dict):
+                    seen['province'].add(str(value.get('province') or ''))
+                    seen['ward'].add(str(value.get('ward') or ''))
+    models = {'province': VnProvince, 'ward': VnWard, 'hospital': Hospital}
+    return {kind: dict(models[kind].objects.filter(code__in=codes - {''}).order_by().values_list('code', 'name'))
+            if codes - {''} else {} for kind, codes in seen.items()}
+
+
+def _readable(field, value, names):
+    if value in (None, ''):
+        return value
+    if field in CODE_FIELDS:
+        return names[CODE_FIELDS[field]].get(str(value), str(value))
+    if field.endswith('_address') and isinstance(value, dict):
+        ward, province = str(value.get('ward') or ''), str(value.get('province') or '')
+        return ', '.join(p for p in (value.get('street'), names['ward'].get(ward, ward),
+                                     names['province'].get(province, province)) if p)
+    return value
+
+
+def readable_changes(changes_list):
+    """Mã chỉ dùng khi xử lý/xuất Excel; giao diện nhận tên. Ảnh không lộ đường
+    dẫn lưu trữ: tách khỏi `changes` thành danh sách trường ảnh đã đổi.
+    Trả [(changes, images)] đúng thứ tự đầu vào."""
+    names = _code_names(changes_list)
+    result = []
+    for changes in changes_list:
+        text, images = {}, []
+        for field, change in (changes or {}).items():
+            if field in IMAGE_FIELDS:
+                images.append(field)
+            elif isinstance(change, dict):
+                text[field] = {k: _readable(field, v, names) for k, v in change.items()}
+        result.append((text, images))
+    return result
+
+
+def readable_payloads(payloads):
+    """Payload sự kiện cho giao diện: bỏ digest, mã → tên, ảnh → `images`."""
+    payloads = [{k: v for k, v in (p or {}).items() if k != 'request_digest'} for p in payloads]
+    for payload, (changes, images) in zip(payloads, readable_changes([p.get('changes') for p in payloads])):
+        if 'changes' in payload:
+            payload['changes'], payload['images'] = changes, images
+    return payloads
+
+
 def timeline(reg, evidence_url):
     items = []
-    for event in reg.events.select_related('assessment').prefetch_related('evidences').order_by('event_no'):
+    events = list(reg.events.select_related('assessment').prefetch_related('evidences').order_by('event_no'))
+    payloads = readable_payloads([event.payload for event in events])
+    for event, payload in zip(events, payloads):
+        if event.event_type == 'IMAGES_REPLACED' and items and items[-1]['event_type'] == 'STUDENT_UPDATED':
+            # Cùng một lần sửa ghi hai sự kiện (append-only); hiển thị gộp làm một.
+            items[-1]['payload'].setdefault('images', []).extend(payload.get('images', []))
+            continue
         a = getattr(event, 'assessment', None)
         # Các ảnh ban đầu đã nằm trong bốn cột của registration. Timeline chỉ
         # hiển thị ảnh thanh toán tải thêm sau khi đơn bị từ chối vì tiền.
@@ -73,7 +138,7 @@ def timeline(reg, evidence_url):
             actor_type=event.actor_type, actor_id=event.actor_id, source_app=event.source_app,
             from_status=from_status, to_status=to_status,
             reason_code=event.reason_code, reason_label=REASONS.get(event.reason_code, ''),
-            reason_text=event.reason_text, payload={k: v for k, v in (event.payload or {}).items() if k != 'request_digest'},
+            reason_text=event.reason_text, payload=payload,
             assessment=({k: getattr(a, k) for k in ('required_amount_vnd', 'confirmed_paid_total_vnd', 'missing_amount_vnd', 'note')} if a else None),
             evidences=[dict(id=e.pk, filename=e.original_filename, url=evidence_url(e),
                             mime_type=e.mime_type, file_size_bytes=e.file_size_bytes) for e in evidences]))

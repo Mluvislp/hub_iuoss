@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useForm, Controller, useWatch } from "react-hook-form";
+import { useForm, Controller, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -17,13 +17,25 @@ import {
   Plus,
   CreditCard,
   CheckSquare,
+  CheckCircle2,
   Copy,
   Check,
+  AlertTriangle,
+  CalendarClock,
+  History,
+  Info,
+  Lock,
+  Upload,
+  Send,
+  RefreshCw,
+  type LucideIcon,
 } from "lucide-react";
+import { PrivateImage, formatDateTime } from "@/components/submitted-insurance-info";
+import { InsuranceStatus } from "@/components/insurance-status";
 import { api, ApiError } from "@/lib/api";
-import { ui } from "@/lib/ui";
+import { badge, ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import type { Province, InsurancePeriodConfig, InsuranceRegistrationPrefill } from "@/lib/types";
+import type { Province, InsurancePeriodConfig, InsuranceRegistrationPrefill, SubmittedInsurance } from "@/lib/types";
 import AddressFields from "@/app/(dashboard)/dashboard/khai-bao-ngoai-tru/AddressFields";
 import SearchableSelect from "@/components/searchable-select";
 import QRCode from "react-qr-code";
@@ -51,6 +63,14 @@ const ACCEPTED_IMAGE_TYPES = [
   "image/webp",
   "image/heic",
 ];
+
+/**
+ * Mô tả đợt do Phòng CTSV soạn bằng CKEditor bên Dashboard (HTML). Preflight của
+ * Tailwind xóa kiểu danh sách/liên kết nên phải khai lại ở đây.
+ */
+const DESCRIPTION_CLS =
+  "text-sm leading-6 [&_a]:font-medium [&_a]:underline [&_h2]:font-semibold [&_h3]:font-semibold " +
+  "[&_h4]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5";
 
 const fileSchema = z
   .any()
@@ -96,13 +116,45 @@ const schema = z.object({
   }),
 });
 
-const externalSchema = schema.extend({
+const externalBase = schema.extend({
   payment_receipt_image: z.any().optional(),
   medical_insurance_code: z.string().regex(/^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$/, "Mã thẻ gồm 10 số hoặc 2 chữ cái và 13 số"),
   valid_from: z.string().min(1, "Vui lòng nhập ngày bắt đầu"),
   valid_until: z.string().min(1, "Vui lòng nhập ngày hết hạn"),
 });
+type ExternalValues = Pick<z.infer<typeof externalBase>, "valid_from" | "valid_until" | "medical_insurance_code" | "social_insurance_number">;
+/**
+ * Kiểm tra chéo giống `ExternalInsuranceSerializer.validate` bên backend, báo ngay
+ * trên đúng ô. `when` cho chạy cả khi ô khác đang lỗi để sinh viên thấy mọi lỗi một lượt.
+ */
+const withExternalRules = <T extends z.ZodType<ExternalValues>>(base: T) => base
+  .refine((v) => !v.valid_from || !v.valid_until || v.valid_until >= v.valid_from, {
+    message: "Ngày hết hạn phải từ ngày bắt đầu trở đi", path: ["valid_until"], when: () => true,
+  })
+  .refine((v) => !/^\d{10}$/.test(v.social_insurance_number ?? "") || !v.medical_insurance_code
+    || v.medical_insurance_code.endsWith(v.social_insurance_number), {
+    message: "Mã thẻ BHYT phải khớp mã số BHXH (10 số cuối)", path: ["medical_insurance_code"], when: () => true,
+  });
+const externalSchema = withExternalRules(externalBase);
+// Sửa hồ sơ đã nộp: ảnh cũ được giữ, chỉ gửi ảnh khi sinh viên chọn ảnh thay thế.
+const keptImages = {
+  cccd_image: z.any().optional(), cccd_image_back: z.any().optional(),
+  bhyt_image: z.any().optional(), payment_receipt_image: z.any().optional(),
+};
+const editSchema = schema.extend(keptImages);
+const externalEditSchema = withExternalRules(externalBase.extend(keptImages));
 type FormData = z.infer<typeof schema> | z.infer<typeof externalSchema>;
+
+type ImageName = "cccd_image" | "cccd_image_back" | "bhyt_image" | "payment_receipt_image";
+type ExtraPrefill = Partial<Record<"medical_insurance_code" | "valid_from" | "valid_until" | "hospital_code" | "hospital_province" | "note", string>>;
+const IMAGE_NAMES: ImageName[] = ["cccd_image", "cccd_image_back", "bhyt_image", "payment_receipt_image"];
+/** Tên trường backend khác tên trong form. */
+const BACKEND_FIELD: Record<string, string> = {
+  permanent_province: "permanent.provinceCode",
+  permanent_ward: "permanent.wardCode",
+  permanent_street: "permanent.street",
+};
+const FORM_FIELDS = new Set(Object.keys(schema.shape).filter((k) => k !== "permanent"));
 
 /** Nút chép nhanh cho số tài khoản và nội dung chuyển khoản. */
 function CopyButton({ text }: { text: string }) {
@@ -134,6 +186,93 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** Link chữ nhỏ "Chỉnh sửa / Hủy sửa" ở góc phải tiêu đề thẻ. */
+function EditLink({ active, label = "Chỉnh sửa", onClick }: { active: boolean; label?: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+    >
+      <Pencil size={12} /> {active ? "Hủy sửa" : label}
+    </button>
+  );
+}
+
+function FieldError({ message }: { message?: unknown }) {
+  if (!message) return null;
+  return <p data-field-error className="mt-1 text-xs text-danger-text">{String(message)}</p>;
+}
+
+/**
+ * Một ô ảnh hồ sơ. Đã có ảnh nộp trước → hiện chính ảnh đó; ô chọn file chỉ còn
+ * là nút "Thay ảnh khác". Chưa có ảnh → ô kéo thả.
+ */
+function ImageField({
+  label, hint, emptyText, Icon, tone, existingUrl, disabled, file, error, input,
+}: {
+  label: string;
+  hint?: string;
+  emptyText: string;
+  Icon: LucideIcon;
+  tone: string;
+  existingUrl?: string;
+  disabled: boolean;
+  file?: File;
+  error?: unknown;
+  input?: UseFormRegisterReturn;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] flex-wrap items-baseline gap-1")}>
+        <span>{label}</span>
+        {!existingUrl && <span className="text-danger-text">*</span>}
+        {hint && <span className="text-xs font-normal text-muted">{hint}</span>}
+      </label>
+      {existingUrl ? (
+        <>
+          <PrivateImage url={existingUrl} label={label} caption={false} />
+          {!disabled && input ? (
+            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs",
+              error ? "border-red-500 bg-red-50 text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
+              <input type="file" accept="image/*" {...input} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+              {file ? <CheckSquare size={14} className="shrink-0" /> : <Upload size={14} className="shrink-0" />}
+              <span className="truncate">{file ? file.name : "Thay ảnh khác"}</span>
+            </label>
+          ) : null}
+        </>
+      ) : (
+        <div
+          className={cn(
+            "group relative flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+            error ? "border-red-500 bg-red-50" : "border-slate-300",
+            disabled ? "bg-slate-50 opacity-70" : "cursor-pointer hover:bg-slate-50",
+          )}
+        >
+          {input && (
+            <input
+              type="file"
+              accept="image/*"
+              {...input}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            />
+          )}
+          <div className="flex min-w-0 flex-col items-center gap-2">
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-full transition-transform group-hover:scale-110", tone)}>
+              {file ? <CheckSquare size={20} className="text-success-text" /> : <Icon size={20} />}
+            </div>
+            <span className="max-w-full break-all text-sm font-medium text-slate-700">
+              {file ? file.name : emptyText}
+            </span>
+            <span className="text-xs text-slate-500">Tối đa 5MB</span>
+          </div>
+        </div>
+      )}
+      <FieldError message={(error as { message?: string } | undefined)?.message} />
+    </div>
+  );
+}
+
 export default function InsuranceRegistrationPage({ external = false }: { external?: boolean }) {
   return (
     <React.Suspense
@@ -152,26 +291,34 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const periodId = searchParams.get("period") || "";
+  const editId = Number(searchParams.get("edit")) || 0;
+  const resubmitting = external && searchParams.get('resubmit') === '1';
+  const [submitted, setSubmitted] = useState<SubmittedInsurance | null>(null);
+  const editingRecord = !!submitted?.id;
+
+  // Hồ sơ đã nộp mở ra ở chế độ CHỈ XEM; sinh viên bấm "Chỉnh sửa" mới mở khóa.
+  const [unlocked, setUnlocked] = useState(false);
+  // Đơn mới: trường nào hồ sơ gốc đã có thì khóa, nút "Chỉnh sửa" của thẻ mở lại.
   const [infoEditable, setInfoEditable] = useState(false);
   const requestKey = useRef<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
+  // Tăng mỗi lần gửi thất bại; effect chạy sau khi lỗi đã render mới cuộn tới.
+  const [scrollTick, setScrollTick] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // Hồ sơ gốc do API trả về. Quy tắc: trường nào ĐÃ ghi nhận thì khóa, trường
-  // nào còn trống thì mở sẵn ô nhập. Riêng Số sổ BHXH và Thường trú có nút
-  // "Chỉnh sửa" để mở lại.
   const [prefill, setPrefill] = useState<InsuranceRegistrationPrefill | null>(
     null,
   );
-  const [bhxhEditable, setBhxhEditable] = useState(false);
 
   // Chuỗi QR đọc từ ảnh CCCD. Chỉ để gửi kèm và lưu lại — KHÔNG điền ngược vào
   // form, và KHÔNG hiện thông báo nào ra màn hình sinh viên.
   const [cccdQrRaw, setCccdQrRaw] = useState<string | null>(null);
-  const [addressEditable, setAddressEditable] = useState(false);
 
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [ethnicities, setEthnicities] = useState<
@@ -185,71 +332,90 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
 
   const [config, setConfig] = useState<InsurancePeriodConfig | null>(null);
 
+  // Schema đổi theo việc đang tạo mới hay sửa hồ sơ; đọc qua ref để resolver
+  // luôn dùng đúng schema của lần render gần nhất.
+  const activeSchema = useRef<object>(external ? externalSchema : schema);
+  activeSchema.current = editingRecord
+    ? (external ? externalEditSchema : editSchema)
+    : (external ? externalSchema : schema);
+
   const {
     watch,
     register,
     handleSubmit,
     control,
     setValue,
+    clearErrors,
+    setError: setFieldError,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(external ? externalSchema : schema),
+    resolver: ((values, context, options) =>
+      zodResolver(activeSchema.current as typeof schema)(values as never, context, options as never)) as Resolver<FormData>,
   });
 
   useEffect(() => {
+    const subscription = watch(() => { requestKey.current = null; });
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
+  /** Đổ dữ liệu (hồ sơ gốc hoặc đơn đã nộp) vào form; cũng dùng để hủy chỉnh sửa. */
+  const applyValues = useCallback((p: InsuranceRegistrationPrefill & ExtraPrefill) => {
+    setValue("full_name", p.full_name ?? "");
+    setValue("student_code", p.student_code ?? "");
+    setValue("gender", p.gender as "Nam" | "Nữ");
+    setValue("dob", p.dob ?? "");
+    setValue("ethnicity", p.ethnicity ?? "");
+    setValue("phone_number", p.phone_number ?? "");
+    setValue("citizen_id", p.citizen_id ?? "");
+    setValue("social_insurance_number", p.social_insurance_number ?? "");
+    setValue("permanent", {
+      provinceCode: p.permanent_province ?? "",
+      wardCode: p.permanent_ward ?? "",
+      street: p.permanent_street ?? "",
+    });
+    setValue("hospital_code", p.hospital_code || "");
+    setValue("note", p.note || "");
+    for (const field of ["medical_insurance_code", "valid_from", "valid_until"] as const) {
+      setValue(field, p[field] || "");
+    }
+    setHospitalProvince(p.hospital_province || "");
+  }, [setValue]);
+
+  useEffect(() => {
     let alive = true;
-    if (!external && !periodId) {
+    if (!external && !periodId && !editId) {
       router.push("/dashboard/bao-hiem-y-te");
       return;
     }
     Promise.all([
-      external ? api.externalInsurance.prefill() : api.insuranceRegistration.prefill(periodId),
+      editId ? (external ? api.externalInsurance.detail(editId) : api.insuranceRegistration.detail(editId)) : external ? api.externalInsurance.prefill() : api.insuranceRegistration.prefill(periodId),
       api.locations.provinces(),
       api.locations.ethnicities(),
     ])
       .then(([pref, provs, eths]) => {
         if (!alive) return;
-        const p = pref.prefill;
-        setPrefill(p);
-        setValue("full_name", p.full_name);
-        setValue("student_code", p.student_code);
-        setValue("gender", p.gender as "Nam" | "Nữ");
-        setValue("dob", p.dob);
-        setValue("phone_number", p.phone_number);
-        setValue("citizen_id", p.citizen_id);
-        setValue("social_insurance_number", p.social_insurance_number);
-        if (external) {
-          const extra = p as InsuranceRegistrationPrefill & Partial<Record<'medical_insurance_code' | 'valid_from' | 'valid_until' | 'hospital_code' | 'hospital_province', string>>;
-          for (const field of ['medical_insurance_code', 'valid_from', 'valid_until', 'hospital_code'] as const) {
-            setValue(field, extra[field] || "");
-          }
-          setHospitalProvince(extra.hospital_province || "");
+        const existing = pref as SubmittedInsurance;
+        if (existing.id) {
+          setSubmitted(existing);
+          setUnlocked(resubmitting);
         }
-        setValue("permanent", {
-          provinceCode: p.permanent_province,
-          wardCode: p.permanent_ward,
-          street: p.permanent_street,
-        });
-
+        setPrefill(pref.prefill);
+        applyValues(pref.prefill);
         setProvinces(provs);
         setEthnicities(eths);
-        if (pref.config) {
-          setConfig(pref.config);
-        }
-        // Tắt trạng thái loading khi tải thành công
+        if (pref.config) setConfig(pref.config);
         setLoading(false);
       })
       .catch((err) => {
         if (!alive) return;
         setError(err instanceof ApiError ? err.message : "Lỗi tải dữ liệu");
-        // Tắt trạng thái loading khi có lỗi
         setLoading(false);
       });
 
     return () => {
       alive = false;
     };
-  }, [external, periodId, router, setValue]);
+  }, [external, editId, periodId, resubmitting, router, applyValues]);
 
   // Danh mục dân tộc nạp bất đồng bộ. Phải gán value SAU khi <option> đã render,
   // nếu không thẻ <select> lặng lẽ bỏ qua vì chưa có option nào khớp.
@@ -323,13 +489,23 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
     );
 
-  const bhxhLocked =
-    recorded(prefill?.social_insurance_number) && !bhxhEditable;
+  const canSubmit = submitted?.id
+    ? !!(resubmitting ? submitted.can_resubmit : (submitted.can_edit ?? submitted.window?.can_edit))
+    : config?.status === 'open';
+  const editLocked = editingRecord && !unlocked;
+  const formEnabled = canSubmit && !editLocked;
+  /** Trường thông tin cá nhân có bị khóa không. */
+  const personalLocked = (value?: string | null) =>
+    editingRecord ? !unlocked : recorded(value) && !infoEditable;
   const hasAddress =
     recorded(prefill?.permanent_province) &&
     recorded(prefill?.permanent_ward) &&
     recorded(prefill?.permanent_street);
-  const addressLocked = hasAddress && !addressEditable;
+  const addressLocked = editingRecord ? !unlocked : hasAddress && !infoEditable;
+  const submittedImages = useMemo(
+    () => Object.fromEntries((submitted?.images ?? []).map((i) => [i.field, i.url])) as Partial<Record<ImageName, string>>,
+    [submitted],
+  );
 
   // Tải ảnh CCCD lên là đọc QR ngay tại máy người dùng, IM LẶNG — không hiện
   // thông báo nào cho sinh viên. Đọc được hay không đều không ảnh hưởng tới
@@ -372,9 +548,29 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
     };
   }, [cccdFrontFile, cccdBackFile]);
 
+  // Cuộn tới lỗi đầu tiên trong form; không có lỗi theo ô thì tới thông báo lỗi chung.
+  useEffect(() => {
+    if (!scrollTick) return;
+    const target = formRef.current?.querySelector<HTMLElement>("[data-field-error]") ?? alertRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [scrollTick]);
+
+  /** Bỏ mọi thay đổi chưa lưu, trả form về đúng đơn đã nộp và khóa lại. */
+  const cancelEdit = () => {
+    if (!submitted) return;
+    applyValues(submitted.prefill);
+    // Ô file chỉ nhận chuỗi rỗng khi xóa lựa chọn.
+    for (const name of IMAGE_NAMES) setValue(name, "");
+    setValue("confirm_declaration", false);
+    clearErrors();
+    setError("");
+    setUnlocked(false);
+  };
+
   const onSubmit = async (data: FormData) => {
     setSaving(true);
     setError("");
+    setNotice("");
 
     try {
       const fd = new FormData();
@@ -382,12 +578,10 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         for (const field of ['medical_insurance_code', 'valid_from', 'valid_until'] as const) {
           fd.append(field, data[field] || "");
         }
-        requestKey.current ??= crypto.randomUUID();
-        fd.append("request_key", requestKey.current);
       } else {
-        if (!config) throw new Error("Không tìm thấy cấu hình đợt đăng ký.");
-        fd.append("registration_year", config.registration_year.toString());
-        fd.append("registration_period", config.registration_period);
+        if (!config && !submitted) throw new Error("Không tìm thấy cấu hình đợt đăng ký.");
+        fd.append("registration_year", String(submitted?.registration_year ?? config?.registration_year));
+        fd.append("registration_period", submitted?.registration_period ?? config?.registration_period ?? "");
       }
       fd.append("full_name", data.full_name);
       fd.append("student_code", data.student_code);
@@ -395,8 +589,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       fd.append("dob", data.dob);
       fd.append("ethnicity", data.ethnicity);
       fd.append("phone_number", data.phone_number);
-      if (data.social_insurance_number)
-        fd.append("social_insurance_number", data.social_insurance_number);
+      fd.append("social_insurance_number", data.social_insurance_number || "");
       fd.append("citizen_id", data.citizen_id);
 
       fd.append("permanent_province", data.permanent.provinceCode);
@@ -404,24 +597,64 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       fd.append("permanent_street", data.permanent.street);
 
       fd.append("hospital_code", data.hospital_code);
-      if (data.note) fd.append("note", data.note);
+      fd.append("note", data.note || "");
 
-      fd.append("cccd_image", data.cccd_image[0]);
-      fd.append("cccd_image_back", data.cccd_image_back[0]);
-      if (data.bhyt_image && data.bhyt_image.length > 0)
-        fd.append("bhyt_image", data.bhyt_image[0]);
+      if (data.cccd_image?.[0]) fd.append("cccd_image", data.cccd_image[0]);
+      if (data.cccd_image_back?.[0]) fd.append("cccd_image_back", data.cccd_image_back[0]);
       if (cccdQrRaw) fd.append("cccd_qr_raw", cccdQrRaw);
-      if (!external) fd.append("payment_receipt_image", data.payment_receipt_image[0]);
+      if (data.bhyt_image?.[0]) fd.append("bhyt_image", data.bhyt_image[0]);
+      if (!external && data.payment_receipt_image?.[0]) fd.append("payment_receipt_image", data.payment_receipt_image[0]);
 
-      if (external) await api.externalInsurance.submit(fd);
-      else await api.insuranceRegistration.submit(fd);
-      setSuccess(true);
+      requestKey.current ??= crypto.randomUUID();
+      fd.set('request_key', requestKey.current);
+      if (submitted?.id) {
+        fd.set('action', resubmitting ? 'resubmit' : 'edit');
+        fd.set('row_version', String(submitted.row_version));
+        if (external) await api.externalInsurance.update(submitted.id, fd);
+        else await api.insuranceRegistration.supplement(submitted.id, fd);
+        // Ở lại trang, hiện bản mới nhất ở chế độ chỉ xem.
+        const fresh = await (external ? api.externalInsurance.detail(submitted.id) : api.insuranceRegistration.detail(submitted.id));
+        requestKey.current = null;
+        setSubmitted(fresh);
+        setPrefill(fresh.prefill);
+        if (fresh.config) setConfig(fresh.config);
+        applyValues(fresh.prefill);
+        for (const name of IMAGE_NAMES) setValue(name, "");
+        setValue("confirm_declaration", false);
+        setUnlocked(false);
+        setNotice(resubmitting
+          ? "Đã gửi lại bản khai. Cán bộ sẽ kiểm tra lại thông tin."
+          : "Đã lưu thay đổi. Thông tin mới nhất được hiển thị bên dưới.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        if (external) await api.externalInsurance.submit(fd);
+        else await api.insuranceRegistration.submit(fd);
+        setSuccess(true);
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Đã có lỗi xảy ra");
+      let message = err instanceof ApiError ? err.message : "Đã có lỗi xảy ra";
+      if (err instanceof ApiError && err.status === 400) {
+        // Lỗi theo từng trường của DRF: gắn vào đúng ô để sinh viên thấy ngay chỗ sai.
+        // Khai nơi khác bọc lỗi trong `errors`, đăng ký tại trường trả thẳng ở gốc.
+        const fieldErrors = (err.data.errors && typeof err.data.errors === "object" ? err.data.errors : err.data) as Record<string, unknown>;
+        let mapped = 0;
+        for (const [key, value] of Object.entries(fieldErrors)) {
+          const field = BACKEND_FIELD[key] ?? (FORM_FIELDS.has(key) ? key : null);
+          const text = Array.isArray(value) ? value[0] : value;
+          if (!field || typeof text !== "string") continue;
+          setFieldError(field as never, { type: "server", message: text });
+          mapped++;
+        }
+        if (mapped) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu đỏ.";
+      }
+      setError(message);
+      setScrollTick((t) => t + 1);
     } finally {
       setSaving(false);
     }
   };
+
+  const onInvalid = () => setScrollTick((t) => t + 1);
 
   if (loading)
     return (
@@ -432,7 +665,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
 
   if (success) {
     return (
-      <div className="max-w-xl mx-auto mt-10 p-8 bg-white border border-line rounded-xl shadow-sm text-center">
+      <div className="max-w-xl mx-auto mt-6 sm:mt-10 p-6 sm:p-8 bg-white border border-line rounded-lg shadow-card text-center">
         <div className="w-16 h-16 bg-success-soft text-success-text rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckSquare size={32} />
         </div>
@@ -444,16 +677,30 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           tiến hành gửi hồ sơ lên BHXH để gia hạn/đăng ký mới. BHYT sẽ có hiệu
           lực từ ngày đầu quý tiếp theo.</>}
         </p>
-        <Link href="/dashboard/bao-hiem-y-te" className={ui.btnPrimary}>
+        <Link href="/dashboard/bao-hiem-y-te" className={cn(ui.btnPrimary, "w-full sm:w-auto")}>
           Quay lại trang BHYT
         </Link>
       </div>
     );
   }
 
+  const year = submitted?.registration_year ?? config?.registration_year;
+  const title = external
+    ? (editingRecord ? "Bản khai BHYT tại nơi khác" : "Khai thông tin tham gia BHYT tại nơi khác")
+    : editingRecord
+      ? `Đơn đăng ký BHYT năm ${year ?? ""}${config?.name ? ` - ${config.name}` : ""}`
+      : `Khai thông tin - Mua BHYT năm ${year ?? ""}${config?.name ? ` - ${config.name}` : ""}`;
+  const windowInfo = submitted?.window ?? (config ? { start_date: config.start_date, end_date: config.end_date, can_edit: config.status === 'open' } : null);
+  const imageSlots = ([
+    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-blue-50 text-blue-500" },
+    { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-sky-50 text-sky-500" },
+    { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-emerald-50 text-emerald-500" },
+    { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-indigo-50 text-indigo-500" },
+  ] as const).filter((slot) => !external || slot.name !== "payment_receipt_image");
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-2 text-sm text-muted">
+    <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
+      <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted" aria-label="Breadcrumb">
         <Link
           href="/dashboard"
           className="hover:text-primary flex items-center gap-1.5"
@@ -465,16 +712,21 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           Bảo hiểm Y tế
         </Link>
         <ChevronRight size={14} />
-        <span className="font-medium text-ink">{external ? "Khai BHYT tại nơi khác" : "Đăng ký BHYT"}</span>
-      </div>
+        <span className="font-medium text-ink">
+          {editingRecord ? (external ? "Bản khai tại nơi khác" : "Đơn đăng ký BHYT") : external ? "Khai BHYT tại nơi khác" : "Đăng ký BHYT"}
+        </span>
+      </nav>
 
-      <div className="bg-primary-soft border border-primary-line rounded-lg p-5 text-primary-text">
-        <h1 className="text-lg font-bold mb-2 flex items-center gap-2">
-          <ShieldPlus size={20} /> {external ? "Khai thông tin tham gia BHYT tại nơi khác" : <>Khai thông tin - Mua BHYT năm {config?.registration_year} - {config?.name}</>}
+      {/* Tiêu đề + mô tả của đợt. Đơn đã nộp dùng mô tả HIỆN HÀNH của chính đợt đó. */}
+      <div className="rounded-lg border border-primary-line bg-primary-soft p-4 text-primary-text sm:p-5">
+        <h1 className="flex items-start gap-2 text-base font-bold sm:text-lg">
+          <ShieldPlus size={20} className="mt-0.5 shrink-0" /> <span>{title}</span>
         </h1>
-        {external ? <p className="text-sm">Dành cho tất cả sinh viên đã tham gia BHYT tại nơi khác. Vui lòng khai đầy đủ thông tin và đính kèm 3 ảnh để nhà trường ghi nhận.</p> : config?.description ? (
+        {external ? (
+          <p className="mt-2 text-sm">Dành cho tất cả sinh viên đã tham gia BHYT tại nơi khác. Vui lòng khai đầy đủ thông tin và đính kèm 3 ảnh để nhà trường ghi nhận.</p>
+        ) : config?.description ? (
           <div
-            className="text-sm mt-3"
+            className={cn(DESCRIPTION_CLS, "mt-3")}
             dangerouslySetInnerHTML={{
               __html: config.description.replace(/\n/g, "<br />"),
             }}
@@ -486,165 +738,204 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
               quy định.
             </li>
             <li>
-              <strong>Thời hạn:</strong> 01/10/2026 - 31/12/2026.
+              <strong>Thời hạn:</strong> {config?.coverage_start || "Chưa có thông tin"} — {config?.coverage_end || "Chưa có thông tin"}
             </li>
             <li>
-              <strong>Lệ phí:</strong> 170.775 đồng/sinh viên.
+              <strong>Lệ phí:</strong> {config?.insurance_fee?.toLocaleString("vi-VN") ?? "Chưa có thông tin"} đồng/sinh viên.
             </li>
           </ul>
         )}
       </div>
 
-      {error && (
-        <div className="p-4 bg-danger-soft border border-danger-line text-danger-text rounded-lg text-sm">
-          {error}
+      {!external && !editingRecord && config?.freshman_warning && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-text">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div><strong className="font-semibold">Lưu ý dành cho tân sinh viên:</strong> {config.freshman_warning}</div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {external && (
-          <section className={ui.card}>
-            <div className={ui.cardHeader}><h2 className={ui.sectionTitle}>Thông tin thẻ tham gia ngoài nhà trường</h2></div>
-            <div className="p-5 grid gap-4 sm:grid-cols-2">
-              {([
-                ['medical_insurance_code', 'Mã thẻ BHYT', 'text'],
-                ['valid_from', 'Giá trị sử dụng từ ngày', 'date'],
-                ['valid_until', 'Giá trị sử dụng đến ngày', 'date'],
-              ] as const).map(([field, label, type]) => (
-                <div key={field}>
-                  <label htmlFor={field} className={ui.fieldLabel}>{label} *</label>
-                  <input id={field} type={type} {...register(field)} className={ui.input} />
-                  {errors[field] && <p className="text-xs text-danger-text mt-1">{errors[field]?.message}</p>}
-                </div>
-              ))}
+      {notice && (
+        <div role="status" className="flex items-start gap-2.5 rounded-lg border border-success-line bg-success-soft px-4 py-3 text-sm text-success-text">
+          <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> {notice}
+        </div>
+      )}
+
+      {error && (
+        <div ref={alertRef} role="alert" className="flex items-start gap-2.5 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" /> {error}
+        </div>
+      )}
+
+      {/* Trạng thái hồ sơ đã nộp; link mở khóa chỉnh sửa ở góc phải tiêu đề */}
+      {editingRecord && submitted ? (
+        <section className={ui.card}>
+          <div className={cn(ui.cardHeader, "px-4 sm:px-5")}>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className={ui.sectionTitle}>
+                <History size={16} className="text-primary" />
+                {external ? "Bản khai đã gửi" : "Đơn đã gửi"}
+              </h2>
+              {submitted.status && <InsuranceStatus status={submitted.status} />}
             </div>
-          </section>
-        )}
-        {/* disabled khi đang gửi: trước đây thẻ này chỉ gom, không khoá gì. */}
-        <fieldset disabled={saving} className={saving ? "space-y-6 opacity-60" : "space-y-6"}>
-          <div className={ui.card}>
+            {canSubmit && (
+              <EditLink
+                active={unlocked}
+                label={resubmitting ? "Gửi lại bản khai" : "Chỉnh sửa"}
+                onClick={() => {
+                  setNotice("");
+                  if (unlocked) cancelEdit();
+                  else setUnlocked(true);
+                }}
+              />
+            )}
+          </div>
+
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3.5 text-sm sm:grid-cols-3 sm:px-5">
+            <div className="min-w-0">
+              <dt className="flex items-center gap-1.5 text-xs text-muted"><Send size={12} /> Đã gửi</dt>
+              <dd className="mt-0.5 font-medium text-ink">{formatDateTime(submitted.created_at)}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="flex items-center gap-1.5 text-xs text-muted"><RefreshCw size={12} /> Cập nhật</dt>
+              <dd className="mt-0.5 font-medium text-ink">{formatDateTime(submitted.updated_at)}</dd>
+            </div>
+            <div className="col-span-2 min-w-0 sm:col-span-1">
+              <dt className="flex items-center gap-1.5 text-xs text-muted"><CalendarClock size={12} /> Hạn chỉnh sửa</dt>
+              <dd className="mt-0.5 flex flex-wrap items-center gap-x-2 font-medium text-ink">
+                {formatDateTime(submitted.window?.end_date)}
+                <span className={cn("inline-flex items-center gap-1 text-xs font-medium", submitted.window?.can_edit ? "text-success-text" : "text-muted")}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {submitted.window?.can_edit ? "Đang mở" : "Đã đóng"}
+                </span>
+              </dd>
+            </div>
+          </dl>
+
+          {submitted.review_note && (
+            <div className={cn("border-t border-l-4 px-4 py-2.5 text-sm sm:px-5", submitted.status === "rejected" ? "border-t-danger-line border-l-danger-text bg-danger-soft text-danger-text" : "border-t-line2 border-l-slate-300 bg-slate-50 text-slate-700")}>
+              <strong className="font-semibold">Phản hồi của cán bộ:</strong> {submitted.review_note}
+            </div>
+          )}
+          {(() => {
+            const hint = unlocked
+              ? { Icon: Info, cls: "text-primary-text", text: resubmitting ? "Sửa theo phản hồi của cán bộ rồi bấm Gửi lại." : "Chỉ được chỉnh sửa một lần trong thời gian đợt mở." }
+              : submitted.edited_at
+                ? { Icon: CheckCircle2, cls: "text-muted", text: `Đã chỉnh sửa lúc ${formatDateTime(submitted.edited_at)} · không thể sửa thêm.` }
+                : !canSubmit
+                  ? { Icon: Lock, cls: "text-muted", text: "Hết thời gian chỉnh sửa · chỉ để xem." }
+                  : null;
+            return hint && (
+              <p className={cn("flex items-center gap-2 border-t border-line2 px-4 py-2.5 text-xs sm:px-5", hint.cls)}>
+                <hint.Icon size={14} className="shrink-0" /> {hint.text}
+              </p>
+            );
+          })()}
+        </section>
+      ) : windowInfo ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2 text-slate-600">
+            <CalendarClock size={16} className="mt-0.5 shrink-0 text-primary" />
+            <span>
+              Bắt đầu: <strong className="font-medium text-ink">{formatDateTime(windowInfo.start_date)}</strong>
+              <span className="hidden sm:inline"> · </span><br className="sm:hidden" />
+              Hạn kết thúc: <strong className="font-medium text-ink">{formatDateTime(windowInfo.end_date)}</strong>
+            </span>
+          </p>
+          <span className={cn(badge.base, "self-start sm:self-auto", windowInfo.can_edit ? badge.success : badge.neutral)}>
+            {windowInfo.can_edit ? "Đang mở" : "Đã đóng / chưa mở"}
+          </span>
+        </div>
+      ) : external ? (
+        <p className="rounded-lg border border-line bg-white px-4 py-3 text-sm text-muted">Hiện chưa mở thời gian tiếp nhận khai báo. Các bản khai đã gửi vẫn xem được tại trang BHYT.</p>
+      ) : null}
+
+      <form ref={formRef} onChange={() => { requestKey.current = null; }} onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5 sm:space-y-6">
+        {/* Hồ sơ đang khóa → mọi ô nhập bị vô hiệu; ảnh đã nộp vẫn xem được. */}
+        <fieldset disabled={saving || !formEnabled} className={cn("min-w-0 space-y-5 sm:space-y-6", saving && "opacity-60")}>
+          {external && (
+            <section className={ui.card}>
+              <div className={ui.cardHeader}><h2 className={ui.sectionTitle}><FileText size={16} className="text-primary" /> Thông tin thẻ tham gia ngoài nhà trường</h2></div>
+              <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
+                {([
+                  ['medical_insurance_code', 'Mã thẻ BHYT', 'text'],
+                  ['valid_from', 'Giá trị sử dụng từ ngày', 'date'],
+                  ['valid_until', 'Giá trị sử dụng đến ngày', 'date'],
+                ] as const).map(([field, label, type]) => (
+                  <div key={field} className="min-w-0">
+                    <label htmlFor={field} className={ui.fieldLabel}>{label} *</label>
+                    <input id={field} type={type} {...register(field)} className={fieldCls(editLocked, !!errors[field])} />
+                    <FieldError message={errors[field]?.message} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
                 <User size={16} className="text-primary" /> Thông tin cá nhân
               </h2>
-              {prefill && (
-                <button
-                  type="button"
+              {prefill && !editingRecord && (
+                <EditLink
+                  active={infoEditable}
                   onClick={() => {
-                    // Nếu đang mở mà bấm Hủy -> Khôi phục lại data gốc từ prefill
-                    if (infoEditable) {
-                      setValue("full_name", prefill.full_name ?? "");
-                      setValue("student_code", prefill.student_code ?? "");
-                      setValue(
-                        "gender",
-                        (prefill.gender as "Nam" | "Nữ") ?? "Nam",
-                      );
-                      setValue("dob", prefill.dob ?? "");
-                      setValue("ethnicity", prefill.ethnicity ?? "");
-                      setValue("phone_number", prefill.phone_number ?? "");
-                      setValue("citizen_id", prefill.citizen_id ?? "");
-
-                      // Bổ sung reset cho Số sổ BHXH
-                      setValue(
-                        "social_insurance_number",
-                        prefill.social_insurance_number ?? "",
-                      );
-
-                      // Bổ sung reset cho Địa chỉ thường trú
-                      setValue("permanent", {
-                        provinceCode: prefill.permanent_province ?? "",
-                        wardCode: prefill.permanent_ward ?? "",
-                        street: prefill.permanent_street ?? "",
-                      });
-                    }
+                    // Đang mở mà bấm Hủy → khôi phục dữ liệu gốc từ hồ sơ.
+                    if (infoEditable) applyValues(prefill);
                     setInfoEditable(!infoEditable);
                   }}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                >
-                  <Pencil size={12} /> {infoEditable ? "Hủy sửa" : "Chỉnh sửa"}
-                </button>
+                />
               )}
             </div>
 
-            <div className="p-5 space-y-6">
-              <div className="grid sm:grid-cols-2 gap-5">
-                <div>
+            <div className="space-y-6 p-4 sm:p-5">
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Họ và tên</label>
                   <input
                     {...register("full_name")}
-                    disabled={recorded(prefill?.full_name) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.full_name) && !infoEditable,
-                      !!errors.full_name,
-                    )}
+                    disabled={personalLocked(prefill?.full_name)}
+                    className={fieldCls(personalLocked(prefill?.full_name), !!errors.full_name)}
                   />
-                  {errors.full_name && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.full_name.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.full_name?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Mã số sinh viên</label>
                   <input
                     {...register("student_code")}
-                    disabled={recorded(prefill?.student_code) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.student_code) && !infoEditable,
-                      !!errors.student_code,
-                    )}
+                    readOnly={editingRecord || (recorded(prefill?.student_code) && !infoEditable)}
+                    className={fieldCls(editingRecord || personalLocked(prefill?.student_code), !!errors.student_code)}
                   />
-                  {errors.student_code && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.student_code.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.student_code?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Giới tính</label>
                   <select
                     {...register("gender")}
-                    disabled={recorded(prefill?.gender) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.gender) && !infoEditable,
-                      !!errors.gender,
-                    )}
+                    disabled={personalLocked(prefill?.gender)}
+                    className={fieldCls(personalLocked(prefill?.gender), !!errors.gender)}
                   >
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                   </select>
-                  {errors.gender && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.gender.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.gender?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Ngày sinh</label>
                   <input
                     type="date"
                     {...register("dob")}
-                    disabled={recorded(prefill?.dob) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.dob) && !infoEditable,
-                      !!errors.dob,
-                    )}
+                    disabled={personalLocked(prefill?.dob)}
+                    className={fieldCls(personalLocked(prefill?.dob), !!errors.dob)}
                   />
-                  {errors.dob && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.dob.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.dob?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Dân tộc</label>
                   <select
                     {...register("ethnicity")}
-                    disabled={recorded(prefill?.ethnicity) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.ethnicity) && !infoEditable,
-                      !!errors.ethnicity,
-                    )}
+                    disabled={personalLocked(prefill?.ethnicity)}
+                    className={fieldCls(personalLocked(prefill?.ethnicity), !!errors.ethnicity)}
                   >
                     <option value="">-- Chọn dân tộc --</option>
                     {ethnicities.map((e) => (
@@ -653,100 +944,73 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                       </option>
                     ))}
                   </select>
-                  {errors.ethnicity && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.ethnicity.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.ethnicity?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Số điện thoại</label>
                   <input
                     {...register("phone_number")}
-                    disabled={recorded(prefill?.phone_number) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.phone_number) && !infoEditable,
-                      !!errors.phone_number,
-                    )}
+                    inputMode="tel"
+                    disabled={personalLocked(prefill?.phone_number)}
+                    className={fieldCls(personalLocked(prefill?.phone_number), !!errors.phone_number)}
                   />
-                  {errors.phone_number && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.phone_number.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.phone_number?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>Số CCCD</label>
                   <input
                     {...register("citizen_id")}
-                    disabled={recorded(prefill?.citizen_id) && !infoEditable}
-                    className={fieldCls(
-                      recorded(prefill?.citizen_id) && !infoEditable,
-                      !!errors.citizen_id,
-                    )}
+                    inputMode="numeric"
+                    disabled={personalLocked(prefill?.citizen_id)}
+                    className={fieldCls(personalLocked(prefill?.citizen_id), !!errors.citizen_id)}
                   />
-                  {errors.citizen_id && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.citizen_id.message}
-                    </p>
-                  )}
+                  <FieldError message={errors.citizen_id?.message} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className={ui.fieldLabel}>
                     Số sổ BHXH (10 số cuối của BHYT)
                   </label>
                   <input
                     {...register("social_insurance_number")}
-                    disabled={
-                      recorded(prefill?.social_insurance_number) &&
-                      !infoEditable
-                    }
-                    className={fieldCls(
-                      recorded(prefill?.social_insurance_number) &&
-                        !infoEditable,
-                      !!errors.social_insurance_number,
-                    )}
+                    inputMode="numeric"
+                    disabled={personalLocked(prefill?.social_insurance_number)}
+                    className={fieldCls(personalLocked(prefill?.social_insurance_number), !!errors.social_insurance_number)}
                   />
-                  {errors.social_insurance_number && (
-                    <p className="text-xs text-danger-text mt-1">
-                      {errors.social_insurance_number.message as string}
+                  <FieldError message={errors.social_insurance_number?.message} />
+                  {!editLocked && (
+                    <p className="mt-2 text-xs leading-5 text-muted">
+                      Tra cứu mã BHYT tại{" "}
+                      <a
+                        href="https://baohiemxahoi.gov.vn/tracuu/Pages/tra-cuu-thoi-han-su-dung-the-bhyt.aspx"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-primary hover:underline"
+                      >
+                        cổng tra cứu BHYT
+                      </a>
+                      .<br />
+                      <strong>Lưu ý:</strong> Điền số CCCD thay cho mã BHYT/BHXH để tra cứu.
+                      <br />
+                      Sinh viên có thể chụp ảnh này thay cho ảnh BHYT cũ và tải lên hệ thống.
                     </p>
                   )}
-                  <p className="mt-2 text-xs leading-5 text-muted">
-                    Tra cứu mã BHYT tại{" "}
-                    <a
-                      href="https://baohiemxahoi.gov.vn/tracuu/Pages/tra-cuu-thoi-han-su-dung-the-bhyt.aspx"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium text-primary hover:underline"
-                    >
-                      cổng tra cứu BHYT
-                    </a>
-                    .<br />
-                    <strong>Lưu ý:</strong> Điền số CCCD thay cho mã BHYT/BHXH để tra cứu.
-                    <br />
-                    Sinh viên có thể chụp ảnh này thay cho ảnh BHYT cũ và tải lên hệ thống.
-                  </p>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-line2">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={cn("text-sm font-semibold", errors.permanent && "text-danger-text")}>
-                    Thường trú
-                  </h3>
-                </div>
+                <h3 className={cn("mb-3 text-sm font-semibold", errors.permanent && "text-danger-text")}>
+                  Thường trú
+                </h3>
 
                 <Controller
                   control={control}
                   name="permanent"
                   render={({ field }) => (
                     <div
+                      data-field-error={errors.permanent ? "" : undefined}
                       className={cn(
                         "transition-opacity",
-                        /* Khóa form mờ đi nếu đã có data gốc VÀ đang không bật chế độ chỉnh sửa */
-                        hasAddress && !infoEditable && "opacity-70 pointer-events-none",
-                        /* Highlight khung đỏ nếu có lỗi validation */
+                        addressLocked && "opacity-70 pointer-events-none",
                         errors.permanent && "p-3 -mx-3 rounded-lg border border-red-500 bg-red-50/40"
                       )}
                     >
@@ -772,445 +1036,287 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 />
               </div>
             </div>
-          </div>
-        </fieldset>
-        {/* Các phần dưới đây luôn mở */}
+          </section>
 
-        <div className={ui.card}>
-          <div className={ui.cardHeader}>
-            <h2 className={ui.sectionTitle}>
-              <ShieldPlus size={16} className="text-primary" /> Nơi Đăng ký Khám
-              chữ bệnh ban đầu
-            </h2>
-          </div>
-          <div className="p-5 space-y-4">
-            <div>
-              <label className={cn(ui.fieldLabel, (!hospitalProvince && errors.hospital_code) && "text-danger-text")} htmlFor="kcb-province">
-                Tỉnh thành bệnh viện
-              </label>
-              {/* Bọc viền đỏ nếu chưa chọn tỉnh mà ấn Submit */}
-              <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
-                <SearchableSelect
-                  id="kcb-province"
-                  value={hospitalProvince}
-                  onChange={(v) => {
-                    setHospitalProvince(v);
-                    setValue("hospital_code", "");
-                  }}
-                  options={provinces
-                    .filter(
-                      (p) =>
-                        external || p.code === "79" ||
-                        p.code === "75" ||
-                        p.name.includes("Hồ Chí Minh") ||
-                        p.name.includes("Đồng Nai"),
-                    )
-                    .map((p) => ({
-                      value: p.code,
-                      label: p.name,
-                    }))}
-                  placeholder="-- Chọn tỉnh thành --"
-                  searchPlaceholder="Gõ tên tỉnh thành..."
-                  emptyText="Không có tỉnh thành nào khớp"
-                />
-              </div>
+          <section className={ui.card}>
+            <div className={ui.cardHeader}>
+              <h2 className={ui.sectionTitle}>
+                <ShieldPlus size={16} className="text-primary" /> Nơi đăng ký khám chữa bệnh ban đầu
+              </h2>
             </div>
-            <div>
-              <label className={cn(ui.fieldLabel, errors.hospital_code && "text-danger-text")} htmlFor="kcb-hospital">
-                Bệnh viện
-              </label>
-
-              {/* Bọc viền đỏ nếu chưa chọn bệnh viện */}
-              <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
-                <Controller
-                  control={control}
-                  name="hospital_code"
-                  render={({ field }) => (
-                    <SearchableSelect
-                      id="kcb-hospital"
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      options={hospitals.map((h) => ({
-                        value: h.code,
-                        label: h.name,
-                        hint: h.code,
+            <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
+              <div className="min-w-0">
+                <label className={cn(ui.fieldLabel, (!hospitalProvince && errors.hospital_code) && "text-danger-text")} htmlFor="kcb-province">
+                  Tỉnh thành bệnh viện
+                </label>
+                <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                  <SearchableSelect
+                    id="kcb-province"
+                    value={hospitalProvince}
+                    disabled={!formEnabled}
+                    onChange={(v) => {
+                      setHospitalProvince(v);
+                      setValue("hospital_code", "");
+                    }}
+                    options={provinces
+                      .filter(
+                        (p) =>
+                          external || p.code === "79" ||
+                          p.code === "75" ||
+                          p.name.includes("Hồ Chí Minh") ||
+                          p.name.includes("Đồng Nai"),
+                      )
+                      .map((p) => ({
+                        value: p.code,
+                        label: p.name,
                       }))}
-                      disabled={!hospitalProvince || hospitalsLoading}
-                      placeholder={
-                        !hospitalProvince
-                          ? "-- Chọn tỉnh thành trước --"
-                          : hospitalsLoading
-                            ? "Đang tải danh sách..."
-                            : "-- Chọn bệnh viện KCB --"
-                      }
-                      searchPlaceholder="Gõ tên hoặc mã cơ sở..."
-                      emptyText="Không có cơ sở nào khớp"
-                    />
-                  )}
-                />
+                    placeholder="-- Chọn tỉnh thành --"
+                    searchPlaceholder="Gõ tên tỉnh thành..."
+                    emptyText="Không có tỉnh thành nào khớp"
+                  />
+                </div>
               </div>
-
-              {errors.hospital_code && (
-                <p className="text-xs text-danger-text mt-1">
-                  {errors.hospital_code.message}
-                </p>
-              )}
-
-              {hospitalProvince && !hospitalsLoading && (
-                <p className="mt-1.5 text-xs text-primary font-medium">
-                  Đã tìm thấy {hospitals.length} cơ sở. Gõ tên hoặc mã để tìm,
-                  không dấu cũng được.
-                </p>
-              )}
-
-              {!external && <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
-                <li>
-                  • <b>Link tra cứu bệnh viện:</b>{" "}
-                  <a
-                    href="https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Xem tại đây
-                  </a>
-                </li>
-                <li>
-                  • Sinh viên chỉ chọn các Bệnh viện tại <b>TP.HCM</b> hoặc{" "}
-                  <b>Đồng Nai</b>.
-                </li>
-                <li>
-                  • <b>Lưu ý:</b> Sinh viên{" "}
-                  <b className="text-danger-text">không</b> chọn bệnh viện{" "}
-                  <b className="text-danger-text">không được đăng ký mới</b> và{" "}
-                  <b className="text-danger-text">đổi nơi Khám chữa bệnh (KCBBD)</b>.
-                </li>
-              </ul>}
-            </div>
-          </div>
-        </div>
-
-        {/* Thanh toán & Hồ sơ - Chỉ hiển thị khi không khoá */}
-        <div className={ui.card}>
-          <div className={ui.cardHeader}>
-            <h2 className={ui.sectionTitle}>
-              <CreditCard size={16} className="text-primary" /> {external ? "Hồ sơ đính kèm" : "Thanh toán & Hồ sơ"}
-            </h2>
-          </div>
-          <div className="p-5 space-y-6">
-            {!external && <div className="flex flex-col items-start gap-6 rounded-lg border border-line bg-slate-50 p-4 md:flex-row">
-              <div className="mx-auto shrink-0 text-center md:mx-0">
-                {qrPayload ? (
-                  <>
-                    <div className="rounded-lg border border-line bg-white p-3">
-                      <QRCode
-                        value={qrPayload}
-                        size={148}
-                        level="M"
-                        style={{ height: 148, width: 148 }}
+              <div className="min-w-0">
+                <label className={cn(ui.fieldLabel, errors.hospital_code && "text-danger-text")} htmlFor="kcb-hospital">
+                  Bệnh viện
+                </label>
+                <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                  <Controller
+                    control={control}
+                    name="hospital_code"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        id="kcb-hospital"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        options={hospitals.map((h) => ({
+                          value: h.code,
+                          label: h.name,
+                          hint: h.code,
+                        }))}
+                        disabled={!formEnabled || !hospitalProvince || hospitalsLoading}
+                        placeholder={
+                          !hospitalProvince
+                            ? "-- Chọn tỉnh thành trước --"
+                            : hospitalsLoading
+                              ? "Đang tải danh sách..."
+                              : "-- Chọn bệnh viện KCB --"
+                        }
+                        searchPlaceholder="Gõ tên hoặc mã cơ sở..."
+                        emptyText="Không có cơ sở nào khớp"
                       />
-                    </div>
-                    <p className="mt-2 text-xs text-muted">
-                      Quét bằng app ngân hàng bất kỳ
-                    </p>
-                  </>
-                ) : (
-                  <div className="flex h-[176px] w-[176px] items-center justify-center rounded-lg border border-dashed border-line bg-white px-4 text-center text-xs text-muted">
-                    Chưa tạo được mã QR. Vui lòng chuyển khoản thủ công theo
-                    thông tin bên cạnh.
-                  </div>
+                    )}
+                  />
+                </div>
+                <FieldError message={errors.hospital_code?.message} />
+                {formEnabled && hospitalProvince && !hospitalsLoading && (
+                  <p className="mt-1.5 text-xs text-primary font-medium">
+                    Đã tìm thấy {hospitals.length} cơ sở. Gõ tên hoặc mã để tìm,
+                    không dấu cũng được.
+                  </p>
                 )}
               </div>
-
-              <div className="min-w-0 flex-1">
-                <h3 className="mb-2 font-semibold text-ink">
-                  Thông tin chuyển khoản
-                </h3>
-                <ul className="space-y-1.5 text-sm text-slate-600">
+              {!external && formEnabled && (
+                <ul className="space-y-0.5 text-[0.75rem] text-muted md:col-span-2">
                   <li>
-                    Ngân hàng:{" "}
-                    <strong className="text-ink">
-                      {config?.bank_name || "—"}
-                    </strong>
-                    {bankBin && (
-                      <span className="ml-1.5 text-xs text-muted">
-                        (BIN {bankBin})
-                      </span>
-                    )}
-                  </li>
-                  <li className="flex flex-wrap items-center gap-x-2">
-                    <span>
-                      Số tài khoản:{" "}
-                      <strong className="font-mono text-ink">
-                        {config?.bank_account_number || "—"}
-                      </strong>
-                    </span>
-                    {config?.bank_account_number && (
-                      <CopyButton text={config.bank_account_number} />
-                    )}
+                    • <b>Link tra cứu bệnh viện:</b>{" "}
+                    <a
+                      href="https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Xem tại đây
+                    </a>
                   </li>
                   <li>
-                    Chủ tài khoản:{" "}
-                    <strong className="text-ink">
-                      {config?.bank_account_name || "—"}
-                    </strong>
+                    • Sinh viên chỉ chọn các Bệnh viện tại <b>TP.HCM</b> hoặc{" "}
+                    <b>Đồng Nai</b>.
                   </li>
                   <li>
-                    Số tiền:{" "}
-                    <strong className="text-base text-primary">
-                      {config?.insurance_fee
-                        ? new Intl.NumberFormat("vi-VN").format(
-                            config.insurance_fee,
-                          )
-                        : "—"}{" "}
-                      VNĐ
-                    </strong>
-                  </li>
-                  <li className="flex flex-wrap items-center gap-x-2">
-                    <span>
-                      Nội dung:{" "}
-                      <strong className="break-all text-ink">
-                        {transferNote}
-                      </strong>
-                    </span>
-                    <CopyButton text={transferNote} />
+                    • <b>Lưu ý:</b> Sinh viên{" "}
+                    <b className="text-danger-text">không</b> chọn bệnh viện{" "}
+                    <b className="text-danger-text">không được đăng ký mới</b> và{" "}
+                    <b className="text-danger-text">đổi nơi Khám chữa bệnh (KCBBD)</b>.
                   </li>
                 </ul>
-                <p className="mt-3 text-xs text-muted">
-                  Mã QR đã gồm sẵn số tài khoản, số tiền và nội dung. Giữ nguyên
-                  nội dung chuyển khoản để Phòng KHTC đối chiếu được hóa đơn.
-                </p>
-              </div>
-            </div>}
+              )}
+            </div>
+          </section>
 
-            <div className={cn("grid items-start gap-5 sm:grid-cols-2", external ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
-              {/* CCCD MẶT TRƯỚC */}
-              <div className="flex flex-col">
-                <label
-                  className={cn(
-                    ui.fieldLabel,
-                    "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1",
-                  )}
-                >
-                  <span>Ảnh VNeID/CCCD mặt trước</span>
-                  <span className="text-danger-text">*</span>
-                </label>
-                <div
-                  className={cn(
-                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
-                    errors.cccd_image
-                      ? "border-red-500 bg-red-50"
-                      : "border-slate-300 hover:bg-slate-50",
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    {...register("cccd_image")}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-500 transition-transform group-hover:scale-110">
-                      {watch("cccd_image")?.length > 0 ? (
-                        <CheckSquare size={20} className="text-success-text" />
-                      ) : (
-                        <Plus size={20} />
-                      )}
+          <section className={ui.card}>
+            <div className={ui.cardHeader}>
+              <h2 className={ui.sectionTitle}>
+                <CreditCard size={16} className="text-primary" /> {external ? "Hồ sơ đính kèm" : "Thanh toán & Hồ sơ"}
+              </h2>
+            </div>
+            <div className="space-y-5 p-4 sm:space-y-6 sm:p-5">
+              {/* Đơn đã nộp: đã chuyển khoản rồi nên ẩn QR + thông tin chuyển khoản. */}
+              {!external && !editingRecord && <div className="flex flex-col items-center gap-5 rounded-lg border border-line bg-slate-50 p-4 md:flex-row md:items-start md:gap-6">
+                <div className="shrink-0 text-center">
+                  {qrPayload ? (
+                    <>
+                      <div className="rounded-lg border border-line bg-white p-3">
+                        <QRCode
+                          value={qrPayload}
+                          size={148}
+                          level="M"
+                          style={{ height: 148, width: 148 }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-muted">
+                        Quét bằng app ngân hàng bất kỳ
+                      </p>
+                    </>
+                  ) : (
+                    <div className="flex h-[176px] w-[176px] items-center justify-center rounded-lg border border-dashed border-line bg-white px-4 text-center text-xs text-muted">
+                      Chưa tạo được mã QR. Vui lòng chuyển khoản thủ công theo
+                      thông tin bên cạnh.
                     </div>
-                    <span className="text-sm font-medium text-slate-700 break-all">
-                      {watch("cccd_image")?.length > 0
-                        ? watch("cccd_image")[0].name
-                        : "Tải lên mặt trước"}
-                    </span>
-                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
-                  </div>
+                  )}
                 </div>
-                {errors.cccd_image && (
-                  <p className="mt-1 text-xs text-danger-text">
-                    {errors.cccd_image.message as string}
-                  </p>
-                )}
-              </div>
 
-              {/* CCCD MẶT SAU */}
-              <div className="flex flex-col">
-                <label
-                  className={cn(
-                    ui.fieldLabel,
-                    "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1",
-                  )}
-                >
-                  <span>Ảnh VNeID/CCCD mặt sau</span>
-                  <span className="text-danger-text">*</span>
-                </label>
-                <div
-                  className={cn(
-                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
-                    errors.cccd_image_back
-                      ? "border-red-500 bg-red-50"
-                      : "border-slate-300 hover:bg-slate-50",
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    {...register("cccd_image_back")}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-500 transition-transform group-hover:scale-110">
-                      {watch("cccd_image_back")?.length > 0 ? (
-                        <CheckSquare size={20} className="text-success-text" />
-                      ) : (
-                        <Plus size={20} />
+                <div className="w-full min-w-0 flex-1">
+                  <h3 className="mb-2 font-semibold text-ink">
+                    Thông tin chuyển khoản
+                  </h3>
+                  <ul className="space-y-1.5 text-sm text-slate-600">
+                    <li>
+                      Ngân hàng:{" "}
+                      <strong className="text-ink">
+                        {config?.bank_name || "—"}
+                      </strong>
+                      {bankBin && (
+                        <span className="ml-1.5 text-xs text-muted">
+                          (BIN {bankBin})
+                        </span>
                       )}
-                    </div>
-                    <span className="text-sm font-medium text-slate-700 break-all">
-                      {watch("cccd_image_back")?.length > 0
-                        ? watch("cccd_image_back")[0].name
-                        : "Tải lên mặt sau"}
-                    </span>
-                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
-                  </div>
-                </div>
-                {errors.cccd_image_back && (
-                  <p className="mt-1 text-xs text-danger-text">
-                    {errors.cccd_image_back.message as string}
-                  </p>
-                )}
-              </div>
-
-              {/* BIÊN LAI */}
-              {!external && <div className="flex flex-col">
-                <label
-                  className={cn(
-                    ui.fieldLabel,
-                    "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1",
-                  )}
-                >
-                  <span>Bill chuyển khoản</span>
-                  <span className="text-danger-text">*</span>
-                </label>
-                <div
-                  className={cn(
-                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
-                    errors.payment_receipt_image
-                      ? "border-red-500 bg-red-50"
-                      : "border-slate-300 hover:bg-slate-50",
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    {...register("payment_receipt_image")}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 transition-transform group-hover:scale-110">
-                      {watch("payment_receipt_image")?.length > 0 ? (
-                        <CheckSquare size={20} className="text-success-text" />
-                      ) : (
-                        <CreditCard size={20} />
+                    </li>
+                    <li className="flex flex-wrap items-center gap-x-2">
+                      <span>
+                        Số tài khoản:{" "}
+                        <strong className="font-mono text-ink">
+                          {config?.bank_account_number || "—"}
+                        </strong>
+                      </span>
+                      {config?.bank_account_number && (
+                        <CopyButton text={config.bank_account_number} />
                       )}
-                    </div>
-                    <span className="text-sm font-medium text-slate-700 break-all">
-                      {watch("payment_receipt_image")?.length > 0
-                        ? watch("payment_receipt_image")[0].name
-                        : "Tải lên biên lai"}
-                    </span>
-                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
-                  </div>
-                </div>
-                {errors.payment_receipt_image && (
-                  <p className="mt-1 text-xs text-danger-text">
-                    {errors.payment_receipt_image.message as string}
+                    </li>
+                    <li>
+                      Chủ tài khoản:{" "}
+                      <strong className="text-ink">
+                        {config?.bank_account_name || "—"}
+                      </strong>
+                    </li>
+                    <li>
+                      Số tiền:{" "}
+                      <strong className="text-base text-primary">
+                        {config?.insurance_fee
+                          ? new Intl.NumberFormat("vi-VN").format(
+                              config.insurance_fee,
+                            )
+                          : "—"}{" "}
+                        VNĐ
+                      </strong>
+                    </li>
+                    <li className="flex flex-wrap items-center gap-x-2">
+                      <span>
+                        Nội dung:{" "}
+                        <strong className="break-all text-ink">
+                          {transferNote}
+                        </strong>
+                      </span>
+                      <CopyButton text={transferNote} />
+                    </li>
+                  </ul>
+                  <p className="mt-3 text-xs text-muted">
+                    Mã QR đã gồm sẵn số tài khoản, số tiền và nội dung. Giữ nguyên
+                    nội dung chuyển khoản để Phòng KHTC đối chiếu được hóa đơn.
                   </p>
-                )}
+                </div>
               </div>}
 
-              {/* ẢNH THẺ BHYT */}
-              <div className="flex flex-col">
-                <label
-                  className={cn(
-                    ui.fieldLabel,
-                    "mb-1.5 flex min-h-[1.25rem] items-baseline gap-1",
-                  )}
-                >
-                  <span>Ảnh thẻ BHYT</span>
-                  <span className="text-danger-text">*</span>
-                  <span className="text-xs font-normal text-muted">
-                    (VssID/VNeID)
-                  </span>
-                </label>
-                <div
-                  className={cn(
-                    "group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
-                    errors.bhyt_image
-                      ? "border-red-500 bg-red-50"
-                      : "border-slate-300 hover:bg-slate-50",
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    {...register("bhyt_image")}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-500 transition-transform group-hover:scale-110">
-                      {watch("bhyt_image")?.length > 0 ? (
-                        <CheckSquare size={20} className="text-success-text" />
-                      ) : (
-                        <FileText size={20} />
-                      )}
-                    </div>
-                    <span className="text-sm font-medium text-slate-700 break-all">
-                      {watch("bhyt_image")?.length > 0
-                        ? watch("bhyt_image")[0].name
-                        : "Tải lên ảnh thẻ BHYT"}
-                    </span>
-                    <span className="text-xs text-slate-500">Tối đa 5MB</span>
-                  </div>
-                </div>
-                {errors.bhyt_image && (
-                  <p className="mt-1 text-xs text-danger-text">
-                    {errors.bhyt_image.message as string}
-                  </p>
-                )}
+              {editingRecord && (
+                <p className="text-xs text-muted">
+                  {editLocked
+                    ? "Ảnh đã nộp. Bấm vào ảnh để xem cỡ lớn."
+                    : "Ảnh đã nộp được giữ nguyên. Chỉ chọn ảnh mới khi muốn thay thế."}
+                </p>
+              )}
+
+              <div className={cn("grid items-start gap-4 sm:grid-cols-2 sm:gap-5", external ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
+                {imageSlots.map((slot) => {
+                  const value = watch(slot.name) as FileList | string | undefined;
+                  return (
+                    <ImageField
+                      key={slot.name}
+                      label={slot.label}
+                      hint={"hint" in slot ? slot.hint : undefined}
+                      emptyText={slot.emptyText}
+                      Icon={slot.Icon}
+                      tone={slot.tone}
+                      existingUrl={submittedImages[slot.name]}
+                      disabled={!formEnabled || saving}
+                      file={typeof value === "string" ? undefined : value?.[0]}
+                      error={errors[slot.name]}
+                      input={register(slot.name)}
+                    />
+                  );
+                })}
               </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div className={ui.card}>
-          <div className={cn("p-5 border rounded-lg transition-colors", errors.confirm_declaration ? "border-red-500 bg-red-50" : "border-transparent")}>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                {...register("confirm_declaration")}
-                className={cn("mt-1 w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary", errors.confirm_declaration && "border-red-500 outline-none ring-2 ring-red-500/20")}
-              />
-              <div>
-                <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-red-700" : "text-ink")}>
-                  {external ? "Xác nhận đã khai đúng thông tin và đồng ý cung cấp thông tin cho nhà trường." : "Xác nhận đã khai đúng thông tin, đã chuyển khoản và đồng ý cung cấp thông tin cho nhà trường."}
-                </span>
-                {errors.confirm_declaration && (
-                  <p className="text-xs text-danger-text mt-1">
-                    {errors.confirm_declaration.message}
-                  </p>
-                )}
-              </div>
-            </label>
-          </div>
-        </div>
+          {formEnabled && (
+            <div className={cn(ui.card, "p-4 sm:p-5 transition-colors", errors.confirm_declaration && "border-red-500 bg-red-50")}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...register("confirm_declaration")}
+                  className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-primary focus:ring-primary", errors.confirm_declaration && "border-red-500 outline-none ring-2 ring-red-500/20")}
+                />
+                <div>
+                  <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-red-700" : "text-ink")}>
+                    {editingRecord
+                      ? "Xác nhận thông tin chỉnh sửa là chính xác và đồng ý cung cấp thông tin cho nhà trường."
+                      : external
+                        ? "Xác nhận đã khai đúng thông tin và đồng ý cung cấp thông tin cho nhà trường."
+                        : "Xác nhận đã khai đúng thông tin, đã chuyển khoản và đồng ý cung cấp thông tin cho nhà trường."}
+                  </span>
+                  <FieldError message={errors.confirm_declaration?.message} />
+                </div>
+              </label>
+            </div>
+          )}
+        </fieldset>
 
-        <div className="flex justify-end gap-3">
-          <Link href="/dashboard/bao-hiem-y-te" className={ui.btnGhost}>
-            Hủy
-          </Link>
-          <button type="submit" disabled={saving} className={ui.btnPrimary}>
-            {saving ? <Loader2 size={16} className="animate-spin" /> : null} {external ? "Gửi khai báo" : "Gửi đăng ký"}
-          </button>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          {editingRecord ? (
+            unlocked ? (
+              <>
+                <button type="button" className={cn(ui.btnGhost, "w-full sm:w-auto")} disabled={saving} onClick={cancelEdit}>
+                  Hủy chỉnh sửa
+                </button>
+                <button type="submit" disabled={saving || !canSubmit} className={cn(ui.btnPrimary, "w-full sm:w-auto")}>
+                  {saving && <Loader2 size={16} className="animate-spin" />} {resubmitting ? "Gửi lại" : "Lưu thay đổi"}
+                </button>
+              </>
+            ) : (
+              <Link href="/dashboard/bao-hiem-y-te" className={cn(ui.btnOutline, "w-full sm:w-auto")}>
+                Quay lại trang BHYT
+              </Link>
+            )
+          ) : (
+            <>
+              <Link href="/dashboard/bao-hiem-y-te" className={cn(ui.btnGhost, "w-full sm:w-auto")}>
+                Hủy
+              </Link>
+              <button type="submit" disabled={saving || !canSubmit} className={cn(ui.btnPrimary, "w-full sm:w-auto")}>
+                {saving && <Loader2 size={16} className="animate-spin" />} {external ? "Gửi khai báo" : "Gửi đăng ký"}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </div>

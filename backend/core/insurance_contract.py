@@ -12,7 +12,9 @@ LEGACY = {'pending': 'iu_processing', 'processing': 'iu_processing', 'done': 'is
 TRANSITIONS = {'iu_processing': {'waiting_bhxh', 'rejected'}, 'waiting_bhxh': {'issued'}}
 REASONS = {'UNPAID': 'Chưa thanh toán tiền', 'UNDERPAID': 'Thanh toán thiếu tiền',
            'HOSPITAL_NOT_ACCEPTED': 'Bệnh viện không chấp nhận', 'OTHER': 'Lý do khác'}
-EVENT_LABELS = {'SUBMITTED': 'Nộp đơn', 'REJECTED': 'Từ chối đơn',
+EVENT_LABELS = {
+    'STUDENT_UPDATED': 'Sinh viên chỉnh sửa', 'IMAGES_REPLACED': 'Thay ảnh',
+    'SUPPLEMENT_REVIEWED': 'Đã kiểm tra bổ sung','SUBMITTED': 'Nộp đơn', 'REJECTED': 'Từ chối đơn',
     'HOSPITAL_CHANGED': 'Điều chỉnh bệnh viện', 'PAYMENT_EVIDENCE_SUBMITTED': 'Gửi minh chứng thanh toán',
     'PAYMENT_ASSESSED': 'Đối soát tiền', 'RESUBMITTED': 'Gửi lại đơn',
     'SENT_TO_BHXH': 'Chuyển BHXH', 'ISSUED': 'Phát hành thẻ', 'REOPENED': 'Mở lại đơn',
