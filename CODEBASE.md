@@ -51,6 +51,8 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
+  core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn, đóng, xếp email người phụ trách
+  core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
   core/address_service.py · address_validators.py   ← BẢN SAO của Dashboard, sửa cả hai
   core/cccd.py              ← đọc QR căn cước
@@ -62,7 +64,7 @@ backend/
   core/external_insurance_models.py ← khai BHYT tại nơi khác
   core/management/commands/backfill_insurance_workflow.py   ← dựng timeline cho đơn cũ
 
-  core/api/urls.py          ← 31 endpoint
+  core/api/urls.py          ← 38 endpoint
   core/api/views.py         ← phần lớn view (1.480 dòng)
   core/api/insurance_views.py · external_insurance_views.py
   core/api/serializers.py · authentication.py · throttling.py · tokens.py
@@ -95,12 +97,13 @@ frontend/
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
 | `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
+| `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
 
-### 31 endpoint — `core/api/urls.py`
+### 38 endpoint — `core/api/urls.py`
 
 `health/` · `features/` (không cần auth) · `auth/{login,logout,token/refresh}` ·
 `auth/microsoft/{start,callback}` · `dashboard/` · `health-insurance/` ·
@@ -108,7 +111,8 @@ frontend/
 `health-insurance/external/` · `requests/` + `<id>/` + `<id>/comments/` +
 5 endpoint `requests/<loại>/form/` · `offcampus/` + `offcampus/request-reopen/` ·
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
-`locations/{provinces,wards,ethnicities}` · `hospitals/`
+`tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` + `<id>/close/` +
+`<id>/attachments/<id>/` · `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
 
@@ -118,6 +122,7 @@ frontend/
 |---|---|
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
+| Hỏi đáp (ticket), realtime | `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |
 | Quan hệ với Dashboard và WordPress | `docs/ECOSYSTEM.md` |
@@ -166,7 +171,8 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
+DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```
 

@@ -1,0 +1,118 @@
+{% comment %}
+Thư báo người phụ trách: ticket mới / sinh viên nhắn thêm. Người nhận là CHUYÊN VIÊN.
+Khung thư bám theo dashboard_iuoss `notifications/templates/notifications/base_email.html`
+(bảng, CSS inline, 600px) nhưng rút gọn: thư nội bộ, không cần khối liên hệ sinh viên.
+Link Dashboard đứng ĐẦU thư theo yêu cầu; file sinh viên gửi được Dashboard đính kèm
+lúc gửi thư (notifications/attachments.py), ở đây chỉ liệt kê tên.
+{% endcomment %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+       style="background:#f4f6f8; margin:0; padding:24px 12px;">
+  <tbody>
+    <tr>
+      <td align="center">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600"
+               style="width:600px; max-width:600px; background:#ffffff; border:1px solid #dddddd;">
+          <tbody>
+            <tr>
+              <td style="padding:18px 30px 14px 30px; border-bottom:3px solid #155e75;
+                         font-family:Arial, Helvetica, sans-serif;">
+                <p style="margin:0; font-size:12px; color:#666666; letter-spacing:.3px;">IUOSS HUB · HỎI ĐÁP SINH VIÊN</p>
+                <p style="margin:4px 0 0 0; font-size:18px; line-height:25px; font-weight:bold; color:#172033;">
+                  {% if is_new %}Ticket mới #{{ ticket.pk }}{% else %}Sinh viên nhắn thêm — ticket #{{ ticket.pk }}{% endif %}
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:20px 30px 6px 30px; font-family:Arial, Helvetica, sans-serif;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+                  <tbody>
+                    <tr>
+                      <td style="background:#155e75; border-radius:6px;">
+                        <a href="{{ ticket_url }}" target="_blank"
+                           style="display:inline-block; padding:11px 22px; font-size:14px; font-weight:bold;
+                                  color:#ffffff; text-decoration:none;">
+                          Mở ticket trên Dashboard
+                        </a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style="margin:8px 0 0 0; font-size:12px; line-height:18px; color:#666666;">
+                  <a href="{{ ticket_url }}" target="_blank" style="color:#155e75; word-break:break-all;">{{ ticket_url }}</a>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 30px 4px 30px; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#222222;">
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                       style="border:1px solid #e5e9ef; border-collapse:collapse;">
+                  <tbody>
+                    <tr>
+                      <td width="150" style="padding:8px 12px; background:#f8fafc; color:#555555; font-size:13px; border-bottom:1px solid #e5e9ef;">Mảng</td>
+                      <td style="padding:8px 12px; font-weight:bold; border-bottom:1px solid #e5e9ef;">{{ topic_name }}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 12px; background:#f8fafc; color:#555555; font-size:13px; border-bottom:1px solid #e5e9ef;">Sinh viên</td>
+                      <td style="padding:8px 12px; border-bottom:1px solid #e5e9ef;">{{ student.full_name|default:message.author_name }} — <span style="font-family:Consolas, monospace;">{{ ticket.student_code }}</span></td>
+                    </tr>
+                    {% if department or student.class_code %}
+                    <tr>
+                      <td style="padding:8px 12px; background:#f8fafc; color:#555555; font-size:13px; border-bottom:1px solid #e5e9ef;">Khoa / Lớp</td>
+                      <td style="padding:8px 12px; border-bottom:1px solid #e5e9ef;">{{ department|default:"—" }}{% if student.class_code %} · {{ student.class_code }}{% endif %}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                      <td style="padding:8px 12px; background:#f8fafc; color:#555555; font-size:13px; border-bottom:1px solid #e5e9ef;">Tiêu đề</td>
+                      <td style="padding:8px 12px; border-bottom:1px solid #e5e9ef;">{{ ticket.subject }}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 12px; background:#f8fafc; color:#555555; font-size:13px;">{% if is_new %}Gửi lúc{% else %}Nhắn lúc{% endif %}</td>
+                      <td style="padding:8px 12px;">{{ message_label }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:16px 30px 6px 30px; font-family:Arial, Helvetica, sans-serif;">
+                <p style="margin:0 0 6px 0; font-size:12px; font-weight:bold; color:#555555; text-transform:uppercase; letter-spacing:.4px;">
+                  {% if is_new %}Nội dung câu hỏi{% else %}Nội dung sinh viên nhắn thêm{% endif %}
+                </p>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"
+                       style="background:#f8fafc; border-left:3px solid #155e75;">
+                  <tbody>
+                    <tr>
+                      <td style="padding:12px 14px; font-size:14px; line-height:22px; color:#222222;">{{ message.body|linebreaksbr }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+
+            {% if attachments %}
+            <tr>
+              <td style="padding:12px 30px 4px 30px; font-family:Arial, Helvetica, sans-serif; font-size:13px; color:#444444;">
+                <p style="margin:0 0 4px 0; font-size:12px; font-weight:bold; color:#555555; text-transform:uppercase; letter-spacing:.4px;">
+                  File đính kèm ({{ attachments|length }})
+                </p>
+                {% for a in attachments %}
+                  <p style="margin:0 0 2px 0;">• {{ a.original_filename }}</p>
+                {% endfor %}
+              </td>
+            </tr>
+            {% endif %}
+
+            <tr>
+              <td style="padding:18px 30px; font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:18px; color:#777777;">
+                Trả lời sinh viên trên Dashboard — thư này là thông báo tự động, trả lời thư không tới sinh viên.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>

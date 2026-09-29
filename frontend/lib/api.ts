@@ -20,6 +20,10 @@ import type {
   OffCampusSubmit,
   OffCampusResult,
   InsuranceRegistrationPrefill,
+  TicketDetail,
+  TicketMessage,
+  TicketSummary,
+  TicketTopic,
 } from './types';
 
 // Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
@@ -256,6 +260,43 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'english_form', ...data }),
       });
+    },
+  },
+
+  tickets: {
+    topics(): Promise<TicketTopic[]> {
+      return request('/tickets/topics/');
+    },
+    list(): Promise<TicketSummary[]> {
+      return request('/tickets/');
+    },
+    /** FormData: topic_id, subject, body, files (tối đa 2). */
+    create(body: FormData): Promise<{ id: number }> {
+      return requestMultipart('/tickets/', body);
+    },
+    /**
+     * Chi tiết + polling. `after` = id lượt cuối đang có → chỉ trả lượt mới.
+     * `seen=false` khi tab đang ẩn: không đánh dấu đã đọc.
+     */
+    detail(id: number, after = 0, seen = true): Promise<TicketDetail> {
+      return request(`/tickets/${id}/?after=${after}${seen ? '' : '&seen=0'}`);
+    },
+    reply(id: number, body: FormData): Promise<TicketSummary & { message: TicketMessage; can_reply: boolean }> {
+      return requestMultipart(`/tickets/${id}/messages/`, body);
+    },
+    close(id: number): Promise<TicketSummary & { message: TicketMessage; can_reply: boolean }> {
+      return request(`/tickets/${id}/close/`, { method: 'POST' });
+    },
+    unread(): Promise<{ count: number }> {
+      return request('/tickets/unread/');
+    },
+    /** File đính kèm cần token → tải qua fetch rồi mở bằng blob URL. */
+    async attachment(ticketId: number, attachmentId: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}/attachments/${attachmentId}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
     },
   },
 

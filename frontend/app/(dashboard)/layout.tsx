@@ -22,7 +22,16 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/requests/thuong-binh': 'Yêu cầu giấy tờ',
   '/dashboard/requests/bank-loan': 'Yêu cầu giấy tờ',
   '/dashboard/requests/english': 'Yêu cầu giấy tờ',
+  '/dashboard/hoi-dap': 'Hỏi đáp',
+  '/dashboard/hoi-dap/new': 'Hỏi đáp',
 };
+
+/** Trang con có id động (/hoi-dap/123) không nằm trong bảng trên. */
+function titleFor(pathname: string): string {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  if (pathname.startsWith('/dashboard/hoi-dap/')) return 'Hỏi đáp';
+  return 'IUOSS Hub';
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,7 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const title = pending && routeFeature
     ? FEATURE_META[routeFeature].label
-    : PAGE_TITLES[pathname] ?? 'IUOSS Hub';
+    : titleFor(pathname);
 
   return (
     <div className="min-h-screen bg-canvas">
