@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ChevronRight, Loader2, MessageSquare, MessagesSquare, Plus } from 'lucide-react';
+import { AlertCircle, Loader2, MessageSquare, MessagesSquare, Plus } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge } from '@/lib/ui';
 import { cn, formatDateTime } from '@/lib/utils';
@@ -145,38 +145,57 @@ export default function TicketListPage() {
             })}
           </div>
 
-          <div className="space-y-2.5">
+          {/* Máy tính: bảng hồ sơ (lối Zendesk "My requests"). Điện thoại: thẻ gọn. */}
+          <section className={cn(ui.card, 'hidden overflow-hidden md:block')}>
+            <table className="w-full text-left text-[0.86rem]">
+              <thead className="border-b border-line bg-[#f8fafc] text-[0.75rem] text-muted">
+                <tr>
+                  <th className="w-[92px] px-5 py-2.5 font-medium">Mã</th>
+                  <th className="px-3 py-2.5 font-medium">Tiêu đề</th>
+                  <th className="w-[140px] px-3 py-2.5 font-medium">Trạng thái</th>
+                  <th className="w-[150px] px-5 py-2.5 font-medium">Cập nhật</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line2">
+                {visible.map((t) => (
+                  <tr key={t.id} className={cn('cursor-pointer hover:bg-[#f9fafb]', t.unread && 'bg-[#f8fbff]')}>
+                    <td className="px-5 py-3 align-top font-mono text-[0.8rem] text-muted">
+                      <Link href={`/dashboard/hoi-dap/${t.id}`} className="block">#{t.id}</Link>
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <Link href={`/dashboard/hoi-dap/${t.id}`} className="block">
+                        <span className="flex items-center gap-2">
+                          {t.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Có phản hồi mới" />}
+                          <span className={cn('line-clamp-1 text-ink', t.unread ? 'font-semibold' : 'font-medium')}>{t.subject}</span>
+                        </span>
+                        <span className="mt-0.5 block text-[0.78rem] text-muted">
+                          {t.topic.name}{t.message_count ? ` · ${t.message_count} lượt trao đổi` : ''}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <span className={cn(badge.base, TICKET_STATUS_STYLES[t.status])}>{t.status_label}</span>
+                    </td>
+                    <td className="px-5 py-3 align-top text-[0.8rem] text-muted">{formatDateTime(t.updated_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <div className="space-y-2.5 md:hidden">
             {visible.map((t) => (
               <Link
                 key={t.id}
                 href={`/dashboard/hoi-dap/${t.id}`}
-                className={cn(
-                  ui.card,
-                  'block px-5 py-4 transition-colors hover:border-primary-line hover:bg-slate-50/60',
-                  t.unread && 'border-primary-line bg-[#f8fbff]',
-                )}
+                className={cn(ui.card, 'block px-4 py-3.5', t.unread && 'border-primary-line bg-[#f8fbff]')}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {t.unread && (
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="Có phản hồi mới" />
-                      )}
-                      <span className={cn('font-medium text-ink', t.unread && 'font-semibold')}>
-                        {t.subject}
-                      </span>
-                      <span className={cn(badge.base, TICKET_STATUS_STYLES[t.status])}>
-                        {t.status_label}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[0.82rem] text-slate-600">{t.topic.name}</p>
-                    <p className="mt-1 text-[0.78rem] text-muted">
-                      #{t.id} · Cập nhật {formatDateTime(t.updated_at)}
-                      {t.message_count ? ` · ${t.message_count} lượt trao đổi` : ''}
-                    </p>
-                  </div>
-                  <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[0.75rem] text-muted">#{t.id}</span>
+                  <span className={cn(badge.base, TICKET_STATUS_STYLES[t.status])}>{t.status_label}</span>
                 </div>
+                <p className={cn('mt-1.5 text-ink', t.unread ? 'font-semibold' : 'font-medium')}>{t.subject}</p>
+                <p className="mt-0.5 text-[0.78rem] text-muted">{t.topic.name} · {formatDateTime(t.updated_at)}</p>
               </Link>
             ))}
           </div>
