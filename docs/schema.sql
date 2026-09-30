@@ -310,6 +310,7 @@ CREATE TABLE `support_ticket_topics` (
   `name` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Gợi ý hiện cho sinh viên khi chọn mảng',
   `notify_emails` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email người phụ trách, phân cách bằng dấu phẩy/xuống dòng; mục con để rỗng = dùng email mảng cha',
+  `cc_emails` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Email CC, phân cách bằng dấu phẩy; mục con để trống = dùng CC mảng cha',
   `sort_order` smallint NOT NULL DEFAULT '0',
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
