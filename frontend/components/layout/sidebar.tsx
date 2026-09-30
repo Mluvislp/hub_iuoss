@@ -78,6 +78,15 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
   // Mục sáng = href khớp DÀI NHẤT với URL hiện tại. So khớp tuyệt đối thì vào
   // trang con là menu tắt hết; so khớp tiền tố đơn thuần thì ở /requests/new sẽ
   // sáng cả "Yêu cầu giấy tờ" lẫn "Tạo yêu cầu mới".
+  // Tính năng chưa mở (cờ FEATURE_* tắt) thì ẨN HẲN khỏi menu — trước 01/10/2026 vẫn
+  // hiện kèm chấm "Đang phát triển", sinh viên bấm vào chỉ gặp trang chưa mở.
+  const sections = NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.feature || features[item.feature]),
+    }))
+    .filter((section) => section.items.length > 0);
+
   const activeHref = NAV_SECTIONS
     .flatMap((section) => section.items.map((item) => item.href))
     .filter((href) => pathname === href || pathname.startsWith(href + '/'))
@@ -131,7 +140,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
-          {NAV_SECTIONS.map((section, i) => (
+          {sections.map((section, i) => (
             <div key={section.label} className={cn('px-3', i > 0 && 'mt-5 pt-5 border-t border-line2')}>
               <p className="px-2.5 mb-2 text-[0.68rem] font-semibold text-slate-400">
                 {section.label}
@@ -140,8 +149,6 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = item.href === activeHref;
-                  // Chỉ đánh dấu cái BẤT THƯỜNG: tính năng chưa mở mới có chấm.
-                  const pending = !!item.feature && !features[item.feature];
 
                   return (
                     <Link
@@ -155,18 +162,9 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                           : 'border-transparent text-slate-600 hover:text-ink hover:bg-slate-100',
                       )}
                     >
-                      <Icon size={17} className={cn('flex-shrink-0', pending && 'text-slate-400')} />
-                      <span className={cn('flex-1', pending && !isActive && 'text-slate-500')}>
-                        {item.label}
-                      </span>
-                      {pending && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-warning-line flex-shrink-0"
-                          title="Đang phát triển"
-                          aria-label="Đang phát triển"
-                        />
-                      )}
-                      {item.feature === 'support_tickets' && !pending && ticketUnread > 0 && (
+                      <Icon size={17} className="flex-shrink-0" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.feature === 'support_tickets' && ticketUnread > 0 && (
                         <span
                           className="min-w-[20px] h-5 px-1.5 rounded-full border border-danger-line bg-danger-soft
                                      text-danger-text text-[0.7rem] font-semibold leading-[18px] text-center"
