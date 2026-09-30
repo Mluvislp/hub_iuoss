@@ -1206,7 +1206,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 
     def _create_conduct(self, request):
-        """Bảng điểm rèn luyện — thông tin chỉ xem + học kỳ. Giấy xuất ở hệ thống ngoài."""
+        """Bảng điểm rèn luyện — học kỳ + ô xin sửa (ngày sinh, CCCD, địa chỉ). Giấy xuất ở hệ thống ngoài."""
         student = self._resolve_student(request)
         if student is None:
             return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
@@ -1219,7 +1219,14 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
         try:
             payload, semester_label = build_conduct_payload(
-                student, semester_code=_get_str(request.data, "semester_code"),
+                student,
+                semester_code=_get_str(request.data, "semester_code"),
+                dob=_get_str(request.data, "dob"),
+                citizen_id=_get_str(request.data, "citizen_id"),
+                citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
+                province_code=_get_str(request.data, "province_code"),
+                ward_code=_get_str(request.data, "ward_code"),
+                street=_get_str(request.data, "street"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
