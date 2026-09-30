@@ -34,6 +34,11 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS_PRODUCTION)
 FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
 FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
+FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
+
+# Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
+# Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.
+DASHBOARD_PUBLIC_URL = os.getenv("DASHBOARD_PUBLIC_URL", "https://dashboard.iuoss.com").strip().rstrip("/")
 
 # Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
 FRONTEND_ORIGINS = env_list(
@@ -192,6 +197,9 @@ REST_FRAMEWORK = {
         # Nới rộng để tránh chặn nhầm khi nhiều SV dùng chung IP (NAT ký túc xá/wifi trường)
         "login": os.getenv("THROTTLE_LOGIN", "30/min"),
         "create_request": os.getenv("THROTTLE_CREATE_REQUEST", "60/hour"),
+        # Ticket hỏi đáp: tạo mới chặt, nhắn trong ticket nới hơn (đang trò chuyện).
+        "ticket_create": os.getenv("THROTTLE_TICKET_CREATE", "10/hour"),
+        "ticket_message": os.getenv("THROTTLE_TICKET_MESSAGE", "120/hour"),
     },
 }
 

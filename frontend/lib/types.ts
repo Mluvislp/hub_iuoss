@@ -369,6 +369,7 @@ export interface FeatureFlags {
   document_requests: boolean;
   civic_activities: boolean;
   health_check: boolean;
+  support_tickets: boolean;
 }
 
 /**
@@ -562,4 +563,64 @@ export interface HealthCheckState {
   data_consent_text: { examined: string; register: string };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
+}
+
+// ── Hỏi đáp (ticket) ─────────────────────────────────────────────────────────
+// Trạng thái = "đang chờ ai": open → chờ Phòng CTSV · answered → Phòng CTSV đã trả lời.
+
+export type TicketStatus = 'open' | 'answered' | 'closed';
+
+export const TICKET_STATUS_STYLES: Record<TicketStatus, string> = {
+  open: 'bg-warning-soft text-warning-text border-warning-line',
+  answered: 'bg-primary-soft text-primary-text border-primary-line',
+  closed: 'bg-slate-50 text-slate-600 border-slate-200',
+};
+
+export interface TicketSubtopic {
+  id: number;
+  name: string;
+  description: string;
+}
+
+/** Mảng công việc; `children` rỗng = chọn thẳng mảng, có mục con = bắt buộc chọn một mục con. */
+export interface TicketTopic extends TicketSubtopic {
+  children: TicketSubtopic[];
+}
+
+export interface TicketAttachment {
+  id: number;
+  name: string;
+  size: number;
+  mime_type: string;
+  is_pdf: boolean;
+}
+
+export interface TicketMessage {
+  id: number;
+  author_role: 'student' | 'staff' | 'system';
+  author_name: string;
+  body: string;
+  /** Chỉ tin chuyên viên: HTML đã được server lọc (đậm/nghiêng/link/danh sách/trích dẫn). */
+  body_html: string;
+  created_at: string;
+  attachments: TicketAttachment[];
+}
+
+export interface TicketSummary {
+  id: number;
+  subject: string;
+  topic: { id: number; name: string };
+  status: TicketStatus;
+  status_label: string;
+  unread: boolean;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  message_count?: number;
+}
+
+export interface TicketDetail extends TicketSummary {
+  can_reply: boolean;
+  messages: TicketMessage[];
+  max_files: number;
 }
