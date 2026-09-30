@@ -192,6 +192,15 @@ export default function NewTicketPage() {
               );
             })()}
             {fieldErrors.topic_id && <p className="mt-2 text-[0.82rem] text-danger-text">{fieldErrors.topic_id}</p>}
+
+            <p className="mt-4 border-t border-line pt-3 text-[0.8rem] leading-relaxed text-muted">
+              Các trường hợp cần giải đáp thông tin khác ngoài các mục ở trên, sinh viên liên hệ Phòng
+              Công tác Sinh viên (phòng O1.105, số điện thoại (+84) 028 3724 4270, số máy lẻ 3334, email{' '}
+              <a href="mailto:oss@hcmiu.edu.vn" className="underline underline-offset-2 hover:text-ink">
+                oss@hcmiu.edu.vn
+              </a>
+              ).
+            </p>
           </div>
         </section>
 
