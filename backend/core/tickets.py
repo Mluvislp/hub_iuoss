@@ -3,7 +3,7 @@
 Luật trạng thái giữ khớp Dashboard `support/services.py`:
   tạo ticket / sinh viên nhắn      → open      (chờ Phòng CTSV)
   chuyên viên trả lời (Dashboard)  → answered  (chờ sinh viên)
-  chuyên viên đóng (Dashboard)     → closed    (sinh viên không nhắn thêm được)
+  đóng (chuyên viên, hoặc SV bấm "Đã được giải đáp") → closed (SV không nhắn thêm được)
 
 Email: Hub KHÔNG gửi thư. Hub chỉ INSERT vào hàng đợi dùng chung `email_messages`;
 timer `send_emails` của Dashboard gửi đi và tự đính file (tra theo `object_id`).
@@ -274,6 +274,30 @@ def student_reply(principal, ticket, *, body, uploads):
     except Exception:
         _cleanup(written)
         raise
+    return ticket, message
+
+
+@transaction.atomic
+def student_close(principal, ticket):
+    """Sinh viên xác nhận đã được giải đáp và tự đóng ticket (nút "Đã được giải đáp - Đóng ticket").
+
+    Không gửi email: chính sinh viên thao tác. Dòng mốc hệ thống để chuyên viên thấy lý do đóng.
+    """
+    ticket = (SupportTicket.objects.select_for_update().select_related("topic__parent")
+              .get(pk=ticket.pk, student_id=principal.student_id))
+    if ticket.status == SupportTicket.STATUS_CLOSED:
+        raise TicketError("Ticket đã đóng.")
+    now = timezone.now()
+    ticket.status = SupportTicket.STATUS_CLOSED
+    ticket.closed_at = now
+    ticket.student_read_at = now
+    ticket.updated_at = now
+    ticket.save(update_fields=["status", "closed_at", "student_read_at", "updated_at"])
+    message = TicketMessage.objects.create(
+        ticket=ticket, author_role=TicketMessage.ROLE_SYSTEM, author_user_id=None, author_name="Hệ thống",
+        body="Sinh viên xác nhận đã được giải đáp và đóng ticket.", created_at=now,
+    )
+    logger.info("SUPPORT_TICKET_CLOSE | uid=%-20s | ticket=%s", principal.ldap_uid, ticket.pk)
     return ticket, message
 
 
