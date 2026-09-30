@@ -9,6 +9,7 @@ class ConfirmationRequest(models.Model):
         ("enrollment", "Xác nhận đang học"),
         ("graduation", "Xác nhận tốt nghiệp"),
         ("deferment", "Hoãn nghĩa vụ quân sự"),
+        ("conduct_score", "Bảng điểm rèn luyện"),
         ("other", "Khác"),
     ]
     STATUS_PENDING = "pending"

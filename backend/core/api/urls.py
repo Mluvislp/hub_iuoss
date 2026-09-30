@@ -37,6 +37,7 @@ urlpatterns = [
     path("requests/thuong-binh/form/", views.ThuongBinhRequestFormView.as_view(),  name="api_thuongbinh_request_form"),
     path("requests/bank-loan/form/",   views.BankLoanRequestFormView.as_view(),    name="api_bankloan_request_form"),
     path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
+    path("requests/conduct-score/form/", views.ConductScoreRequestFormView.as_view(), name="api_conduct_request_form"),
 
     # Khai báo thông tin ngoại trú
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
