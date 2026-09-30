@@ -513,7 +513,7 @@ export default function TicketDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white px-5 py-3.5">
               <p className="text-[0.85rem] text-slate-600">
                 {waitingOffice
-                  ? `Ticket đang chờ ${OFFICE} phản hồi. Phản hồi được thông báo qua email trường.`
+                  ? `Ticket đang chờ ${OFFICE} phản hồi.`
                   : `${OFFICE} đã phản hồi. Nội dung chưa rõ có thể phản hồi lại trong ticket này.`}
               </p>
               <button
@@ -558,7 +558,6 @@ export default function TicketDetailPage() {
             <ul className="mt-2 list-disc space-y-1.5 pl-4 text-[0.8rem] leading-relaxed text-slate-600">
               <li>Mỗi ticket dành cho một vấn đề. Vấn đề khác đề nghị đặt câu hỏi mới.</li>
               <li>Thông tin bổ sung trình bày đầy đủ trong một lượt phản hồi, kèm tệp minh chứng nếu có.</li>
-              <li>Phản hồi của {OFFICE} được thông báo qua email trường.</li>
             </ul>
           </section>
         </aside>
