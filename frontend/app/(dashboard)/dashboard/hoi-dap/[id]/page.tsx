@@ -539,19 +539,19 @@ export default function TicketDetailPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => { setConfirmClose(true); setCloseError(null); }}
-                  className={ui.btnSecondary}
-                >
-                  <CheckCircle2 size={15} />
-                  Đã được giải đáp - Đóng ticket
-                </button>
-                <button
-                  type="button"
                   onClick={openComposer}
                   className={waitingOffice ? ui.btnSecondary : ui.btnPrimary}
                 >
                   <Reply size={15} />
                   {waitingOffice ? 'Bổ sung thông tin' : 'Phản hồi'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmClose(true); setCloseError(null); }}
+                  className={ui.btnSecondary}
+                >
+                  <CheckCircle2 size={15} />
+                  Đã được giải đáp - Đóng ticket
                 </button>
               </div>
             </div>
