@@ -40,6 +40,9 @@ from core.documents import (
     build_english_prefill,
     ENGLISH_PURPOSE_CHOICES,
     ENGLISH_PROGRAM_CODE,
+    build_conduct_payload,
+    build_conduct_prefill,
+    conduct_semester_choices,
 )
 from core import offcampus
 from students.models import (
@@ -963,6 +966,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             return self._create_bankloan(request)
         if request_type == "english_form":
             return self._create_english(request)
+        if request_type == "conduct_score":
+            return self._create_conduct(request)
 
         purpose = _get_str(request.data, "purpose")
         note = _get_str(request.data, "note")
@@ -1200,6 +1205,39 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         )
         return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
 
+    def _create_conduct(self, request):
+        """Bảng điểm rèn luyện — thông tin chỉ xem + học kỳ. Giấy xuất ở hệ thống ngoài."""
+        student = self._resolve_student(request)
+        if student is None:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        note = _get_str(request.data, "note")
+        if len(note) > 1000:
+            return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload, semester_label = build_conduct_payload(
+                student, semester_code=_get_str(request.data, "semester_code"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        req = ConfirmationRequest.objects.create(
+            student_id=student.pk,
+            ldap_uid=request.user.ldap_uid,
+            request_type="conduct_score",
+            purpose=semester_label,
+            note=note or None,
+            payload=payload,
+        )
+        logger.info(
+            "CONFIRMATION_REQUEST | uid=%-20s | type=conduct_score | purpose=%s",
+            request.user.ldap_uid, semester_label,
+        )
+        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
 
@@ -1400,6 +1438,30 @@ class EnglishRequestFormView(DocumentRequestsRequiredMixin, APIView):
             "purpose_choices": ENGLISH_PURPOSE_CHOICES,
             "program_purpose_code": ENGLISH_PROGRAM_CODE,
             "prefill": build_english_prefill(student),
+        })
+
+
+# ── GET /api/requests/conduct-score/form/ — prefill cho form bảng điểm rèn luyện ─
+
+class ConductScoreRequestFormView(DocumentRequestsRequiredMixin, APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student = (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({
+            "semester_choices": conduct_semester_choices(student),
+            "prefill": build_conduct_prefill(student),
         })
 
 

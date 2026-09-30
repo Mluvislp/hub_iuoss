@@ -130,7 +130,7 @@ export interface CivicActivity {
   completed_at: string | null;
 }
 
-export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'other';
+export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'conduct_score' | 'other';
 export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' | 'rejected';
 
 export interface ConfirmationRequest {
@@ -272,6 +272,22 @@ export interface EnglishFormData {
   prefill: EnglishPrefill;
 }
 
+// Bảng điểm rèn luyện — thông tin chỉ xem, SV chỉ chọn học kỳ.
+export interface ConductScorePrefill {
+  student_name: string;
+  student_id: string;
+  dob: string;
+  department: string;
+  course_year: string;
+  citizen_id: string;
+  permanent_address: string;
+}
+
+export interface ConductScoreFormData {
+  semester_choices: PurposeChoice[];
+  prefill: ConductScorePrefill;
+}
+
 // Đơn vị hành chính (cơ cấu 2025)
 export interface Province {
   code: string;
@@ -410,6 +426,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   thuong_binh: 'Ưu đãi giáo dục (thương binh)',
   bank_loan: 'Vay vốn ngân hàng',
   english_form: 'Xác nhận (mẫu tiếng Anh)',
+  conduct_score: 'Bảng điểm rèn luyện',
   other: 'Khác',
 };
 

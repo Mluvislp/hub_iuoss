@@ -14,6 +14,7 @@ import type {
   ThuongBinhFormData,
   BankLoanFormData,
   EnglishFormData,
+  ConductScoreFormData,
   Province,
   Ward,
   OffCampusForm,
@@ -259,6 +260,18 @@ export const api = {
       return request('/requests/', {
         method: 'POST',
         body: JSON.stringify({ request_type: 'english_form', ...data }),
+      });
+    },
+    conductScoreForm(): Promise<ConductScoreFormData> {
+      return request('/requests/conduct-score/form/');
+    },
+    createConductScore(data: {
+      semester_code: string;
+      note?: string;
+    }): Promise<ConfirmationRequest> {
+      return request('/requests/', {
+        method: 'POST',
+        body: JSON.stringify({ request_type: 'conduct_score', ...data }),
       });
     },
   },

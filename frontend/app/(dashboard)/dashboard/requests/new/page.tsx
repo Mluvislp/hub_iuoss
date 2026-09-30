@@ -16,6 +16,7 @@ const DEDICATED_FORMS: Record<string, string> = {
   thuong_binh: '/dashboard/requests/thuong-binh',
   bank_loan: '/dashboard/requests/bank-loan',
   english_form: '/dashboard/requests/english',
+  conduct_score: '/dashboard/requests/conduct-score',
   other: '/dashboard/requests/other',
 };
 
@@ -30,6 +31,7 @@ const TYPE_HINTS: Record<RequestType, string> = {
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
   bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
   english_form: 'Giấy xác nhận bằng tiếng Anh (du học, xin việc, visa…).',
+  conduct_score: 'Bảng điểm rèn luyện theo học kỳ.',
   other: 'Các mục đích khác (du học, xin việc, visa…).',
 };
 
