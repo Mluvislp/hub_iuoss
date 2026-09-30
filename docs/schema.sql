@@ -404,3 +404,17 @@ CREATE TABLE `support_canned_responses` (
   KEY `idx_scr_topic` (`topic_id`, `sort_order`),
   CONSTRAINT `fk_scr_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Chỉ định mảng hỏi đáp cho tài khoản Dashboard (Hub không đọc bảng này).
+CREATE TABLE `support_topic_assignees` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `topic_id` int NOT NULL,
+  `user_id` int NOT NULL COMMENT 'auth_user.id',
+  `created_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_sta_topic_user` (`topic_id`, `user_id`),
+  KEY `idx_sta_user` (`user_id`),
+  CONSTRAINT `fk_stassign_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_stassign_user` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
