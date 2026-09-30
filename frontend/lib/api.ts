@@ -267,6 +267,12 @@ export const api = {
     },
     createConductScore(data: {
       semester_code: string;
+      dob: string;
+      citizen_id: string;
+      citizen_id_issue_date: string;
+      province_code: string;
+      ward_code: string;
+      street: string;
       note?: string;
     }): Promise<ConfirmationRequest> {
       return request('/requests/', {

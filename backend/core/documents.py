@@ -341,17 +341,37 @@ def resolve_address_prefill(student):
     }
 
 
-def build_deferment_prefill(student):
-    """Prefill form 'Hoãn nghĩa vụ quân sự'.
+def _permanent_address_field(student, province_code, ward_code, street):
+    """Ô `editable.permanent_address` — dùng chung cho mọi form có địa chỉ thường trú.
 
-    Địa chỉ LUÔN sửa được (trước đây có bản chuẩn hóa là khóa vĩnh viễn — SV
-    chuyển nhà hoặc nhập sai thì kẹt). Form khóa sẵn ô nào đã có dữ liệu và mở
-    ra khi SV bấm "Yêu cầu chỉnh sửa", nhưng không có ô nào bị khóa cứng.
-
-    Địa chỉ trả về TÁCH RIÊNG tỉnh / phường / số nhà (kèm cả mã lẫn tên) để form
-    hiển thị ba ô độc lập kể cả lúc đang khóa — không gộp thành một dòng.
+    Luôn dựng từ input SV (buộc chọn tỉnh/phường theo cơ cấu 2025); so với bản
+    chuẩn hóa CURRENT_STD đang có để biết có đổi không — trùng thì `changed=false`
+    để khỏi sinh việc duyệt vô nghĩa. Chưa có bản chuẩn hóa ⇒ luôn chờ duyệt.
     """
-    labels = build_timeline_labels(student)
+    baseline = get_current_std(student)
+    proposed_addr = build_address_proposed(province_code, ward_code, street)
+    if baseline:
+        same = all(
+            (baseline.get(k) or "") == (proposed_addr.get(k) or "")
+            for k in ("street", "ward_code", "province_code")
+        )
+        return {
+            "original": baseline,
+            "proposed": proposed_addr,
+            "changed": not same,
+            "review": None if same else "pending",
+        }
+    return {
+        "original": get_current_address_raw(student),
+        "proposed": proposed_addr,
+        "changed": True,
+        "review": "pending",
+    }
+
+
+def _address_prefill(student):
+    """Địa chỉ thường trú cho form: TÁCH RIÊNG tỉnh / phường / số nhà (mã + tên) để
+    hiển thị ba ô độc lập kể cả lúc đang khóa."""
     std = get_current_std(student)
     addr = resolve_address_prefill(student)
 
@@ -365,6 +385,27 @@ def build_deferment_prefill(student):
         province_name, ward_name = (pv.name if pv else ""), (wd.name if wd else "")
 
     return {
+        "address_standardized": std is not None,
+        "province_code": addr["province_code"],
+        "province_name": province_name,
+        "ward_code": addr["ward_code"],
+        "ward_name": ward_name,
+        "street": addr["street"],
+    }
+
+
+def build_deferment_prefill(student):
+    """Prefill form 'Hoãn nghĩa vụ quân sự'.
+
+    Địa chỉ LUÔN sửa được (trước đây có bản chuẩn hóa là khóa vĩnh viễn — SV
+    chuyển nhà hoặc nhập sai thì kẹt). Form khóa sẵn ô nào đã có dữ liệu và mở
+    ra khi SV bấm "Yêu cầu chỉnh sửa", nhưng không có ô nào bị khóa cứng.
+
+    Địa chỉ trả về TÁCH RIÊNG tỉnh / phường / số nhà (kèm cả mã lẫn tên) để form
+    hiển thị ba ô độc lập kể cả lúc đang khóa — không gộp thành một dòng.
+    """
+    labels = build_timeline_labels(student)
+    return {
         "student_name": student.full_name or "",
         "student_id": student.current_student_code or "",
         "department": student.current_department.name_vi if student.current_department else "",
@@ -374,12 +415,7 @@ def build_deferment_prefill(student):
         "graduation_label": labels["graduation_label"],
         "max_label": labels["max_label"],
         # Địa chỉ thường trú — ba ô riêng
-        "address_standardized": std is not None,
-        "province_code": addr["province_code"],
-        "province_name": province_name,
-        "ward_code": addr["ward_code"],
-        "ward_name": ward_name,
-        "street": addr["street"],
+        **_address_prefill(student),
     }
 
 
@@ -399,27 +435,7 @@ def build_deferment_payload(student, *, dob, province_code, ward_code, street):
     if dob_field["changed"]:
         validate_dob(dob_field["proposed"])
 
-    # Địa chỉ: luôn dựng từ input SV; so với bản chuẩn hóa đang có để biết có đổi không.
-    baseline = get_current_std(student)
-    proposed_addr = build_address_proposed(province_code, ward_code, street)
-    if baseline:
-        same = all(
-            (baseline.get(k) or "") == (proposed_addr.get(k) or "")
-            for k in ("street", "ward_code", "province_code")
-        )
-        addr_field = {
-            "original": baseline,
-            "proposed": proposed_addr,
-            "changed": not same,
-            "review": None if same else "pending",
-        }
-    else:
-        addr_field = {
-            "original": get_current_address_raw(student),
-            "proposed": proposed_addr,
-            "changed": True,
-            "review": "pending",
-        }
+    addr_field = _permanent_address_field(student, province_code, ward_code, street)
 
     purpose_label = "Hoãn nghĩa vụ quân sự"
     payload = {
@@ -475,6 +491,33 @@ def validate_issue_date(value):
     cccd_rules.check_issue_date(d)
 
 
+def _cccd_prefill(student):
+    """Số CCCD + ngày cấp cho form. `cccd_valid=False` (hồ sơ trống hoặc CMND cũ) ⇒
+    form mở sẵn ô và bắt buộc nhập."""
+    num, issue = get_current_cccd_doc(student)
+    return {
+        "cccd_valid": bool(CCCD_RE.match(num)),
+        "citizen_id": num,
+        "citizen_id_issue_date": issue,
+    }
+
+
+def _cccd_fields(student, citizen_id, citizen_id_issue_date):
+    """Hai ô `editable.citizen_id` + `editable.citizen_id_issue_date`.
+
+    SV xin sửa ⇒ `changed` + `review=pending`, chuyên viên duyệt ở Dashboard. Duyệt
+    thì Dashboard GHI DÒNG CCCD MỚI và hạ dòng cũ (không sửa đè), số + ngày cấp đi
+    chung một lần duyệt. Ngày cấp trong hồ sơ trống/sai ⇒ soi cả khi SV giữ nguyên.
+    """
+    num, issue = get_current_cccd_doc(student)
+    cid_field = _editable_field(num, citizen_id)
+    issue_field = _editable_field(issue, citizen_id_issue_date)
+    validate_citizen_id(cid_field["proposed"], cid_field["original"])
+    if cid_field["changed"] or issue_field["changed"] or not _issue_date_ok(issue):
+        validate_issue_date(issue_field["proposed"])
+    return cid_field, issue_field
+
+
 def _thuongbinh_snapshot(student):
     prog = build_academic_progress(student)
     nums = build_course_numbers(student)
@@ -498,13 +541,8 @@ def build_thuongbinh_prefill(student):
     khuôn ngày sinh / địa chỉ của giấy hoãn NVQS. `cccd_valid=False` (hồ sơ trống
     hoặc CMND cũ) ⇒ form mở sẵn và bắt buộc nhập.
     """
-    num, issue = get_current_cccd_doc(student)
     snap = _thuongbinh_snapshot(student)
-    snap.update({
-        "cccd_valid": bool(CCCD_RE.match(num)),
-        "citizen_id": num,
-        "citizen_id_issue_date": issue,
-    })
+    snap.update(_cccd_prefill(student))
     return snap
 
 
@@ -515,16 +553,7 @@ def build_thuongbinh_payload(student, *, citizen_id, citizen_id_issue_date):
     NHÓM CỨNG: chỉ nằm trong `snapshot`, SV không sửa được.
     """
     snap0 = _thuongbinh_snapshot(student)
-    num, issue = get_current_cccd_doc(student)
-
-    # SV xin sửa ⇒ `changed` + `review=pending`, chuyên viên duyệt ở Dashboard. Duyệt
-    # thì Dashboard GHI DÒNG CCCD MỚI và hạ dòng cũ (không sửa đè), số + ngày cấp đi
-    # chung một lần duyệt.
-    cid_field = _editable_field(num, citizen_id)
-    issue_field = _editable_field(issue, citizen_id_issue_date)
-    validate_citizen_id(cid_field["proposed"], cid_field["original"])
-    if cid_field["changed"] or issue_field["changed"] or not _issue_date_ok(issue):
-        validate_issue_date(issue_field["proposed"])
+    cid_field, issue_field = _cccd_fields(student, citizen_id, citizen_id_issue_date)
 
     purpose_label = "Xác nhận ưu đãi giáo dục (thương binh)"
     payload = {
@@ -582,14 +611,11 @@ def build_bankloan_prefill(student):
     đề xuất chỉ vào hồ sơ khi chuyên viên DUYỆT ở Dashboard (từ 26/09/2026; trước
     đó mã lớp + CCCD khóa cứng khi hồ sơ đã có).
     """
-    num, issue = get_current_cccd_doc(student)
     snap = _bankloan_snapshot(student, "")
     snap.pop("class_code", None)
     snap.update({
         "dob": format_student_birth_date(student),
-        "cccd_valid": bool(CCCD_RE.match(num)),
-        "citizen_id": num,
-        "citizen_id_issue_date": issue,
+        **_cccd_prefill(student),
         "class_code": (student.class_code or "").strip(),
     })
     return snap
@@ -619,12 +645,7 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
     if dob_field["changed"]:
         validate_dob(dob_field["proposed"])
 
-    num, issue = get_current_cccd_doc(student)
-    cid_field = _editable_field(num, citizen_id)
-    issue_field = _editable_field(issue, citizen_id_issue_date)
-    validate_citizen_id(cid_field["proposed"], cid_field["original"])
-    if cid_field["changed"] or issue_field["changed"] or not _issue_date_ok(issue):
-        validate_issue_date(issue_field["proposed"])
+    cid_field, issue_field = _cccd_fields(student, citizen_id, citizen_id_issue_date)
 
     class_code = profile_class
     snap0 = _bankloan_snapshot(student, class_code)
@@ -730,8 +751,9 @@ def build_english_payload(student, *, dob, purpose_code, program_name):
 # ── Bảng điểm rèn luyện (conduct_score) ───────────────────────────────────────
 #
 # Giấy này Phòng CTSV xuất từ HỆ THỐNG NGOÀI — Dashboard không sinh DOCX/PDF, chỉ
-# chuyển trạng thái và trả mã hồ sơ portal. Toàn bộ thông tin SV chỉ để xem (nằm
-# trong `snapshot`, không có `editable`); sai thì SV ghi vào ô ghi chú.
+# chuyển trạng thái và trả mã hồ sơ portal. Ngày sinh / CCCD + ngày cấp / địa chỉ
+# thường trú là ô XIN SỬA giống các loại khác (duyệt ở Dashboard ⇒ ghi hồ sơ gốc);
+# họ tên, MSSV, khoa, khóa học chỉ xem.
 
 # Số năm học lùi lại khi hồ sơ chưa có năm/học kỳ nhập học.
 CONDUCT_FALLBACK_YEARS = 4
@@ -774,26 +796,42 @@ def _conduct_snapshot(student):
     return {
         "student_name": student.full_name or "",
         "student_id": student.current_student_code or "",
-        "dob": format_student_birth_date(student),
         "department": student.current_department.name_vi if student.current_department else "",
         "course_year": course_year_label(student),
-        "citizen_id": get_current_cccd(student),
-        "permanent_address": get_current_address_raw(student),
     }
 
 
 def build_conduct_prefill(student):
-    return _conduct_snapshot(student)
+    return {
+        **_conduct_snapshot(student),
+        "dob": format_student_birth_date(student),
+        **_cccd_prefill(student),
+        **_address_prefill(student),
+    }
 
 
-def build_conduct_payload(student, *, semester_code):
+def build_conduct_payload(student, *, semester_code, dob, citizen_id,
+                          citizen_id_issue_date, province_code, ward_code, street):
     choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)}
     if semester_code not in choices:
         raise ValueError("Vui lòng chọn học kỳ cấp bảng điểm rèn luyện hợp lệ.")
     label = choices[semester_code]
+
+    dob_field = _editable_field(format_student_birth_date(student), dob)
+    if dob_field["changed"]:
+        validate_dob(dob_field["proposed"])
+    cid_field, issue_field = _cccd_fields(student, citizen_id, citizen_id_issue_date)
+    addr_field = _permanent_address_field(student, province_code, ward_code, street)
+
     payload = {
         "doc_type": "conduct_score",
         "purpose": {"code": semester_code, "label": label, "program_name": None},
         "snapshot": {**_conduct_snapshot(student), "semester": label},
+        "editable": {
+            "dob": dob_field,
+            "citizen_id": cid_field,
+            "citizen_id_issue_date": issue_field,
+            "permanent_address": addr_field,
+        },
     }
     return payload, label

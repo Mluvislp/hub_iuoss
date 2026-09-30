@@ -272,15 +272,22 @@ export interface EnglishFormData {
   prefill: EnglishPrefill;
 }
 
-// Bảng điểm rèn luyện — thông tin chỉ xem, SV chỉ chọn học kỳ.
+// Bảng điểm rèn luyện — ngày sinh / CCCD + ngày cấp / địa chỉ là ô xin sửa.
 export interface ConductScorePrefill {
   student_name: string;
   student_id: string;
-  dob: string;
   department: string;
   course_year: string;
+  dob: string;
+  cccd_valid: boolean;
   citizen_id: string;
-  permanent_address: string;
+  citizen_id_issue_date: string;
+  address_standardized: boolean;
+  province_code: string;
+  province_name: string;
+  ward_code: string;
+  ward_name: string;
+  street: string;
 }
 
 export interface ConductScoreFormData {
