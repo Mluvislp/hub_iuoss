@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  AlertCircle, ArrowLeft, ChevronsUpDown, CircleDot, Info, Loader2, Lock, Paperclip, Reply,
+  AlertCircle, ArrowLeft, CheckCircle2, ChevronsUpDown, CircleDot, Info, Loader2, Lock, Paperclip, Reply,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge } from '@/lib/ui';
@@ -211,6 +211,9 @@ export default function TicketDetailPage() {
   const [notice, setNotice] = useState<number | null>(null);   // id lượt mới của Phòng CTSV
   const [showOlder, setShowOlder] = useState(false);
   const [toggled, setToggled] = useState<Record<number, boolean>>({});
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
   const tempSeq = useRef(-1);
   const lastId = useRef(0);
@@ -333,6 +336,23 @@ export default function TicketDetailPage() {
     const again: PendingMessage = { ...item, state: 'sending', error: undefined };
     setPending((list) => list.map((p) => (p.tempId === item.tempId ? again : p)));
     deliver(again);
+  }
+
+  async function closeTicket() {
+    setClosing(true);
+    setCloseError(null);
+    try {
+      const res = await api.tickets.close(id);
+      const { message, ...rest } = res;
+      merge([message], rest);
+      setConfirmClose(false);
+      setComposing(false);
+      refreshTicketUnread();
+    } catch (err) {
+      setCloseError(err instanceof ApiError ? err.message : 'Không đóng được ticket.');
+    } finally {
+      setClosing(false);
+    }
   }
 
   function openComposer() {
@@ -516,14 +536,45 @@ export default function TicketDetailPage() {
                   ? `Ticket đang chờ ${OFFICE} phản hồi.`
                   : `${OFFICE} đã phản hồi. Nội dung chưa rõ có thể phản hồi lại trong ticket này.`}
               </p>
-              <button
-                type="button"
-                onClick={openComposer}
-                className={waitingOffice ? ui.btnSecondary : ui.btnPrimary}
-              >
-                <Reply size={15} />
-                {waitingOffice ? 'Bổ sung thông tin' : 'Phản hồi'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setConfirmClose(true); setCloseError(null); }}
+                  className={ui.btnSecondary}
+                >
+                  <CheckCircle2 size={15} />
+                  Đã được giải đáp - Đóng ticket
+                </button>
+                <button
+                  type="button"
+                  onClick={openComposer}
+                  className={waitingOffice ? ui.btnSecondary : ui.btnPrimary}
+                >
+                  <Reply size={15} />
+                  {waitingOffice ? 'Bổ sung thông tin' : 'Phản hồi'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Xác nhận đóng — một bước tại chỗ để tránh bấm nhầm (không dùng hộp thoại trình duyệt). */}
+          {data.can_reply && confirmClose && (
+            <div className="rounded-lg border border-warning-line bg-warning-soft px-5 py-4">
+              <p className="text-[0.88rem] font-semibold text-warning-text">Đóng ticket #{data.id}?</p>
+              <p className="mt-1 text-[0.84rem] text-slate-700">
+                Xác nhận nội dung đã được giải đáp. Ticket đã đóng không tiếp nhận thêm trao đổi;
+                vấn đề phát sinh sau đó đề nghị đặt câu hỏi mới.
+              </p>
+              {closeError && <p className="mt-2 text-[0.82rem] text-danger-text">{closeError}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={closeTicket} disabled={closing} className={ui.btnPrimary}>
+                  {closing ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                  Đóng ticket
+                </button>
+                <button type="button" onClick={() => setConfirmClose(false)} disabled={closing} className={ui.btnGhost}>
+                  Huỷ
+                </button>
+              </div>
             </div>
           )}
         </div>

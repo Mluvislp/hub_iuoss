@@ -1,7 +1,7 @@
 """API "Hỏi đáp" (ticket) — nghiệp vụ ở `core/tickets.py`.
 
 Mọi truy vấn lọc theo `student_id` lấy từ JWT do server ký ⇒ id trên URL không mở
-được ticket của người khác. Sinh viên không tự đóng ticket — chỉ chuyên viên đóng.
+được ticket của người khác. Sinh viên tự đóng được bằng nút "Đã được giải đáp - Đóng ticket".
 
 "Realtime" = polling: trang chi tiết gọi `GET tickets/<id>/?after=<id lượt cuối>`
 mỗi 5 giây khi tab đang mở; sidebar gọi `tickets/unread/` mỗi phút. Hai endpoint này
@@ -185,6 +185,20 @@ class TicketMessagesView(TicketsRequiredMixin, APIView):
         message = TicketMessage.objects.prefetch_related("attachments").get(pk=message.pk)
         return Response({"message": _message(message), **_ticket_summary(ticket),
                          "can_reply": True}, status=status.HTTP_201_CREATED)
+
+
+class TicketCloseView(TicketsRequiredMixin, APIView):
+    """Sinh viên bấm "Đã được giải đáp - Đóng ticket"."""
+
+    throttle_scope = "ticket_message"
+
+    def post(self, request, pk):
+        ticket = self.own_ticket(request, pk)
+        try:
+            ticket, message = tickets.student_close(request.user, ticket)
+        except tickets.TicketError as exc:
+            return _error(exc)
+        return Response({"message": _message(message), **_ticket_summary(ticket), "can_reply": False})
 
 
 class TicketAttachmentView(TicketsRequiredMixin, APIView):
