@@ -209,7 +209,7 @@ export default function RequestDetailPage() {
         </div>
         <div className="px-5 py-2">
           <div className={ui.dtRow}>
-            <span className={ui.dtLabel}>Mục đích</span>
+            <span className={ui.dtLabel}>{data.request_type === 'conduct_score' ? 'Học kỳ' : 'Mục đích'}</span>
             <span className={ui.dtValue}>{data.purpose}</span>
           </div>
           {snapshot.student_name ? (

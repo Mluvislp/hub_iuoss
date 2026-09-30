@@ -11,6 +11,9 @@ from datetime import date, datetime
 from core import address_service, cccd_rules
 from students.models import StudentIdentityDocument, StudentAddress, VnProvince, VnWard
 from students.timeline import (
+    admission_start,
+    current_academic_year,
+    current_semester,
     course_year_label,
     max_year_label,
     format_student_birth_date,
@@ -722,3 +725,75 @@ def build_english_payload(student, *, dob, purpose_code, program_name):
         "editable": {"dob": dob_field},
     }
     return payload, purpose_label
+
+
+# ── Bảng điểm rèn luyện (conduct_score) ───────────────────────────────────────
+#
+# Giấy này Phòng CTSV xuất từ HỆ THỐNG NGOÀI — Dashboard không sinh DOCX/PDF, chỉ
+# chuyển trạng thái và trả mã hồ sơ portal. Toàn bộ thông tin SV chỉ để xem (nằm
+# trong `snapshot`, không có `editable`); sai thì SV ghi vào ô ghi chú.
+
+# Số năm học lùi lại khi hồ sơ chưa có năm/học kỳ nhập học.
+CONDUCT_FALLBACK_YEARS = 4
+
+
+def _semester_label(year, semester):
+    return f"Học kỳ {semester}, năm học {year}-{year + 1}"
+
+
+def conduct_semester_choices(student, today=None):
+    """Các học kỳ SV được xin bảng điểm rèn luyện, MỚI NHẤT trước.
+
+    Chỉ học kỳ chính (HK1, HK2) ĐÃ KẾT THÚC — điểm rèn luyện chỉ có sau khi học
+    kỳ đóng. Mốc kết thúc theo `current_semester` (HK1 = T9–T1, HK2 = T2–T6):
+    đang HK1 thì học kỳ gần nhất là HK2 năm học trước; đang HK2 thì là HK1 năm
+    nay; đang hè thì là HK2 năm nay.
+
+    Bắt đầu từ học kỳ nhập học (nhập học HK3 ⇒ bắt đầu từ HK1 năm học kế).
+    Hồ sơ không có năm nhập học ⇒ lùi `CONDUCT_FALLBACK_YEARS` năm học.
+    """
+    cur_start, _ = current_academic_year(today)
+    sem_now = current_semester(today)
+    last = (cur_start - 1, 2) if sem_now == 1 else (cur_start, sem_now - 1 if sem_now == 2 else 2)
+
+    entry_year, _, _, entry_sem = admission_start(student)
+    if entry_year:
+        first = (entry_year + 1, 1) if entry_sem == 3 else (entry_year, 2 if entry_sem == 2 else 1)
+    else:
+        first = (last[0] - CONDUCT_FALLBACK_YEARS + 1, 1)
+
+    choices = []
+    year, sem = last
+    while (year, sem) >= first:
+        choices.append({"code": f"{year}{sem}", "label": _semester_label(year, sem)})
+        year, sem = (year, 1) if sem == 2 else (year - 1, 2)
+    return choices
+
+
+def _conduct_snapshot(student):
+    return {
+        "student_name": student.full_name or "",
+        "student_id": student.current_student_code or "",
+        "dob": format_student_birth_date(student),
+        "department": student.current_department.name_vi if student.current_department else "",
+        "course_year": course_year_label(student),
+        "citizen_id": get_current_cccd(student),
+        "permanent_address": get_current_address_raw(student),
+    }
+
+
+def build_conduct_prefill(student):
+    return _conduct_snapshot(student)
+
+
+def build_conduct_payload(student, *, semester_code):
+    choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)}
+    if semester_code not in choices:
+        raise ValueError("Vui lòng chọn học kỳ cấp bảng điểm rèn luyện hợp lệ.")
+    label = choices[semester_code]
+    payload = {
+        "doc_type": "conduct_score",
+        "purpose": {"code": semester_code, "label": label, "program_name": None},
+        "snapshot": {**_conduct_snapshot(student), "semester": label},
+    }
+    return payload, label
