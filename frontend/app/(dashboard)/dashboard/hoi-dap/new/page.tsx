@@ -81,10 +81,6 @@ export default function NewTicketPage() {
 
       <div>
         <h1 className="text-xl font-semibold text-ink">Đặt câu hỏi</h1>
-        <p className="mt-1 text-sm text-muted">
-          Câu hỏi được chuyển tới chuyên viên phụ trách mảng đã chọn. Phản hồi hiển thị tại
-          mục Hỏi đáp và được báo qua email trường.
-        </p>
       </div>
 
       <form onSubmit={submit} className="space-y-5">
