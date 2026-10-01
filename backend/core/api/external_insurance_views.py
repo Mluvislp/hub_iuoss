@@ -49,7 +49,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from core.models import HealthInsuranceConfig
 from core.external_insurance_models import ExternalInsuranceEvent
-from core.insurance_editing import window
+from core.insurance_editing import closes_at, window
 from core.insurance_history import check_version, readable_payloads, require_active
 from core.insurance_contract import safe_path
 from .views import _insurance_config_payload
@@ -57,10 +57,12 @@ from .views import _insurance_config_payload
 EXTERNAL_IMAGES = ('cccd_image', 'cccd_image_back', 'bhyt_image')
 
 
-def active_config():
+def active_config(student=None):
+    # Hạn đóng tùy người (học viên cao học có hạn riêng) nên lọc giờ đóng bằng Python;
+    # tối đa 4 dòng config.
     now = timezone.now()
-    rows = list(HealthInsuranceConfig.objects.select_related('bank_account').filter(
-        is_active=True, registration_opens_at__lte=now, registration_closes_at__gte=now)[:2])
+    rows = [cfg for cfg in HealthInsuranceConfig.objects.select_related('bank_account').filter(
+        is_active=True, registration_opens_at__lte=now) if closes_at(cfg, student) >= now]
     return rows[0] if len(rows) == 1 else None
 
 
@@ -83,7 +85,7 @@ def external_detail(row):
         social_insurance_number=row.social_insurance_code, medical_insurance_code=row.medical_insurance_code,
         hospital_code=row.hospital_code, hospital_province=hospital.province_code if hospital else '',
         valid_from=str(row.valid_from), valid_until=str(row.valid_until))
-    win = window(row.intake_year, row.intake_period, row.intake_snapshot)
+    win = window(row.intake_year, row.intake_period, row.intake_snapshot, row.student)
     return dict(id=row.pk, status=row.status, row_version=row.row_version,
         prefill=prefill, config=row.intake_snapshot, window=win,
         display={'permanent_province': province.name if province else 'Chưa xác định',
@@ -106,7 +108,7 @@ class ExternalInsuranceView(InsuranceRegistrationView):
         student = self._student(request)
         if student is None:
             raise Http404
-        cfg = active_config()
+        cfg = active_config(student)
         if cfg is None:
             cfg = (HealthInsuranceConfig.objects.select_related('bank_account')
                    .order_by('-is_active', '-registration_opens_at', '-id').first())
@@ -150,11 +152,11 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                     if legacy.request_digest != digest:
                         raise Conflict('Yêu cầu này đã được dùng cho nội dung khác.')
                     return Response({'id': legacy.pk, 'status': legacy.status})
-                cfg = active_config()
+                cfg = active_config(student)
                 if row:
                     check_version(row, request.data.get('row_version'))
                     resubmitted = row.status == 'rejected' and request.data.get('action') == 'resubmit'
-                    if not resubmitted and not window(row.intake_year, row.intake_period, row.intake_snapshot)['can_edit']:
+                    if not resubmitted and not window(row.intake_year, row.intake_period, row.intake_snapshot, student)['can_edit']:
                         raise Conflict('Đã hết hạn chỉnh sửa bản khai.')
                     previous_edit = row.events.filter(event_type='STUDENT_UPDATED').order_by('created_at').first()
                     if not resubmitted and previous_edit:

@@ -33,11 +33,22 @@ def snapshot_datetime(value):
         return None
 
 
-def window(year, period, snapshot=None):
+def closes_at(cfg, student=None):
+    """Hạn đóng của đợt với người này: học viên cao học dùng `graduate_closes_at` nếu
+    staff đã cấu hình, còn lại (và mọi sinh viên đại học) dùng `registration_closes_at`.
+    Hạn này áp cho cả nộp đơn, sửa đơn lẫn khai BHYT nơi khác."""
+    from .login_policy import is_graduate
+    graduate_end = getattr(cfg, 'graduate_closes_at', None)
+    if graduate_end and student is not None and is_graduate(student):
+        return graduate_end
+    return cfg.registration_closes_at
+
+
+def window(year, period, snapshot=None, student=None):
     cfg = HealthInsuranceConfig.objects.filter(registration_year=year, registration_period=period).first() if year and period else None
     snapshot = snapshot if isinstance(snapshot, dict) else {}
     start = cfg.registration_opens_at if cfg else snapshot_datetime(snapshot.get('start_date'))
-    end = cfg.registration_closes_at if cfg else snapshot_datetime(snapshot.get('end_date'))
+    end = closes_at(cfg, student) if cfg else snapshot_datetime(snapshot.get('end_date'))
     now = timezone.now()
     opened = bool(start and end and (cfg.is_active if cfg else False) and start <= now <= end)
     return {'start_date': start, 'end_date': end, 'status': 'open' if opened else 'closed', 'can_edit': opened}
@@ -51,7 +62,7 @@ def registration_data(reg):
         code=reg.permanent_ward, province_code=reg.permanent_province,
     ).first()
     edited = reg.events.filter(event_type='STUDENT_UPDATED').order_by('created_at').first()
-    edit_window = window(reg.registration_year, reg.registration_period, reg.config_snapshot)
+    edit_window = window(reg.registration_year, reg.registration_period, reg.config_snapshot, reg.student)
     values = {name: str(getattr(reg, name) or '') for name in FIELDS}
     values.update(student_code=reg.student_code or '', hospital_province=hospital.province_code if hospital else '')
     config = period_config(reg.registration_year, reg.registration_period, reg.config_snapshot, reg.student)
@@ -82,7 +93,7 @@ def edit_registration(pk, student_id, data, files):
             if replay(reg, data.get('request_key'), digest, student_id, 'Hub'):
                 return reg
             check_version(reg, data.get('row_version'))
-            if not window(reg.registration_year, reg.registration_period, reg.config_snapshot)['can_edit']:
+            if not window(reg.registration_year, reg.registration_period, reg.config_snapshot, reg.student)['can_edit']:
                 raise Conflict('Đợt đã đóng hoặc chưa mở; chỉ tiếp nhận bổ sung theo phản hồi từ chối.')
             previous_edit = reg.events.filter(event_type='STUDENT_UPDATED').order_by('created_at').first()
             if previous_edit:
