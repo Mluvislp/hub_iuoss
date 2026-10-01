@@ -228,7 +228,7 @@ export default function ThuongBinhRequestPage() {
         </form>
       </div>
 
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-line bg-surface-subtle">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-sm text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.

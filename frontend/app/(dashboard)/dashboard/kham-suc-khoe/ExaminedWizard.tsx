@@ -234,7 +234,7 @@ export default function ExaminedWizard({
             {locked ? (
               <p className="text-meta text-muted">Thông tin đã khai báo ngoại trú, không chỉnh sửa tại đây.</p>
             ) : (
-              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-surface-subtle px-4 py-2.5 text-meta text-ink">
+              <div className="rounded-lg border border-line bg-surface-subtle px-4 py-2.5 text-meta text-ink">
                 Bấm <b>Lưu và tiếp tục</b> là thông tin được ghi nhận ngay thành khai báo ngoại trú.
                 Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo ngoại trú.
               </div>

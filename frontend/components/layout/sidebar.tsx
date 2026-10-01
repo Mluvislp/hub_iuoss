@@ -174,10 +174,10 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                       onClick={onClose}
                       aria-current={isActive ? 'page' : undefined}
                       className={cn(
-                        'flex items-center gap-3 px-2.5 h-10 coarse:h-11 rounded-md text-sm transition-colors border-l-[3px]',
+                        'flex items-center gap-3 px-2.5 h-10 coarse:h-11 rounded-md text-sm transition-colors',
                         isActive
-                          ? 'bg-primary-soft border-primary text-primary-text font-semibold'
-                          : 'border-transparent text-ink-3 hover:text-ink hover:bg-surface-muted',
+                          ? 'bg-primary-soft text-primary-text font-semibold'
+                          : 'text-ink-3 hover:text-ink hover:bg-surface-muted',
                       )}
                     >
                       <Icon size={17} className={cn('flex-shrink-0', pending && 'text-faint')} />
@@ -185,11 +185,14 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                         {item.label}
                       </span>
                       {pending && (
-                        <span
-                          className="w-1.5 h-1.5 rounded-full bg-warning-line flex-shrink-0"
-                          title="Đang phát triển"
-                          aria-label="Đang phát triển"
-                        />
+                        <>
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-warning-line flex-shrink-0"
+                            title="Đang phát triển"
+                            aria-hidden="true"
+                          />
+                          <span className="sr-only">(đang phát triển)</span>
+                        </>
                       )}
                     </Link>
                   );

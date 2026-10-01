@@ -441,7 +441,7 @@ export default function HealthCheckPage() {
 
               {!eligible ? (
                 <div className="px-6 py-5">
-                  <div role="alert" className="flex items-start gap-3 rounded-lg border border-warning-line border-l-4 border-l-warning-text bg-warning-soft px-4 py-3.5">
+                  <div role="alert" className="flex items-start gap-3 rounded-lg border border-warning-line bg-warning-soft px-4 py-3.5">
                     <AlertTriangle size={20} className="text-warning-text flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-warning-text">
                       <div className="font-semibold">Phần đăng ký khám chưa mở</div>

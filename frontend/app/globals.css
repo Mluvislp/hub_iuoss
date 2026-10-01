@@ -54,6 +54,13 @@
   .sidebar-transition[data-open='true'] {
     transition-delay: 0s;
   }
+  /* Giảm chuyển động: drawer hiện/ẩn ngay, không trượt. Spinner (animate-spin)
+     giữ nguyên — đó là tín hiệu "đang tải", không phải trang trí. */
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-transition {
+      transition: none;
+    }
+  }
   /* Mở rộng vùng bấm lên tối thiểu 44×44 mà không đổi hình thức — cho nút icon
      nhỏ và link chữ. Không dùng cho nút xếp sát nhau (vùng mở rộng sẽ chồng lên
      nút bên cạnh) — chỗ đó dùng `coarse:min-h-11`. */

@@ -35,8 +35,8 @@ export function RejectionNotice({ rejected = true, title, note, noteLabel = 'Phá
               {!rejected && <MessageSquareText className="h-3.5 w-3.5" />}{noteLabel}
             </p>
             <blockquote className={cn(
-              'whitespace-pre-wrap break-words rounded-lg border-l-4 bg-surface-subtle px-3.5 py-3 text-sm leading-6 text-ink',
-              rejected ? 'border-danger-text' : 'border-line-strong',
+              'whitespace-pre-wrap break-words rounded-lg border bg-surface-subtle px-3.5 py-3 text-sm leading-6 text-ink',
+              rejected ? 'border-danger-line' : 'border-line',
             )}>{note}</blockquote>
           </div>
         )}

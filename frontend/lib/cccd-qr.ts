@@ -9,7 +9,10 @@
  * không gửi đi đâu ngoài đơn đăng ký của chính sinh viên đó.
  */
 
-import jsQR from 'jsqr';
+// jsQR (~130 KB chưa nén) chỉ cần khi SV chọn ảnh CCCD → tải động trong
+// readCccdQr thay vì nằm sẵn trong bundle của trang đăng ký BHYT.
+type JsQR = typeof import('jsqr').default;
+let jsQR: JsQR | null = null;
 
 /**
  * Cạnh dài tối đa khi dựng canvas cho lượt quét TOÀN KHUNG. Ảnh điện thoại
@@ -34,6 +37,7 @@ const TILE_FRACTION = 0.25;
 const TILE_BUDGET_MS = 6000;
 
 function decode(img: ImageData): string | null {
+  if (!jsQR) return null;
   const found = jsQR(img.data, img.width, img.height, {
     inversionAttempts: 'attemptBoth',
   });
@@ -126,6 +130,12 @@ function scanTiles(bitmap: ImageBitmap): string | null {
  */
 export async function readCccdQr(file: File): Promise<string | null> {
   if (typeof createImageBitmap !== 'function') return null;
+
+  try {
+    jsQR ??= (await import('jsqr')).default;
+  } catch {
+    return null; // không tải được thư viện (mạng chập chờn) — như ảnh không có QR
+  }
 
   let bitmap: ImageBitmap;
   try {

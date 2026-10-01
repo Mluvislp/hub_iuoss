@@ -37,7 +37,7 @@ export function FreshmanWarningModal({ message, onConfirm, confirmLabel = 'Tôi 
           </div>
         </div>
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-4">
-          <blockquote className="whitespace-pre-wrap break-words rounded-lg border-l-4 border-danger-text bg-surface-subtle px-3.5 py-3 text-sm leading-6 text-ink">
+          <blockquote className="whitespace-pre-wrap break-words rounded-lg border border-danger-line bg-surface-subtle px-3.5 py-3 text-sm leading-6 text-ink">
             {message}
           </blockquote>
         </div>
