@@ -58,7 +58,7 @@ export function fmtVnd(n: number) {
 export function Breadcrumb({ trail }: { trail: { label: string; href?: string }[] }) {
   const items = [{ label: 'Bảng thông tin', href: '/dashboard' }, ...trail];
   return (
-    <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted flex-wrap">
+    <nav className="flex items-center gap-1.5 text-meta text-muted flex-wrap">
       {items.map((it, i) => (
         <span key={it.label} className="flex items-center gap-1.5">
           {i > 0 && <ChevronRight size={14} className="text-faint" />}
@@ -109,7 +109,7 @@ export function IneligibleModal({ message, onClose }: { message: string; onClose
 /** Ghi chú "đang dựng khung" — gỡ khi phần tương ứng được cài thật. */
 export function ScaffoldNote({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-[0.82rem]">
+    <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-meta">
       <Construction size={15} className="flex-shrink-0 mt-0.5" />
       <div>{children}</div>
     </div>

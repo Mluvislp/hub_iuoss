@@ -127,7 +127,7 @@ export default function BankLoanRequestPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">Đã gửi yêu cầu</h2>
+          <h2 className="text-title font-semibold text-ink">Đã gửi yêu cầu</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
           <div className="mt-6"><Link href="/dashboard" className={ui.btnPrimary}>Về Bảng thông tin</Link></div>
         </div>
@@ -156,7 +156,7 @@ export default function BankLoanRequestPage() {
 
   return (
     <div className="max-w-[760px] space-y-4">
-      <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+      <nav className="flex items-center gap-1.5 text-meta text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
         <ChevronRight size={14} className="text-faint" />
         <Link href="/dashboard/requests/new" className="hover:text-ink">Yêu cầu giấy tờ</Link>
@@ -166,7 +166,7 @@ export default function BankLoanRequestPage() {
 
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         <div className="px-6 py-5 border-b border-line">
-          <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+          <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
             <FileText size={17} className="text-primary" />
             Giấy xác nhận sinh viên — Vay vốn ngân hàng
           </h1>
@@ -182,7 +182,7 @@ export default function BankLoanRequestPage() {
 
           {/* Thông tin chỉ xem */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin sinh viên</h2>
+            <h2 className="text-meta font-semibold text-muted mb-2.5">Thông tin sinh viên</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <ReadonlyField label="Họ và tên" value={p.student_name} />
               <ReadonlyField label="Mã số sinh viên" value={p.student_id} />
@@ -228,7 +228,7 @@ export default function BankLoanRequestPage() {
 
           {/* CCCD — ô xin sửa, chuyên viên duyệt */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Căn cước công dân</h2>
+            <h2 className="text-meta font-semibold text-muted mb-2.5">Căn cước công dân</h2>
             <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
               <EditableField
                 label="Số CCCD"
@@ -252,7 +252,7 @@ export default function BankLoanRequestPage() {
                 onCancel={() => cancelField('citizen_id_issue_date', originals)}
               />
             </div>
-            <p className="mt-2 text-[0.78rem] text-muted">
+            <p className="mt-2 text-xs text-muted">
               {p.cccd_valid
                 ? 'Mã lớp và thông tin CCCD mới được Phòng Công tác Sinh viên duyệt trước khi cập nhật vào hồ sơ.'
                 : 'Hồ sơ chưa có CCCD hợp lệ (đang trống hoặc CMND cũ) — vui lòng nhập; thông tin được Phòng Công tác Sinh viên duyệt trước khi cập nhật vào hồ sơ.'}
@@ -286,7 +286,7 @@ export default function BankLoanRequestPage() {
 
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-ink-3 leading-relaxed">
+        <p className="text-sm text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>

@@ -68,16 +68,16 @@ function Bubble({ c }: { c: RequestComment }) {
         )}
       >
         <div className="mb-1 flex flex-wrap items-center gap-2">
-          <span className="text-[0.78rem] font-semibold text-ink">{c.author_name}</span>
+          <span className="text-xs font-semibold text-ink">{c.author_name}</span>
           <span className={cn(badge.base, mine ? badge.info : badge.neutral, 'py-0')}>
             {mine ? 'Sinh viên' : 'Phòng CTSV'}
           </span>
           {c.event && EVENT_LABELS[c.event] && (
             <span className={cn(badge.base, badge.warning, 'py-0')}>{EVENT_LABELS[c.event]}</span>
           )}
-          <span className="ml-auto text-[0.72rem] text-muted">{formatDateTime(c.created_at)}</span>
+          <span className="ml-auto text-xs text-muted">{formatDateTime(c.created_at)}</span>
         </div>
-        <p className="whitespace-pre-wrap break-words text-[0.87rem] leading-relaxed text-ink">
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
           {c.body}
         </p>
       </div>
@@ -176,28 +176,28 @@ export default function RequestDetailPage() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ink">
+          <h1 className="text-title font-semibold text-ink">
             {REQUEST_TYPE_LABELS[data.request_type]}
           </h1>
           <p className="mt-1 text-sm text-muted">
             Mã #{data.id} · Gửi {formatDateTime(data.created_at)}
           </p>
         </div>
-        <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status], 'text-[0.82rem]')}>
+        <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status], 'text-meta')}>
           {REQUEST_STATUS_LABELS[data.status]}
         </span>
       </div>
 
       {data.portal_code && (
         <section className="rounded-lg border border-primary-line bg-primary-soft px-5 py-4">
-          <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-primary-text">
+          <p className="flex items-center gap-1.5 text-meta font-medium text-primary-text">
             <Ticket size={14} />
             MÃ HỒ SƠ PORTAL
           </p>
           <p className="mt-1.5 font-mono text-2xl font-bold tracking-wide text-primary-text">
             {data.portal_code}
           </p>
-          <p className="mt-1.5 text-[0.82rem] text-primary-text/80">
+          <p className="mt-1.5 text-meta text-primary-text/80">
             Xuất trình mã này khi đến nhận giấy tại Phòng Công tác Sinh viên (O1.105).
           </p>
         </section>
@@ -292,7 +292,7 @@ export default function RequestDetailPage() {
                 }
               />
               {sendError && (
-                <p className="mt-1.5 text-[0.82rem] text-danger-text">{sendError}</p>
+                <p className="mt-1.5 text-meta text-danger-text">{sendError}</p>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-3">
                 <button
@@ -304,11 +304,11 @@ export default function RequestDetailPage() {
                   {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                   Gửi trao đổi
                 </button>
-                <span className="text-[0.78rem] text-muted">{body.length}/2000 ký tự</span>
+                <span className="text-xs text-muted">{body.length}/2000 ký tự</span>
               </div>
             </>
           ) : (
-            <p className="flex items-start gap-2 text-[0.85rem] text-muted">
+            <p className="flex items-start gap-2 text-sm text-muted">
               <Lock size={14} className="mt-0.5 shrink-0" />
               Không gửi được trao đổi khi yêu cầu ở trạng thái “{REQUEST_STATUS_LABELS[data.status]}”.
               Liên hệ Phòng Công tác Sinh viên (O1.105) nếu cần hỗ trợ.
@@ -317,7 +317,7 @@ export default function RequestDetailPage() {
         </div>
       </section>
 
-      <p className="text-[0.78rem] text-muted">
+      <p className="text-xs text-muted">
         Cập nhật lần cuối: {formatDate(data.updated_at)}
       </p>
     </div>

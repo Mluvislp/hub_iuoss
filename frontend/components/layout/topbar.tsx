@@ -21,13 +21,13 @@ export default function Topbar({ title, session, onMenuClick }: TopbarProps) {
         <Menu size={20} />
       </button>
 
-      <h1 className="text-[0.95rem] font-semibold text-ink">{title}</h1>
+      <h1 className="text-section font-semibold text-ink">{title}</h1>
 
       {session && (
         <div className="ml-auto flex items-center gap-2 text-sm">
           <span className="text-muted hidden sm:inline">Mã số sinh viên</span>
           <span className="font-medium text-ink bg-surface-muted border border-line-strong rounded-md
-                           px-2.5 py-1 font-mono text-[0.8rem]">
+                           px-2.5 py-1 font-mono text-meta">
             {session.student_code}
           </span>
         </div>

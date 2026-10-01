@@ -27,13 +27,13 @@ function PlanBlock({ state }: { state: TuitionExemptionState }) {
     <div className="space-y-3">
       {plan.renewals.length > 0 && (
         <div className="rounded-lg border border-line divide-y divide-line2">
-          <div className="px-4 py-2.5 text-[0.8rem] font-medium text-muted">Diện bạn đang được hưởng</div>
+          <div className="px-4 py-2.5 text-meta font-medium text-muted">Diện bạn đang được hưởng</div>
           {plan.renewals.map((c) => (
             <div key={c.code} className="px-4 py-2.5 flex flex-wrap items-center gap-2">
               <div className="flex-1 min-w-[180px]">
                 <div className="text-sm text-ink font-medium">{c.name}</div>
                 {c.last_verified && (
-                  <div className="text-[0.75rem] text-muted">Xác nhận gần nhất: {c.last_verified}</div>
+                  <div className="text-xs text-muted">Xác nhận gần nhất: {c.last_verified}</div>
                 )}
               </div>
               <span className={cn(badge.base, MODE_BADGE[c.mode])}>
@@ -44,7 +44,7 @@ function PlanBlock({ state }: { state: TuitionExemptionState }) {
         </div>
       )}
       {plan.inactive_history.length > 0 && (
-        <p className="text-[0.8rem] text-muted">
+        <p className="text-meta text-muted">
           Diện không còn nhận hồ sơ ở đợt này: {plan.inactive_history.map((c) => c.name).join(', ')}.
         </p>
       )}
@@ -74,7 +74,7 @@ function RoundCard({ state }: { state: TuitionExemptionState }) {
           <>
             <div>
               <div className="font-semibold text-ink">{r.title}</div>
-              <div className="text-muted text-[0.82rem] mt-0.5">
+              <div className="text-muted text-meta mt-0.5">
                 {r.term_label} · Nhận hồ sơ từ {fmtDateTime(r.opens_at)} đến {fmtDateTime(r.closes_at)}
               </div>
             </div>
@@ -105,7 +105,7 @@ function ApplicationRow({ app }: { app: TuitionExemptionApplication }) {
           className="flex items-center gap-3 px-5 py-3 hover:bg-surface-subtle transition-colors">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-ink truncate">{app.round_title}</div>
-        <div className="text-[0.78rem] text-muted mt-0.5 truncate">
+        <div className="text-xs text-muted mt-0.5 truncate">
           {app.submission_kind_label} · {app.categories.map((c) => c.name).join(', ')} · {fmtDateTime(app.submitted_at)}
         </div>
       </div>
@@ -167,16 +167,16 @@ export default function TuitionWaiverPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-ink">{r.term_code}</p>
-                        <p className="mt-0.5 text-[0.82rem] text-ink">{r.category || '—'}</p>
+                        <p className="mt-0.5 text-meta text-ink">{r.category || '—'}</p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-[0.72rem] text-muted">Được miễn giảm</p>
+                        <p className="text-xs text-muted">Được miễn giảm</p>
                         <p className="text-sm font-semibold tabular-nums text-success-text">
                           {fmtVnd(r.exemption_amount_vnd)}
                         </p>
                       </div>
                     </div>
-                    <p className="mt-1.5 text-[0.78rem] text-muted tabular-nums">
+                    <p className="mt-1.5 text-xs text-muted tabular-nums">
                       Mức {Number(r.percent)}% · Học phí {fmtVnd(r.fee_amount_vnd)}
                     </p>
                   </li>
@@ -184,7 +184,7 @@ export default function TuitionWaiverPage() {
               </ul>
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
-                  <thead className="text-[0.78rem] text-muted">
+                  <thead className="text-xs text-muted">
                     <tr className="border-b border-line2">
                       <th className="text-left font-medium px-5 py-2">Học kỳ</th>
                       <th className="text-left font-medium px-3 py-2">Đối tượng áp dụng</th>
@@ -214,7 +214,7 @@ export default function TuitionWaiverPage() {
           </section>
 
           {state.application?.supplement_deadline && (
-            <p className="text-[0.82rem] text-muted">
+            <p className="text-meta text-muted">
               Hạn bổ sung hồ sơ: {fmtDate(state.application.supplement_deadline)}
             </p>
           )}

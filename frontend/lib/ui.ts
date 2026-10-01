@@ -6,11 +6,11 @@ export const ui = {
   // Panel / card
   card: 'bg-white border border-line rounded-lg shadow-card',
   cardHeader: 'flex items-center justify-between gap-3 px-5 py-3 border-b border-line',
-  sectionTitle: 'flex items-center gap-2 text-[0.95rem] font-semibold text-ink',
+  sectionTitle: 'flex items-center gap-2 text-section font-semibold text-ink',
 
   // Text
-  label: 'text-[0.8rem] font-medium text-muted',
-  fieldLabel: 'block text-[0.82rem] font-medium text-ink mb-1.5',
+  label: 'text-meta font-medium text-muted',
+  fieldLabel: 'block text-meta font-medium text-ink mb-1.5',
 
   // Form controls
   // Focus = viền 1px + ring 1px cùng màu primary → vạch 2px đặc (~5:1 trên nền

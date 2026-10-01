@@ -41,7 +41,7 @@ function daysLeft(iso: string) {
 
 function Breadcrumb() {
   return (
-    <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+    <nav className="flex items-center gap-1.5 text-meta text-muted">
       <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
       <ChevronRight size={14} className="text-faint" />
       <span className="text-ink font-medium">Khám sức khỏe</span>
@@ -61,13 +61,13 @@ function ErrorBox({ text }: { text: string }) {
 function PackageInfo({ state }: { state: HealthCheckState }) {
   const r = state.round!;
   return (
-    <div className="rounded-lg border border-line divide-y divide-line2 text-[0.86rem]">
+    <div className="rounded-lg border border-line divide-y divide-line2 text-sm">
       <div className="px-4 py-3">
-        <div className="text-[0.75rem] font-medium text-muted mb-0.5">Tên gói</div>
+        <div className="text-xs font-medium text-muted mb-0.5">Tên gói</div>
         <div className="font-semibold text-ink">{r.package_name}</div>
       </div>
       <div className="px-4 py-3">
-        <div className="text-[0.75rem] font-medium text-muted mb-1">Nội dung</div>
+        <div className="text-xs font-medium text-muted mb-1">Nội dung</div>
         <div className="space-y-1.5 text-ink leading-relaxed">
           {r.package_lines.map((l, i) => l.bullet ? (
             <div key={i} className="flex gap-2 pl-1">
@@ -83,7 +83,7 @@ function PackageInfo({ state }: { state: HealthCheckState }) {
         <div className="px-4 py-3 flex items-start gap-2">
           <CalendarClock size={15} className="text-primary mt-0.5 flex-shrink-0" />
           <div>
-            <div className="text-[0.75rem] font-medium text-muted mb-0.5">Thời gian và địa điểm dự kiến</div>
+            <div className="text-xs font-medium text-muted mb-0.5">Thời gian và địa điểm dự kiến</div>
             <div className="text-ink">{r.schedule_note}</div>
           </div>
         </div>
@@ -107,7 +107,7 @@ function ResultSummary({ response }: { response: HealthCheckResponse }) {
   ];
   return (
     <div>
-      <div className="text-[0.82rem] font-medium text-ink mb-2">Kết quả khám đã khai</div>
+      <div className="text-meta font-medium text-ink mb-2">Kết quả khám đã khai</div>
       <div className="rounded-lg border border-line px-4 py-1">
         {rows.map(([k, v]) => (
           <div key={k} className={ui.dtRow}>
@@ -166,7 +166,7 @@ export default function HealthCheckPage() {
     <div className="px-6 py-5 border-b border-line">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+          <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
             <HeartPulse size={17} className="text-primary" /> {round.title}
           </h1>
           <p className="text-sm text-muted mt-1">
@@ -236,7 +236,7 @@ export default function HealthCheckPage() {
           <div className="px-6 py-5 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[0.75rem] font-medium text-muted">Phản hồi đã gửi</div>
+                <div className="text-xs font-medium text-muted">Phản hồi đã gửi</div>
                 <div className="text-sm font-semibold text-ink mt-0.5">
                   {response.choice === 'register'
                     ? 'Chưa khám — đăng ký khám tập trung tại trường'
@@ -301,7 +301,7 @@ export default function HealthCheckPage() {
 
             {response.choice === 'examined' && (
               <div>
-                <div className="text-[0.82rem] font-medium text-ink mb-2">Minh chứng đã nộp</div>
+                <div className="text-meta font-medium text-ink mb-2">Minh chứng đã nộp</div>
                 <EvidenceThumbs response={response} />
               </div>
             )}
@@ -379,7 +379,7 @@ export default function HealthCheckPage() {
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         {header}
         <div className="px-6 py-5">
-          <p className="text-[0.9rem] font-semibold text-ink mb-3">
+          <p className="text-section font-semibold text-ink mb-3">
             Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
             Hồ Chí Minh hay chưa?<span className="text-danger-text"> *</span>
           </p>
@@ -408,10 +408,10 @@ export default function HealthCheckPage() {
             <div className={ui.card}>
               <div className="px-6 py-4 border-b border-line">
                 <h2 className={ui.sectionTitle}>
-                  <span className="w-6 h-6 rounded-md border border-primary-line bg-primary-soft text-primary-text text-[0.75rem] font-bold flex items-center justify-center">1</span>
+                  <span className="w-6 h-6 rounded-md border border-primary-line bg-primary-soft text-primary-text text-xs font-bold flex items-center justify-center">1</span>
                   Khai báo thông tin cá nhân
                 </h2>
-                <p className="text-[0.78rem] text-muted mt-1">
+                <p className="text-xs text-muted mt-1">
                   {declarationLocked
                     ? 'Thông tin đã khai báo ngoại trú, không chỉnh sửa tại đây.'
                     : 'Thông tin gửi kèm đăng ký được ghi nhận là khai báo ngoại trú.'}
@@ -431,7 +431,7 @@ export default function HealthCheckPage() {
               <div className="px-6 py-4 border-b border-line">
                 <h2 className={cn(ui.sectionTitle, !eligible && 'text-muted')}>
                   <span className={cn(
-                    'w-6 h-6 rounded-md border text-[0.75rem] font-bold flex items-center justify-center',
+                    'w-6 h-6 rounded-md border text-xs font-bold flex items-center justify-center',
                     eligible ? 'border-primary-line bg-primary-soft text-primary-text' : 'border-line bg-white text-muted',
                   )}>2</span>
                   Thông tin và đăng ký khám
@@ -463,7 +463,7 @@ export default function HealthCheckPage() {
                 </div>
               ) : (
                 <div className="px-6 py-5 space-y-4">
-                  <div className="flex items-center gap-2 text-[0.8rem] text-success-text">
+                  <div className="flex items-center gap-2 text-meta text-success-text">
                     <MapPin size={14} />
                     {(declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
                       && (declarationLocked ? state.residence.temporary_hcm : draft.inHcmc === true)
@@ -501,7 +501,7 @@ export default function HealthCheckPage() {
       )}
 
       {!choice && (
-        <p className="flex items-center gap-2 text-[0.8rem] text-muted px-1">
+        <p className="flex items-center gap-2 text-meta text-muted px-1">
           <Stethoscope size={14} /> Chọn một phương án để tiếp tục.
         </p>
       )}

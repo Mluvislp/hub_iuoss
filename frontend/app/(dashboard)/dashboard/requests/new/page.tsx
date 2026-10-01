@@ -42,7 +42,7 @@ export default function NewRequestPage() {
     <div className="max-w-[720px] space-y-4">
 
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+      <nav className="flex items-center gap-1.5 text-meta text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
         <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Yêu cầu giấy tờ</span>
@@ -51,7 +51,7 @@ export default function NewRequestPage() {
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-line">
-          <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+          <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
             <FileText size={17} className="text-primary" />
             Tạo yêu cầu giấy tờ
           </h1>
@@ -93,7 +93,7 @@ export default function NewRequestPage() {
                       <span className={cn('block text-sm font-medium', selected ? 'text-primary' : 'text-ink')}>
                         {label}
                       </span>
-                      <span className="block text-[0.8rem] text-muted mt-0.5">{TYPE_HINTS[value]}</span>
+                      <span className="block text-meta text-muted mt-0.5">{TYPE_HINTS[value]}</span>
                     </span>
                   </label>
                 );
@@ -118,7 +118,7 @@ export default function NewRequestPage() {
               </Link>
             </div>
           ) : (
-            <p className="text-[0.85rem] text-muted px-1">
+            <p className="text-sm text-muted px-1">
               Chọn một loại giấy tờ ở trên để tiếp tục.
             </p>
           )}
@@ -128,7 +128,7 @@ export default function NewRequestPage() {
       {/* Alert note */}
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-ink-3 leading-relaxed">
+        <p className="text-sm text-ink-3 leading-relaxed">
           Sau khi gửi biểu mẫu, theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.

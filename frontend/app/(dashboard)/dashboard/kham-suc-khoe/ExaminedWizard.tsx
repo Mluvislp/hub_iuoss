@@ -196,10 +196,10 @@ export default function ExaminedWizard({
       <div className="px-6 pt-5 pb-4 border-b border-line">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <div className="text-[0.72rem] font-medium text-muted">Bước {step + 1}/{steps.length}</div>
-            <h2 className="text-[0.98rem] font-semibold text-ink">{steps[step].title}</h2>
+            <div className="text-xs font-medium text-muted">Bước {step + 1}/{steps.length}</div>
+            <h2 className="text-section font-semibold text-ink">{steps[step].title}</h2>
           </div>
-          {onCancel && <button type="button" onClick={onCancel} className="touch-target text-[0.8rem] text-muted hover:text-ink">Hủy</button>}
+          {onCancel && <button type="button" onClick={onCancel} className="touch-target text-meta text-muted hover:text-ink">Hủy</button>}
         </div>
         <ol className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
           {steps.map((s, i) => {
@@ -211,7 +211,7 @@ export default function ExaminedWizard({
                         className="w-full text-left disabled:cursor-default group" title={s.title}>
                   <span className={cn('block h-1.5 rounded-full transition-colors',
                     i === step ? 'bg-primary' : done ? 'bg-primary/40' : 'bg-line')} />
-                  <span className={cn('hidden md:flex items-center gap-1 mt-1.5 text-[0.72rem] truncate',
+                  <span className={cn('hidden md:flex items-center gap-1 mt-1.5 text-xs truncate',
                     i === step ? 'text-primary-text font-semibold' : 'text-muted')}>
                     {done && <Check size={11} />}{s.title}
                   </span>
@@ -232,9 +232,9 @@ export default function ExaminedWizard({
         {step === 0 && (
           <div className="space-y-6">
             {locked ? (
-              <p className="text-[0.8rem] text-muted">Thông tin đã khai báo ngoại trú, không chỉnh sửa tại đây.</p>
+              <p className="text-meta text-muted">Thông tin đã khai báo ngoại trú, không chỉnh sửa tại đây.</p>
             ) : (
-              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-surface-subtle px-4 py-2.5 text-[0.8rem] text-ink">
+              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-surface-subtle px-4 py-2.5 text-meta text-ink">
                 Bấm <b>Lưu và tiếp tục</b> là thông tin được ghi nhận ngay thành khai báo ngoại trú.
                 Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo ngoại trú.
               </div>
@@ -247,14 +247,14 @@ export default function ExaminedWizard({
 
         {section && (
           <>
-            <p className="text-[0.8rem] text-muted -mt-1">{section.desc}</p>
+            <p className="text-meta text-muted -mt-1">{section.desc}</p>
             <ResultSectionFields section={section} values={values} set={set} errors={errors} />
           </>
         )}
 
         {last && (
           <section className="space-y-3 pt-2">
-            <h3 className="text-[0.84rem] font-semibold text-ink">Ảnh minh chứng<span className="text-danger-text"> *</span></h3>
+            <h3 className="text-sm font-semibold text-ink">Ảnh minh chứng<span className="text-danger-text"> *</span></h3>
             <EvidencePicker files={files} max={state.max_evidence_files} error={errors.evidence}
                             onChange={(f) => { setFiles(f); setErrors(({ evidence: _, ...rest }) => rest); }} />
             <EvidenceGuide hcmc={state.residence.eligible}
@@ -271,7 +271,7 @@ export default function ExaminedWizard({
         <div className="flex items-center justify-between gap-2 pt-4 border-t border-line2">
           {step > 0
             ? <button type="button" className={ui.btnGhost} onClick={() => goTo(step - 1)}><ArrowLeft size={15} /> Quay lại</button>
-            : <span className="text-[0.72rem] text-muted">Nháp được lưu tự động trên thiết bị này.</span>}
+            : <span className="text-xs text-muted">Nháp được lưu tự động trên thiết bị này.</span>}
           {last ? (
             <button type="button" className={ui.btnPrimary} disabled={saving || !dataConsent} onClick={submit}>
               {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>

@@ -97,7 +97,7 @@ interface FieldProps {
 }
 
 function FieldInput({ field, value, onChange, error, computed, compact, label = true }: FieldProps) {
-  const base = cn(ui.input, compact ? 'h-9 text-[0.85rem]' : 'h-10', error && 'border-danger-line');
+  const base = cn(ui.input, compact ? 'h-9 text-sm' : 'h-10', error && 'border-danger-line');
   const id = useId();
   const msgId = `${id}-msg`;
   // label={false} (ô nằm trong bảng có tiêu đề cột) → vẫn cần tên cho trình đọc màn hình.
@@ -135,7 +135,7 @@ function FieldInput({ field, value, onChange, error, computed, compact, label = 
           className={cn(base, field.unit && 'pr-16')}
         />
         {field.unit && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.72rem] text-muted pointer-events-none">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">
             {field.unit}
           </span>
         )}
@@ -145,13 +145,13 @@ function FieldInput({ field, value, onChange, error, computed, compact, label = 
   return (
     <div>
       {label && (
-        <label htmlFor={field.type === 'computed' ? undefined : id} className="block text-[0.78rem] font-medium text-ink mb-1">
+        <label htmlFor={field.type === 'computed' ? undefined : id} className="block text-xs font-medium text-ink mb-1">
           {field.label}{field.required && field.type !== 'computed' && <span className="text-danger-text"> *</span>}
         </label>
       )}
       {control}
-      {error ? <p id={msgId} className="mt-1 text-[0.72rem] text-danger-text">{error}</p>
-        : field.hint ? <p id={msgId} className="mt-1 text-[0.72rem] text-muted">{field.hint}</p> : null}
+      {error ? <p id={msgId} className="mt-1 text-xs text-danger-text">{error}</p>
+        : field.hint ? <p id={msgId} className="mt-1 text-xs text-muted">{field.hint}</p> : null}
     </div>
   );
 }
@@ -177,7 +177,7 @@ function Group({ group, values, set, errors }: {
         <div className="rounded-lg border border-line divide-y divide-line2">
           {organs.map((o) => (
             <div key={o.key} className="grid grid-cols-[1fr_5.5rem] sm:grid-cols-[11rem_1fr_5.5rem] items-start gap-2 px-3 py-2">
-              <div className="col-span-2 sm:col-span-1 text-[0.82rem] font-medium text-ink sm:pt-2">{o.label}</div>
+              <div className="col-span-2 sm:col-span-1 text-meta font-medium text-ink sm:pt-2">{o.label}</div>
               <FieldInput field={o.result} value={values[o.result.key] ?? ''} error={errors[o.result.key]}
                           compact label={false} onChange={(v) => set(o.result.key, v)} />
               <FieldInput field={o.class} value={values[o.class.key] ?? ''} error={errors[o.class.key]}
@@ -195,8 +195,8 @@ function Group({ group, values, set, errors }: {
     return (
       <details className="group rounded-lg border border-line" open={hasError || undefined}>
         <summary className="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer list-none">
-          <span className="text-[0.84rem] font-semibold text-ink">{group.title}</span>
-          <span className="flex items-center gap-2 text-[0.75rem] text-muted">
+          <span className="text-sm font-semibold text-ink">{group.title}</span>
+          <span className="flex items-center gap-2 text-xs text-muted">
             đã nhập {filled}/{fields.length}
             <ChevronDown size={15} className="transition-transform group-open:rotate-180" />
           </span>
@@ -207,9 +207,9 @@ function Group({ group, values, set, errors }: {
   }
   return (
     <section>
-      <h3 className="text-[0.84rem] font-semibold text-ink mb-2">{group.title}</h3>
+      <h3 className="text-sm font-semibold text-ink mb-2">{group.title}</h3>
       {organs.length > 0 && (
-        <div className="hidden sm:grid grid-cols-[11rem_1fr_5.5rem] gap-2 px-3 pb-1 text-[0.72rem] text-muted">
+        <div className="hidden sm:grid grid-cols-[11rem_1fr_5.5rem] gap-2 px-3 pb-1 text-xs text-muted">
           <span />
           <span>Kết quả</span>
           <span>Phân loại</span>

@@ -65,10 +65,10 @@ function ContactRow({
         <Icon size={14} className="text-primary" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[0.72rem] text-muted">{label}</div>
+        <div className="text-xs text-muted">{label}</div>
         <a
           href={href}
-          className="block mt-0.5 text-[0.85rem] font-medium text-ink hover:text-primary-text
+          className="block mt-0.5 text-sm font-medium text-ink hover:text-primary-text
                      hover:underline break-all"
         >
           {value}
@@ -126,7 +126,7 @@ export default function SupportWidget() {
                      focus:outline-none"
         >
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-surface-subtle">
-            <h2 className="flex items-center gap-2 text-[0.9rem] font-semibold text-ink">
+            <h2 className="flex items-center gap-2 text-section font-semibold text-ink">
               <Headset size={15} className="text-primary" />
               Hỗ trợ kỹ thuật
             </h2>
@@ -141,7 +141,7 @@ export default function SupportWidget() {
           </div>
 
           <div className="px-4 py-3.5">
-            <p className="text-[0.82rem] text-muted leading-relaxed">
+            <p className="text-meta text-muted leading-relaxed">
               Mọi sự cố về kỹ thuật vui lòng liên hệ chuyên viên{' '}
               <span className="font-medium text-ink">{SUPPORT.name}</span>
             </p>
@@ -157,7 +157,7 @@ export default function SupportWidget() {
                     href={`https://zalo.me/${SUPPORT.phoneRaw}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-1 text-[0.75rem] font-medium text-primary-text hover:underline"
+                    className="inline-block mt-1 text-xs font-medium text-primary-text hover:underline"
                   >
                     Nhắn qua Zalo
                   </a>

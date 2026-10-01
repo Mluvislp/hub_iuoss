@@ -18,7 +18,7 @@ export function RequestNoteField({ value, onChange }: { value: string; onChange:
         value={value} onChange={(e) => onChange(e.target.value)} rows={3} maxLength={1000}
         className={ui.textarea}
       />
-      <ul id="request-note-hint" className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
+      <ul id="request-note-hint" className="mt-1.5 space-y-0.5 text-xs text-muted">
         <li>• Thông tin sinh viên có sai sót: ghi rõ thông tin sai và thông tin đúng vào đây.</li>
         <li>• Nếu có yêu cầu đặc biệt, vui lòng ghi rõ nội dung.</li>
       </ul>

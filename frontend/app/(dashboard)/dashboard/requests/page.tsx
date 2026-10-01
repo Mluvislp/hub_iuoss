@@ -58,7 +58,7 @@ export default function RequestHistoryPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ink">Yêu cầu giấy tờ</h1>
+          <h1 className="text-title font-semibold text-ink">Yêu cầu giấy tờ</h1>
           <p className="mt-1 text-sm text-muted">
             Danh sách yêu cầu đã gửi, trạng thái xử lý và trao đổi với Phòng Công tác Sinh viên.
           </p>
@@ -121,7 +121,7 @@ export default function RequestHistoryPage() {
                   type="button"
                   onClick={() => setFilter(key)}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors',
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-meta font-medium transition-colors',
                     filter === key
                       ? 'border-primary bg-primary text-white'
                       : 'border-line bg-white text-ink-3 hover:bg-surface-subtle',
@@ -130,7 +130,7 @@ export default function RequestHistoryPage() {
                   {label}
                   <span
                     className={cn(
-                      'rounded-full px-1.5 text-[0.7rem]',
+                      'rounded-full px-1.5 text-xs',
                       filter === key ? 'bg-white/20' : 'bg-surface-muted text-muted',
                     )}
                   >
@@ -167,14 +167,14 @@ export default function RequestHistoryPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 line-clamp-1 text-[0.85rem] text-ink-3" title={req.purpose}>
+                    <p className="mt-1 line-clamp-1 text-sm text-ink-3" title={req.purpose}>
                       {req.purpose}
                     </p>
-                    <p className="mt-1 text-[0.78rem] text-muted">
+                    <p className="mt-1 text-xs text-muted">
                       Mã #{req.id} · Gửi {formatDateTime(req.created_at)}
                     </p>
                     {req.portal_code && (
-                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary-line bg-primary-soft px-2 py-1 text-[0.78rem] text-primary-text">
+                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary-line bg-primary-soft px-2 py-1 text-xs text-primary-text">
                         <Ticket size={13} />
                         Mã hồ sơ portal:{' '}
                         <span className="font-mono font-semibold">{req.portal_code}</span>

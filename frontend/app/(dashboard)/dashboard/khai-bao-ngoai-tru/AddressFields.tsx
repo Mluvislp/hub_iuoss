@@ -78,7 +78,7 @@ export default function AddressFields({
             </select>
           )}
           {errors.province && (
-            <p id={`${idPrefix}-province-error`} className="mt-1 text-[0.75rem] text-danger-text">{errors.province}</p>
+            <p id={`${idPrefix}-province-error`} className="mt-1 text-xs text-danger-text">{errors.province}</p>
           )}
         </div>
 
@@ -106,7 +106,7 @@ export default function AddressFields({
               <option key={w.code} value={w.code}>{w.name}</option>
             ))}
           </select>
-          {errors.ward && <p id={`${idPrefix}-ward-error`} className="mt-1 text-[0.75rem] text-danger-text">{errors.ward}</p>}
+          {errors.ward && <p id={`${idPrefix}-ward-error`} className="mt-1 text-xs text-danger-text">{errors.ward}</p>}
         </div>
       </div>
 
@@ -126,14 +126,14 @@ export default function AddressFields({
           className={cn(ui.input, errors.street && 'border-danger-line')}
         />
         {errors.street ? (
-          <p id={`${idPrefix}-street-error`} className="mt-1 text-[0.75rem] text-danger-text">{errors.street}</p>
+          <p id={`${idPrefix}-street-error`} className="mt-1 text-xs text-danger-text">{errors.street}</p>
         ) : (
           <StreetHint />
         )}
       </div>
 
       {hint && (
-        <div className="flex gap-2 px-3 py-2 rounded-lg bg-warning-soft border border-warning-line text-[0.78rem] text-warning-text">
+        <div className="flex gap-2 px-3 py-2 rounded-lg bg-warning-soft border border-warning-line text-xs text-warning-text">
           {hint}
         </div>
       )}

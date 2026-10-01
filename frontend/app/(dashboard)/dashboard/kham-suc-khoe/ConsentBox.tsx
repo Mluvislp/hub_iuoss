@@ -17,11 +17,11 @@ export default function ConsentBox({
       )}>
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)}
                className="mt-0.5 w-4 h-4 flex-shrink-0 accent-primary" />
-        <span className="text-[0.84rem] text-ink leading-relaxed">
+        <span className="text-sm text-ink leading-relaxed">
           {text}<span className="text-danger-text"> *</span>
         </span>
       </label>
-      {error && <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
+      {error && <p className="mt-1 text-xs text-danger-text">{error}</p>}
     </div>
   );
 }

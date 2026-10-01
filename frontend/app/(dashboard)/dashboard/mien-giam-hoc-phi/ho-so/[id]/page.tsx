@@ -59,7 +59,7 @@ function SupplementBox({ app, onDone }: { app: TuitionExemptionApplication; onDo
       <div className={ui.cardHeader}>
         <h2 className={ui.sectionTitle}><FileUp size={17} className="text-danger-text" />Cán bộ yêu cầu bổ sung hồ sơ</h2>
         {app.supplement_deadline && (
-          <span className="text-[0.78rem] text-muted">Hạn: {fmtDateTime(app.supplement_deadline)}</span>
+          <span className="text-xs text-muted">Hạn: {fmtDateTime(app.supplement_deadline)}</span>
         )}
       </div>
       <div className="px-5 py-4 space-y-4">
@@ -76,28 +76,28 @@ function SupplementBox({ app, onDone }: { app: TuitionExemptionApplication; onDo
             {(app.supplement_targets ?? []).map((c) => (
               <div key={c.code} className="space-y-2">
                 <div className="text-sm font-medium text-ink">{c.name}</div>
-                {c.review_note && <p className="text-[0.8rem] text-warning-text">{c.review_note}</p>}
+                {c.review_note && <p className="text-meta text-warning-text">{c.review_note}</p>}
                 {c.documents.map((d) => {
                   const key = `doc_${c.code}__${d.doc_type}`;
                   const list = files[key] ?? [];
                   return (
                     <div key={key} className="pl-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[0.82rem] text-ink flex-1 min-w-[160px]">{d.label}</span>
+                        <span className="text-meta text-ink flex-1 min-w-[160px]">{d.label}</span>
                         <label className={cn(ui.btnOutline, 'h-9 cursor-pointer')}>
                           <FileUp size={15} /> {list.length ? `${list.length} file` : 'Chọn file'}
                           <input type="file" multiple accept={ACCEPT} className="hidden"
                                  onChange={(e) => { const fs = Array.from(e.target.files ?? []); setFiles((cur) => ({ ...cur, [key]: fs })); e.target.value = ''; }} />
                         </label>
                       </div>
-                      {list.length > 0 && <p className="mt-1 text-[0.78rem] text-muted truncate">{list.map((f) => f.name).join(', ')}</p>}
-                      {errors[key] && <p className="mt-1 text-[0.78rem] text-danger-text">{errors[key][0]}</p>}
+                      {list.length > 0 && <p className="mt-1 text-xs text-muted truncate">{list.map((f) => f.name).join(', ')}</p>}
+                      {errors[key] && <p className="mt-1 text-xs text-danger-text">{errors[key][0]}</p>}
                     </div>
                   );
                 })}
               </div>
             ))}
-            <p className="text-[0.78rem] text-muted">File mới sẽ thay file cùng loại đã nộp trước đó.</p>
+            <p className="text-xs text-muted">File mới sẽ thay file cùng loại đã nộp trước đó.</p>
             {error && <ErrorBox text={error} />}
             <div className="flex justify-end">
               <button type="button" className={ui.btnPrimary} onClick={send} disabled={saving}>
@@ -149,7 +149,7 @@ export default function TuitionWaiverDetailPage() {
               <h2 className={ui.sectionTitle}>Đơn {app.submission_kind_label.toLowerCase()} #{app.id}</h2>
               <StatusBadge status={app.status} label={app.status_label} />
             </div>
-            <div className="px-5 py-3 text-[0.82rem] text-muted">{app.round_title} · Nộp lúc {fmtDateTime(app.submitted_at)}</div>
+            <div className="px-5 py-3 text-meta text-muted">{app.round_title} · Nộp lúc {fmtDateTime(app.submitted_at)}</div>
             {(app.status === 'approved' || app.status === 'rejected') && (app.review_note || app.rejection_reason) && (
               <div className="px-5 pb-3 text-sm text-ink whitespace-pre-line">
                 {app.status === 'rejected' && app.rejection_reason && (
@@ -176,7 +176,7 @@ export default function TuitionWaiverDetailPage() {
                         <span className={cn(badge.base, MODE_BADGE[c.mode])}>{c.mode_label}</span>
                       )}
                     </div>
-                    {c.review_note && <p className="text-[0.8rem] text-muted mt-0.5">{c.review_note}</p>}
+                    {c.review_note && <p className="text-meta text-muted mt-0.5">{c.review_note}</p>}
                   </div>
                   <span className={cn(badge.base, REVIEW_BADGE[c.review_status] ?? badge.neutral)}>
                     {REVIEW_LABEL[c.review_status] ?? c.review_status}
@@ -221,7 +221,7 @@ export default function TuitionWaiverDetailPage() {
                     <span className="flex-1 min-w-0 truncate">
                       <span className="text-muted">{d.category_code} · {d.doc_label}:</span> {d.original_filename}
                     </span>
-                    {d.expires_at && <span className="text-[0.75rem] text-muted">Hết hạn {fmtDate(d.expires_at)}</span>}
+                    {d.expires_at && <span className="text-xs text-muted">Hết hạn {fmtDate(d.expires_at)}</span>}
                   </button>
                 ))
               )}
@@ -241,8 +241,8 @@ export default function TuitionWaiverDetailPage() {
                     <li key={i} className="relative">
                       <span className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-primary" />
                       <div className="text-sm text-ink">{ev.label}</div>
-                      <div className="text-[0.75rem] text-muted">{fmtDateTime(ev.at)}</div>
-                      {ev.note && <p className="text-[0.8rem] text-muted mt-0.5">{ev.note}</p>}
+                      <div className="text-xs text-muted">{fmtDateTime(ev.at)}</div>
+                      {ev.note && <p className="text-meta text-muted mt-0.5">{ev.note}</p>}
                     </li>
                   ))}
                 </ol>

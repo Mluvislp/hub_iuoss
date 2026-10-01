@@ -33,7 +33,7 @@ export function RequestEditButton({ onClick, label = 'Yêu cầu chỉnh sửa' 
     <button
       type="button"
       onClick={onClick}
-      className="touch-target mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-primary-text hover:underline"
+      className="touch-target mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-text hover:underline"
     >
       <PencilLine size={12} /> {label}
     </button>
@@ -46,7 +46,7 @@ export function CancelEditButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="touch-target mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-muted hover:text-ink transition-colors"
+      className="touch-target mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink transition-colors"
     >
       <RotateCcw size={12} /> Hủy chỉnh sửa
     </button>
@@ -56,7 +56,7 @@ export function CancelEditButton({ onClick }: { onClick: () => void }) {
 /** Nhãn "sẽ gửi duyệt" gắn cạnh tên ô khi giá trị khác hồ sơ. */
 export function ChangedTag() {
   return (
-    <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-warning-text">
+    <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs font-normal text-warning-text">
       <PencilLine size={11} /> sẽ gửi duyệt
     </span>
   );
@@ -133,8 +133,8 @@ export function EditableField({
             />
           )}
           {error
-            ? <p id={msgId} className="mt-1 text-[0.75rem] text-danger-text">{error}</p>
-            : hint && <p id={msgId} className="mt-1 text-[0.75rem] text-warning-text">{hint}</p>}
+            ? <p id={msgId} className="mt-1 text-xs text-danger-text">{error}</p>
+            : hint && <p id={msgId} className="mt-1 text-xs text-warning-text">{hint}</p>}
           {lockable && <CancelEditButton onClick={onCancel} />}
         </>
       ) : (

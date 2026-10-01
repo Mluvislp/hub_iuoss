@@ -58,7 +58,7 @@ export default function OffCampusDeclarationPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">Đã ghi nhận khai báo</h2>
+          <h2 className="text-title font-semibold text-ink">Đã ghi nhận khai báo</h2>
           <p className="text-sm text-muted mt-2">
             Thông tin đã được cập nhật vào hồ sơ. Cần sửa lại thì gửi yêu cầu
             chỉnh sửa ở màn hình xem lại.
@@ -79,7 +79,7 @@ export default function OffCampusDeclarationPage() {
   if (form.locked) {
     return (
       <div className="max-w-[820px] space-y-4">
-        <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+        <nav className="flex items-center gap-1.5 text-meta text-muted">
           <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
           <ChevronRight size={14} className="text-faint" />
           <span className="text-ink font-medium">Khai báo ngoại trú</span>
@@ -87,7 +87,7 @@ export default function OffCampusDeclarationPage() {
 
         <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
           <div className="px-6 py-5 border-b border-line">
-            <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+            <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
               <ShieldCheck size={17} className="text-success-text" />
               Bạn đã hoàn tất khai báo
             </h1>
@@ -105,7 +105,7 @@ export default function OffCampusDeclarationPage() {
 
             {!form.reopen_requested && (
               <div>
-                <label htmlFor="reopen-reason" className="block text-[0.78rem] text-muted mb-1">
+                <label htmlFor="reopen-reason" className="block text-xs text-muted mb-1">
                   Lý do cần chỉnh sửa <span className="text-muted">(không bắt buộc)</span>
                 </label>
                 <input
@@ -113,7 +113,7 @@ export default function OffCampusDeclarationPage() {
                   type="text" value={askReason} maxLength={255}
                   placeholder="Ví dụ: đã chuyển chỗ trọ, sai số nhà…"
                   onChange={(e) => setAskReason(e.target.value)}
-                  className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                  className={cn(ui.input, 'h-9 text-sm')}
                 />
               </div>
             )}
@@ -192,7 +192,7 @@ export default function OffCampusDeclarationPage() {
 
   return (
     <div className="max-w-[820px] space-y-4">
-      <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+      <nav className="flex items-center gap-1.5 text-meta text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
         <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Khai báo ngoại trú</span>
@@ -200,7 +200,7 @@ export default function OffCampusDeclarationPage() {
 
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         <div className="px-6 py-5 border-b border-line">
-          <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+          <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
             <Home size={17} className="text-primary" />
             Khai báo thông tin ngoại trú
           </h1>

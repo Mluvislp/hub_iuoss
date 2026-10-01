@@ -33,16 +33,16 @@ export default function PersonalField({
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1.5">
-        <label htmlFor={unlocked ? id : undefined} className="text-[0.82rem] font-medium text-ink">{field.label}</label>
+        <label htmlFor={unlocked ? id : undefined} className="text-meta font-medium text-ink">{field.label}</label>
 
         {unlocked ? (
           <button type="button" onClick={onCancel}
-                  className="touch-target text-[0.75rem] font-medium text-muted hover:text-ink">
+                  className="touch-target text-xs font-medium text-muted hover:text-ink">
             Hủy sửa
           </button>
         ) : (
           <button type="button" onClick={onUnlock}
-                  className="touch-target inline-flex items-center gap-1 text-[0.75rem] font-medium text-primary-text hover:underline">
+                  className="touch-target inline-flex items-center gap-1 text-xs font-medium text-primary-text hover:underline">
             <PencilLine size={11} />
             {blank ? 'Bổ sung' : 'Yêu cầu chỉnh sửa'}
           </button>
@@ -74,9 +74,9 @@ export default function PersonalField({
         </div>
       )}
 
-      {error && <p id={msgId} className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
+      {error && <p id={msgId} className="mt-1 text-xs text-danger-text">{error}</p>}
       {hint && !error && !unlocked && (
-        <p id={msgId} className="mt-1 text-[0.75rem] text-muted">{hint}</p>
+        <p id={msgId} className="mt-1 text-xs text-muted">{hint}</p>
       )}
     </div>
   );

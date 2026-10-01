@@ -76,7 +76,7 @@ function errA11y(errors: Errors, name: string) {
 
 function FieldError({ errors, name }: { errors: Errors; name: string }) {
   const msg = errors[name]?.[0];
-  return msg ? <p id={errId(name)} className="mt-1 text-[0.78rem] text-danger-text">{msg}</p> : null;
+  return msg ? <p id={errId(name)} className="mt-1 text-xs text-danger-text">{msg}</p> : null;
 }
 
 /** Lý do không đủ điều kiện kiểm được ngay trên trình duyệt — CÙNG luật với
@@ -118,8 +118,8 @@ function CategoryOption({
             <span className="text-sm font-medium text-ink">{c.name}</span>
             {c.mode !== 'new' && <span className={cn(badge.base, MODE_BADGE[c.mode])}>Đang hưởng · {c.mode_label}</span>}
           </div>
-          {c.description && <p className="text-[0.8rem] text-muted mt-0.5 whitespace-pre-line">{c.description}</p>}
-          {c.last_verified && <p className="text-[0.75rem] text-muted mt-0.5">Xác nhận gần nhất: {c.last_verified}</p>}
+          {c.description && <p className="text-meta text-muted mt-0.5 whitespace-pre-line">{c.description}</p>}
+          {c.last_verified && <p className="text-xs text-muted mt-0.5">Xác nhận gần nhất: {c.last_verified}</p>}
         </div>
       </label>
 
@@ -127,12 +127,12 @@ function CategoryOption({
         <div className="mt-3 ml-7 space-y-3">
           {c.fields.length > 0 && (
             <div className="rounded-lg border border-line bg-white px-4 py-3 space-y-3">
-              <div className="text-[0.8rem] font-medium text-ink">Thông tin riêng của đối tượng {c.code}</div>
+              <div className="text-meta font-medium text-ink">Thông tin riêng của đối tượng {c.code}</div>
               {c.fields.map((f) => {
                 const name = `detail_${f.name}`;
                 if (f.type === 'checkbox') {
                   return (
-                    <label key={f.name} className="flex items-start gap-2.5 text-[0.84rem] text-ink cursor-pointer">
+                    <label key={f.name} className="flex items-start gap-2.5 text-sm text-ink cursor-pointer">
                       <input type="checkbox" className="mt-0.5 accent-primary" checked={!!details[f.name]}
                              onChange={(e) => setDetail(f.name, e.target.checked)} />
                       {f.label}
@@ -157,13 +157,13 @@ function CategoryOption({
           )}
 
           {c.mode === 'confirm' ? (
-            <p className="flex items-center gap-1.5 text-[0.8rem] text-success-text">
+            <p className="flex items-center gap-1.5 text-meta text-success-text">
               <CheckCircle2 size={14} /> Không cần nộp lại giấy tờ — cán bộ sẽ xác nhận gia hạn.
             </p>
           ) : (
             <div className="space-y-2.5">
               {c.mode === 'supplement' && (
-                <p className="text-[0.8rem] text-warning-text">Đối tượng này cần nộp lại các giấy tờ sau cho học kỳ này:</p>
+                <p className="text-meta text-warning-text">Đối tượng này cần nộp lại các giấy tờ sau cho học kỳ này:</p>
               )}
               {c.documents.map((d) => {
                 const key = fileKey(c.code, d.doc_type);
@@ -171,7 +171,7 @@ function CategoryOption({
                 return (
                   <div key={key}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[0.82rem] text-ink flex-1 min-w-[160px]">
+                      <span className="text-meta text-ink flex-1 min-w-[160px]">
                         {d.label}{d.required && <span className="text-danger-text"> *</span>}
                       </span>
                       <label className={cn(ui.btnOutline, 'h-9 cursor-pointer')}>
@@ -183,7 +183,7 @@ function CategoryOption({
                     {list.length > 0 && (
                       <ul className="mt-1 space-y-0.5">
                         {list.map((f, i) => (
-                          <li key={`${f.name}-${i}`} className="flex items-center gap-1.5 text-[0.78rem] text-muted">
+                          <li key={`${f.name}-${i}`} className="flex items-center gap-1.5 text-xs text-muted">
                             <span className="truncate">{f.name}</span>
                             <button type="button" aria-label="Bỏ file" className="touch-target text-muted hover:text-danger-text"
                                     onClick={() => onFiles(key, list.filter((_, j) => j !== i))}>
@@ -332,7 +332,7 @@ export default function TuitionWaiverSubmitPage() {
             <h2 className={ui.sectionTitle}>{state.round.title}</h2>
             <span className={cn(badge.base, renewal ? badge.success : badge.info)}>{plan.submission_kind_label}</span>
           </div>
-          <div className="px-5 py-3 text-[0.82rem] text-muted space-y-1">
+          <div className="px-5 py-3 text-meta text-muted space-y-1">
             <div>{state.round.term_label} · Hạn nộp: {fmtDateTime(state.round.closes_at)}</div>
             {renewal && (
               <div className="flex items-start gap-1.5 text-ink">
@@ -359,7 +359,7 @@ export default function TuitionWaiverSubmitPage() {
         </section>
 
         {p.source === 'previous_application' && (
-          <p className="text-[0.8rem] text-muted -mb-2">
+          <p className="text-meta text-muted -mb-2">
             Các ô dưới đây được điền sẵn từ đơn gần nhất của bạn — kiểm tra và sửa nếu có thay đổi.
           </p>
         )}
@@ -385,18 +385,18 @@ export default function TuitionWaiverSubmitPage() {
         <section className={ui.card}>
           <div className={ui.cardHeader}>
             <h2 className={ui.sectionTitle}>Đối tượng miễn giảm</h2>
-            <span className="text-[0.78rem] text-muted">Chọn MỘT đối tượng</span>
+            <span className="text-xs text-muted">Chọn MỘT đối tượng</span>
           </div>
           {all.length === 0 ? (
             <p className="px-5 py-4 text-sm text-muted">Chưa có đối tượng nào được mở.</p>
           ) : (
             <div className="divide-y divide-line2">
               {plan.renewals.length > 0 && (
-                <div className="px-5 py-2 text-[0.75rem] font-medium text-muted bg-surface-subtle">Đối tượng bạn đang hưởng</div>
+                <div className="px-5 py-2 text-xs font-medium text-muted bg-surface-subtle">Đối tượng bạn đang hưởng</div>
               )}
               {plan.renewals.map(option)}
               {plan.renewals.length > 0 && plan.others.length > 0 && (
-                <div className="px-5 py-2 text-[0.75rem] font-medium text-muted bg-surface-subtle">Đối tượng khác</div>
+                <div className="px-5 py-2 text-xs font-medium text-muted bg-surface-subtle">Đối tượng khác</div>
               )}
               {plan.others.map(option)}
             </div>
@@ -404,7 +404,7 @@ export default function TuitionWaiverSubmitPage() {
           <div className="px-5 pb-3"><FieldError errors={errors} name="category_codes" /></div>
         </section>
 
-        <p className="text-[0.78rem] text-muted">
+        <p className="text-xs text-muted">
           Giấy tờ nhận PDF (tối đa {state.limits.max_pdf_mb} MB) hoặc ảnh JPG/PNG/HEIC (tối đa {state.limits.max_image_mb} MB mỗi ảnh),
           tổng cộng không quá {state.limits.max_files} file. Mẫu đơn M01–M04 tải tại iuoss.com/bieumau.
         </p>

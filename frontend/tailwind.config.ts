@@ -65,6 +65,15 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
       },
+      // Thang cỡ chữ theo VAI TRÒ. Dùng cùng xs (12) / sm (14, nội dung) có sẵn;
+      // không viết text-[0.82rem]… nữa. Thêm cỡ mới ở đây thì khai báo luôn trong
+      // lib/utils.ts (tailwind-merge) — không thì cn() coi nó là màu chữ và xóa mất.
+      fontSize: {
+        meta: ['0.8125rem', { lineHeight: '1.25rem' }],     // 13px — mô tả phụ, nhãn ô nhập
+        section: ['0.9375rem', { lineHeight: '1.375rem' }], // 15px — tiêu đề thẻ / mục
+        title: ['1.125rem', { lineHeight: '1.625rem' }],    // 18px — tiêu đề trang
+        headline: ['1.375rem', { lineHeight: '1.875rem' }], // 22px — lời chào trang chủ
+      },
       boxShadow: {
         card: '0 1px 2px rgba(16,24,40,0.04)',
       },

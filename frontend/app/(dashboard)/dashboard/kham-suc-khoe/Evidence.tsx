@@ -21,12 +21,12 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export function EvidenceGuide({ hcmc, year }: { hcmc: boolean; year: string }) {
   const link = 'inline-flex items-center gap-1 font-medium text-primary-text hover:underline';
   const box = (active: boolean) => cn(
-    'rounded-lg border px-4 py-3 text-[0.84rem] text-ink',
+    'rounded-lg border px-4 py-3 text-sm text-ink',
     active ? 'border-primary-line border-l-4 border-l-primary bg-primary-soft' : 'border-line bg-surface-subtle',
   );
   return (
     <div className="space-y-2.5">
-      <div className="text-[0.82rem] font-semibold text-ink">Hướng dẫn chuẩn bị ảnh minh chứng</div>
+      <div className="text-meta font-semibold text-ink">Hướng dẫn chuẩn bị ảnh minh chứng</div>
 
       <div className={box(hcmc)}>
         <div className="font-semibold mb-1.5">
@@ -96,7 +96,7 @@ export function EvidencePicker({
                     className="touch-target absolute top-1.5 right-1.5 w-7 h-7 coarse:w-9 coarse:h-9 rounded-md bg-white/95 border border-line flex items-center justify-center text-muted hover:text-danger-text">
               <X size={14} />
             </button>
-            <div className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-line px-2 py-1 text-[0.7rem] text-muted truncate">
+            <div className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-line px-2 py-1 text-xs text-muted truncate">
               {f.name}
             </div>
           </div>
@@ -108,19 +108,19 @@ export function EvidencePicker({
                     error || localError ? 'border-danger-line' : 'border-line-strong',
                   )}>
             <ImagePlus size={22} />
-            <span className="text-[0.8rem] font-medium">Thêm ảnh</span>
-            <span className="text-[0.7rem]">{files.length}/{max}</span>
+            <span className="text-meta font-medium">Thêm ảnh</span>
+            <span className="text-xs">{files.length}/{max}</span>
           </button>
         )}
       </div>
       <input ref={input} type="file" accept={ACCEPT} multiple className="hidden"
              onChange={(e) => add(e.target.files)} />
-      <p className="mt-2 text-[0.75rem] text-muted">
+      <p className="mt-2 text-xs text-muted">
         Ảnh chụp phiếu kết quả hoặc màn hình kết quả trên ứng dụng Công dân số. JPG, PNG, WebP
         hoặc HEIC; tối đa {max} ảnh, mỗi ảnh không quá 5 MB.
       </p>
       {(error || localError) && (
-        <p className="mt-1 text-[0.75rem] text-danger-text">{error || localError}</p>
+        <p className="mt-1 text-xs text-danger-text">{error || localError}</p>
       )}
     </div>
   );

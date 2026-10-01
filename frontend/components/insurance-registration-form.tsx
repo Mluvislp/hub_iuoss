@@ -724,7 +724,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         <div className="w-16 h-16 bg-success-soft text-success-text rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckSquare size={32} />
         </div>
-        <h2 className="text-xl font-semibold text-ink mb-2">
+        <h2 className="text-title font-semibold text-ink mb-2">
           {external ? "Khai báo thành công" : "Đăng ký thành công"}
         </h2>
         <p className="text-ink-3 mb-6">
@@ -1198,7 +1198,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 )}
               </div>
               {!external && formEnabled && (
-                <ul className="space-y-0.5 text-[0.75rem] text-muted md:col-span-2">
+                <ul className="space-y-0.5 text-xs text-muted md:col-span-2">
                   <li>
                     • <b>Link tra cứu bệnh viện:</b>{" "}
                     <a

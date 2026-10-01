@@ -135,12 +135,12 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <div className="flex items-center justify-between h-[55px] px-5 bg-white border-b border-line">
           <Link href="/dashboard" className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-md bg-primary text-white flex items-center justify-center
-                            text-[0.82rem] font-bold tracking-tight shadow-sm shadow-primary/25">
+                            text-meta font-bold tracking-tight shadow-sm shadow-primary/25">
               IU
             </div>
             <div className="leading-tight">
-              <div className="text-ink font-semibold text-[0.9rem]">IUOSS Hub</div>
-              <div className="text-muted text-[0.68rem]">Cổng dịch vụ sinh viên</div>
+              <div className="text-ink font-semibold text-section">IUOSS Hub</div>
+              <div className="text-muted text-xs">Cổng dịch vụ sinh viên</div>
             </div>
           </Link>
           <button
@@ -157,7 +157,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label} className={cn('px-3', i > 0 && 'mt-5 pt-5 border-t border-line2')}>
-              <p className="px-2.5 mb-2 text-[0.68rem] font-semibold text-muted">
+              <p className="px-2.5 mb-2 text-xs font-semibold text-muted">
                 {section.label}
               </p>
               <div className="space-y-0.5">

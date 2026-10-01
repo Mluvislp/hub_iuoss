@@ -92,7 +92,7 @@ export default function DashboardPage() {
       <section className="rounded-lg border border-primary-line bg-primary-wash px-5 sm:px-6 py-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-[1.35rem] font-semibold text-ink">
+            <h1 className="text-headline font-semibold text-ink">
               Xin chào, {session?.full_name ?? '—'}
             </h1>
             <p className="text-sm text-muted mt-1">
@@ -172,7 +172,7 @@ export default function DashboardPage() {
                 <dl>
                   <DefRow
                     label="Mã thẻ BHYT"
-                    value={<span className="font-mono text-[0.82rem]">{health_insurance.medical_insurance_code}</span>}
+                    value={<span className="font-mono text-meta">{health_insurance.medical_insurance_code}</span>}
                   />
                   {/* Ưu tiên tên cơ sở; mã lạ (không có trong danh mục) thì hiện mã. */}
                   <DefRow
@@ -183,7 +183,7 @@ export default function DashboardPage() {
                 </dl>
                 <Link
                   href="/dashboard/bao-hiem-y-te"
-                  className="mt-3 inline-flex items-center gap-1 text-[0.82rem] font-medium text-primary-text hover:underline"
+                  className="mt-3 inline-flex items-center gap-1 text-meta font-medium text-primary-text hover:underline"
                 >
                   Xem chi tiết
                   <ChevronRight size={14} />
@@ -256,9 +256,9 @@ export default function DashboardPage() {
                       )}
                     </div>
                     {req.purpose && (
-                      <p className="mt-1 line-clamp-2 text-[0.82rem] text-ink-3">{req.purpose}</p>
+                      <p className="mt-1 line-clamp-2 text-meta text-ink-3">{req.purpose}</p>
                     )}
-                    <p className="mt-1 text-[0.78rem] text-muted">{formatDateTime(req.created_at)}</p>
+                    <p className="mt-1 text-xs text-muted">{formatDateTime(req.created_at)}</p>
                   </div>
                   <ChevronRight size={16} className="mt-0.5 shrink-0 text-faint" aria-hidden="true" />
                 </Link>
@@ -268,7 +268,7 @@ export default function DashboardPage() {
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-surface-subtle text-[0.78rem] text-muted border-b border-line">
+                <tr className="bg-surface-subtle text-xs text-muted border-b border-line">
                   <th className="text-left font-medium px-5 py-2.5">Loại giấy</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden sm:table-cell">Mục đích</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden md:table-cell">Ngày tạo</th>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
                     <td className="px-5 py-3.5 text-ink-3 hidden sm:table-cell max-w-[260px] align-top">
                       <span className="line-clamp-2" title={req.purpose}>{req.purpose}</span>
                     </td>
-                    <td className="px-5 py-3.5 text-muted text-[0.82rem] hidden md:table-cell whitespace-nowrap align-top">
+                    <td className="px-5 py-3.5 text-muted text-meta hidden md:table-cell whitespace-nowrap align-top">
                       {formatDateTime(req.created_at)}
                     </td>
                     <td className="px-5 py-3.5 align-top">
@@ -310,7 +310,7 @@ export default function DashboardPage() {
                     <td className="px-5 py-3.5 align-top whitespace-nowrap">
                       <Link
                         href={`/dashboard/requests/${req.id}`}
-                        className="text-[0.82rem] font-medium text-primary-text hover:underline"
+                        className="text-meta font-medium text-primary-text hover:underline"
                       >
                         Xem
                       </Link>

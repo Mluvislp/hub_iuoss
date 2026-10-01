@@ -20,7 +20,7 @@ const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: ''
 export function ReadonlyField({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div>
-      <div className="text-[0.82rem] font-medium text-ink mb-1.5">{label}</div>
+      <div className="text-meta font-medium text-ink mb-1.5">{label}</div>
       <div className={cn(
         'flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-surface-subtle text-sm',
         value ? 'text-ink' : 'text-muted italic',
@@ -28,7 +28,7 @@ export function ReadonlyField({ label, value, note }: { label: string; value: st
         <Lock size={13} className="text-faint flex-shrink-0" />
         {value || 'Chưa có thông tin'}
       </div>
-      {note && <p className="mt-1 text-[0.75rem] text-muted">{note}</p>}
+      {note && <p className="mt-1 text-xs text-muted">{note}</p>}
     </div>
   );
 }
@@ -61,7 +61,7 @@ export function ChoiceTile({
         <span className={cn('block text-sm font-semibold', active ? 'text-primary-text' : 'text-ink')}>
           {title}
         </span>
-        <span className="block text-[0.78rem] text-muted mt-0.5">{desc}</span>
+        <span className="block text-xs text-muted mt-0.5">{desc}</span>
       </span>
     </button>
   );
@@ -199,10 +199,10 @@ export function DeclarationFields({
     <>
       {/* ── 1. Thông tin cá nhân ── */}
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-1">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-1">
           <User size={15} className={accentIcon.primary} /> Thông tin cá nhân
         </h2>
-        <p className="text-[0.78rem] text-muted mb-3">
+        <p className="text-xs text-muted mb-3">
           Thông tin lấy từ hồ sơ của trường. Cần sửa thì bấm <b>Yêu cầu chỉnh sửa</b> —
           thay đổi sẽ được phòng CTSV duyệt trước khi có hiệu lực.
         </p>
@@ -227,24 +227,24 @@ export function DeclarationFields({
             extra={
               <div className="grid sm:grid-cols-2 gap-2 mt-2">
                 <div>
-                  <label htmlFor="cccd-issue-place" className="block text-[0.75rem] text-muted mb-1">Nơi cấp</label>
+                  <label htmlFor="cccd-issue-place" className="block text-xs text-muted mb-1">Nơi cấp</label>
                   <input
                     id="cccd-issue-place"
                     type="text" value={cccdExtra.issue_place} maxLength={255}
                     placeholder="Cục Cảnh sát QLHC về TTXH"
                     onChange={(e) => setCccdExtra((s) => ({ ...s, issue_place: e.target.value }))}
-                    className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                    className={cn(ui.input, 'h-9 text-sm')}
                   />
                 </div>
                 <div>
-                  <label htmlFor="cccd-issue-date" className="block text-[0.75rem] text-muted mb-1">Ngày cấp</label>
+                  <label htmlFor="cccd-issue-date" className="block text-xs text-muted mb-1">Ngày cấp</label>
                   <input
                     id="cccd-issue-date"
                     type="date"
                     value={cccdExtra.issue_date}
                     max={todayInput()}
                     onChange={(e) => setCccdExtra((s) => ({ ...s, issue_date: e.target.value }))}
-                    className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                    className={cn(ui.input, 'h-9 text-sm')}
                   />
                 </div>
               </div>
@@ -276,10 +276,10 @@ export function DeclarationFields({
 
       {/* ── 2. Thường trú ── */}
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-1">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-1">
           <MapPin size={15} className={accentIcon.primary} /> Địa chỉ thường trú
         </h2>
-        <p className="text-[0.78rem] text-muted mb-3">Địa chỉ theo hộ khẩu / nơi ở lâu dài của gia đình.</p>
+        <p className="text-xs text-muted mb-3">Địa chỉ theo hộ khẩu / nơi ở lâu dài của gia đình.</p>
         <AddressFields
           idPrefix="perm"
           value={permanent}
@@ -299,10 +299,10 @@ export function DeclarationFields({
 
       {/* ── 3. Tạm trú ── */}
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-1">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-1">
           <Home size={15} className={accentIcon.primary} /> Nơi tạm trú hiện tại
         </h2>
-        <p className="text-[0.78rem] text-muted mb-3">
+        <p className="text-xs text-muted mb-3">
           Sinh viên hiện có đang tạm trú tại Thành phố Hồ Chí Minh hay không?
           <span className="text-danger-text"> *</span>
         </p>
@@ -347,7 +347,7 @@ export function DeclarationFields({
           )}
         </div>
         {fieldErrors.temporary_in_hcmc && (
-          <p className="mt-1.5 text-[0.75rem] text-danger-text">{fieldErrors.temporary_in_hcmc}</p>
+          <p className="mt-1.5 text-xs text-danger-text">{fieldErrors.temporary_in_hcmc}</p>
         )}
 
         {!noTemp && inHcmc !== null && (
@@ -392,7 +392,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
   return (
     <>
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-2">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-2">
           <User size={15} className={accentIcon.primary} /> Thông tin cá nhân
         </h2>
         <div className="rounded-lg border border-line px-4 py-1">
@@ -414,7 +414,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
       </section>
 
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-2">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-2">
           <MapPin size={15} className={accentIcon.primary} /> Địa chỉ đã khai
         </h2>
         <div className="rounded-lg border border-line px-4 py-1">

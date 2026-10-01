@@ -32,7 +32,7 @@
 /* iOS Safari tự phóng to cả trang khi focus ô nhập có chữ < 16px, rồi không thu
    lại — với form dài (BHYT, ngoại trú, MGHP) SV phải chụm tay thu nhỏ sau mỗi ô.
    Ép 16px trên thiết bị cảm ứng; desktop (chuột) giữ cỡ chữ gọn của từng form.
-   Viết ngoài @layer + bọc :is() để thắng mọi class text-sm / text-[0.85rem] trên ô. */
+   Viết ngoài @layer + bọc :is() để thắng mọi class cỡ chữ (text-sm, text-meta…) trên ô. */
 @media (hover: none) and (pointer: coarse) {
   :is(
     input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),

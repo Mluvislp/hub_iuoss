@@ -24,7 +24,7 @@ export default function ComingSoon({ feature }: { feature: FeatureKey }) {
           <Icon size={24} className="text-primary" strokeWidth={1.75} />
         </div>
 
-        <h1 className="mt-5 text-[1.15rem] font-semibold text-ink">{label}</h1>
+        <h1 className="mt-5 text-title font-semibold text-ink">{label}</h1>
 
         <div className="mt-2.5 flex justify-center">
           <span className={cn(badge.base, badge.info)}>Đang phát triển</span>
@@ -35,7 +35,7 @@ export default function ComingSoon({ feature }: { feature: FeatureKey }) {
         </p>
 
         <div className="mt-7 pt-6 border-t border-line2">
-          <p className="text-[0.82rem] text-muted">
+          <p className="text-meta text-muted">
             Trong thời gian chờ, vui lòng liên hệ Phòng Công tác Sinh viên nếu cần hỗ trợ.
           </p>
           <Link href="/dashboard" className={cn(ui.btnSecondary, 'mt-4')}>

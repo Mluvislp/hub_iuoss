@@ -28,7 +28,7 @@ const PERIOD_LABELS: Record<string, string> = {
 const PERIOD_SEQUENCE = ['MAIN', 'Q2', 'Q3', 'Q4'];
 
 /** Tiêu đề cột dùng chung cho mọi bảng trên trang. */
-const TH = 'px-5 py-2.5 text-left text-[0.78rem] font-medium text-muted';
+const TH = 'px-5 py-2.5 text-left text-xs font-medium text-muted';
 const THEAD_ROW = 'border-b border-line bg-surface-subtle';
 
 function Empty() {
@@ -51,12 +51,12 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
 function HospitalValue({ card }: { card: HealthInsuranceCard }) {
   if (!card.hospital_code) return null;
   if (!card.hospital_name) {
-    return <span className="font-mono text-[0.82rem]">{card.hospital_code}</span>;
+    return <span className="font-mono text-meta">{card.hospital_code}</span>;
   }
   return (
     <span className="block">
       <span className="block">{card.hospital_name}</span>
-      <span className="block mt-0.5 font-mono text-[0.75rem] font-normal text-muted">
+      <span className="block mt-0.5 font-mono text-xs font-normal text-muted">
         {card.hospital_code}
       </span>
     </span>
@@ -157,14 +157,14 @@ export default function HealthInsurancePage() {
             {/* Mã thẻ là thứ SV cần nhất khi đi khám → cho nổi lên trên cùng. */}
             <div className="rounded-lg border border-primary-line bg-primary-wash px-5 py-4">
               <div className={ui.label}>Mã thẻ BHYT</div>
-              <div className="mt-1.5 font-mono text-[1.25rem] font-semibold text-ink tracking-wide break-all">
+              <div className="mt-1.5 font-mono text-xl font-semibold text-ink tracking-wide break-all">
                 {current.medical_insurance_code || <Empty />}
               </div>
-              {period && <div className="mt-2 text-[0.82rem] text-muted">Giá trị sử dụng: {period}</div>}
+              {period && <div className="mt-2 text-meta text-muted">Giá trị sử dụng: {period}</div>}
             </div>
 
             {expiringSoon && (
-              <p className="mt-3 flex items-start gap-2 text-[0.82rem] text-warning-text">
+              <p className="mt-3 flex items-start gap-2 text-meta text-warning-text">
                 <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
                 <span>
                   Thẻ còn hiệu lực {remaining} ngày. Vui lòng theo dõi thông báo gia hạn từ Phòng
@@ -178,7 +178,7 @@ export default function HealthInsurancePage() {
                 label="Mã số BHXH"
                 value={
                   current.social_insurance_code && (
-                    <span className="font-mono text-[0.82rem]">{current.social_insurance_code}</span>
+                    <span className="font-mono text-meta">{current.social_insurance_code}</span>
                   )
                 }
               />
@@ -193,7 +193,7 @@ export default function HealthInsurancePage() {
         ) : (
           <div className="px-5 py-10 text-center">
             <p className="text-sm text-muted">Chưa có thông tin bảo hiểm y tế.</p>
-            <p className="mt-1.5 text-[0.82rem] text-muted">
+            <p className="mt-1.5 text-meta text-muted">
               Trường hợp đã tham gia BHYT tại trường, vui lòng liên hệ Phòng Công tác Sinh viên để được
               cập nhật.
             </p>
@@ -262,10 +262,10 @@ export default function HealthInsurancePage() {
                     key={card.id}
                     className="border-b border-line2 last:border-0 hover:bg-surface-subtle transition-colors"
                   >
-                    <td className="px-5 py-3 text-[0.82rem] text-ink">
+                    <td className="px-5 py-3 text-meta text-ink">
                       {card.medical_insurance_code || '—'}
                     </td>
-                    <td className="px-3 py-3 text-[0.82rem] text-ink">{card.social_insurance_code || '—'}</td>
+                    <td className="px-3 py-3 text-meta text-ink">{card.social_insurance_code || '—'}</td>
                     <td className="px-3 py-3 text-ink-3 max-w-[220px]">
                       {!hideHistoricalCardDetails(card) && <span
                         className="line-clamp-2"
@@ -282,7 +282,7 @@ export default function HealthInsurancePage() {
                     <td className="px-3 py-3 text-ink-3">{card.registration_year || '—'}</td>
                     <td
                       className={cn(
-                        'px-5 py-3 text-[0.82rem] whitespace-nowrap',
+                        'px-5 py-3 text-meta whitespace-nowrap',
                         validityState(card.valid_until) === 'expired' ? 'text-muted' : 'text-ink',
                       )}
                     >
@@ -336,10 +336,10 @@ export default function HealthInsurancePage() {
               <tbody className="divide-y divide-line2">
                 {data.registrations.map(reg => (
                   <tr key={reg.id} className="hover:bg-surface-subtle transition-colors">
-                    <td className="px-5 py-3 font-medium text-[0.85rem] text-ink">
+                    <td className="px-5 py-3 font-medium text-sm text-ink">
                       {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} năm {reg.registration_year}
                     </td>
-                    <td className="px-5 py-3 text-[0.82rem] text-ink-3">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
+                    <td className="px-5 py-3 text-meta text-ink-3">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3">
                       <InsuranceStatus status={reg.status} />
                     </td>
@@ -389,9 +389,9 @@ export default function HealthInsurancePage() {
               <tbody className="divide-y divide-line2">
                 {data.external_declarations.map(row => (
                   <tr key={row.id} className="hover:bg-surface-subtle transition-colors">
-                    <td className="px-5 py-3 text-[0.82rem] font-mono">{row.medical_insurance_code}</td>
-                    <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</td>
-                    <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
+                    <td className="px-5 py-3 text-meta font-mono">{row.medical_insurance_code}</td>
+                    <td className="px-5 py-3 text-meta whitespace-nowrap">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</td>
+                    <td className="px-5 py-3 text-meta whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3"><InsuranceStatus status={row.status} /></td>
                     <td className="px-5 py-3 text-right"><ExternalDeclarationDetail row={row} /></td>
                   </tr>
@@ -411,13 +411,13 @@ export default function HealthInsurancePage() {
           <div className="rounded-lg border border-primary-line bg-primary-soft p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div>
               <h3 className="text-sm font-semibold text-ink">Đã tham gia BHYT tại nơi khác?</h3>
-              <p className="mt-1 text-[0.82rem] text-muted">Khai thông tin thẻ để nhà trường kiểm tra và xác nhận.</p>
+              <p className="mt-1 text-meta text-muted">Khai thông tin thẻ để nhà trường kiểm tra và xác nhận.</p>
             </div>
             <Link href="/dashboard/bao-hiem-y-te/khai-noi-khac" className={cn(ui.btnOutline, "mt-3 shrink-0 sm:mt-0")}>Khai thông tin tại nơi khác</Link>
           </div>
           <div className="border-t border-line2 pt-5">
             <h3 className="text-sm font-semibold text-ink">Đăng ký BHYT tại trường</h3>
-            <p className="text-[0.85rem] text-muted mb-4">
+            <p className="text-sm text-muted mb-4">
               Sinh viên có thể đăng ký mua mới hoặc gia hạn BHYT tại trường vào các đợt theo quy định.
             </p>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -438,7 +438,7 @@ export default function HealthInsurancePage() {
                 <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-surface-subtle flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
-                    <p className="text-[0.78rem] text-muted mt-1">
+                    <p className="text-xs text-muted mt-1">
                       {isOpen
                         ? 'Đang mở'
                         : p.status === 'expired'
@@ -446,7 +446,7 @@ export default function HealthInsurancePage() {
                           : `Dự kiến mở từ ${formatDate(p.start_date)}`}
                     </p>
                     {isOpen && (
-                      <p className="text-[0.78rem] font-medium text-ink mt-1">
+                      <p className="text-xs font-medium text-ink mt-1">
                         Hạn cuối đăng ký: {formatDate(p.end_date)}
                       </p>
                     )}
@@ -485,7 +485,7 @@ export default function HealthInsurancePage() {
           </div>
         </div>
       </section>
-      <p className="text-[0.78rem] text-muted">
+      <p className="text-xs text-muted">
         Thông tin BHYT do Phòng Công tác Sinh viên quản lý. Nếu phát hiện sai sót, vui lòng liên hệ
         Phòng Công tác Sinh viên để được điều chỉnh.
       </p>
