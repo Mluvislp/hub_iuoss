@@ -12,11 +12,12 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  AlertCircle, ArrowLeft, Lock, Loader2, MessageSquare, Send, Ticket,
+  AlertCircle, ArrowLeft, Lock, Loader2, MessageSquare, PencilLine, Send, Ticket,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, accentIcon } from '@/lib/ui';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
+import { editHref } from '@/components/request-edit';
 import {
   REQUEST_TYPE_LABELS,
   REQUEST_STATUS_LABELS,
@@ -203,6 +204,21 @@ export default function RequestDetailPage() {
           <p className="mt-1.5 text-[0.82rem] text-primary-text/80">
             Xuất trình mã này khi đến nhận giấy tại Phòng Công tác Sinh viên (O1.105).
           </p>
+        </section>
+      )}
+
+      {data.student_can_edit && editHref(data) && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-line bg-warning-soft px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[0.88rem] font-semibold text-warning-text">Phòng CTSV yêu cầu bổ sung thông tin</p>
+            <p className="mt-0.5 text-[0.82rem] text-ink">
+              Sửa lại thông tin trên form theo nội dung trao đổi bên dưới, hoặc trả lời bằng tin nhắn.
+            </p>
+          </div>
+          <Link href={editHref(data)!} className={cn(ui.btnPrimary, 'shrink-0')}>
+            <PencilLine size={15} />
+            Sửa yêu cầu
+          </Link>
         </section>
       )}
 

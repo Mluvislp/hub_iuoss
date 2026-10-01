@@ -73,6 +73,12 @@ class ConfirmationRequest(models.Model):
     def student_can_comment(self):
         return self.status in self.STUDENT_CAN_COMMENT_STATUSES
 
+    @property
+    def student_can_edit(self):
+        """Chờ bổ sung thông tin ⇒ SV mở lại form để sửa (core/request_edit.py)."""
+        from core.request_edit import can_student_edit
+        return can_student_edit(self)
+
 
 class ConfirmationRequestComment(models.Model):
     """Một lượt trao đổi giữa sinh viên và chuyên viên trên một yêu cầu giấy tờ.

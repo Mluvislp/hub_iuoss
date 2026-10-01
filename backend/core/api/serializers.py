@@ -107,12 +107,14 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
     student_can_comment = serializers.BooleanField(read_only=True)
     # Mã hiển thị cho sinh viên; `id` chỉ dùng làm đường dẫn nội bộ.
     code = serializers.CharField(read_only=True)
+    student_can_edit = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = ConfirmationRequest
         fields = [
             "id", "code", "request_type", "purpose", "note", "payload",
             "status", "portal_code", "comment_count", "student_can_comment",
+            "student_can_edit",
             "created_at", "updated_at",
         ]
         read_only_fields = fields
