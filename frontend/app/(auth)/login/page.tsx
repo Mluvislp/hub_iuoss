@@ -227,7 +227,7 @@ function LoginForm() {
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg border text-sm bg-white',
                   'text-slate-900 placeholder:text-slate-500',
-                  'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500',
+                  'focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500',
                   'transition-colors duration-150',
                   error ? 'border-red-300' : 'border-slate-300 hover:border-slate-400',
                 )}
@@ -252,7 +252,7 @@ function LoginForm() {
                   className={cn(
                     'w-full px-3.5 py-2.5 pr-11 rounded-lg border text-sm bg-white',
                     'text-slate-900 placeholder:text-slate-500',
-                    'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500',
+                    'focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500',
                     'transition-colors duration-150',
                     error ? 'border-red-300' : 'border-slate-300 hover:border-slate-400',
                   )}
@@ -260,7 +260,7 @@ function LoginForm() {
                 <button
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2
+                  className="touch-target absolute right-3 top-1/2 -translate-y-1/2
                              text-slate-500 hover:text-slate-700 transition-colors"
                   tabIndex={-1}
                 >

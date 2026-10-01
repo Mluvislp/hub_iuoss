@@ -54,6 +54,21 @@
   .sidebar-transition[data-open='true'] {
     transition-delay: 0s;
   }
+  /* Mở rộng vùng bấm lên tối thiểu 44×44 mà không đổi hình thức — cho nút icon
+     nhỏ và link chữ. Không dùng cho nút xếp sát nhau (vùng mở rộng sẽ chồng lên
+     nút bên cạnh) — chỗ đó dùng `coarse:min-h-11`. */
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;

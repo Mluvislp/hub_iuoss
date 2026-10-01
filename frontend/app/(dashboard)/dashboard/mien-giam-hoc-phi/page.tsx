@@ -158,7 +158,31 @@ export default function TuitionWaiverPage() {
             {state.results.length === 0 ? (
               <p className="px-5 py-4 text-sm text-muted">Chưa có kết quả miễn giảm nào được chốt.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Điện thoại: 5 cột tiền không vừa màn hình → mỗi học kỳ một thẻ,
+                  số tiền được miễn giảm (thứ SV tìm) đứng đầu bên phải. */}
+              <ul className="divide-y divide-line2 md:hidden">
+                {state.results.map((r) => (
+                  <li key={r.term_code} className="px-4 py-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink">{r.term_code}</p>
+                        <p className="mt-0.5 text-[0.82rem] text-ink">{r.category || '—'}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[0.72rem] text-muted">Được miễn giảm</p>
+                        <p className="text-sm font-semibold tabular-nums text-success-text">
+                          {fmtVnd(r.exemption_amount_vnd)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-[0.78rem] text-muted tabular-nums">
+                      Mức {Number(r.percent)}% · Học phí {fmtVnd(r.fee_amount_vnd)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead className="text-[0.78rem] text-muted">
                     <tr className="border-b border-line2">
@@ -184,6 +208,7 @@ export default function TuitionWaiverPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
             {/* TODO(mghp): ghi chú thời điểm hoàn tiền về tài khoản khi quy trình chi trả được chốt. */}
           </section>

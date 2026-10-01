@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { AlertCircle, AlertTriangle, ChevronRight, Construction } from 'lucide-react';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
+import { useDialog } from '@/lib/use-dialog';
 import type { TuitionCategoryMode, TuitionCategoryReview, TuitionExemptionStatus } from '@/lib/types';
 
 // Dùng chung cho các trang Miễn giảm học phí (tổng quan, nộp hồ sơ, chi tiết đơn).
@@ -84,17 +85,13 @@ export function StatusBadge({ status, label }: { status: TuitionExemptionStatus;
 
 /** Pop-up "Sinh viên không đủ điều kiện do …" — cùng khung với FreshmanWarningModal. */
 export function IneligibleModal({ message, onClose }: { message: string; onClose: () => void }) {
+  const boxRef = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    btn.current?.focus();
-    return () => { document.body.style.overflow = overflow; };
-  }, []);
+  useDialog(boxRef, btn);
   return createPortal(
-    <div role="alertdialog" aria-modal="true" aria-labelledby="mghp-ineligible-title"
-         className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-6">
-      <div className="w-full flex flex-col overflow-hidden rounded-t-xl border border-danger-line bg-white shadow-card sm:max-w-md sm:rounded-lg">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-6">
+      <div ref={boxRef} role="alertdialog" aria-modal="true" aria-labelledby="mghp-ineligible-title"
+           className="w-full flex flex-col overflow-hidden rounded-t-xl border border-danger-line bg-white shadow-card sm:max-w-md sm:rounded-lg">
         <div className="flex items-start gap-3 border-b border-danger-line bg-danger-soft px-4 py-3 text-danger-text">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <h2 id="mghp-ineligible-title" className="font-semibold leading-snug">Không đủ điều kiện</h2>

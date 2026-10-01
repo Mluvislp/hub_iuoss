@@ -238,7 +238,7 @@ export default function OtherRequestPage() {
                   type="text" value={programName} maxLength={200}
                   onChange={(e) => { setProgramName(e.target.value); setFieldErrors((f) => ({ ...f, program_name: undefined })); }}
                   placeholder="Nhập tên chương trình tham gia…"
-                  className={cn(ui.input, fieldErrors.program_name && 'border-red-400 focus:border-red-400 focus:ring-red-100')}
+                  className={cn(ui.input, fieldErrors.program_name && ui.inputError)}
                 />
                 {fieldErrors.program_name && <p id="other-program-error" className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.program_name}</p>}
               </div>

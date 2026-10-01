@@ -231,7 +231,41 @@ export default function DashboardPage() {
         }
       >
         {confirmation_requests?.length ? (
-          <div className="overflow-x-auto">
+          <>
+          {/* Điện thoại: cả hàng là link (vùng bấm lớn), không phải vuốt ngang đọc
+              trạng thái. Từ md trở lên giữ bảng như cũ. */}
+          <ul className="divide-y divide-line2 md:hidden">
+            {confirmation_requests.map((req) => (
+              <li key={req.id}>
+                <Link
+                  href={`/dashboard/requests/${req.id}`}
+                  className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-ink">{TYPE_LABELS[req.request_type]}</span>
+                      <span className={cn(badge.base, STATUS_STYLES[req.status])}>
+                        {STATUS_LABELS[req.status]}
+                      </span>
+                      {req.comment_count > 0 && (
+                        <span className={cn(badge.base, badge.neutral)}>
+                          <MessageSquare size={12} aria-hidden="true" />
+                          {req.comment_count}
+                          <span className="sr-only"> trao đổi</span>
+                        </span>
+                      )}
+                    </div>
+                    {req.purpose && (
+                      <p className="mt-1 line-clamp-2 text-[0.82rem] text-slate-600">{req.purpose}</p>
+                    )}
+                    <p className="mt-1 text-[0.78rem] text-muted">{formatDateTime(req.created_at)}</p>
+                  </div>
+                  <ChevronRight size={16} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
@@ -286,6 +320,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          </>
         ) : (
           <div className="py-10 text-center">
             <p className="text-sm text-muted">Chưa có yêu cầu nào.</p>

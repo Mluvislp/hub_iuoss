@@ -93,7 +93,7 @@ export function EvidencePicker({
             <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
             <button type="button" aria-label="Bỏ ảnh"
                     onClick={() => onChange(files.filter((_, j) => j !== i))}
-                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md bg-white/95 border border-line flex items-center justify-center text-muted hover:text-danger-text">
+                    className="touch-target absolute top-1.5 right-1.5 w-7 h-7 coarse:w-9 coarse:h-9 rounded-md bg-white/95 border border-line flex items-center justify-center text-muted hover:text-danger-text">
               <X size={14} />
             </button>
             <div className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-line px-2 py-1 text-[0.7rem] text-muted truncate">

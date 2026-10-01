@@ -39,7 +39,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       type="button"
       onClick={copy}
       aria-label={copied ? `Đã chép ${label}` : `Chép ${label}`}
-      className="flex-shrink-0 p-1.5 -mr-1 rounded-md text-muted hover:text-ink
+      className="touch-target flex-shrink-0 p-1.5 -mr-1 rounded-md text-muted hover:text-ink
                  hover:bg-slate-100 transition-colors"
     >
       {copied ? <Check size={14} className="text-success-text" /> : <Copy size={14} />}
@@ -134,7 +134,7 @@ export default function SupportWidget() {
               type="button"
               onClick={() => { setOpen(false); buttonRef.current?.focus(); }}
               aria-label="Đóng"
-              className="p-1 -mr-1 rounded-md text-muted hover:text-ink hover:bg-slate-200/60 transition-colors"
+              className="touch-target p-1 -mr-1 rounded-md text-muted hover:text-ink hover:bg-slate-200/60 transition-colors"
             >
               <X size={16} />
             </button>

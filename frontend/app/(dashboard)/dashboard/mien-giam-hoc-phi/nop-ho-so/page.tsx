@@ -185,7 +185,7 @@ function CategoryOption({
                         {list.map((f, i) => (
                           <li key={`${f.name}-${i}`} className="flex items-center gap-1.5 text-[0.78rem] text-muted">
                             <span className="truncate">{f.name}</span>
-                            <button type="button" aria-label="Bỏ file" className="text-muted hover:text-danger-text"
+                            <button type="button" aria-label="Bỏ file" className="touch-target text-muted hover:text-danger-text"
                                     onClick={() => onFiles(key, list.filter((_, j) => j !== i))}>
                               <X size={13} />
                             </button>

@@ -208,7 +208,7 @@ function EditLink({ active, label = "Chỉnh sửa", onClick, disabled = false }
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); }
       }}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary hover:underline",
+        "touch-target inline-flex shrink-0 cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary hover:underline",
         disabled && "pointer-events-none opacity-50",
       )}
     >

@@ -1,10 +1,14 @@
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
 
 const config: Config = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    // lib/ui.ts chứa class token (ui.input, ui.btn*, badge…) — thiếu dòng này thì
+    // class chỉ xuất hiện ở đó sẽ không được sinh CSS.
+    './lib/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
@@ -41,7 +45,11 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // `coarse:` = thiết bị cảm ứng (ngón tay). Dùng để nâng vùng chạm lên 44px
+    // trên điện thoại mà desktop vẫn giữ mật độ gọn như cũ.
+    plugin(({ addVariant }) => addVariant('coarse', '@media (pointer: coarse)')),
+  ],
 };
 
 export default config;

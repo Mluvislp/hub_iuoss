@@ -17,7 +17,7 @@ const money = (value: number) => value.toLocaleString('vi-VN') + ' VNĐ';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  return <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+  return <button type="button" className="touch-target inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
     onClick={async () => {
       try {
         await navigator.clipboard.writeText(text);

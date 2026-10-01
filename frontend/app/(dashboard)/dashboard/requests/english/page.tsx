@@ -170,7 +170,7 @@ export default function EnglishRequestPage() {
               aria-describedby={fieldErrors.purpose_code ? 'eng-purpose-error' : undefined}
               value={purposeCode}
               onChange={(e) => { setPurposeCode(e.target.value); setFieldErrors((f) => ({ ...f, purpose_code: undefined, program_name: undefined })); }}
-              className={cn(ui.input, fieldErrors.purpose_code && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
+              className={cn(ui.input, fieldErrors.purpose_code && ui.inputError)}
             >
               <option value="">— Chọn mục đích —</option>
               {form.purpose_choices.map((c) => (
@@ -189,7 +189,7 @@ export default function EnglishRequestPage() {
                   type="text" value={programName} maxLength={255}
                   onChange={(e) => { setProgramName(e.target.value); setFieldErrors((f) => ({ ...f, program_name: undefined })); }}
                   placeholder="Ví dụ: Master of Computer Science"
-                  className={cn(ui.input, fieldErrors.program_name && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
+                  className={cn(ui.input, fieldErrors.program_name && ui.inputError)}
                 />
                 {fieldErrors.program_name && <p id="eng-program-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.program_name}</p>}
               </div>

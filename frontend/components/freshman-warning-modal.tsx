@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
+import { useDialog } from '@/lib/use-dialog';
 
 /**
  * Popup cảnh báo dành cho tân sinh viên. Dùng cùng tông đỏ nhạt với
@@ -16,23 +17,18 @@ export function FreshmanWarningModal({ message, onConfirm, confirmLabel = 'Tôi 
   onConfirm: () => void;
   confirmLabel?: string;
 }) {
+  const boxRef = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    confirmRef.current?.focus();
-    return () => { document.body.style.overflow = overflow; };
-  }, []);
+  useDialog(boxRef, confirmRef);
 
   return createPortal(
-    <div
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="freshman-warning-title"
-      className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
-    >
-      <div className="flex max-h-[calc(100dvh-1rem)] w-full min-w-0 flex-col overflow-hidden rounded-t-xl border border-danger-line bg-white text-left shadow-card sm:max-w-md sm:rounded-lg">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-6">
+      <div
+        ref={boxRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="freshman-warning-title"
+        className="flex max-h-[calc(100dvh-1rem)] w-full min-w-0 flex-col overflow-hidden rounded-t-xl border border-danger-line bg-white text-left shadow-card sm:max-w-md sm:rounded-lg">
         <div className="flex shrink-0 items-start gap-3 border-b border-danger-line bg-danger-soft px-4 py-3 text-danger-text">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div className="min-w-0">

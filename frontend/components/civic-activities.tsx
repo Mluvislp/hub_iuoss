@@ -20,7 +20,26 @@ export function CivicActivitiesTable({ items }: { items: CivicActivity[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    {/* Điện thoại: mỗi hoạt động một dòng, kết quả nằm bên phải. */}
+    <ul className="divide-y divide-line2 md:hidden">
+      {items.map((act) => (
+        <li
+          key={`${act.activity_code}-${act.attempt_no}`}
+          className="flex items-center justify-between gap-3 px-4 py-3"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink">{act.activity_code}</p>
+            <p className="mt-0.5 text-[0.78rem] text-muted">
+              Lần {act.attempt_no}
+              {act.completed_at && <> · Hoàn thành {formatDate(act.completed_at)}</>}
+            </p>
+          </div>
+          <CivicResult value={act.result_value} />
+        </li>
+      ))}
+    </ul>
+    <div className="hidden overflow-x-auto md:block">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
@@ -45,5 +64,6 @@ export function CivicActivitiesTable({ items }: { items: CivicActivity[] }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }

@@ -33,7 +33,7 @@ export function RequestEditButton({ onClick, label = 'Yêu cầu chỉnh sửa' 
     <button
       type="button"
       onClick={onClick}
-      className="mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-primary-text hover:underline"
+      className="touch-target mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-primary-text hover:underline"
     >
       <PencilLine size={12} /> {label}
     </button>
@@ -46,7 +46,7 @@ export function CancelEditButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-muted hover:text-ink transition-colors"
+      className="touch-target mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-muted hover:text-ink transition-colors"
     >
       <RotateCcw size={12} /> Hủy chỉnh sửa
     </button>
@@ -96,7 +96,7 @@ export function EditableField({
   const a11y = { id, 'aria-invalid': !!error, 'aria-describedby': error || hint ? msgId : undefined };
   const inputCls = cn(
     ui.input,
-    error ? 'border-danger-line focus:border-danger-line focus:ring-red-100' : changed && 'border-warning-line',
+    error ? ui.inputError : changed && 'border-warning-line',
   );
 
   return (

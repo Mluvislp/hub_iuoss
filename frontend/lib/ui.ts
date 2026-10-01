@@ -13,29 +13,33 @@ export const ui = {
   fieldLabel: 'block text-[0.82rem] font-medium text-ink mb-1.5',
 
   // Form controls
+  // Focus = viền 1px + ring 1px cùng màu primary → vạch 2px đặc (~5:1 trên nền
+  // trắng). Ring /15 trước đây gần như vô hình.
   input:
-    'w-full h-10 px-3 rounded-lg border border-line bg-white text-sm text-ink ' +
+    'w-full h-10 coarse:min-h-11 px-3 rounded-lg border border-line bg-white text-sm text-ink ' +
     'placeholder:text-muted transition-colors ' +
-    'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15',
+    'focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary',
   textarea:
     'w-full px-3 py-2.5 rounded-lg border border-line bg-white text-sm text-ink ' +
     'placeholder:text-muted resize-none transition-colors ' +
-    'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15',
+    'focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary',
+  /** Ô đang lỗi — ghép sau `input`/`textarea`. Focus đậm màu lỗi, không nhạt đi. */
+  inputError: 'border-danger-line focus:border-danger-text focus:ring-danger-text',
 
   // Buttons
   btnPrimary:
-    'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg ' +
+    'inline-flex items-center justify-center gap-2 h-10 coarse:min-h-11 px-4 rounded-lg ' +
     'bg-primary hover:bg-primary-hover text-white text-sm font-semibold ' +
     'transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-primary ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
   btnSecondary:
-    'inline-flex items-center justify-center gap-2 h-9 px-3.5 rounded-lg ' +
+    'inline-flex items-center justify-center gap-2 h-9 coarse:min-h-11 px-3.5 rounded-lg ' +
     'border border-line bg-white text-sm font-medium text-primary-text hover:bg-slate-50 transition-colors',
   btnGhost:
-    'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg ' +
+    'inline-flex items-center justify-center gap-2 h-10 coarse:min-h-11 px-4 rounded-lg ' +
     'text-sm font-medium text-muted hover:text-ink hover:bg-slate-100 transition-colors',
   btnOutline:
-    'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg ' +
+    'inline-flex items-center justify-center gap-2 h-10 coarse:min-h-11 px-4 rounded-lg ' +
     'border border-line bg-white text-sm font-medium text-ink hover:bg-slate-50 transition-colors',
 
   // Definition list row (thông tin hành chính)

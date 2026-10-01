@@ -37,12 +37,12 @@ export default function PersonalField({
 
         {unlocked ? (
           <button type="button" onClick={onCancel}
-                  className="text-[0.75rem] font-medium text-muted hover:text-ink">
+                  className="touch-target text-[0.75rem] font-medium text-muted hover:text-ink">
             Hủy sửa
           </button>
         ) : (
           <button type="button" onClick={onUnlock}
-                  className="inline-flex items-center gap-1 text-[0.75rem] font-medium text-primary-text hover:underline">
+                  className="touch-target inline-flex items-center gap-1 text-[0.75rem] font-medium text-primary-text hover:underline">
             <PencilLine size={11} />
             {blank ? 'Bổ sung' : 'Yêu cầu chỉnh sửa'}
           </button>

@@ -199,7 +199,7 @@ export default function ExaminedWizard({
             <div className="text-[0.72rem] font-medium text-muted">Bước {step + 1}/{steps.length}</div>
             <h2 className="text-[0.98rem] font-semibold text-ink">{steps[step].title}</h2>
           </div>
-          {onCancel && <button type="button" onClick={onCancel} className="text-[0.8rem] text-muted hover:text-ink">Hủy</button>}
+          {onCancel && <button type="button" onClick={onCancel} className="touch-target text-[0.8rem] text-muted hover:text-ink">Hủy</button>}
         </div>
         <ol className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
           {steps.map((s, i) => {

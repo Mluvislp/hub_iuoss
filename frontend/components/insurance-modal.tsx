@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
+import { useDialog } from '@/lib/use-dialog';
 
 /**
  * Khung hộp thoại dùng chung cho cụm BHYT: tiêu đề dính trên cùng, thân cuộn
@@ -18,27 +19,29 @@ export function InsuranceModal({ title, eyebrow, onClose, closeDisabled = false,
   size?: 'sm' | 'lg';
   children: ReactNode;
 }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useDialog(boxRef);
+
   useEffect(() => {
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !closeDisabled) onClose(); };
     window.addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = overflow; window.removeEventListener('keydown', onKey); };
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose, closeDisabled]);
 
   return createPortal(
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
       onClick={(e) => { if (e.target === e.currentTarget && !closeDisabled) onClose(); }}>
-      <div className={cn(
-        'flex max-h-[calc(100dvh-1rem)] w-full min-w-0 flex-col overflow-hidden rounded-t-xl border border-line bg-canvas text-left shadow-card sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg',
+      <div ref={boxRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cn(
+        'flex max-h-[calc(100dvh-1rem)] focus:outline-none w-full min-w-0 flex-col overflow-hidden rounded-t-xl border border-line bg-canvas text-left shadow-card sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg',
         size === 'sm' ? 'sm:max-w-md' : 'sm:max-w-4xl',
       )}>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 sm:px-6">
           <div className="min-w-0">
             {eyebrow && <p className="text-xs font-medium text-primary-text">{eyebrow}</p>}
-            <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
+            <h2 id={titleId} className="truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
           </div>
-          <button type="button" aria-label="Đóng" className={cn(ui.btnGhost, 'h-9 w-9 shrink-0 px-0')} disabled={closeDisabled} onClick={onClose}>
+          <button type="button" aria-label="Đóng" className={cn(ui.btnGhost, 'h-9 w-9 coarse:h-11 coarse:w-11 shrink-0 px-0')} disabled={closeDisabled} onClick={onClose}>
             <X size={18} />
           </button>
         </div>

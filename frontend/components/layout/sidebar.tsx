@@ -146,7 +146,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
           <button
             ref={closeRef}
             onClick={onClose}
-            className="lg:hidden p-1.5 -mr-1.5 text-muted hover:text-ink"
+            className="touch-target lg:hidden p-1.5 -mr-1.5 text-muted hover:text-ink"
             aria-label="Đóng menu"
           >
             <X size={18} />
@@ -174,7 +174,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                       onClick={onClose}
                       aria-current={isActive ? 'page' : undefined}
                       className={cn(
-                        'flex items-center gap-3 px-2.5 h-10 rounded-md text-sm transition-colors border-l-[3px]',
+                        'flex items-center gap-3 px-2.5 h-10 coarse:h-11 rounded-md text-sm transition-colors border-l-[3px]',
                         isActive
                           ? 'bg-primary-soft border-primary text-primary-text font-semibold'
                           : 'border-transparent text-slate-600 hover:text-ink hover:bg-slate-100',
@@ -217,7 +217,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
           )}
           <button
             onClick={handleLogout}
-            className="mt-1 w-full flex items-center gap-2.5 px-2.5 h-9 rounded-md text-sm
+            className="mt-1 w-full flex items-center gap-2.5 px-2.5 h-9 coarse:h-11 rounded-md text-sm
                        text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <LogOut size={16} />

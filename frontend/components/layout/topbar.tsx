@@ -15,7 +15,7 @@ export default function Topbar({ title, session, onMenuClick }: TopbarProps) {
                        bg-white border-b border-line">
       <button
         onClick={onMenuClick}
-        className="lg:hidden -ml-1 p-1.5 rounded-md text-muted hover:text-ink hover:bg-slate-100"
+        className="touch-target lg:hidden -ml-1 p-1.5 rounded-md text-muted hover:text-ink hover:bg-slate-100"
         aria-label="Mở menu"
       >
         <Menu size={20} />
