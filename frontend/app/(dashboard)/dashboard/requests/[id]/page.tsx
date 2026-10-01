@@ -24,6 +24,7 @@ import {
   type ConfirmationRequestDetail,
   type RequestComment,
 } from '@/lib/types';
+import { RequestCode } from '@/components/request-code';
 
 /** Nhãn cho các ô sinh viên đã khai / xin sửa (khớp EDITABLE_FIELD_LABELS bên Dashboard). */
 const FIELD_LABELS: Record<string, string> = {
@@ -179,8 +180,10 @@ export default function RequestDetailPage() {
           <h1 className="text-xl font-semibold text-ink">
             {REQUEST_TYPE_LABELS[data.request_type]}
           </h1>
-          <p className="mt-1 text-sm text-muted">
-            Mã #{data.id} · Gửi {formatDateTime(data.created_at)}
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span className="text-[0.75rem] font-medium uppercase tracking-wide">Mã yêu cầu</span>
+            <RequestCode code={data.code} size="lg" />
+            <span>· Gửi {formatDateTime(data.created_at)}</span>
           </p>
         </div>
         <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status], 'text-[0.82rem]')}>
