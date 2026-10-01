@@ -18,6 +18,7 @@ import {
 } from '@/lib/form-validators';
 import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 import { QuotaGuard, QuotaNotice, useRequestQuota } from '@/components/request-quota';
+import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf, pendingAddress } from '@/components/request-edit';
 
 // Bảng điểm rèn luyện: Phòng CTSV xuất từ hệ thống khác. Ngày sinh / CCCD + ngày cấp /
 // địa chỉ thường trú là ô XIN SỬA như các loại giấy khác (khóa sẵn, "Yêu cầu chỉnh
@@ -56,6 +57,35 @@ export default function ConductScoreRequestPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FErr>({});
+
+  // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
+  const edit = useEditRequest('conduct_score');
+  const isEdit = edit.id !== null;
+  const editApplied = useRef(false);
+  useEffect(() => {
+    const r = edit.request;
+    if (!form || !r || editApplied.current) return;
+    editApplied.current = true;
+    setNote(r.note ?? '');
+    FIELD_KEYS.forEach((k) => {
+      const v = pendingValue(r, k);
+      if (v !== null) {
+        setValues((s) => ({ ...s, [k]: v }));
+        setOpenFields((s) => ({ ...s, [k]: true }));
+      }
+    });
+    setSemesterCode(purposeOf(r).code);
+    const a = pendingAddress(r);
+    if (a) {
+      setStreet(a.street);
+      setAddressOpen(true);
+      // Danh sách xã có thể chưa nạp xong ⇒ để effect nạp xã chọn giúp; đã nạp thì chọn luôn.
+      pendingWardRef.current = a.ward_code;
+      if (a.province_code === provinceCode) setWardCode(a.ward_code);
+      else setProvinceCode(a.province_code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, edit.request]);
 
   useEffect(() => {
     api.requests.conductScoreForm()
@@ -150,7 +180,7 @@ export default function ConductScoreRequestPage() {
     setError('');
     setLoading(true);
     try {
-      await api.requests.createConductScore({
+      await submitOrUpdate(edit, 'conduct_score', api.requests.createConductScore, {
         semester_code: semesterCode,
         dob: values.dob.trim(),
         citizen_id: values.citizen_id.trim(),
@@ -188,9 +218,9 @@ export default function ConductScoreRequestPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">Đã gửi yêu cầu</h2>
+          <h2 className="text-lg font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
-          <div className="mt-6"><Link href="/dashboard" className={ui.btnPrimary}>Về Bảng thông tin</Link></div>
+          <div className="mt-6"><Link href={isEdit ? `/dashboard/requests/${edit.id}` : '/dashboard'} className={ui.btnPrimary}>{isEdit ? 'Xem yêu cầu' : 'Về Bảng thông tin'}</Link></div>
         </div>
       </div>
     );
@@ -225,6 +255,8 @@ export default function ConductScoreRequestPage() {
         <span className="text-ink font-medium">Bảng điểm rèn luyện</span>
       </nav>
 
+      <EditRequestBanner edit={edit} />
+
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
@@ -237,7 +269,7 @@ export default function ConductScoreRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
-          <QuotaGuard type="conduct_score">
+          <QuotaGuard type="conduct_score" bypass={isEdit}>
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -267,17 +299,18 @@ export default function ConductScoreRequestPage() {
                 <select
                   value={semesterCode}
                   onChange={(e) => { setSemesterCode(e.target.value); setFieldErrors((f) => ({ ...f, semester: undefined })); }}
+                  disabled={isEdit}
                   className={cn(ui.input, fieldErrors.semester && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
                 >
                   <option value="">— Chọn học kỳ —</option>
                   {form.semester_choices.map((c) => (
-                    <option key={c.code} value={c.code} disabled={!!usedSemesters[c.code]}>
-                      {c.label}{usedSemesters[c.code] ? ' — đã xin trong học kỳ này' : ''}
+                    <option key={c.code} value={c.code} disabled={!isEdit && !!usedSemesters[c.code]}>
+                      {c.label}{!isEdit && usedSemesters[c.code] ? ' — đã xin trong học kỳ này' : ''}
                     </option>
                   ))}
                 </select>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
-                {Object.keys(usedSemesters).length > 0 && quota && (
+                {!isEdit && Object.keys(usedSemesters).length > 0 && quota && (
                   <QuotaNotice
                     className="mt-2"
                     reason={`Học kỳ bảng điểm đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
@@ -425,9 +458,9 @@ export default function ConductScoreRequestPage() {
               <ArrowLeft size={15} /> Quay lại
             </Link>
             <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading || noSemester} className={ui.btnPrimary}>
+              <button type="submit" disabled={loading || noSemester || (isEdit && !edit.request)} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
-                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+                {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>
             </ConsentGate>
           </div>

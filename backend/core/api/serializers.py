@@ -105,12 +105,14 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
 
     comment_count = serializers.SerializerMethodField()
     student_can_comment = serializers.BooleanField(read_only=True)
+    student_can_edit = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = ConfirmationRequest
         fields = [
             "id", "request_type", "purpose", "note", "payload",
             "status", "portal_code", "comment_count", "student_can_comment",
+            "student_can_edit",
             "created_at", "updated_at",
         ]
         read_only_fields = fields

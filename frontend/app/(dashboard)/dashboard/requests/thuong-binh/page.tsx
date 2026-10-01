@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
@@ -12,6 +12,7 @@ import type { ThuongBinhFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
 import { QuotaGuard } from '@/components/request-quota';
+import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue } from '@/components/request-edit';
 
 // CCCD + ngày cấp là ô XIN SỬA (khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở) — cùng
 // khuôn ngày sinh / địa chỉ của giấy hoãn NVQS. Chuyên viên duyệt ở Dashboard.
@@ -31,6 +32,25 @@ export default function ThuongBinhRequestPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FErr>({});
+
+  // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
+  const edit = useEditRequest('thuong_binh');
+  const isEdit = edit.id !== null;
+  const editApplied = useRef(false);
+  useEffect(() => {
+    const r = edit.request;
+    if (!form || !r || editApplied.current) return;
+    editApplied.current = true;
+    setNote(r.note ?? '');
+    (['citizen_id', 'citizen_id_issue_date'] as FieldKey[]).forEach((k) => {
+      const v = pendingValue(r, k);
+      if (v !== null) {
+        setValues((s) => ({ ...s, [k]: v }));
+        setOpenFields((s) => ({ ...s, [k]: true }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, edit.request]);
 
   useEffect(() => {
     api.requests.thuongbinhForm()
@@ -78,7 +98,7 @@ export default function ThuongBinhRequestPage() {
     setError('');
     setLoading(true);
     try {
-      await api.requests.createThuongBinh({
+      await submitOrUpdate(edit, 'thuong_binh', api.requests.createThuongBinh, {
         citizen_id: values.citizen_id.trim(),
         citizen_id_issue_date: values.citizen_id_issue_date.trim(),
         note: note.trim() || undefined,
@@ -111,9 +131,9 @@ export default function ThuongBinhRequestPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">Đã gửi yêu cầu</h2>
+          <h2 className="text-lg font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
-          <div className="mt-6"><Link href="/dashboard" className={ui.btnPrimary}>Về Bảng thông tin</Link></div>
+          <div className="mt-6"><Link href={isEdit ? `/dashboard/requests/${edit.id}` : '/dashboard'} className={ui.btnPrimary}>{isEdit ? 'Xem yêu cầu' : 'Về Bảng thông tin'}</Link></div>
         </div>
       </div>
     );
@@ -139,6 +159,8 @@ export default function ThuongBinhRequestPage() {
         <span className="text-ink font-medium">Ưu đãi giáo dục (thương binh)</span>
       </nav>
 
+      <EditRequestBanner edit={edit} />
+
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
@@ -149,7 +171,7 @@ export default function ThuongBinhRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
-          <QuotaGuard type="thuong_binh">
+          <QuotaGuard type="thuong_binh" bypass={isEdit}>
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -221,9 +243,9 @@ export default function ThuongBinhRequestPage() {
               <ArrowLeft size={15} /> Quay lại
             </Link>
             <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+              <button type="submit" disabled={loading || (isEdit && !edit.request)} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
-                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+                {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>
             </ConsentGate>
           </div>
