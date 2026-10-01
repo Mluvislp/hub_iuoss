@@ -48,5 +48,6 @@ const VARIANTS: Record<ValidityState, string> = {
 
 export function HealthValidityBadge({ validUntil }: { validUntil: string | null | undefined }) {
   const state = validityState(validUntil);
-  return <span className={cn(badge.base, VARIANTS[state])}>{LABELS[state]}</span>;
+  // Nhãn ngắn ("Còn hiệu lực"…) — không cho ngắt dòng khi tiêu đề thẻ bên cạnh dài.
+  return <span className={cn(badge.base, 'shrink-0 whitespace-nowrap', VARIANTS[state])}>{LABELS[state]}</span>;
 }

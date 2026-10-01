@@ -106,7 +106,8 @@ function ApplicationRow({ app }: { app: TuitionExemptionApplication }) {
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-ink truncate">{app.round_title}</div>
         <div className="text-xs text-muted mt-0.5 truncate">
-          {app.submission_kind_label} · {app.categories.map((c) => c.name).join(', ')} · {fmtDateTime(app.submitted_at)}
+          {[app.submission_kind_label, app.categories.map((c) => c.name).join(', '), fmtDateTime(app.submitted_at)]
+            .filter(Boolean).join(' · ')}
         </div>
       </div>
       <StatusBadge status={app.status} label={app.status_label} />

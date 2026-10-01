@@ -184,7 +184,9 @@ export default function HealthInsurancePage() {
               />
               {showCoverage && <DefRow
                 label="Nơi đăng ký khám chữa bệnh"
-                value={<HospitalValue card={current} />}
+                // HospitalValue trả null khi thiếu mã, nhưng bản thân phần tử JSX luôn
+                // "truthy" → DefRow không hiện "Chưa cập nhật". Kiểm tra ở đây.
+                value={current.hospital_code ? <HospitalValue card={current} /> : null}
               />}
               <DefRow label="Diện đăng ký" value={current.registration_type} />
               <DefRow label="Năm tham gia" value={current.registration_year} />
