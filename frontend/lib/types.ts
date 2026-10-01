@@ -369,6 +369,7 @@ export interface FeatureFlags {
   document_requests: boolean;
   civic_activities: boolean;
   health_check: boolean;
+  tuition_waiver: boolean;
 }
 
 /**
@@ -562,4 +563,148 @@ export interface HealthCheckState {
   data_consent_text: { examined: string; register: string };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
+}
+
+// ── Miễn giảm học phí (MGHP) ─────────────────────────────────────────────────
+// Khớp `core/tuition_exemption.py` (build_state / build_plan / serialize_application).
+
+export type TuitionExemptionStatus =
+  | 'submitted' | 'under_review' | 'need_supplement' | 'approved' | 'rejected';
+
+export type TuitionCategoryReview = 'pending' | 'approved' | 'rejected' | 'need_supplement';
+
+/** Việc SV phải làm với một diện: xác nhận gia hạn / bổ sung giấy tờ / đăng ký mới. */
+export type TuitionCategoryMode = 'confirm' | 'supplement' | 'new';
+
+export interface TuitionExemptionRound {
+  id: number;
+  title: string;
+  description: string;
+  term_code: string;
+  term_label: string;
+  opens_at: string;
+  closes_at: string;
+}
+
+export interface TuitionRequiredDocument {
+  doc_type: string;
+  label: string;
+  required: boolean;
+  has_expiry: boolean;
+  /** Phải nộp lại khi gia hạn (diện nộp lại mỗi kỳ/năm). */
+  renewal_required?: boolean;
+}
+
+/** Ô thông tin riêng của một đối tượng (contract.CATEGORY_FIELDS) — gửi lên dạng `detail_<name>`. */
+export interface TuitionCategoryField {
+  name: string;
+  type: 'text' | 'textarea' | 'checkbox';
+  label: string;
+  required?: boolean;
+  max?: number;
+}
+
+export interface TuitionExemptionCategory {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  resubmit_policy: string;
+  resubmit_label: string;
+  /** Giấy phải nộp THEO CHẾ ĐỘ (gia hạn có bổ sung chỉ còn giấy phải nộp lại). */
+  documents: TuitionRequiredDocument[];
+  fields: TuitionCategoryField[];
+  /** Đối tượng chỉ dành cho người dân tộc thiểu số (theo hồ sơ). */
+  requires_ethnic_minority: boolean;
+  mode: TuitionCategoryMode;
+  mode_label: string;
+  /** Kỳ gần nhất được xác nhận (chỉ có với diện đang hưởng). */
+  last_verified: string | null;
+}
+
+export interface TuitionExemptionPlan {
+  submission_kind: 'first_time' | 'previously_reviewed';
+  submission_kind_label: string;
+  /** submit = chưa từng hưởng; confirm = chỉ xác nhận gia hạn; supplement = có diện phải bổ sung. */
+  action: 'submit' | 'confirm' | 'supplement';
+  action_label: string;
+  renewals: TuitionExemptionCategory[];
+  others: TuitionExemptionCategory[];
+  /** Luôn 1: SV tự chọn đúng một đối tượng, hệ thống không chọn sẵn. */
+  max_categories: number;
+  /** Dân tộc theo hồ sơ ("Kinh", "Mường"…), rỗng nếu chưa có. */
+  ethnicity: string;
+  /** null = hồ sơ chưa có thông tin dân tộc. */
+  is_ethnic_minority: boolean | null;
+  inactive_history: { code: string; name: string }[];
+}
+
+export interface TuitionExemptionApplication {
+  id: number;
+  round_id: number;
+  round_title: string;
+  submission_kind: string;
+  submission_kind_label: string;
+  status: TuitionExemptionStatus;
+  status_label: string;
+  submitted_at: string;
+  review_note: string;
+  supplement_deadline: string | null;
+  row_version: number;
+  categories: {
+    code: string;
+    name: string;
+    review_status: TuitionCategoryReview;
+    review_note: string;
+    mode: TuitionCategoryMode | null;
+    mode_label: string;
+  }[];
+  /** Chỉ có ở API chi tiết. */
+  timeline?: { kind: string; label: string; at: string; note: string }[];
+  documents?: { id: number; doc_type: string; doc_label: string; category_code: string;
+                original_filename: string; mime_type: string; expires_at: string | null }[];
+  snapshot?: Record<string, string>;
+  /** Đơn "Cần bổ sung" và còn hạn — hiện khu nộp bổ sung. */
+  can_supplement?: boolean;
+  supplement_overdue?: boolean;
+  /** Diện được nộp bổ sung (cán bộ đánh "Cần bổ sung", hoặc mọi diện nếu không đánh). */
+  supplement_targets?: (TuitionExemptionCategory & { link_id: number; review_note: string })[];
+  rejection_reason?: string;
+  /** Thông tin riêng theo đối tượng đã khai (nhãn + giá trị chữ). */
+  category_details?: { label: string; value: string }[];
+}
+
+export interface TuitionExemptionResult {
+  term_code: string;
+  category: string;
+  percent: string;
+  fee_amount_vnd: number;
+  exemption_amount_vnd: number;
+}
+
+export interface TuitionExemptionPrefill {
+  student_code: string;
+  full_name: string;
+  date_of_birth: string | null;
+  class_code: string;
+  department_code: string;
+  department_name: string;
+  /** Các ô SV sửa được — tên trùng tên trường gửi lên. */
+  fields: Record<string, string>;
+  /** previous_application = chép từ đơn gần nhất; profile = từ hồ sơ SV. */
+  source: 'previous_application' | 'profile';
+  /** Thông tin riêng đã khai ở đơn trước — chỉ điền lại khi SV chọn đúng đối tượng `code`. */
+  category_details: { code: string; values: Record<string, string | boolean> } | null;
+}
+
+export interface TuitionExemptionState {
+  round: TuitionExemptionRound | null;
+  plan: TuitionExemptionPlan | null;
+  application: TuitionExemptionApplication | null;
+  history: TuitionExemptionApplication[];
+  results: TuitionExemptionResult[];
+  prefill: TuitionExemptionPrefill;
+  limits: { max_files: number; max_pdf_mb: number; max_image_mb: number };
+  /** Chỉ có trong phản hồi POST nộp đơn. */
+  submitted_id?: number;
 }

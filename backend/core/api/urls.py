@@ -1,5 +1,5 @@
 from django.urls import path
-from . import health_check_views, views
+from . import health_check_views, tuition_exemption_views, views
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
 
@@ -53,6 +53,19 @@ urlpatterns = [
          name="api_health_check_register"),
     path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
          name="api_health_check_citizen_id"),
+
+    # Miễn giảm học phí (FEATURE_TUITION_WAIVER)
+    path("tuition-exemption/", tuition_exemption_views.TuitionExemptionView.as_view(),
+         name="api_tuition_exemption"),
+    path("tuition-exemption/applications/<int:pk>/",
+         tuition_exemption_views.TuitionExemptionDetailView.as_view(),
+         name="api_tuition_exemption_detail"),
+    path("tuition-exemption/applications/<int:pk>/supplement/",
+         tuition_exemption_views.TuitionExemptionSupplementView.as_view(),
+         name="api_tuition_exemption_supplement"),
+    path("tuition-exemption/applications/<int:pk>/documents/<int:document_id>/",
+         tuition_exemption_views.TuitionExemptionDocumentView.as_view(),
+         name="api_tuition_exemption_document"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

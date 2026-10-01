@@ -60,11 +60,15 @@ backend/
   core/insurance_history.py · insurance_history_models.py   ← timeline + 3 bảng phụ
   core/insurance_submission.py · insurance_files.py         ← nhận ảnh, xác minh MIME/HEIC
   core/external_insurance_models.py ← khai BHYT tại nơi khác
+
+  core/tuition_exemption_contract.py ← MGHP: trạng thái/event/lý do — GIỐNG HỆT bản Dashboard
+  core/tuition_exemption.py          ← MGHP: đọc đợt/danh mục/đơn/kết quả (đã cài); nộp, bổ sung (KHUNG)
+  core/tuition_exemption_history.py · tuition_exemption_models.py   ← timeline (KHUNG) + 4 bảng hub_tuition_*
   core/management/commands/backfill_insurance_workflow.py   ← dựng timeline cho đơn cũ
 
-  core/api/urls.py          ← 31 endpoint
+  core/api/urls.py          ← 35 endpoint
   core/api/views.py         ← phần lớn view (1.480 dòng)
-  core/api/insurance_views.py · external_insurance_views.py
+  core/api/insurance_views.py · external_insurance_views.py · tuition_exemption_views.py
   core/api/serializers.py · authentication.py · throttling.py · tokens.py
   students/models.py        ← read-only từ shared DB
   students/timeline.py      ← 3 luật tính mốc đào tạo (bản đối ứng ở Dashboard)
@@ -73,7 +77,7 @@ backend/
 frontend/
   app/(auth)/login                         ← split-screen, có nút Microsoft
   app/auth/microsoft/callback              ← đổi code lấy JWT
-  app/(dashboard)/dashboard/               ← 10 trang (xem bảng dưới)
+  app/(dashboard)/dashboard/               ← 13 trang (xem bảng dưới)
   components/                              ← health-insurance · insurance-registration-form
                                              insurance-status · insurance-supplement
                                              civic-activities · editable-field · form-busy
@@ -85,7 +89,7 @@ frontend/
   ecosystem.config.js       ← PM2 **của production** (sandbox dùng file ngoài repo)
 ```
 
-### 10 trang sinh viên thấy
+### 13 trang sinh viên thấy
 
 | URL | Việc |
 |---|---|
@@ -96,11 +100,14 @@ frontend/
 | `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
+| `/dashboard/mien-giam-hoc-phi` | MGHP — đợt đang mở, đơn đã nộp, kết quả đã chốt (cờ `tuition_waiver`) |
+| `/dashboard/mien-giam-hoc-phi/nop-ho-so` | form nộp đơn (KHUNG — backend trả 501) |
+| `/dashboard/mien-giam-hoc-phi/ho-so/[id]` | chi tiết đơn, bổ sung giấy tờ |
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
 
-### 31 endpoint — `core/api/urls.py`
+### 35 endpoint — `core/api/urls.py`
 
 `health/` · `features/` (không cần auth) · `auth/{login,logout,token/refresh}` ·
 `auth/microsoft/{start,callback}` · `dashboard/` · `health-insurance/` ·
@@ -108,6 +115,7 @@ frontend/
 `health-insurance/external/` · `requests/` + `<id>/` + `<id>/comments/` +
 5 endpoint `requests/<loại>/form/` · `offcampus/` + `offcampus/request-reopen/` ·
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
+`tuition-exemption/` + `applications/<id>/` + `<id>/supplement/` + `<id>/documents/<id>/` ·
 `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
@@ -118,6 +126,7 @@ frontend/
 |---|---|
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
+| Miễn giảm học phí | `dashboard_iuoss/docs/TUITION_EXEMPTION.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |
 | Quan hệ với Dashboard và WordPress | `docs/ECOSYSTEM.md` |
@@ -166,7 +175,7 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_TUITION_WAIVER   # mặc định TẮT ở production
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```
 

@@ -39,6 +39,20 @@ class ApiError extends Error {
   }
 }
 
+/**
+ * `crypto.randomUUID` chỉ có trong secure context (HTTPS/localhost). Mở dev qua IP LAN
+ * (http://192.168.x.x:3000, test trên điện thoại) thì hàm này không tồn tại và nộp đơn
+ * chết ngay ở trình duyệt trước khi gọi API.
+ */
+export function newRequestKey(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 interface RequestOptions {
   // Bỏ qua cơ chế auto-redirect về /login khi gặp 401.
   // Dùng cho chính request đăng nhập: 401 lúc đó = "sai mật khẩu",
@@ -85,16 +99,29 @@ async function requestMultipart<T>(
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch {
+    // Nginx gặp body vượt client_max_body_size thường trả 413 rồi cắt kết nối khi
+    // trình duyệt còn đang upload → fetch chỉ thấy "Failed to fetch", không có status.
+    throw new ApiError(0, {
+      detail: 'Không gửi được dữ liệu lên máy chủ. Kiểm tra kết nối mạng, hoặc ảnh tải lên có thể quá lớn — thử chụp/chọn ảnh nhẹ hơn rồi gửi lại.',
+    });
+  }
 
   if (res.status === 401 && !opts.skipAuthRedirect) {
     clearAuth();
     window.location.href = '/login';
     throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
+  }
+
+  if (res.status === 413) {
+    throw new ApiError(413, { detail: 'Tổng dung lượng ảnh tải lên quá lớn. Vui lòng chọn ảnh nhẹ hơn rồi gửi lại.' });
   }
 
   const data = res.headers.get('Content-Type')?.includes('application/json')
@@ -299,6 +326,35 @@ export const api = {
     },
   },
 
+  // Miễn giảm học phí (FEATURE_TUITION_WAIVER). Bổ sung khi cán bộ yêu cầu: backend còn
+  // trả 501, trang hiển thị nguyên văn `detail`.
+  tuitionExemption: {
+    state(): Promise<import('./types').TuitionExemptionState> {
+      return request('/tuition-exemption/');
+    },
+    detail(id: number): Promise<import('./types').TuitionExemptionApplication> {
+      return request(`/tuition-exemption/applications/${id}/`);
+    },
+    /** Field form + `category_codes` (lặp) + file `doc_<MÃ_DIỆN>__<doc_type>` (lặp). */
+    submit(body: FormData): Promise<import('./types').TuitionExemptionState> {
+      if (!body.has('request_key')) body.set('request_key', newRequestKey());
+      return requestMultipart('/tuition-exemption/', body);
+    },
+    /** Kèm `row_version` của đơn; file `doc_<MÃ_DIỆN>__<doc_type>` như lúc nộp. */
+    supplement(id: number, body: FormData): Promise<import('./types').TuitionExemptionApplication> {
+      if (!body.has('request_key')) body.set('request_key', newRequestKey());
+      return requestMultipart(`/tuition-exemption/applications/${id}/supplement/`, body);
+    },
+    /** Giấy tờ của chính SV — cần token nên tải qua fetch rồi mở blob. */
+    async document(id: number, documentId: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/tuition-exemption/applications/${id}/documents/${documentId}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được giấy tờ.');
+      return res.blob();
+    },
+  },
+
   locations: {
     provinces(): Promise<Province[]> {
       return request('/locations/provinces/');
@@ -345,7 +401,7 @@ export const api = {
       return request(`/health-insurance/registrations/?period=${encodeURIComponent(period)}`);
     },
     submit(formData: FormData): Promise<{ id: number; status: string }> {
-      if (!formData.has('request_key')) formData.set('request_key', crypto.randomUUID());
+      if (!formData.has('request_key')) formData.set('request_key', newRequestKey());
       return requestMultipart('/health-insurance/registrations/', formData);
     },
   },

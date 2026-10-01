@@ -17,6 +17,7 @@ Mặc định: **production → tắt (hiện trang chờ)**, **local/staging �
 | `FEATURE_DOCUMENT_REQUESTS` | Route `/dashboard/requests/*`, nút CTA ở hero + bảng "Yêu cầu giấy tờ gần đây" ở trang chủ, và toàn bộ `/api/requests/*` (404 khi tắt) |
 | `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
 | `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được |
+| `FEATURE_TUITION_WAIVER` | Route `/dashboard/mien-giam-hoc-phi/*` và toàn bộ `/api/tuition-exemption/*` (404 khi tắt). Trang quản lý bên Dashboard (`/tuition/`) KHÔNG bị cờ này chặn — phòng cấu hình đợt/danh mục trước được |
 
 **Nguồn sự thật là backend** — `config/settings.py`, mặc định `not IS_PRODUCTION`
 (suy từ `DJANGO_ENV`). Không phải flag phía frontend, nên sửa `sessionStorage`

@@ -16,6 +16,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/sinh-hoat-cong-dan': 'Sinh hoạt công dân',
   '/dashboard/khai-bao-ngoai-tru': 'Khai báo ngoại trú',
   '/dashboard/kham-suc-khoe': 'Khám sức khỏe',
+  '/dashboard/mien-giam-hoc-phi': 'Miễn giảm học phí',
+  '/dashboard/mien-giam-hoc-phi/nop-ho-so': 'Miễn giảm học phí',
   '/dashboard/requests/new': 'Yêu cầu giấy tờ',
   '/dashboard/requests/other': 'Yêu cầu giấy tờ',
   '/dashboard/requests/deferment': 'Yêu cầu giấy tờ',
@@ -41,7 +43,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const title = pending && routeFeature
     ? FEATURE_META[routeFeature].label
-    : PAGE_TITLES[pathname] ?? 'IUOSS Hub';
+    // Route động (vd. /mien-giam-hoc-phi/ho-so/12) không có trong bảng → lấy tên tính năng.
+    : PAGE_TITLES[pathname] ?? (routeFeature ? FEATURE_META[routeFeature].label : 'IUOSS Hub');
 
   return (
     <div className="min-h-screen bg-canvas">

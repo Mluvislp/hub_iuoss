@@ -65,6 +65,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       },
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
       featureItem('health_check'),
+      featureItem('tuition_waiver'),
     ],
   },
 ];

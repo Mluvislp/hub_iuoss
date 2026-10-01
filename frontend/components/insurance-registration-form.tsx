@@ -34,7 +34,7 @@ import { PrivateImage, formatDateTime } from "@/components/submitted-insurance-i
 import { InsuranceStatus } from "@/components/insurance-status";
 import { RejectionNotice } from "@/components/rejection-notice";
 import { FreshmanWarningModal } from "@/components/freshman-warning-modal";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, newRequestKey } from "@/lib/api";
 import { badge, ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import type { Province, InsurancePeriodConfig, InsuranceRegistrationPrefill, SubmittedInsurance } from "@/lib/types";
@@ -630,7 +630,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       if (data.bhyt_image?.[0]) fd.append("bhyt_image", data.bhyt_image[0]);
       if (!external && data.payment_receipt_image?.[0]) fd.append("payment_receipt_image", data.payment_receipt_image[0]);
 
-      requestKey.current ??= crypto.randomUUID();
+      requestKey.current ??= newRequestKey();
       fd.set('request_key', requestKey.current);
       if (submitted?.id) {
         fd.set('action', resubmitting ? 'resubmit' : 'edit');
@@ -657,20 +657,29 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         setSuccess(true);
       }
     } catch (err) {
-      let message = err instanceof ApiError ? err.message : "Đã có lỗi xảy ra";
+      console.error("Nộp đơn BHYT thất bại", err);
+      // Lỗi JS phía trình duyệt (vd. thiếu cấu hình đợt) vẫn mang thông điệp riêng — đừng nuốt mất.
+      let message = err instanceof Error && err.message ? err.message : "Đã có lỗi xảy ra";
       if (err instanceof ApiError && err.status === 400) {
         // Lỗi theo từng trường của DRF: gắn vào đúng ô để sinh viên thấy ngay chỗ sai.
         // Khai nơi khác bọc lỗi trong `errors`, đăng ký tại trường trả thẳng ở gốc.
         const fieldErrors = (err.data.errors && typeof err.data.errors === "object" ? err.data.errors : err.data) as Record<string, unknown>;
         let mapped = 0;
+        const unmapped: string[] = [];
         for (const [key, value] of Object.entries(fieldErrors)) {
           const field = BACKEND_FIELD[key] ?? (FORM_FIELDS.has(key) ? key : null);
           const text = Array.isArray(value) ? value[0] : value;
-          if (!field || typeof text !== "string") continue;
+          if (typeof text !== "string") continue;
+          if (!field) {
+            if (key !== "detail" && key !== "non_field_errors") unmapped.push(text);
+            continue;
+          }
           setFieldError(field as never, { type: "server", message: text });
           mapped++;
         }
-        if (mapped) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu đỏ.";
+        // Trường backend không có ô tương ứng trên form thì vẫn phải nói ra, không để "HTTP 400".
+        if (unmapped.length && message.startsWith("HTTP ")) message = unmapped.join(" ");
+        else if (mapped) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu đỏ.";
       }
       setError(message);
       setScrollTick((t) => t + 1);

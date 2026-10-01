@@ -269,3 +269,46 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
 
     def validate_payment_receipt_image(self, value):
         return self._validate_file(value, "Ảnh biên lai thanh toán")
+
+
+class TuitionExemptionSubmitSerializer(serializers.Serializer):
+    """Hình dạng form nộp đơn Miễn giảm học phí (multipart/form-data).
+
+    CHỈ kiểm kiểu/độ dài. Bắt buộc/định dạng (CCCD, SĐT, ít nhất một đối tượng, giấy
+    tờ theo diện…) nằm ở `tuition_exemption_contract.validate_*` — thông báo tiếng Việt
+    theo từng ô, Hub và Dashboard dùng chung. Vì vậy các ô ở đây đều không bắt buộc.
+
+    Loại đơn (lần đầu / gia hạn) do HỆ THỐNG xác định, SV không gửi.
+    File KHÔNG khai ở đây: service gom từ request.FILES theo tên trường
+    `doc_<MÃ_ĐỐI_TƯỢNG>__<doc_type>` (lặp được nhiều file), ví dụ `doc_DT02__so_ho_ngheo`;
+    diện chưa khai danh sách giấy tờ dùng doc_type `general`.
+    """
+
+    request_key = serializers.CharField(max_length=80)
+    # Thông tin cá nhân (ảnh chụp lúc nộp)
+    full_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    student_code = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    citizen_id = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    citizen_id_issued_on = serializers.DateField(required=False, allow_null=True)
+    class_code = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    department_code = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    # Tài khoản nhận hoàn tiền
+    bank_account_number = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    bank_account_holder = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    bank_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    # Cha mẹ / người giám hộ
+    father_full_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    father_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    mother_full_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    mother_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    guardian_full_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    guardian_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    guardian_relationship = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    # Thường trú
+    permanent_address = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    permanent_ward_code = serializers.CharField(max_length=5, required=False, allow_blank=True)
+    # Ghi chú + đối tượng
+    previous_review_note = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    category_codes = serializers.ListField(child=serializers.CharField(max_length=32), required=False)

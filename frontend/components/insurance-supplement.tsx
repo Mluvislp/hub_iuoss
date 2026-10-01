@@ -9,7 +9,7 @@ import { InsuranceStatus } from '@/components/insurance-status';
 import { ui } from '@/lib/ui';
 import { ChangeList, SubmittedInsuranceInfo } from '@/components/submitted-insurance-info';
 import { InsuranceModal } from '@/components/insurance-modal';
-import { api } from '@/lib/api';
+import { api, newRequestKey } from '@/lib/api';
 import { buildVietQrPayload, findBank } from '@/lib/vietqr';
 import type { InsuranceDetail, InsuranceEvidence, Province } from '@/lib/types';
 
@@ -92,7 +92,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
     setBusy(true); setError('');
     if (!pending.current) {
       const body = new FormData();
-      body.set('request_key', crypto.randomUUID()); body.set('row_version', String(data.row_version));
+      body.set('request_key', newRequestKey()); body.set('row_version', String(data.row_version));
       if (data.reason_code === 'HOSPITAL_NOT_ACCEPTED') {
         body.set('hospital_code', hospital); body.set('province_code', province);
       } else files.forEach(file => body.append('evidences', file));

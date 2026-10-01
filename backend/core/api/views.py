@@ -70,6 +70,7 @@ def feature_flags() -> dict:
         "document_requests": settings.FEATURE_DOCUMENT_REQUESTS,
         "civic_activities": settings.FEATURE_CIVIC_ACTIVITIES,
         "health_check": settings.FEATURE_HEALTH_CHECK,
+        "tuition_waiver": settings.FEATURE_TUITION_WAIVER,
         # Không phải cờ FEATURE_* bật/tắt bằng tay: tự suy ra từ việc đã cấu hình
         # app registration hay chưa, để không bao giờ hiện nút dẫn tới endpoint chết.
         "microsoft_login": settings.MS_LOGIN_ENABLED,

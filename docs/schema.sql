@@ -285,3 +285,134 @@ CREATE TABLE `health_check_responses` (
   CONSTRAINT `fk_hcresp_round` FOREIGN KEY (`round_id`) REFERENCES `health_check_rounds` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_hcresp_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ── Miễn giảm học phí (30/09/2026) — nguồn: dashboard_iuoss/docs/sql/20260930_mghp_schema.sql
+-- + 20260930_mghp_add_guardian.sql (3 cột guardian_* trên bảng đơn). Chỉ chép 4 bảng
+-- hub_* ở đây; 6 bảng Dashboard sở hữu mà Hub đọc (tuition_exemption_categories,
+-- _category_rates, _rounds, student_tuition_fees, tuition_fee_import_batches,
+-- tuition_exemption_results) xem ở file nguồn. Cột ghi [DASH] = Dashboard được ghi.
+
+CREATE TABLE `hub_tuition_exemption_applications` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `student_id` bigint NOT NULL,
+  `round_id` bigint NOT NULL,
+  -- Thông tin cá nhân (ảnh chụp)
+  `student_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'MSSV lúc nộp',
+  `full_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `date_of_birth` date DEFAULT NULL,
+  `citizen_id` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Số CCCD',
+  `citizen_id_issued_on` date DEFAULT NULL,
+  `class_code` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `department_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `department_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone_number` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Tài khoản nhận hoàn tiền (ảnh chụp — phương án A)
+  `bank_account_number` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bank_account_holder` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bank_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Cha mẹ
+  `father_full_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `father_phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `mother_full_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `mother_phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Địa chỉ thường trú
+  `permanent_address` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Địa chỉ đầy đủ dạng chữ',
+  `permanent_ward_code` char(5) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'vn_wards.code, không FK',
+  -- Phân loại nộp lần đầu / đã được xét
+  `submission_kind` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'first_time | previously_reviewed',
+  `previous_review_note` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Đã xét ở kỳ nào (SV tự khai)',
+  `category_details` json DEFAULT NULL COMMENT 'Thông tin riêng theo đối tượng (TSKK, KHAC…) — 20261001_mghp_official_categories.sql',
+  -- Workflow
+  `status` varchar(24) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'submitted'                 COMMENT '[DASH] giá trị ở tuition_exemption_contract.py',
+  `rejection_reason_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL                  COMMENT '[DASH]',
+  `review_note` text COLLATE utf8mb4_unicode_ci                                               COMMENT '[DASH] phản hồi hiện cho SV',
+  `supplement_deadline` datetime(6) DEFAULT NULL                                              COMMENT '[DASH] hạn bổ sung',
+  `reviewed_by_id` int DEFAULT NULL                                                           COMMENT '[DASH]',
+  `reviewed_at` datetime(6) DEFAULT NULL                                                      COMMENT '[DASH]',
+  `bank_synced_at` datetime(6) DEFAULT NULL                                                   COMMENT '[DASH] lúc chép TK vào student_bank_accounts',
+  `bank_synced_by_id` int DEFAULT NULL                                                        COMMENT '[DASH]',
+  `workflow_version` smallint unsigned NOT NULL DEFAULT '1',
+  `row_version` int unsigned NOT NULL DEFAULT '0' COMMENT 'Khóa lạc quan — cả hai app tăng khi ghi; [DASH] được ghi',
+  `submitted_at` datetime(6) NOT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '[DASH]',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_htea_student_round` (`student_id`, `round_id`),
+  KEY `idx_htea_round_status` (`round_id`, `status`),
+  KEY `idx_htea_status_updated` (`status`, `updated_at`),
+  KEY `idx_htea_student_code` (`student_code`),
+  CONSTRAINT `fk_htea_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_htea_round` FOREIGN KEY (`round_id`) REFERENCES `tuition_exemption_rounds` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `chk_htea_kind` CHECK (`submission_kind` IN ('first_time','previously_reviewed'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `hub_tuition_exemption_application_categories` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `application_id` bigint NOT NULL,
+  `category_id` bigint NOT NULL,
+  `review_status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending' COMMENT '[DASH] pending | approved | rejected | need_supplement',
+  `review_note` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL             COMMENT '[DASH]',
+  `reviewed_by_id` int DEFAULT NULL                                               COMMENT '[DASH]',
+  `reviewed_at` datetime(6) DEFAULT NULL                                          COMMENT '[DASH]',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_hteac_app_category` (`application_id`, `category_id`),
+  KEY `idx_hteac_category_status` (`category_id`, `review_status`),
+  CONSTRAINT `fk_hteac_application` FOREIGN KEY (`application_id`) REFERENCES `hub_tuition_exemption_applications` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_hteac_category` FOREIGN KEY (`category_id`) REFERENCES `tuition_exemption_categories` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `hub_tuition_exemption_events` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `application_id` bigint NOT NULL,
+  `event_no` int unsigned NOT NULL,
+  `event_type` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `from_status` varchar(24) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `to_status` varchar(24) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reason_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reason_text` text COLLATE utf8mb4_unicode_ci,
+  `actor_type` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'student | staff | system',
+  `actor_id` bigint DEFAULT NULL,
+  `source_app` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Hub | Dashboard | Migration',
+  `request_key` varchar(96) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `batch_id` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `payload` json DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_htee_number` (`application_id`, `event_no`),
+  UNIQUE KEY `uq_htee_request` (`application_id`, `request_key`),
+  KEY `idx_htee_timeline` (`application_id`, `created_at`, `id`),
+  KEY `idx_htee_batch` (`batch_id`),
+  CONSTRAINT `fk_htee_application` FOREIGN KEY (`application_id`) REFERENCES `hub_tuition_exemption_applications` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `hub_tuition_exemption_documents` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `application_id` bigint NOT NULL,
+  `application_category_id` bigint DEFAULT NULL COMMENT 'Giấy này chứng minh đối tượng nào; NULL = giấy chung',
+  `event_id` bigint NOT NULL,
+  `doc_type` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Khớp required_documents[].doc_type',
+  `storage_key` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size_bytes` bigint NOT NULL,
+  `sha256` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `issued_on` date DEFAULT NULL COMMENT 'Ngày cấp giấy (SV khai, tùy chọn)',
+  `expires_at` date DEFAULT NULL COMMENT '[DASH] Ngày hết hiệu lực; SV khai, cán bộ xác nhận/sửa',
+  `is_superseded` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Hub đặt 1 khi SV thay file',
+  `verified_status` varchar(16) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '[DASH] valid | invalid | NULL = chưa xem',
+  `verified_note` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL  COMMENT '[DASH]',
+  `verified_by_id` int DEFAULT NULL                                      COMMENT '[DASH]',
+  `verified_at` datetime(6) DEFAULT NULL                                 COMMENT '[DASH]',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_hted_application` (`application_id`, `is_superseded`, `id`),
+  KEY `idx_hted_event` (`event_id`),
+  KEY `idx_hted_expiry` (`expires_at`),
+  CONSTRAINT `fk_hted_application` FOREIGN KEY (`application_id`) REFERENCES `hub_tuition_exemption_applications` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_hted_app_category` FOREIGN KEY (`application_category_id`) REFERENCES `hub_tuition_exemption_application_categories` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_hted_event` FOREIGN KEY (`event_id`) REFERENCES `hub_tuition_exemption_events` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `chk_hted_size` CHECK (`file_size_bytes` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
