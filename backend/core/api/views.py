@@ -17,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from core import microsoft_auth
 from core.auth import verify_ldap
-from core.login_policy import check_login
+from core.login_policy import check_login, is_bhyt_only
 from core import address_service
 from core.models import (
     HubStudent,
@@ -141,6 +141,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
     viên đổi mã.
     """
     uid = student.current_student_code
+    bhyt_only = is_bhyt_only(student)
 
     HubStudent.record_login(student_code=uid, student_id=student.pk, channel=channel)
 
@@ -149,6 +150,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
         student_id=student.pk,
         student_code=uid,
         full_name=student.full_name,
+        bhyt_only=bhyt_only,
     )
 
     logger.info(
@@ -164,6 +166,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
             "student_id": student.pk,
             "student_code": uid,
             "full_name": student.full_name,
+            "bhyt_only": bhyt_only,
         },
     })
 
@@ -405,6 +408,7 @@ class HubTokenRefreshView(APIView):
             student_id=student.pk,
             student_code=student.current_student_code,
             full_name=student.full_name,
+            bhyt_only=is_bhyt_only(student),
         )
         return Response({"access": str(token.access_token), "refresh": str(token)})
 

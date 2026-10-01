@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
-import { clearAuth } from '@/lib/auth';
+import { BHYT_HOME, clearAuth } from '@/lib/auth';
 import { clearFeatureCache, FEATURE_META, type FeatureKey } from '@/lib/features';
 import { useTicketUnread } from '@/lib/ticket-unread';
 import type { FeatureFlags, StudentSession } from '@/lib/types';
@@ -73,14 +73,18 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
 
 export default function Sidebar({ session, features, open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const ticketUnread = useTicketUnread(features.support_tickets);
+  // Học viên cao học (phiên `bhyt_only`): chỉ một mục Bảo hiểm y tế, không gì khác.
+  const bhytOnly = session?.bhyt_only === true;
+  const ticketUnread = useTicketUnread(features.support_tickets && !bhytOnly);
 
   // Mục sáng = href khớp DÀI NHẤT với URL hiện tại. So khớp tuyệt đối thì vào
   // trang con là menu tắt hết; so khớp tiền tố đơn thuần thì ở /requests/new sẽ
   // sáng cả "Yêu cầu giấy tờ" lẫn "Tạo yêu cầu mới".
   // Tính năng chưa mở (cờ FEATURE_* tắt) thì ẨN HẲN khỏi menu — trước 01/10/2026 vẫn
   // hiện kèm chấm "Đang phát triển", sinh viên bấm vào chỉ gặp trang chưa mở.
-  const sections = NAV_SECTIONS
+  const sections: { label: string; items: NavItem[] }[] = bhytOnly
+    ? [{ label: 'Hồ sơ của tôi', items: [{ href: BHYT_HOME, icon: ShieldCheck, label: 'Bảo hiểm y tế' }] }]
+    : NAV_SECTIONS
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => !item.feature || features[item.feature]),
@@ -119,7 +123,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
 
         {/* Brand — identity IU/HCMIU */}
         <div className="flex items-center justify-between h-[55px] px-5 bg-white border-b border-line">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Link href={bhytOnly ? BHYT_HOME : '/dashboard'} className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-md bg-primary text-white flex items-center justify-center
                             text-[0.82rem] font-bold tracking-tight shadow-sm shadow-primary/25">
               IU
