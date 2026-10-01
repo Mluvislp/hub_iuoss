@@ -9,7 +9,7 @@ import unicodedata
 from datetime import date, datetime
 
 from core import address_service, cccd_rules
-from students.models import StudentIdentityDocument, StudentAddress, VnProvince, VnWard
+from students.models import Department, StudentIdentityDocument, StudentAddress, VnProvince, VnWard
 from students.timeline import (
     admission_start,
     current_academic_year,
@@ -700,9 +700,23 @@ def resolve_english_purpose(purpose_code, program_name):
 
 
 def _english_academic_unit(department):
-    """School (Khoa) / Department (Bộ môn) theo tên khoa tiếng Việt."""
-    name = ((department.name_vi if department else "") or "").strip()
-    return "Department" if name.startswith("Bộ môn") else "School"
+    """Tên tiếng Anh đầy đủ in lên giấy: "School of Business", "Department of Physics"…
+
+    Mã phụ (MBA, PBA, MIT…) để trống `name_en` ⇒ mượn tên của khoa cùng `name_vi`.
+    Không tra ra thì lùi về chữ chung School (Khoa) / Department (Bộ môn)."""
+    if department is None:
+        return "School"
+    name_en = (department.name_en or "").strip()
+    if not name_en:
+        name_en = (
+            Department.objects.filter(name_vi=department.name_vi)
+            .exclude(name_en__isnull=True).exclude(name_en="")
+            .order_by("id").values_list("name_en", flat=True).first()
+            or ""
+        ).strip()
+    if name_en:
+        return name_en
+    return "Department" if (department.name_vi or "").strip().startswith("Bộ môn") else "School"
 
 
 def _english_snapshot(student):

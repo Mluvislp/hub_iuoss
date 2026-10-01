@@ -8,6 +8,7 @@ from django.db import models
 class Department(models.Model):
     code = models.CharField(max_length=32)
     name_vi = models.CharField(max_length=255)
+    name_en = models.CharField(max_length=255, blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
