@@ -23,6 +23,7 @@ import {
   type ConfirmationRequest,
   type RequestStatus,
 } from '@/lib/types';
+import { RequestCode } from '@/components/request-code';
 
 const FILTERS: { key: 'all' | RequestStatus; label: string }[] = [
   { key: 'all', label: 'Tất cả' },
@@ -171,7 +172,7 @@ export default function RequestHistoryPage() {
                       {req.purpose}
                     </p>
                     <p className="mt-1 text-[0.78rem] text-muted">
-                      Mã #{req.id} · Gửi {formatDateTime(req.created_at)}
+                      <RequestCode code={req.code} /> <span className="ml-1">Gửi {formatDateTime(req.created_at)}</span>
                     </p>
                     {req.portal_code && (
                       <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary-line bg-primary-soft px-2 py-1 text-[0.78rem] text-primary-text">

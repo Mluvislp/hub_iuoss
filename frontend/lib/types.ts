@@ -135,6 +135,8 @@ export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' 
 
 export interface ConfirmationRequest {
   id: number;
+  /** Mã yêu cầu hiển thị `GT-YYMM-XXXXX` — dùng thay cho id khi hiện cho sinh viên. */
+  code: string;
   request_type: RequestType;
   purpose: string;
   note: string | null;
@@ -653,6 +655,7 @@ export interface TicketDetail extends TicketSummary {
 
 export interface QuotaBlocking {
   request_id: number;
+  code: string;
   status: RequestStatus;
   status_label: string;
   created_at: string;

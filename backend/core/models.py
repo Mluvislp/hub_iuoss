@@ -64,6 +64,12 @@ class ConfirmationRequest(models.Model):
         return self.STATUS_BADGE.get(self.status, "secondary")
 
     @property
+    def code(self):
+        """Mã yêu cầu hiển thị `GT-YYMM-XXXXX` (core/request_code.py) — trùng khớp Dashboard."""
+        from .request_code import encode
+        return encode(self.pk, self.created_at)
+
+    @property
     def student_can_comment(self):
         return self.status in self.STUDENT_CAN_COMMENT_STATUSES
 

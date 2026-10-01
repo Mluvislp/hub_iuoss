@@ -67,6 +67,7 @@ def _counted(student_id, term):
 def _blocking_info(req, term):
     return {
         "request_id": req.id,
+        "code": req.code,
         "status": req.status,
         "status_label": _STATUS_LABELS.get(req.status, req.status),
         "created_at": req.created_at,
@@ -104,7 +105,7 @@ def availability(student_id, request_types, today=None):
 def block_message(request_type, info, semester_label=None):
     what = (f"Bảng điểm rèn luyện {semester_label.lower()}" if semester_label
             else "Loại giấy này")
-    return (f"{what} đã được xin trong {info['term'].lower()} (yêu cầu #{info['request_id']}, "
+    return (f"{what} đã được xin trong {info['term'].lower()} (mã yêu cầu {info['code']}, "
             f"{info['status_label'].lower()}). Mỗi loại giấy chỉ được xin 1 lần trong một học kỳ; "
             f"được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ "
             f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.")
