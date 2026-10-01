@@ -77,7 +77,7 @@ class RequestEditTests(TestCase):
         resp = self._put(req, purpose_code=codes[1], dob="02/05/2002", note="đã sửa")
         self.assertEqual(resp.status_code, 200, resp.content)
         req.refresh_from_db()
-        self.assertEqual(req.status, ConfirmationRequest.STATUS_PROCESSING)
+        self.assertEqual(req.status, ConfirmationRequest.STATUS_PENDING)
         self.assertEqual(req.payload["purpose"]["code"], codes[1])
         self.assertEqual(req.note, "đã sửa")
         dob = req.payload["editable"]["dob"]
