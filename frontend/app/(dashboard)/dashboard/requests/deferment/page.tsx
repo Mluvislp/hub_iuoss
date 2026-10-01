@@ -14,6 +14,7 @@ import {
 } from '@/components/editable-field';
 import { validateDob, isValidDob } from '@/lib/form-validators';
 import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
+import { QuotaGuard } from '@/components/request-quota';
 
 // Ba mốc thời gian học thuộc NHÓM CỨNG — chỉ xem.
 type FieldKey = 'dob';
@@ -197,6 +198,7 @@ export default function DefermentRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="deferment">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -333,6 +335,7 @@ export default function DefermentRequestPage() {
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 

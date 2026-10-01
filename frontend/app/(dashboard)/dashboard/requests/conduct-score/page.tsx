@@ -17,6 +17,7 @@ import {
   isValidDob, isValidIssueDate,
 } from '@/lib/form-validators';
 import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
+import { QuotaGuard, QuotaNotice, useRequestQuota } from '@/components/request-quota';
 
 // Bảng điểm rèn luyện: Phòng CTSV xuất từ hệ thống khác. Ngày sinh / CCCD + ngày cấp /
 // địa chỉ thường trú là ô XIN SỬA như các loại giấy khác (khóa sẵn, "Yêu cầu chỉnh
@@ -32,6 +33,9 @@ export default function ConductScoreRequestPage() {
   const [loadError, setLoadError] = useState('');
 
   const [semesterCode, setSemesterCode] = useState('');
+  // Học kỳ bảng điểm đã xin trong học kỳ hiện tại — làm mờ trong danh sách, không ẩn.
+  const quota = useRequestQuota();
+  const usedSemesters = quota?.types.conduct_score?.blocked_semesters ?? {};
   const [values, setValues] = useState<Record<FieldKey, string>>(
     { dob: '', citizen_id: '', citizen_id_issue_date: '' });
   const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>(
@@ -233,6 +237,7 @@ export default function ConductScoreRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="conduct_score">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -266,10 +271,18 @@ export default function ConductScoreRequestPage() {
                 >
                   <option value="">— Chọn học kỳ —</option>
                   {form.semester_choices.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
+                    <option key={c.code} value={c.code} disabled={!!usedSemesters[c.code]}>
+                      {c.label}{usedSemesters[c.code] ? ' — đã xin trong học kỳ này' : ''}
+                    </option>
                   ))}
                 </select>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
+                {Object.keys(usedSemesters).length > 0 && quota && (
+                  <QuotaNotice
+                    className="mt-2"
+                    reason={`Học kỳ bảng điểm đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
+                  />
+                )}
               </>
             )}
           </div>
@@ -418,6 +431,7 @@ export default function ConductScoreRequestPage() {
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 
