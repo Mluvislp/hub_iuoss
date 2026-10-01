@@ -199,7 +199,8 @@ function LoginForm() {
 
             {/* Error banner */}
             {error && (
-              <div className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50
+              <div id="login-error" role="alert"
+                   className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50
                               border border-red-200 text-red-700 text-sm">
                 <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -210,10 +211,13 @@ function LoginForm() {
 
             {/* MSSV */}
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">
+              <label htmlFor="login-uid" className="block text-sm font-medium text-slate-700">
                 Tài khoản (MSSV)
               </label>
               <input
+                id="login-uid"
+                aria-invalid={!!error}
+                aria-describedby={error ? 'login-error' : undefined}
                 type="text"
                 autoComplete="username"
                 autoFocus
@@ -222,7 +226,7 @@ function LoginForm() {
                 placeholder="vd: BABAWE21603"
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg border text-sm bg-white',
-                  'text-slate-900 placeholder:text-slate-400',
+                  'text-slate-900 placeholder:text-slate-500',
                   'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500',
                   'transition-colors duration-150',
                   error ? 'border-red-300' : 'border-slate-300 hover:border-slate-400',
@@ -232,11 +236,14 @@ function LoginForm() {
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">
+              <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
                 Mật khẩu
               </label>
               <div className="relative">
                 <input
+                  id="login-password"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? 'login-error' : undefined}
                   type={showPw ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={password}
@@ -244,7 +251,7 @@ function LoginForm() {
                   placeholder="Mật khẩu mạng IU"
                   className={cn(
                     'w-full px-3.5 py-2.5 pr-11 rounded-lg border text-sm bg-white',
-                    'text-slate-900 placeholder:text-slate-400',
+                    'text-slate-900 placeholder:text-slate-500',
                     'focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500',
                     'transition-colors duration-150',
                     error ? 'border-red-300' : 'border-slate-300 hover:border-slate-400',
@@ -254,7 +261,7 @@ function LoginForm() {
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2
-                             text-slate-400 hover:text-slate-600 transition-colors"
+                             text-slate-500 hover:text-slate-700 transition-colors"
                   tabIndex={-1}
                 >
                   {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -292,7 +299,7 @@ function LoginForm() {
             <>
               <div className="flex items-center gap-3 my-5">
                 <span className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs text-slate-400">hoặc</span>
+                <span className="text-xs text-slate-500">hoặc</span>
                 <span className="h-px flex-1 bg-slate-200" />
               </div>
 
@@ -319,7 +326,7 @@ function LoginForm() {
                   </>
                 )}
               </button>
-              <p className="mt-2 text-center text-xs text-slate-400">
+              <p className="mt-2 text-center text-xs text-slate-500">
                 Dùng email sinh viên @student.hcmiu.edu.vn
               </p>
             </>

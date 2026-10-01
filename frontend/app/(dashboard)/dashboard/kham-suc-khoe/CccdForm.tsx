@@ -42,25 +42,26 @@ export default function CccdForm({ onSaved }: { onSaved: (next: HealthCheckState
       </div>
       <div className="grid sm:grid-cols-3 gap-2">
         <div>
-          <label className="block text-[0.75rem] text-ink mb-1">Số CCCD<span className="text-red-500"> *</span></label>
-          <input type="text" inputMode="numeric" maxLength={12} value={number} placeholder="12 chữ số"
+          <label htmlFor="hc-cccd-number" className="block text-[0.75rem] text-ink mb-1">Số CCCD<span className="text-red-500"> *</span></label>
+          <input id="hc-cccd-number" aria-invalid={!!error} aria-describedby={error ? 'hc-cccd-error' : undefined}
+                 type="text" inputMode="numeric" maxLength={12} value={number} placeholder="12 chữ số"
                  onChange={(e) => { setNumber(e.target.value.replace(/\D/g, '')); setError(''); }}
                  className={cn(ui.input, 'h-9 text-[0.85rem] bg-white', error && 'border-danger-line')} />
         </div>
         <div>
-          <label className="block text-[0.75rem] text-ink mb-1">Nơi cấp</label>
-          <input type="text" value={issuePlace} maxLength={255} placeholder="Cục Cảnh sát QLHC về TTXH"
+          <label htmlFor="hc-cccd-place" className="block text-[0.75rem] text-ink mb-1">Nơi cấp</label>
+          <input id="hc-cccd-place" type="text" value={issuePlace} maxLength={255} placeholder="Cục Cảnh sát QLHC về TTXH"
                  onChange={(e) => setIssuePlace(e.target.value)}
                  className={cn(ui.input, 'h-9 text-[0.85rem] bg-white')} />
         </div>
         <div>
-          <label className="block text-[0.75rem] text-ink mb-1">Ngày cấp</label>
-          <input type="date" value={issueDate} max={todayInput()}
+          <label htmlFor="hc-cccd-date" className="block text-[0.75rem] text-ink mb-1">Ngày cấp</label>
+          <input id="hc-cccd-date" type="date" value={issueDate} max={todayInput()}
                  onChange={(e) => setIssueDate(e.target.value)}
                  className={cn(ui.input, 'h-9 text-[0.85rem] bg-white')} />
         </div>
       </div>
-      {error && <p className="text-[0.75rem] text-danger-text">{error}</p>}
+      {error && <p id="hc-cccd-error" className="text-[0.75rem] text-danger-text">{error}</p>}
       <div className="flex justify-end">
         <button type="button" onClick={save} disabled={saving} className={cn(ui.btnPrimary, 'h-9')}>
           {saving ? <><Loader2 size={15} className="animate-spin" /> Đang lưu…</> : 'Lưu số CCCD'}

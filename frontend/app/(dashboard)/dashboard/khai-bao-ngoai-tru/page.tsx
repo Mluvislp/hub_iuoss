@@ -105,10 +105,11 @@ export default function OffCampusDeclarationPage() {
 
             {!form.reopen_requested && (
               <div>
-                <label className="block text-[0.78rem] text-muted mb-1">
-                  Lý do cần chỉnh sửa <span className="text-slate-400">(không bắt buộc)</span>
+                <label htmlFor="reopen-reason" className="block text-[0.78rem] text-muted mb-1">
+                  Lý do cần chỉnh sửa <span className="text-muted">(không bắt buộc)</span>
                 </label>
                 <input
+                  id="reopen-reason"
                   type="text" value={askReason} maxLength={255}
                   placeholder="Ví dụ: đã chuyển chỗ trọ, sai số nhà…"
                   onChange={(e) => setAskReason(e.target.value)}

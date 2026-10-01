@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -81,6 +82,25 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
     .filter((href) => pathname === href || pathname.startsWith(href + '/'))
     .sort((a, b) => b.length - a.length)[0] ?? '';
   const router = useRouter();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  // layout truyền onClose là arrow mới mỗi lần render — giữ trong ref để effect
+  // dưới chỉ chạy khi `open` đổi, không giật focus mỗi lần layout render lại.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Drawer mobile: mở thì đưa focus vào nút đóng, Esc để đóng, đóng thì trả focus
+  // về chỗ cũ (nút mở menu). Ở desktop `open` luôn false nên effect không làm gì.
+  useEffect(() => {
+    if (!open) return;
+    const returnTo = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      returnTo?.focus();
+    };
+  }, [open]);
 
   function handleLogout() {
     clearAuth();
@@ -95,12 +115,17 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <div className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden" onClick={onClose} />
       )}
 
+      {/* Đóng ở mobile → `invisible`: chỉ dịch ra ngoài màn hình thì các link vẫn
+          nhận Tab và vẫn bị trình đọc màn hình đọc. visibility được transition
+          cùng transform (globals.css) nên hiệu ứng trượt ra vẫn chạy hết. */}
       <aside
+        aria-label="Menu chính"
+        data-open={open}
         className={cn(
           'fixed top-0 left-0 bottom-0 z-50 w-[260px]',
           'bg-sidebar border-r border-line flex flex-col',
           'sidebar-transition lg:translate-x-0',
-          open ? 'translate-x-0' : '-translate-x-full',
+          open ? 'translate-x-0' : '-translate-x-full max-lg:invisible',
         )}
       >
         {/* Dải accent thương hiệu */}
@@ -119,6 +144,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
             </div>
           </Link>
           <button
+            ref={closeRef}
             onClick={onClose}
             className="lg:hidden p-1.5 -mr-1.5 text-muted hover:text-ink"
             aria-label="Đóng menu"
@@ -131,7 +157,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label} className={cn('px-3', i > 0 && 'mt-5 pt-5 border-t border-line2')}>
-              <p className="px-2.5 mb-2 text-[0.68rem] font-semibold text-slate-400">
+              <p className="px-2.5 mb-2 text-[0.68rem] font-semibold text-muted">
                 {section.label}
               </p>
               <div className="space-y-0.5">
@@ -146,6 +172,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                       key={item.href}
                       href={item.href}
                       onClick={onClose}
+                      aria-current={isActive ? 'page' : undefined}
                       className={cn(
                         'flex items-center gap-3 px-2.5 h-10 rounded-md text-sm transition-colors border-l-[3px]',
                         isActive

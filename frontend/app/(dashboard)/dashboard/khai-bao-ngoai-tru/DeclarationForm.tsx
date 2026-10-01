@@ -23,7 +23,7 @@ export function ReadonlyField({ label, value, note }: { label: string; value: st
       <div className="text-[0.82rem] font-medium text-ink mb-1.5">{label}</div>
       <div className={cn(
         'flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm',
-        value ? 'text-ink' : 'text-slate-400 italic',
+        value ? 'text-ink' : 'text-muted italic',
       )}>
         <Lock size={13} className="text-slate-400 flex-shrink-0" />
         {value || 'Chưa có thông tin'}
@@ -227,8 +227,9 @@ export function DeclarationFields({
             extra={
               <div className="grid sm:grid-cols-2 gap-2 mt-2">
                 <div>
-                  <label className="block text-[0.75rem] text-muted mb-1">Nơi cấp</label>
+                  <label htmlFor="cccd-issue-place" className="block text-[0.75rem] text-muted mb-1">Nơi cấp</label>
                   <input
+                    id="cccd-issue-place"
                     type="text" value={cccdExtra.issue_place} maxLength={255}
                     placeholder="Cục Cảnh sát QLHC về TTXH"
                     onChange={(e) => setCccdExtra((s) => ({ ...s, issue_place: e.target.value }))}
@@ -236,8 +237,9 @@ export function DeclarationFields({
                   />
                 </div>
                 <div>
-                  <label className="block text-[0.75rem] text-muted mb-1">Ngày cấp</label>
+                  <label htmlFor="cccd-issue-date" className="block text-[0.75rem] text-muted mb-1">Ngày cấp</label>
                   <input
+                    id="cccd-issue-date"
                     type="date"
                     value={cccdExtra.issue_date}
                     max={todayInput()}
@@ -382,7 +384,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
   const row = (label: string, value: string) => (
     <div key={label} className="flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0">
       <span className="text-sm text-muted">{label}</span>
-      <span className={cn('text-sm text-right', value ? 'font-medium text-ink' : 'italic text-slate-400')}>
+      <span className={cn('text-sm text-right', value ? 'font-medium text-ink' : 'italic text-muted')}>
         {value || 'Chưa có'}
       </span>
     </div>

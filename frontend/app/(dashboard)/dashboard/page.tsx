@@ -53,7 +53,7 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
     <div className={ui.dtRow}>
       <span className={ui.dtLabel}>{label}</span>
       <span className={ui.dtValue}>
-        {value ?? <span className="italic font-normal text-slate-400">Chưa cập nhật</span>}
+        {value ?? <span className="italic font-normal text-muted">Chưa cập nhật</span>}
       </span>
     </div>
   );
@@ -270,7 +270,7 @@ export default function DashboardPage() {
                           {req.comment_count}
                         </span>
                       ) : (
-                        <span className="italic text-slate-400">—</span>
+                        <span className="italic text-muted">—</span>
                       )}
                     </td>
                     <td className="px-5 py-3.5 align-top whitespace-nowrap">

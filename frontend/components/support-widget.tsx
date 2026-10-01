@@ -39,7 +39,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       type="button"
       onClick={copy}
       aria-label={copied ? `Đã chép ${label}` : `Chép ${label}`}
-      className="flex-shrink-0 p-1.5 -mr-1 rounded-md text-slate-400 hover:text-ink
+      className="flex-shrink-0 p-1.5 -mr-1 rounded-md text-muted hover:text-ink
                  hover:bg-slate-100 transition-colors"
     >
       {copied ? <Check size={14} className="text-success-text" /> : <Copy size={14} />}

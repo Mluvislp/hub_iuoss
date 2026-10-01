@@ -65,6 +65,8 @@ export default function AddressFields({
           ) : (
             <select
               id={`${idPrefix}-province`}
+              aria-invalid={!!errors.province}
+              aria-describedby={errors.province ? `${idPrefix}-province-error` : undefined}
               value={value.provinceCode}
               onChange={(e) => onChange({ ...value, provinceCode: e.target.value, wardCode: '' })}
               className={cn(ui.input, 'bg-white', errors.province && 'border-danger-line')}
@@ -76,7 +78,7 @@ export default function AddressFields({
             </select>
           )}
           {errors.province && (
-            <p className="mt-1 text-[0.75rem] text-danger-text">{errors.province}</p>
+            <p id={`${idPrefix}-province-error`} className="mt-1 text-[0.75rem] text-danger-text">{errors.province}</p>
           )}
         </div>
 
@@ -86,6 +88,8 @@ export default function AddressFields({
           </label>
           <select
             id={`${idPrefix}-ward`}
+            aria-invalid={!!errors.ward}
+            aria-describedby={errors.ward ? `${idPrefix}-ward-error` : undefined}
             value={value.wardCode}
             disabled={!provinceCode || loading}
             onChange={(e) => onChange({ ...value, wardCode: e.target.value })}
@@ -102,7 +106,7 @@ export default function AddressFields({
               <option key={w.code} value={w.code}>{w.name}</option>
             ))}
           </select>
-          {errors.ward && <p className="mt-1 text-[0.75rem] text-danger-text">{errors.ward}</p>}
+          {errors.ward && <p id={`${idPrefix}-ward-error`} className="mt-1 text-[0.75rem] text-danger-text">{errors.ward}</p>}
         </div>
       </div>
 
@@ -112,6 +116,8 @@ export default function AddressFields({
         </label>
         <input
           id={`${idPrefix}-street`}
+          aria-invalid={!!errors.street}
+          aria-describedby={errors.street ? `${idPrefix}-street-error` : undefined}
           type="text"
           value={value.street}
           maxLength={255}
@@ -120,7 +126,7 @@ export default function AddressFields({
           className={cn(ui.input, errors.street && 'border-danger-line')}
         />
         {errors.street ? (
-          <p className="mt-1 text-[0.75rem] text-danger-text">{errors.street}</p>
+          <p id={`${idPrefix}-street-error`} className="mt-1 text-[0.75rem] text-danger-text">{errors.street}</p>
         ) : (
           <StreetHint />
         )}

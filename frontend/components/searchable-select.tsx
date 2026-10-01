@@ -135,7 +135,7 @@ export default function SearchableSelect({
           ui.input,
           'flex items-center justify-between gap-2 text-left',
           disabled && 'cursor-not-allowed bg-slate-50 text-slate-500',
-          !selected && !disabled && 'text-slate-400',
+          !selected && !disabled && 'text-muted',
         )}
       >
         <span className="truncate">
@@ -155,7 +155,8 @@ export default function SearchableSelect({
               onChange={(e) => { setQuery(e.target.value); setActive(0); }}
               onKeyDown={onKeyDown}
               placeholder={searchPlaceholder}
-              className="h-10 w-full bg-transparent text-sm text-ink placeholder:text-slate-400 focus:outline-none"
+              aria-label={searchPlaceholder}
+              className="h-10 w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
             />
           </div>
 

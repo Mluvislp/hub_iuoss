@@ -432,7 +432,7 @@ export default function HealthCheckPage() {
                 <h2 className={cn(ui.sectionTitle, !eligible && 'text-muted')}>
                   <span className={cn(
                     'w-6 h-6 rounded-md border text-[0.75rem] font-bold flex items-center justify-center',
-                    eligible ? 'border-primary-line bg-primary-soft text-primary-text' : 'border-line bg-white text-slate-400',
+                    eligible ? 'border-primary-line bg-primary-soft text-primary-text' : 'border-line bg-white text-muted',
                   )}>2</span>
                   Thông tin và đăng ký khám
                   {!eligible && <Lock size={14} className="text-slate-400" />}

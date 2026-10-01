@@ -5,6 +5,7 @@
    sửa backend. Hai luật tính (BMI, phân loại sức khỏe gợi ý) chép lại từ backend để
    hiện ngay khi gõ; server vẫn tính lại lúc nhận. */
 
+import { useId } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ui } from '@/lib/ui';
 import { cn, todayInput } from '@/lib/utils';
@@ -97,16 +98,25 @@ interface FieldProps {
 
 function FieldInput({ field, value, onChange, error, computed, compact, label = true }: FieldProps) {
   const base = cn(ui.input, compact ? 'h-9 text-[0.85rem]' : 'h-10', error && 'border-danger-line');
+  const id = useId();
+  const msgId = `${id}-msg`;
+  // label={false} (ô nằm trong bảng có tiêu đề cột) → vẫn cần tên cho trình đọc màn hình.
+  const a11y = {
+    id,
+    'aria-label': label ? undefined : field.label,
+    'aria-invalid': !!error,
+    'aria-describedby': error || field.hint ? msgId : undefined,
+  };
   let control: React.ReactNode;
   if (field.type === 'computed') {
     control = (
       <div className={cn(base, 'flex items-center bg-slate-50 text-ink font-medium')}>
-        {computed || <span className="text-slate-400 font-normal">—</span>}
+        {computed || <span className="text-muted font-normal">—</span>}
       </div>
     );
   } else if (field.type === 'class' || field.type === 'choice') {
     control = (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={cn(base, 'pr-8')}>
+      <select {...a11y} value={value} onChange={(e) => onChange(e.target.value)} className={cn(base, 'pr-8')}>
         {!field.required && <option value="">—</option>}
         {(field.choices ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
       </select>
@@ -115,6 +125,7 @@ function FieldInput({ field, value, onChange, error, computed, compact, label = 
     control = (
       <div className="relative">
         <input
+          {...a11y}
           type={field.type === 'date' ? 'date' : 'text'}
           inputMode={field.type === 'number' ? 'decimal' : undefined}
           max={field.type === 'date' ? todayInput() : undefined}
@@ -134,13 +145,13 @@ function FieldInput({ field, value, onChange, error, computed, compact, label = 
   return (
     <div>
       {label && (
-        <label className="block text-[0.78rem] font-medium text-ink mb-1">
+        <label htmlFor={field.type === 'computed' ? undefined : id} className="block text-[0.78rem] font-medium text-ink mb-1">
           {field.label}{field.required && field.type !== 'computed' && <span className="text-red-500"> *</span>}
         </label>
       )}
       {control}
-      {error ? <p className="mt-1 text-[0.72rem] text-danger-text">{error}</p>
-        : field.hint ? <p className="mt-1 text-[0.72rem] text-muted">{field.hint}</p> : null}
+      {error ? <p id={msgId} className="mt-1 text-[0.72rem] text-danger-text">{error}</p>
+        : field.hint ? <p id={msgId} className="mt-1 text-[0.72rem] text-muted">{field.hint}</p> : null}
     </div>
   );
 }

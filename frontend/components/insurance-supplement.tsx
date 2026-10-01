@@ -202,9 +202,9 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
               </> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
 
               <div>
-                <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
-                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
-                  <input className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => {
+                <label htmlFor={'supplement-file-' + id} className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50 focus-within:ring-2 focus-within:ring-primary/40">
+                  <input id={'supplement-file-' + id} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => {
                     setFiles(e.target.files?.[0] ? [e.target.files[0]] : []); pending.current = null;
                   }} />
                   <div className="flex min-w-0 flex-col items-center gap-2">

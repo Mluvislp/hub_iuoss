@@ -12,12 +12,13 @@ import { ui } from '@/lib/ui';
 export function RequestNoteField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
+      <label htmlFor="request-note" className={ui.fieldLabel}>Ghi chú thêm <span className="text-muted font-normal">(không bắt buộc)</span></label>
       <textarea
+        id="request-note" aria-describedby="request-note-hint"
         value={value} onChange={(e) => onChange(e.target.value)} rows={3} maxLength={1000}
         className={ui.textarea}
       />
-      <ul className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
+      <ul id="request-note-hint" className="mt-1.5 space-y-0.5 text-[0.75rem] text-muted">
         <li>• Thông tin sinh viên có sai sót: ghi rõ thông tin sai và thông tin đúng vào đây.</li>
         <li>• Nếu có yêu cầu đặc biệt, vui lòng ghi rõ nội dung.</li>
       </ul>

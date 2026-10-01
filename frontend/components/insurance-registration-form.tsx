@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm, Controller, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
@@ -222,10 +222,23 @@ function lastTenDigits(raw: string): string {
   return raw.replace(/\D/g, "").slice(-10);
 }
 
-function FieldError({ message }: { message?: unknown }) {
+function FieldError({ message, id }: { message?: unknown; id?: string }) {
   if (!message) return null;
-  return <p data-field-error className="mt-1 text-xs text-danger-text">{String(message)}</p>;
+  return <p id={id} data-field-error className="mt-1 text-xs text-danger-text">{String(message)}</p>;
 }
+
+/** id + trạng thái lỗi cho một ô của form — label trỏ vào `id`, lỗi gắn vào ô qua
+ *  aria-describedby để trình đọc màn hình đọc được ô nào sai, sai vì sao. Mỗi trang
+ *  chỉ có một form BHYT nên id tĩnh là đủ. */
+function fieldA11y(name: string, invalid: boolean) {
+  const id = `bhyt-${name}`;
+  return {
+    id,
+    "aria-invalid": invalid,
+    "aria-describedby": invalid ? `${id}-error` : undefined,
+  };
+}
+const errorId = (name: string) => `bhyt-${name}-error`;
 
 /**
  * Một ô ảnh hồ sơ. Đã có ảnh nộp trước → hiện chính ảnh đó; ô chọn file chỉ còn
@@ -245,9 +258,12 @@ function ImageField({
   error?: unknown;
   input?: UseFormRegisterReturn;
 }) {
+  const inputId = useId();
+  const errId = `${inputId}-error`;
+  const invalid = !!error;
   return (
     <div className="flex min-w-0 flex-col">
-      <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] flex-wrap items-baseline gap-1")}>
+      <label htmlFor={existingUrl ? undefined : inputId} className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] flex-wrap items-baseline gap-1")}>
         <span>{label}</span>
         {!existingUrl && <span className="text-danger-text">*</span>}
         {hint && <span className="text-xs font-normal text-muted">{hint}</span>}
@@ -256,9 +272,10 @@ function ImageField({
         <>
           <PrivateImage url={existingUrl} label={label} caption={false} />
           {!disabled && input ? (
-            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs",
+            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs focus-within:ring-2 focus-within:ring-primary/40",
               error ? "border-red-500 bg-red-50 text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
-              <input type="file" accept="image/*" {...input} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+              <input type="file" accept="image/*" {...input} aria-invalid={invalid} aria-describedby={invalid ? errId : undefined}
+                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
               {file ? <CheckSquare size={14} className="shrink-0" /> : <Upload size={14} className="shrink-0" />}
               <span className="truncate">{file ? file.name : "Thay ảnh khác"}</span>
             </label>
@@ -267,13 +284,17 @@ function ImageField({
       ) : (
         <div
           className={cn(
-            "group relative flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
+            // input file trong suốt phủ cả ô → viền focus của nó vô hình; vẽ focus lên khung.
+            "group relative flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors focus-within:ring-2 focus-within:ring-primary/40",
             error ? "border-red-500 bg-red-50" : "border-slate-300",
             disabled ? "bg-slate-50 opacity-70" : "cursor-pointer hover:bg-slate-50",
           )}
         >
           {input && (
             <input
+              id={inputId}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? errId : undefined}
               type="file"
               accept="image/*"
               {...input}
@@ -291,7 +312,7 @@ function ImageField({
           </div>
         </div>
       )}
-      <FieldError message={(error as { message?: string } | undefined)?.message} />
+      <FieldError id={errId} message={(error as { message?: string } | undefined)?.message} />
     </div>
   );
 }
@@ -882,9 +903,9 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                   ['valid_until', 'Giá trị sử dụng đến ngày', 'date'],
                 ] as const).map(([field, label, type]) => (
                   <div key={field} className="min-w-0">
-                    <label htmlFor={field} className={ui.fieldLabel}>{label} *</label>
-                    <input id={field} type={type} {...register(field)} className={fieldCls(editLocked, !!errors[field])} />
-                    <FieldError message={errors[field]?.message} />
+                    <label htmlFor={`bhyt-${field}`} className={ui.fieldLabel}>{label} *</label>
+                    <input {...fieldA11y(field, !!errors[field])} type={type} {...register(field)} className={fieldCls(editLocked, !!errors[field])} />
+                    <FieldError id={errorId(field)} message={errors[field]?.message} />
                   </div>
                 ))}
               </div>
@@ -925,26 +946,29 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
             <div className="space-y-6 p-4 sm:p-5">
               <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Họ và tên</label>
+                  <label htmlFor="bhyt-full_name" className={ui.fieldLabel}>Họ và tên</label>
                   <input
+                    {...fieldA11y("full_name", !!errors.full_name)}
                     {...register("full_name")}
                     disabled={personalLocked(prefill?.full_name)}
                     className={fieldCls(personalLocked(prefill?.full_name), !!errors.full_name)}
                   />
-                  <FieldError message={errors.full_name?.message} />
+                  <FieldError id={errorId("full_name")} message={errors.full_name?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Mã số sinh viên</label>
+                  <label htmlFor="bhyt-student_code" className={ui.fieldLabel}>Mã số sinh viên</label>
                   <input
+                    {...fieldA11y("student_code", !!errors.student_code)}
                     {...register("student_code")}
                     readOnly={editingRecord || (recorded(prefill?.student_code) && !infoEditable)}
                     className={fieldCls(editingRecord || personalLocked(prefill?.student_code), !!errors.student_code)}
                   />
-                  <FieldError message={errors.student_code?.message} />
+                  <FieldError id={errorId("student_code")} message={errors.student_code?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Giới tính</label>
+                  <label htmlFor="bhyt-gender" className={ui.fieldLabel}>Giới tính</label>
                   <select
+                    {...fieldA11y("gender", !!errors.gender)}
                     {...register("gender")}
                     disabled={personalLocked(prefill?.gender)}
                     className={fieldCls(personalLocked(prefill?.gender), !!errors.gender)}
@@ -952,21 +976,23 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                   </select>
-                  <FieldError message={errors.gender?.message} />
+                  <FieldError id={errorId("gender")} message={errors.gender?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Ngày sinh</label>
+                  <label htmlFor="bhyt-dob" className={ui.fieldLabel}>Ngày sinh</label>
                   <input
+                    {...fieldA11y("dob", !!errors.dob)}
                     type="date"
                     {...register("dob")}
                     disabled={personalLocked(prefill?.dob)}
                     className={fieldCls(personalLocked(prefill?.dob), !!errors.dob)}
                   />
-                  <FieldError message={errors.dob?.message} />
+                  <FieldError id={errorId("dob")} message={errors.dob?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Dân tộc</label>
+                  <label htmlFor="bhyt-ethnicity" className={ui.fieldLabel}>Dân tộc</label>
                   <select
+                    {...fieldA11y("ethnicity", !!errors.ethnicity)}
                     {...register("ethnicity")}
                     disabled={personalLocked(prefill?.ethnicity)}
                     className={fieldCls(personalLocked(prefill?.ethnicity), !!errors.ethnicity)}
@@ -978,33 +1004,36 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                       </option>
                     ))}
                   </select>
-                  <FieldError message={errors.ethnicity?.message} />
+                  <FieldError id={errorId("ethnicity")} message={errors.ethnicity?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Số điện thoại</label>
+                  <label htmlFor="bhyt-phone_number" className={ui.fieldLabel}>Số điện thoại</label>
                   <input
+                    {...fieldA11y("phone_number", !!errors.phone_number)}
                     {...register("phone_number")}
                     inputMode="tel"
                     disabled={personalLocked(prefill?.phone_number)}
                     className={fieldCls(personalLocked(prefill?.phone_number), !!errors.phone_number)}
                   />
-                  <FieldError message={errors.phone_number?.message} />
+                  <FieldError id={errorId("phone_number")} message={errors.phone_number?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Số CCCD</label>
+                  <label htmlFor="bhyt-citizen_id" className={ui.fieldLabel}>Số CCCD</label>
                   <input
+                    {...fieldA11y("citizen_id", !!errors.citizen_id)}
                     {...register("citizen_id")}
                     inputMode="numeric"
                     disabled={personalLocked(prefill?.citizen_id)}
                     className={fieldCls(personalLocked(prefill?.citizen_id), !!errors.citizen_id)}
                   />
-                  <FieldError message={errors.citizen_id?.message} />
+                  <FieldError id={errorId("citizen_id")} message={errors.citizen_id?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>
+                  <label htmlFor="bhyt-social_insurance_number" className={ui.fieldLabel}>
                     Số sổ BHXH (10 số cuối của BHYT)
                   </label>
                   <input
+                    {...fieldA11y("social_insurance_number", !!errors.social_insurance_number)}
                     {...sinField}
                     inputMode="numeric"
                     autoComplete="off"
@@ -1016,7 +1045,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                     disabled={personalLocked(prefill?.social_insurance_number)}
                     className={fieldCls(personalLocked(prefill?.social_insurance_number), !!errors.social_insurance_number)}
                   />
-                  <FieldError message={errors.social_insurance_number?.message} />
+                  <FieldError id={errorId("social_insurance_number")} message={errors.social_insurance_number?.message} />
                   {!editLocked && (
                     <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
                       <p className="flex items-center gap-1.5 font-semibold">
@@ -1325,6 +1354,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
+                  {...fieldA11y("confirm_declaration", !!errors.confirm_declaration)}
                   {...register("confirm_declaration")}
                   className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-primary focus:ring-primary", errors.confirm_declaration && "border-red-500 outline-none ring-2 ring-red-500/20")}
                 />
@@ -1336,7 +1366,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                         ? "Xác nhận đã khai đúng thông tin và đồng ý cung cấp thông tin cho nhà trường."
                         : "Xác nhận đã khai đúng thông tin, đã chuyển khoản và đồng ý cung cấp thông tin cho nhà trường."}
                   </span>
-                  <FieldError message={errors.confirm_declaration?.message} />
+                  <FieldError id={errorId("confirm_declaration")} message={errors.confirm_declaration?.message} />
                 </div>
               </label>
             </div>

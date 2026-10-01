@@ -246,8 +246,11 @@ export default function DefermentRequestPage() {
               <>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <label className={ui.fieldLabel}>Tỉnh / Thành phố <span className="text-red-500">*</span></label>
+                    <label htmlFor="def-province" className={ui.fieldLabel}>Tỉnh / Thành phố <span className="text-red-500">*</span></label>
                     <select
+                      id="def-province"
+                      aria-invalid={!!fieldErrors.province}
+                      aria-describedby={fieldErrors.province ? 'def-province-error' : undefined}
                       value={provinceCode}
                       onChange={(e) => { setProvinceCode(e.target.value); setFieldErrors((f) => ({ ...f, province: undefined, ward: undefined })); }}
                       className={cn(ui.input, 'bg-white', fieldErrors.province && 'border-danger-line')}
@@ -255,11 +258,14 @@ export default function DefermentRequestPage() {
                       <option value="">— Chọn tỉnh/thành —</option>
                       {provinces.map((pv) => <option key={pv.code} value={pv.code}>{pv.name}</option>)}
                     </select>
-                    {fieldErrors.province && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.province}</p>}
+                    {fieldErrors.province && <p id="def-province-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.province}</p>}
                   </div>
                   <div>
-                    <label className={ui.fieldLabel}>Phường / Xã <span className="text-red-500">*</span></label>
+                    <label htmlFor="def-ward" className={ui.fieldLabel}>Phường / Xã <span className="text-red-500">*</span></label>
                     <select
+                      id="def-ward"
+                      aria-invalid={!!fieldErrors.ward}
+                      aria-describedby={fieldErrors.ward ? 'def-ward-error' : undefined}
                       value={wardCode}
                       disabled={!provinceCode || wardsLoading}
                       onChange={(e) => { setWardCode(e.target.value); setFieldErrors((f) => ({ ...f, ward: undefined })); }}
@@ -268,19 +274,22 @@ export default function DefermentRequestPage() {
                       <option value="">{!provinceCode ? '— Chọn tỉnh trước —' : wardsLoading ? 'Đang tải…' : '— Chọn phường/xã —'}</option>
                       {wards.map((w) => <option key={w.code} value={w.code}>{w.name}</option>)}
                     </select>
-                    {fieldErrors.ward && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.ward}</p>}
+                    {fieldErrors.ward && <p id="def-ward-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.ward}</p>}
                   </div>
                 </div>
                 <div className="mt-3">
-                  <label className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-red-500">*</span></label>
+                  <label htmlFor="def-street" className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-red-500">*</span></label>
                   <input
+                    id="def-street"
+                    aria-invalid={!!fieldErrors.street}
+                    aria-describedby={fieldErrors.street ? 'def-street-error' : undefined}
                     type="text" value={street} maxLength={255}
                     onChange={(e) => { setStreet(e.target.value); setFieldErrors((f) => ({ ...f, street: undefined })); }}
                     placeholder={STREET_PLACEHOLDER}
                     className={cn(ui.input, fieldErrors.street && 'border-danger-line')}
                   />
                   {fieldErrors.street
-                    ? <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.street}</p>
+                    ? <p id="def-street-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.street}</p>
                     : <StreetHint />}
                 </div>
                 {addressLockable && <CancelEditButton onClick={cancelAddress} />}

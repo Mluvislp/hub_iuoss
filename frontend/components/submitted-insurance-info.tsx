@@ -35,7 +35,7 @@ export function ChangeList({changes, images, submitted = false, className}:{
   return <dl className={className}>
     {entries.map(([field,change]) => <div key={field} className="flex flex-wrap gap-x-1.5">
       <dt className="text-muted">{labels[field] || field}:</dt>
-      <dd className="min-w-0"><span className="text-slate-400 line-through">{changeText(change.before)}</span> → <span className="font-medium text-ink">{changeText(change.after)}</span></dd>
+      <dd className="min-w-0"><span className="text-muted line-through">{changeText(change.before)}</span> → <span className="font-medium text-ink">{changeText(change.after)}</span></dd>
     </div>)}
     {!!images?.length && <div className="flex flex-wrap gap-x-1.5">
       <dt className="text-muted">{submitted ? 'Ảnh đã tải lên' : 'Ảnh đã thay mới'}:</dt>

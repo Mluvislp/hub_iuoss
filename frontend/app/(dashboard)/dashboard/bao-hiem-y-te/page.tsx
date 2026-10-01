@@ -32,7 +32,7 @@ const TH = 'px-5 py-2.5 text-left text-[0.78rem] font-medium text-muted';
 const THEAD_ROW = 'border-b border-line bg-[#f8fafc]';
 
 function Empty() {
-  return <span className="italic font-normal text-slate-400">Chưa cập nhật</span>;
+  return <span className="italic font-normal text-muted">Chưa cập nhật</span>;
 }
 
 function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -283,7 +283,7 @@ export default function HealthInsurancePage() {
                     <td
                       className={cn(
                         'px-5 py-3 text-[0.82rem] whitespace-nowrap',
-                        validityState(card.valid_until) === 'expired' ? 'text-slate-400' : 'text-muted',
+                        validityState(card.valid_until) === 'expired' ? 'text-muted' : 'text-ink',
                       )}
                     >
                       {hideHistoricalCardDetails(card) ? null : periodText(card) || '—'}

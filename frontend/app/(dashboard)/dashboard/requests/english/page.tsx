@@ -163,8 +163,11 @@ export default function EnglishRequestPage() {
 
           {/* Mục đích — chọn từ danh sách tiếng Anh */}
           <div>
-            <label className={ui.fieldLabel}>Mục đích (Purpose) <span className="text-red-500">*</span></label>
+            <label htmlFor="eng-purpose" className={ui.fieldLabel}>Mục đích (Purpose) <span className="text-red-500">*</span></label>
             <select
+              id="eng-purpose"
+              aria-invalid={!!fieldErrors.purpose_code}
+              aria-describedby={fieldErrors.purpose_code ? 'eng-purpose-error' : undefined}
               value={purposeCode}
               onChange={(e) => { setPurposeCode(e.target.value); setFieldErrors((f) => ({ ...f, purpose_code: undefined, program_name: undefined })); }}
               className={cn(ui.input, fieldErrors.purpose_code && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
@@ -174,18 +177,21 @@ export default function EnglishRequestPage() {
                 <option key={c.code} value={c.code}>{c.label}</option>
               ))}
             </select>
-            {fieldErrors.purpose_code && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.purpose_code}</p>}
+            {fieldErrors.purpose_code && <p id="eng-purpose-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.purpose_code}</p>}
 
             {isProgram && (
               <div className="mt-3">
-                <label className={ui.fieldLabel}>Tên chương trình (Program name) <span className="text-red-500">*</span></label>
+                <label htmlFor="eng-program" className={ui.fieldLabel}>Tên chương trình (Program name) <span className="text-red-500">*</span></label>
                 <input
+                  id="eng-program"
+                  aria-invalid={!!fieldErrors.program_name}
+                  aria-describedby={fieldErrors.program_name ? 'eng-program-error' : undefined}
                   type="text" value={programName} maxLength={255}
                   onChange={(e) => { setProgramName(e.target.value); setFieldErrors((f) => ({ ...f, program_name: undefined })); }}
                   placeholder="Ví dụ: Master of Computer Science"
                   className={cn(ui.input, fieldErrors.program_name && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
                 />
-                {fieldErrors.program_name && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.program_name}</p>}
+                {fieldErrors.program_name && <p id="eng-program-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.program_name}</p>}
               </div>
             )}
           </div>

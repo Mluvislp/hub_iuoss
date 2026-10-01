@@ -64,10 +64,11 @@ export default function NewRequestPage() {
         <div className="px-6 py-5 space-y-6">
           {/* Loại giấy tờ — tiles */}
           <div>
-            <label className={ui.fieldLabel}>
+            {/* Tiêu đề của một nhóm radio, không phải label của một ô → p + radiogroup. */}
+            <p id="request-type-label" className={ui.fieldLabel}>
               Loại giấy tờ <span className="text-red-500">*</span>
-            </label>
-            <div className="grid sm:grid-cols-2 gap-2.5">
+            </p>
+            <div role="radiogroup" aria-labelledby="request-type-label" className="grid sm:grid-cols-2 gap-2.5">
               {REQUEST_TYPES.map(([value, label]) => {
                 const selected = requestType === value;
                 return (

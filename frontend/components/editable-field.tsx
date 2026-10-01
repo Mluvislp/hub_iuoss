@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { Lock, PencilLine, RotateCcw } from 'lucide-react';
 import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
 import { ui } from '@/lib/ui';
@@ -90,6 +91,9 @@ export function EditableField({
   onCancel: () => void;
 }) {
   const changed = value.trim() !== original.trim();
+  const id = useId();
+  const msgId = `${id}-msg`;
+  const a11y = { id, 'aria-invalid': !!error, 'aria-describedby': error || hint ? msgId : undefined };
   const inputCls = cn(
     ui.input,
     error ? 'border-danger-line focus:border-danger-line focus:ring-red-100' : changed && 'border-warning-line',
@@ -97,7 +101,7 @@ export function EditableField({
 
   return (
     <div>
-      <label className={ui.fieldLabel}>
+      <label htmlFor={open ? id : undefined} className={ui.fieldLabel}>
         {label}
         {changed && <ChangedTag />}
       </label>
@@ -106,6 +110,7 @@ export function EditableField({
         <>
           {kind === 'date' ? (
             <input
+              {...a11y}
               type="date"
               value={toDateInput(value)}
               min={DATE_INPUT_MIN}
@@ -116,6 +121,7 @@ export function EditableField({
             />
           ) : (
             <input
+              {...a11y}
               type="text"
               value={value}
               maxLength={maxLength}
@@ -127,8 +133,8 @@ export function EditableField({
             />
           )}
           {error
-            ? <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>
-            : hint && <p className="mt-1 text-[0.75rem] text-warning-text">{hint}</p>}
+            ? <p id={msgId} className="mt-1 text-[0.75rem] text-danger-text">{error}</p>
+            : hint && <p id={msgId} className="mt-1 text-[0.75rem] text-warning-text">{hint}</p>}
           {lockable && <CancelEditButton onClick={onCancel} />}
         </>
       ) : (

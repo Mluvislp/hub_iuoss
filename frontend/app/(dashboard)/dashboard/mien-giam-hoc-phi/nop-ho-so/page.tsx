@@ -66,9 +66,17 @@ function fileKey(code: string, docType: string) {
   return `doc_${code}__${docType}`;
 }
 
+const errId = (name: string) => `mghp-err-${name}`;
+
+/** Gắn ô với dòng lỗi của nó (aria-describedby) để trình đọc màn hình đọc được lý do. */
+function errA11y(errors: Errors, name: string) {
+  const invalid = !!errors[name]?.[0];
+  return { 'aria-invalid': invalid, 'aria-describedby': invalid ? errId(name) : undefined };
+}
+
 function FieldError({ errors, name }: { errors: Errors; name: string }) {
   const msg = errors[name]?.[0];
-  return msg ? <p className="mt-1 text-[0.78rem] text-danger-text">{msg}</p> : null;
+  return msg ? <p id={errId(name)} className="mt-1 text-[0.78rem] text-danger-text">{msg}</p> : null;
 }
 
 /** Lý do không đủ điều kiện kiểm được ngay trên trình duyệt — CÙNG luật với
@@ -135,10 +143,10 @@ function CategoryOption({
                   <label key={f.name} className="block">
                     <span className={ui.fieldLabel}>{f.label}{f.required && <span className="text-danger-text"> *</span>}</span>
                     {f.type === 'textarea' ? (
-                      <textarea rows={4} maxLength={f.max} className={cn(ui.textarea, errors[name] && 'border-danger-line')}
+                      <textarea {...errA11y(errors, name)} rows={4} maxLength={f.max} className={cn(ui.textarea, errors[name] && 'border-danger-line')}
                                 value={String(details[f.name] ?? '')} onChange={(e) => setDetail(f.name, e.target.value)} />
                     ) : (
-                      <input maxLength={f.max} className={cn(ui.input, errors[name] && 'border-danger-line')}
+                      <input {...errA11y(errors, name)} maxLength={f.max} className={cn(ui.input, errors[name] && 'border-danger-line')}
                              value={String(details[f.name] ?? '')} onChange={(e) => setDetail(f.name, e.target.value)} />
                     )}
                     <FieldError errors={errors} name={name} />
@@ -177,7 +185,7 @@ function CategoryOption({
                         {list.map((f, i) => (
                           <li key={`${f.name}-${i}`} className="flex items-center gap-1.5 text-[0.78rem] text-muted">
                             <span className="truncate">{f.name}</span>
-                            <button type="button" aria-label="Bỏ file" className="text-slate-400 hover:text-danger-text"
+                            <button type="button" aria-label="Bỏ file" className="text-muted hover:text-danger-text"
                                     onClick={() => onFiles(key, list.filter((_, j) => j !== i))}>
                               <X size={13} />
                             </button>
@@ -364,7 +372,7 @@ export default function TuitionWaiverSubmitPage() {
                   <span className={ui.fieldLabel}>
                     {f.label}{f.required && <span className="text-danger-text"> *</span>}
                   </span>
-                  <input className={cn(ui.input, errors[f.name] && 'border-danger-line')} type={f.type ?? 'text'}
+                  <input {...errA11y(errors, f.name)} className={cn(ui.input, errors[f.name] && 'border-danger-line')} type={f.type ?? 'text'}
                          value={fields[f.name] ?? ''}
                          onChange={(e) => setFields((cur) => ({ ...cur, [f.name]: e.target.value }))} />
                   <FieldError errors={errors} name={f.name} />

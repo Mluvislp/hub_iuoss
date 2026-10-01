@@ -217,8 +217,9 @@ export default function OtherRequestPage() {
 
           {/* Mục đích */}
           <div>
-            <label className={ui.fieldLabel}>Mục đích làm giấy <span className="text-red-500">*</span></label>
+            <label htmlFor="other-purpose" className={ui.fieldLabel}>Mục đích làm giấy <span className="text-red-500">*</span></label>
             <select
+              id="other-purpose"
               value={purposeCode}
               onChange={(e) => setPurposeCode(e.target.value)}
               className={cn(ui.input, 'appearance-none bg-white')}
@@ -229,14 +230,17 @@ export default function OtherRequestPage() {
 
             {isProgram && (
               <div className="mt-2.5">
-                <label className={ui.fieldLabel}>Tên chương trình <span className="text-red-500">*</span></label>
+                <label htmlFor="other-program" className={ui.fieldLabel}>Tên chương trình <span className="text-red-500">*</span></label>
                 <input
+                  id="other-program"
+                  aria-invalid={!!fieldErrors.program_name}
+                  aria-describedby={fieldErrors.program_name ? 'other-program-error' : undefined}
                   type="text" value={programName} maxLength={200}
                   onChange={(e) => { setProgramName(e.target.value); setFieldErrors((f) => ({ ...f, program_name: undefined })); }}
                   placeholder="Nhập tên chương trình tham gia…"
                   className={cn(ui.input, fieldErrors.program_name && 'border-red-400 focus:border-red-400 focus:ring-red-100')}
                 />
-                {fieldErrors.program_name && <p className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.program_name}</p>}
+                {fieldErrors.program_name && <p id="other-program-error" className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.program_name}</p>}
               </div>
             )}
           </div>

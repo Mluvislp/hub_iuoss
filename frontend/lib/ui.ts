@@ -15,11 +15,11 @@ export const ui = {
   // Form controls
   input:
     'w-full h-10 px-3 rounded-lg border border-line bg-white text-sm text-ink ' +
-    'placeholder:text-slate-400 transition-colors ' +
+    'placeholder:text-muted transition-colors ' +
     'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15',
   textarea:
     'w-full px-3 py-2.5 rounded-lg border border-line bg-white text-sm text-ink ' +
-    'placeholder:text-slate-400 resize-none transition-colors ' +
+    'placeholder:text-muted resize-none transition-colors ' +
     'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15',
 
   // Buttons
