@@ -81,7 +81,7 @@ export default function OffCampusDeclarationPage() {
       <div className="max-w-[820px] space-y-4">
         <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
           <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-          <ChevronRight size={14} className="text-slate-400" />
+          <ChevronRight size={14} className="text-faint" />
           <span className="text-ink font-medium">Khai báo ngoại trú</span>
         </nav>
 
@@ -194,7 +194,7 @@ export default function OffCampusDeclarationPage() {
     <div className="max-w-[820px] space-y-4">
       <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Khai báo ngoại trú</span>
       </nav>
 

@@ -22,10 +22,10 @@ export function ReadonlyField({ label, value, note }: { label: string; value: st
     <div>
       <div className="text-[0.82rem] font-medium text-ink mb-1.5">{label}</div>
       <div className={cn(
-        'flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm',
+        'flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-surface-subtle text-sm',
         value ? 'text-ink' : 'text-muted italic',
       )}>
-        <Lock size={13} className="text-slate-400 flex-shrink-0" />
+        <Lock size={13} className="text-faint flex-shrink-0" />
         {value || 'Chưa có thông tin'}
       </div>
       {note && <p className="mt-1 text-[0.75rem] text-muted">{note}</p>}
@@ -48,12 +48,12 @@ export function ChoiceTile({
         'disabled:opacity-60 disabled:cursor-not-allowed',
         active
           ? 'border-primary bg-primary-soft ring-2 ring-primary-line'
-          : 'border-line bg-white hover:bg-slate-50',
+          : 'border-line bg-white hover:bg-surface-subtle',
       )}
     >
       <span className={cn(
         'mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
-        active ? 'border-primary' : 'border-slate-300',
+        active ? 'border-primary' : 'border-line-strong',
       )}>
         {active && <span className="w-2 h-2 rounded-full bg-primary" />}
       </span>
@@ -304,7 +304,7 @@ export function DeclarationFields({
         </h2>
         <p className="text-[0.78rem] text-muted mb-3">
           Sinh viên hiện có đang tạm trú tại Thành phố Hồ Chí Minh hay không?
-          <span className="text-red-500"> *</span>
+          <span className="text-danger-text"> *</span>
         </p>
 
         <div className={cn('grid gap-3', permanentInHcmc ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>

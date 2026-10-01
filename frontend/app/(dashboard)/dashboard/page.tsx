@@ -89,7 +89,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
 
       {/* ── Hero / greeting ───────────────────────────────── */}
-      <section className="rounded-lg border border-primary-line bg-[#f5f9ff] px-5 sm:px-6 py-5">
+      <section className="rounded-lg border border-primary-line bg-primary-wash px-5 sm:px-6 py-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-[1.35rem] font-semibold text-ink">
@@ -129,21 +129,21 @@ export default function DashboardPage() {
       {student && (
         <Panel title="Hồ sơ sinh viên" icon={UserRound} accent="primary">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
+            <div className="rounded-lg border border-line2 bg-surface-subtle px-3.5 py-3">
               <div className={ui.label}>Mã số sinh viên</div>
               <div className="mt-1 text-sm font-semibold text-ink font-mono">{student.current_student_code}</div>
             </div>
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
+            <div className="rounded-lg border border-line2 bg-surface-subtle px-3.5 py-3">
               <div className={ui.label}>Khoa</div>
               <div className="mt-1 text-sm font-medium text-ink">
                 {student.current_department?.name_vi ?? student.current_department?.code ?? '—'}
               </div>
             </div>
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
+            <div className="rounded-lg border border-line2 bg-surface-subtle px-3.5 py-3">
               <div className={ui.label}>Bậc đào tạo</div>
               <div className="mt-1 text-sm font-medium text-ink">{student.current_degree_level?.name ?? '—'}</div>
             </div>
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
+            <div className="rounded-lg border border-line2 bg-surface-subtle px-3.5 py-3">
               <div className={ui.label}>Trạng thái</div>
               <div className="mt-1.5">
                 <span className={cn(badge.base, isActive ? badge.success : badge.neutral)}>
@@ -239,7 +239,7 @@ export default function DashboardPage() {
               <li key={req.id}>
                 <Link
                   href={`/dashboard/requests/${req.id}`}
-                  className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50"
+                  className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-subtle"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -256,11 +256,11 @@ export default function DashboardPage() {
                       )}
                     </div>
                     {req.purpose && (
-                      <p className="mt-1 line-clamp-2 text-[0.82rem] text-slate-600">{req.purpose}</p>
+                      <p className="mt-1 line-clamp-2 text-[0.82rem] text-ink-3">{req.purpose}</p>
                     )}
                     <p className="mt-1 text-[0.78rem] text-muted">{formatDateTime(req.created_at)}</p>
                   </div>
-                  <ChevronRight size={16} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+                  <ChevronRight size={16} className="mt-0.5 shrink-0 text-faint" aria-hidden="true" />
                 </Link>
               </li>
             ))}
@@ -268,7 +268,7 @@ export default function DashboardPage() {
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
+                <tr className="bg-surface-subtle text-[0.78rem] text-muted border-b border-line">
                   <th className="text-left font-medium px-5 py-2.5">Loại giấy</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden sm:table-cell">Mục đích</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden md:table-cell">Ngày tạo</th>
@@ -281,12 +281,12 @@ export default function DashboardPage() {
                 {confirmation_requests.map((req) => (
                   <tr
                     key={req.id}
-                    className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
+                    className="border-b border-line2 last:border-0 hover:bg-surface-subtle transition-colors"
                   >
                     <td className="px-5 py-3.5 font-medium text-ink whitespace-nowrap align-top">
                       {TYPE_LABELS[req.request_type]}
                     </td>
-                    <td className="px-5 py-3.5 text-slate-600 hidden sm:table-cell max-w-[260px] align-top">
+                    <td className="px-5 py-3.5 text-ink-3 hidden sm:table-cell max-w-[260px] align-top">
                       <span className="line-clamp-2" title={req.purpose}>{req.purpose}</span>
                     </td>
                     <td className="px-5 py-3.5 text-muted text-[0.82rem] hidden md:table-cell whitespace-nowrap align-top">
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                         {STATUS_LABELS[req.status]}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-600 hidden lg:table-cell align-top">
+                    <td className="px-5 py-3.5 text-ink-3 hidden lg:table-cell align-top">
                       {req.comment_count > 0 ? (
                         <span className={cn(badge.base, badge.neutral)}>
                           <MessageSquare size={12} />

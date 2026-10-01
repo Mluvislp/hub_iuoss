@@ -67,9 +67,9 @@ export default function PersonalField({
       ) : (
         <div className={cn(
           'flex items-center gap-2 h-10 px-3 rounded-lg border text-sm',
-          blank ? 'border-line bg-slate-50 text-muted italic' : 'border-line bg-slate-50 text-ink',
+          blank ? 'border-line bg-surface-subtle text-muted italic' : 'border-line bg-surface-subtle text-ink',
         )}>
-          <Lock size={13} className="text-slate-400 flex-shrink-0" />
+          <Lock size={13} className="text-faint flex-shrink-0" />
           {field.value || 'Chưa có thông tin'}
         </div>
       )}

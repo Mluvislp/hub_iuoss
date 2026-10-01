@@ -30,7 +30,7 @@ export function InsuranceModal({ title, eyebrow, onClose, closeDisabled = false,
   }, [onClose, closeDisabled]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-scrim/50 sm:items-center sm:p-6"
       onClick={(e) => { if (e.target === e.currentTarget && !closeDisabled) onClose(); }}>
       <div ref={boxRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cn(
         'flex max-h-[calc(100dvh-1rem)] focus:outline-none w-full min-w-0 flex-col overflow-hidden rounded-t-xl border border-line bg-canvas text-left shadow-card sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg',

@@ -40,7 +40,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       onClick={copy}
       aria-label={copied ? `Đã chép ${label}` : `Chép ${label}`}
       className="touch-target flex-shrink-0 p-1.5 -mr-1 rounded-md text-muted hover:text-ink
-                 hover:bg-slate-100 transition-colors"
+                 hover:bg-surface-muted transition-colors"
     >
       {copied ? <Check size={14} className="text-success-text" /> : <Copy size={14} />}
     </button>
@@ -125,7 +125,7 @@ export default function SupportWidget() {
                      bg-white border border-line rounded-lg shadow-card overflow-hidden
                      focus:outline-none"
         >
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-[#f8fafc]">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-surface-subtle">
             <h2 className="flex items-center gap-2 text-[0.9rem] font-semibold text-ink">
               <Headset size={15} className="text-primary" />
               Hỗ trợ kỹ thuật
@@ -134,7 +134,7 @@ export default function SupportWidget() {
               type="button"
               onClick={() => { setOpen(false); buttonRef.current?.focus(); }}
               aria-label="Đóng"
-              className="touch-target p-1 -mr-1 rounded-md text-muted hover:text-ink hover:bg-slate-200/60 transition-colors"
+              className="touch-target p-1 -mr-1 rounded-md text-muted hover:text-ink hover:bg-line/60 transition-colors"
             >
               <X size={16} />
             </button>

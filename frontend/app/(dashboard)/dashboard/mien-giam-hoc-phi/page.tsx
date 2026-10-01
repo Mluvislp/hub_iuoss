@@ -102,7 +102,7 @@ function RoundCard({ state }: { state: TuitionExemptionState }) {
 function ApplicationRow({ app }: { app: TuitionExemptionApplication }) {
   return (
     <Link href={`${BASE}/ho-so/${app.id}`}
-          className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+          className="flex items-center gap-3 px-5 py-3 hover:bg-surface-subtle transition-colors">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-ink truncate">{app.round_title}</div>
         <div className="text-[0.78rem] text-muted mt-0.5 truncate">
@@ -110,7 +110,7 @@ function ApplicationRow({ app }: { app: TuitionExemptionApplication }) {
         </div>
       </div>
       <StatusBadge status={app.status} label={app.status_label} />
-      <ChevronRight size={15} className="text-slate-400" />
+      <ChevronRight size={15} className="text-faint" />
     </Link>
   );
 }

@@ -44,7 +44,7 @@ export default function NewRequestPage() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Yêu cầu giấy tờ</span>
       </nav>
 
@@ -66,7 +66,7 @@ export default function NewRequestPage() {
           <div>
             {/* Tiêu đề của một nhóm radio, không phải label của một ô → p + radiogroup. */}
             <p id="request-type-label" className={ui.fieldLabel}>
-              Loại giấy tờ <span className="text-red-500">*</span>
+              Loại giấy tờ <span className="text-danger-text">*</span>
             </p>
             <div role="radiogroup" aria-labelledby="request-type-label" className="grid sm:grid-cols-2 gap-2.5">
               {REQUEST_TYPES.map(([value, label]) => {
@@ -78,7 +78,7 @@ export default function NewRequestPage() {
                       'flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-colors',
                       selected
                         ? 'border-primary bg-primary-soft ring-1 ring-primary-line'
-                        : 'border-line hover:border-slate-300 hover:bg-slate-50',
+                        : 'border-line hover:border-line-strong hover:bg-surface-subtle',
                     )}
                   >
                     <input
@@ -126,9 +126,9 @@ export default function NewRequestPage() {
       </div>
 
       {/* Alert note */}
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-[0.85rem] text-ink-3 leading-relaxed">
           Sau khi gửi biểu mẫu, theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.

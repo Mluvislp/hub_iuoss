@@ -29,7 +29,7 @@ const PERIOD_SEQUENCE = ['MAIN', 'Q2', 'Q3', 'Q4'];
 
 /** Tiêu đề cột dùng chung cho mọi bảng trên trang. */
 const TH = 'px-5 py-2.5 text-left text-[0.78rem] font-medium text-muted';
-const THEAD_ROW = 'border-b border-line bg-[#f8fafc]';
+const THEAD_ROW = 'border-b border-line bg-surface-subtle';
 
 function Empty() {
   return <span className="italic font-normal text-muted">Chưa cập nhật</span>;
@@ -155,7 +155,7 @@ export default function HealthInsurancePage() {
         {current ? (
           <div className="px-5 py-5">
             {/* Mã thẻ là thứ SV cần nhất khi đi khám → cho nổi lên trên cùng. */}
-            <div className="rounded-lg border border-primary-line bg-[#f5f9ff] px-5 py-4">
+            <div className="rounded-lg border border-primary-line bg-primary-wash px-5 py-4">
               <div className={ui.label}>Mã thẻ BHYT</div>
               <div className="mt-1.5 font-mono text-[1.25rem] font-semibold text-ink tracking-wide break-all">
                 {current.medical_insurance_code || <Empty />}
@@ -221,7 +221,7 @@ export default function HealthInsurancePage() {
                     </p>
                     <p className="mt-1 text-xs text-muted">{card.registration_type || 'Chưa xác định diện tham gia'}</p>
                   </div>
-                  <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                  <span className="shrink-0 rounded-full border border-line bg-surface-subtle px-2.5 py-1 text-xs font-medium text-ink-3">
                     {card.registration_year || '—'}
                   </span>
                 </div>
@@ -236,7 +236,7 @@ export default function HealthInsurancePage() {
                   </div>}
                 </div>
                 {!hideHistoricalCardDetails(card) && (card.hospital_name || card.hospital_code) && (
-                  <p className="border-t border-line2 pt-2 text-xs text-slate-600">
+                  <p className="border-t border-line2 pt-2 text-xs text-ink-3">
                     <span className="text-muted">Nơi đăng ký KCB: </span>
                     {card.hospital_name || card.hospital_code}
                   </p>
@@ -260,13 +260,13 @@ export default function HealthInsurancePage() {
                 {history.map((card) => (
                   <tr
                     key={card.id}
-                    className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
+                    className="border-b border-line2 last:border-0 hover:bg-surface-subtle transition-colors"
                   >
                     <td className="px-5 py-3 text-[0.82rem] text-ink">
                       {card.medical_insurance_code || '—'}
                     </td>
                     <td className="px-3 py-3 text-[0.82rem] text-ink">{card.social_insurance_code || '—'}</td>
-                    <td className="px-3 py-3 text-slate-600 max-w-[220px]">
+                    <td className="px-3 py-3 text-ink-3 max-w-[220px]">
                       {!hideHistoricalCardDetails(card) && <span
                         className="line-clamp-2"
                         title={[card.hospital_name, card.hospital_code].filter(Boolean).join(' — ') || undefined}
@@ -274,12 +274,12 @@ export default function HealthInsurancePage() {
                         {card.hospital_name || card.hospital_code || '—'}
                       </span>}
                     </td>
-                    <td className="px-3 py-3 text-slate-600 max-w-[220px]">
+                    <td className="px-3 py-3 text-ink-3 max-w-[220px]">
                       <span className="line-clamp-2" title={card.registration_type ?? undefined}>
                         {card.registration_type || '—'}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-slate-600">{card.registration_year || '—'}</td>
+                    <td className="px-3 py-3 text-ink-3">{card.registration_year || '—'}</td>
                     <td
                       className={cn(
                         'px-5 py-3 text-[0.82rem] whitespace-nowrap',
@@ -335,11 +335,11 @@ export default function HealthInsurancePage() {
               </thead>
               <tbody className="divide-y divide-line2">
                 {data.registrations.map(reg => (
-                  <tr key={reg.id} className="hover:bg-[#f9fafb] transition-colors">
+                  <tr key={reg.id} className="hover:bg-surface-subtle transition-colors">
                     <td className="px-5 py-3 font-medium text-[0.85rem] text-ink">
                       {PERIOD_LABELS[reg.registration_period?.toUpperCase()] ?? reg.registration_period} năm {reg.registration_year}
                     </td>
-                    <td className="px-5 py-3 text-[0.82rem] text-slate-600">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
+                    <td className="px-5 py-3 text-[0.82rem] text-ink-3">{new Date(reg.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3">
                       <InsuranceStatus status={reg.status} />
                     </td>
@@ -371,7 +371,7 @@ export default function HealthInsurancePage() {
                   <InsuranceStatus status={row.status} />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-slate-600">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</p>
+                  <p className="text-xs text-ink-3">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</p>
                   <ExternalDeclarationDetail row={row} />
                 </div>
               </article>
@@ -388,7 +388,7 @@ export default function HealthInsurancePage() {
               </tr></thead>
               <tbody className="divide-y divide-line2">
                 {data.external_declarations.map(row => (
-                  <tr key={row.id} className="hover:bg-[#f9fafb] transition-colors">
+                  <tr key={row.id} className="hover:bg-surface-subtle transition-colors">
                     <td className="px-5 py-3 text-[0.82rem] font-mono">{row.medical_insurance_code}</td>
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{formatDate(row.valid_from)} — {formatDate(row.valid_until)}</td>
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
@@ -435,7 +435,7 @@ export default function HealthInsurancePage() {
               const blockedByEarlierRegistration = !!blockingRegistration;
               const blocked = !data?.is_eligible || blockedByEarlierRegistration;
               return (
-                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
+                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-surface-subtle flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
@@ -469,11 +469,11 @@ export default function HealthInsurancePage() {
                             : "Đăng ký ngay"}
                       </Link>
                     ) : p.status === 'expired' ? (
-                      <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
+                      <button disabled className={ui.btnOutline + " w-full bg-surface-muted text-faint border-line cursor-not-allowed"}>
                         Đã kết thúc
                       </button>
                     ) : (
-                      <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"}>
+                      <button disabled className={ui.btnOutline + " w-full bg-surface-muted text-faint border-line cursor-not-allowed"}>
                         Chưa mở
                       </button>
                     )}

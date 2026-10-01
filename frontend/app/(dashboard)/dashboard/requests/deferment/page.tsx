@@ -181,9 +181,9 @@ export default function DefermentRequestPage() {
     <div className="max-w-[760px] space-y-4">
       <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <Link href="/dashboard/requests/new" className="hover:text-ink">Yêu cầu giấy tờ</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Hoãn nghĩa vụ quân sự</span>
       </nav>
 
@@ -246,7 +246,7 @@ export default function DefermentRequestPage() {
               <>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="def-province" className={ui.fieldLabel}>Tỉnh / Thành phố <span className="text-red-500">*</span></label>
+                    <label htmlFor="def-province" className={ui.fieldLabel}>Tỉnh / Thành phố <span className="text-danger-text">*</span></label>
                     <select
                       id="def-province"
                       aria-invalid={!!fieldErrors.province}
@@ -261,7 +261,7 @@ export default function DefermentRequestPage() {
                     {fieldErrors.province && <p id="def-province-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.province}</p>}
                   </div>
                   <div>
-                    <label htmlFor="def-ward" className={ui.fieldLabel}>Phường / Xã <span className="text-red-500">*</span></label>
+                    <label htmlFor="def-ward" className={ui.fieldLabel}>Phường / Xã <span className="text-danger-text">*</span></label>
                     <select
                       id="def-ward"
                       aria-invalid={!!fieldErrors.ward}
@@ -269,7 +269,7 @@ export default function DefermentRequestPage() {
                       value={wardCode}
                       disabled={!provinceCode || wardsLoading}
                       onChange={(e) => { setWardCode(e.target.value); setFieldErrors((f) => ({ ...f, ward: undefined })); }}
-                      className={cn(ui.input, 'bg-white disabled:bg-slate-50 disabled:text-slate-400', fieldErrors.ward && 'border-danger-line')}
+                      className={cn(ui.input, 'bg-white disabled:bg-surface-subtle disabled:text-faint', fieldErrors.ward && 'border-danger-line')}
                     >
                       <option value="">{!provinceCode ? '— Chọn tỉnh trước —' : wardsLoading ? 'Đang tải…' : '— Chọn phường/xã —'}</option>
                       {wards.map((w) => <option key={w.code} value={w.code}>{w.name}</option>)}
@@ -278,7 +278,7 @@ export default function DefermentRequestPage() {
                   </div>
                 </div>
                 <div className="mt-3">
-                  <label htmlFor="def-street" className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-red-500">*</span></label>
+                  <label htmlFor="def-street" className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-danger-text">*</span></label>
                   <input
                     id="def-street"
                     aria-invalid={!!fieldErrors.street}
@@ -345,9 +345,9 @@ export default function DefermentRequestPage() {
         </form>
       </div>
 
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-[0.85rem] text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>

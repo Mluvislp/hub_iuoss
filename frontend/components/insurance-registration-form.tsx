@@ -273,7 +273,7 @@ function ImageField({
           <PrivateImage url={existingUrl} label={label} caption={false} />
           {!disabled && input ? (
             <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs focus-within:ring-2 focus-within:ring-primary/40",
-              error ? "border-red-500 bg-red-50 text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
+              error ? "border-danger bg-danger-soft text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
               <input type="file" accept="image/*" {...input} aria-invalid={invalid} aria-describedby={invalid ? errId : undefined}
                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
               {file ? <CheckSquare size={14} className="shrink-0" /> : <Upload size={14} className="shrink-0" />}
@@ -286,8 +286,8 @@ function ImageField({
           className={cn(
             // input file trong suốt phủ cả ô → viền focus của nó vô hình; vẽ focus lên khung.
             "group relative flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors focus-within:ring-2 focus-within:ring-primary/40",
-            error ? "border-red-500 bg-red-50" : "border-slate-300",
-            disabled ? "bg-slate-50 opacity-70" : "cursor-pointer hover:bg-slate-50",
+            error ? "border-danger bg-danger-soft" : "border-line-strong",
+            disabled ? "bg-surface-subtle opacity-70" : "cursor-pointer hover:bg-surface-subtle",
           )}
         >
           {input && (
@@ -305,10 +305,10 @@ function ImageField({
             <div className={cn("flex h-10 w-10 items-center justify-center rounded-full transition-transform group-hover:scale-110", tone)}>
               {file ? <CheckSquare size={20} className="text-success-text" /> : <Icon size={20} />}
             </div>
-            <span className="max-w-full break-all text-sm font-medium text-slate-700">
+            <span className="max-w-full break-all text-sm font-medium text-ink-2">
               {file ? file.name : emptyText}
             </span>
-            <span className="text-xs text-slate-500">Tối đa 5MB</span>
+            <span className="text-xs text-muted">Tối đa 5MB</span>
           </div>
         </div>
       )}
@@ -530,9 +530,9 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
   const fieldCls = (locked: boolean, hasError?: boolean) =>
     cn(
       ui.input,
-      locked && "bg-slate-50 text-slate-500",
+      locked && "bg-surface-subtle text-muted",
       hasError &&
-        "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
+        "border-danger focus:border-danger focus:ring-danger bg-danger-soft/30",
     );
 
   const canSubmit = submitted?.id
@@ -727,7 +727,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         <h2 className="text-xl font-semibold text-ink mb-2">
           {external ? "Khai báo thành công" : "Đăng ký thành công"}
         </h2>
-        <p className="text-slate-600 mb-6">
+        <p className="text-ink-3 mb-6">
           {external ? "Thông tin tham gia BHYT tại nơi khác đã được ghi nhận và đang chờ cán bộ xác nhận." : <>Yêu cầu đăng ký BHYT của sinh viên đã được ghi nhận. Phòng CTSV sẽ
           tiến hành gửi hồ sơ lên BHXH để gia hạn/đăng ký mới. BHYT sẽ có hiệu
           lực từ ngày đầu quý tiếp theo.</>}
@@ -747,7 +747,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       : `Khai thông tin - Mua BHYT năm ${year ?? ""}${config?.name ? ` - ${config.name}` : ""}`;
   const windowInfo = submitted?.window ?? (config ? { start_date: config.start_date, end_date: config.end_date, can_edit: config.status === 'open' } : null);
   const imageSlots = ([
-    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-blue-50 text-blue-500" },
+    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-primary-soft text-primary" },
     { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-sky-50 text-sky-500" },
     { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-emerald-50 text-emerald-500" },
     { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-indigo-50 text-indigo-500" },
@@ -874,7 +874,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         </section>
       ) : windowInfo ? (
         <div className="flex flex-col gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p className="flex items-start gap-2 text-slate-600">
+          <p className="flex items-start gap-2 text-ink-3">
             <CalendarClock size={16} className="mt-0.5 shrink-0 text-primary" />
             <span>
               Bắt đầu: <strong className="font-medium text-ink">{formatDateTime(windowInfo.start_date)}</strong>
@@ -1051,7 +1051,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                       <p className="flex items-center gap-1.5 font-semibold">
                         <Info size={14} className="shrink-0" /> Cách lấy số sổ BHXH
                       </p>
-                      <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-slate-700">
+                      <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-ink-2">
                         <li>
                           Mở{" "}
                           <a
@@ -1092,7 +1092,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                       className={cn(
                         "transition-opacity",
                         addressLocked && "opacity-70 pointer-events-none",
-                        errors.permanent && "p-3 -mx-3 rounded-lg border border-red-500 bg-red-50/40"
+                        errors.permanent && "p-3 -mx-3 rounded-lg border border-danger bg-danger-soft/40"
                       )}
                     >
                       <AddressFields
@@ -1130,7 +1130,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 <label className={cn(ui.fieldLabel, (!hospitalProvince && errors.hospital_code) && "text-danger-text")} htmlFor="kcb-province">
                   Tỉnh thành bệnh viện
                 </label>
-                <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-danger shadow-sm")}>
                   <SearchableSelect
                     id="kcb-province"
                     value={hospitalProvince}
@@ -1161,7 +1161,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 <label className={cn(ui.fieldLabel, errors.hospital_code && "text-danger-text")} htmlFor="kcb-hospital">
                   Bệnh viện
                 </label>
-                <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-danger shadow-sm")}>
                   <Controller
                     control={control}
                     name="hospital_code"
@@ -1233,7 +1233,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
             </div>
             <div className="space-y-5 p-4 sm:space-y-6 sm:p-5">
               {/* Đơn đã nộp: đã chuyển khoản rồi nên ẩn QR + thông tin chuyển khoản. */}
-              {!external && !editingRecord && <div className="flex flex-col items-center gap-5 rounded-lg border border-line bg-slate-50 p-4 md:flex-row md:items-start md:gap-6">
+              {!external && !editingRecord && <div className="flex flex-col items-center gap-5 rounded-lg border border-line bg-surface-subtle p-4 md:flex-row md:items-start md:gap-6">
                 <div className="shrink-0 text-center">
                   {qrPayload ? (
                     <>
@@ -1261,7 +1261,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                   <h3 className="mb-2 font-semibold text-ink">
                     Thông tin chuyển khoản
                   </h3>
-                  <ul className="space-y-1.5 text-sm text-slate-600">
+                  <ul className="space-y-1.5 text-sm text-ink-3">
                     <li>
                       Ngân hàng:{" "}
                       <strong className="text-ink">
@@ -1350,16 +1350,16 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           </section>
 
           {formEnabled && (
-            <div className={cn(ui.card, "p-4 sm:p-5 transition-colors", errors.confirm_declaration && "border-red-500 bg-red-50")}>
+            <div className={cn(ui.card, "p-4 sm:p-5 transition-colors", errors.confirm_declaration && "border-danger bg-danger-soft")}>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   {...fieldA11y("confirm_declaration", !!errors.confirm_declaration)}
                   {...register("confirm_declaration")}
-                  className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-primary focus:ring-primary", errors.confirm_declaration && "border-red-500 outline-none ring-2 ring-red-500/20")}
+                  className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-line-strong text-primary focus:ring-primary", errors.confirm_declaration && "border-danger outline-none ring-2 ring-danger/20")}
                 />
                 <div>
-                  <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-red-700" : "text-ink")}>
+                  <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-danger-text" : "text-ink")}>
                     {editingRecord
                       ? "Xác nhận thông tin chỉnh sửa là chính xác và đồng ý cung cấp thông tin cho nhà trường."
                       : external

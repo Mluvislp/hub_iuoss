@@ -43,7 +43,7 @@ function Breadcrumb() {
   return (
     <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
       <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-      <ChevronRight size={14} className="text-slate-400" />
+      <ChevronRight size={14} className="text-faint" />
       <span className="text-ink font-medium">Khám sức khỏe</span>
     </nav>
   );
@@ -191,7 +191,7 @@ export default function HealthCheckPage() {
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
         <div className={cn(ui.card, 'p-8 text-center')}>
-          <HeartPulse size={26} className="mx-auto text-slate-400 mb-3" />
+          <HeartPulse size={26} className="mx-auto text-faint mb-3" />
           <h2 className="text-base font-semibold text-ink">Chưa có đợt khai báo khám sức khỏe</h2>
           <p className="text-sm text-muted mt-1">Thông tin sẽ được cập nhật khi Nhà trường mở đợt khai báo.</p>
         </div>
@@ -381,7 +381,7 @@ export default function HealthCheckPage() {
         <div className="px-6 py-5">
           <p className="text-[0.9rem] font-semibold text-ink mb-3">
             Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
-            Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
+            Hồ Chí Minh hay chưa?<span className="text-danger-text"> *</span>
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
             <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
@@ -427,7 +427,7 @@ export default function HealthCheckPage() {
               </div>
             </div>
 
-            <div className={cn(ui.card, !eligible && 'bg-slate-50')}>
+            <div className={cn(ui.card, !eligible && 'bg-surface-subtle')}>
               <div className="px-6 py-4 border-b border-line">
                 <h2 className={cn(ui.sectionTitle, !eligible && 'text-muted')}>
                   <span className={cn(
@@ -435,7 +435,7 @@ export default function HealthCheckPage() {
                     eligible ? 'border-primary-line bg-primary-soft text-primary-text' : 'border-line bg-white text-muted',
                   )}>2</span>
                   Thông tin và đăng ký khám
-                  {!eligible && <Lock size={14} className="text-slate-400" />}
+                  {!eligible && <Lock size={14} className="text-faint" />}
                 </h2>
               </div>
 
@@ -475,10 +475,10 @@ export default function HealthCheckPage() {
                   <PackageInfo state={state} />
                   <label className={cn(
                     'flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
-                    consent ? 'border-primary bg-primary-soft' : 'border-line hover:bg-slate-50',
+                    consent ? 'border-primary bg-primary-soft' : 'border-line hover:bg-surface-subtle',
                   )}>
                     <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)}
-                           className="mt-0.5 w-4 h-4 accent-[#2563eb]" />
+                           className="mt-0.5 w-4 h-4 accent-primary" />
                     <span className="text-sm font-medium text-ink">
                       Đồng ý tham gia khám sức khỏe tập trung theo kế hoạch của Nhà trường
                     </span>

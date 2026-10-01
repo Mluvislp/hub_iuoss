@@ -110,7 +110,7 @@ function FieldInput({ field, value, onChange, error, computed, compact, label = 
   let control: React.ReactNode;
   if (field.type === 'computed') {
     control = (
-      <div className={cn(base, 'flex items-center bg-slate-50 text-ink font-medium')}>
+      <div className={cn(base, 'flex items-center bg-surface-subtle text-ink font-medium')}>
         {computed || <span className="text-muted font-normal">—</span>}
       </div>
     );
@@ -146,7 +146,7 @@ function FieldInput({ field, value, onChange, error, computed, compact, label = 
     <div>
       {label && (
         <label htmlFor={field.type === 'computed' ? undefined : id} className="block text-[0.78rem] font-medium text-ink mb-1">
-          {field.label}{field.required && field.type !== 'computed' && <span className="text-red-500"> *</span>}
+          {field.label}{field.required && field.type !== 'computed' && <span className="text-danger-text"> *</span>}
         </label>
       )}
       {control}

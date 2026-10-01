@@ -61,7 +61,7 @@ export function Breadcrumb({ trail }: { trail: { label: string; href?: string }[
     <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted flex-wrap">
       {items.map((it, i) => (
         <span key={it.label} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight size={14} className="text-slate-400" />}
+          {i > 0 && <ChevronRight size={14} className="text-faint" />}
           {it.href && i < items.length - 1
             ? <Link href={it.href} className="hover:text-ink">{it.label}</Link>
             : <span className="text-ink font-medium">{it.label}</span>}
@@ -89,7 +89,7 @@ export function IneligibleModal({ message, onClose }: { message: string; onClose
   const btn = useRef<HTMLButtonElement>(null);
   useDialog(boxRef, btn);
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-scrim/50 sm:items-center sm:p-6">
       <div ref={boxRef} role="alertdialog" aria-modal="true" aria-labelledby="mghp-ineligible-title"
            className="w-full flex flex-col overflow-hidden rounded-t-xl border border-danger-line bg-white shadow-card sm:max-w-md sm:rounded-lg">
         <div className="flex items-start gap-3 border-b border-danger-line bg-danger-soft px-4 py-3 text-danger-text">

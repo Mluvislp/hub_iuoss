@@ -10,7 +10,7 @@ export function ReadonlyField({ label, value }: { label: string; value: string }
   return (
     <div>
       <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
+      <div className="mt-1 rounded-lg border border-line bg-surface-subtle px-3 h-10 flex items-center text-sm text-ink">
         {value || '—'}
       </div>
     </div>
@@ -20,9 +20,9 @@ export function ReadonlyField({ label, value }: { label: string; value: string }
 /** Hộp hiển thị giá trị đang khóa — dùng cho cả ô đơn lẫn từng ô trong cụm địa chỉ. */
 export function LockedBox({ value }: { value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center justify-between gap-2 text-sm text-ink">
+    <div className="rounded-lg border border-line bg-surface-subtle px-3 h-10 flex items-center justify-between gap-2 text-sm text-ink">
       <span className="truncate">{value || '—'}</span>
-      <Lock size={13} className="flex-shrink-0 text-slate-400" />
+      <Lock size={13} className="flex-shrink-0 text-faint" />
     </div>
   );
 }

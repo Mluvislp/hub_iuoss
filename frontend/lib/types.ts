@@ -427,7 +427,7 @@ export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   processing: 'bg-primary-soft text-primary-text border-primary-line',
   // Cố ý KHÁC hẳn 'pending': đây là trạng thái việc đang nằm ở phía sinh viên,
   // phải nhìn ra ngay giữa một danh sách toàn màu vàng "chờ xử lý".
-  awaiting_info: 'bg-violet-50 text-violet-700 border-violet-200',
+  awaiting_info: 'bg-attention-soft text-attention-text border-attention-line',
   done:       'bg-success-soft text-success-text border-success-line',
   rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };

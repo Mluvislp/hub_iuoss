@@ -55,11 +55,11 @@ export default function AddressFields({
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className={ui.fieldLabel} htmlFor={`${idPrefix}-province`}>
-            Tỉnh / Thành phố <span className="text-red-500">*</span>
+            Tỉnh / Thành phố <span className="text-danger-text">*</span>
           </label>
           {lockedProvinceCode ? (
-            <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
-              <Lock size={13} className="text-slate-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-surface-subtle text-sm text-ink">
+              <Lock size={13} className="text-faint flex-shrink-0" />
               {lockedProvince?.name ?? 'Thành phố Hồ Chí Minh'}
             </div>
           ) : (
@@ -84,7 +84,7 @@ export default function AddressFields({
 
         <div>
           <label className={ui.fieldLabel} htmlFor={`${idPrefix}-ward`}>
-            Phường / Xã <span className="text-red-500">*</span>
+            Phường / Xã <span className="text-danger-text">*</span>
           </label>
           <select
             id={`${idPrefix}-ward`}
@@ -95,7 +95,7 @@ export default function AddressFields({
             onChange={(e) => onChange({ ...value, wardCode: e.target.value })}
             className={cn(
               ui.input,
-              'bg-white disabled:bg-slate-50 disabled:text-slate-400',
+              'bg-white disabled:bg-surface-subtle disabled:text-faint',
               errors.ward && 'border-danger-line',
             )}
           >
@@ -112,7 +112,7 @@ export default function AddressFields({
 
       <div>
         <label className={ui.fieldLabel} htmlFor={`${idPrefix}-street`}>
-          Địa chỉ chi tiết <span className="text-red-500">*</span>
+          Địa chỉ chi tiết <span className="text-danger-text">*</span>
         </label>
         <input
           id={`${idPrefix}-street`}

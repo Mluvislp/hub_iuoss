@@ -112,7 +112,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
     <>
       {/* Mobile overlay */}
       {open && (
-        <div className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 bg-scrim/40 z-40 lg:hidden" onClick={onClose} />
       )}
 
       {/* Đóng ở mobile → `invisible`: chỉ dịch ra ngoài màn hình thì các link vẫn
@@ -177,11 +177,11 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                         'flex items-center gap-3 px-2.5 h-10 coarse:h-11 rounded-md text-sm transition-colors border-l-[3px]',
                         isActive
                           ? 'bg-primary-soft border-primary text-primary-text font-semibold'
-                          : 'border-transparent text-slate-600 hover:text-ink hover:bg-slate-100',
+                          : 'border-transparent text-ink-3 hover:text-ink hover:bg-surface-muted',
                       )}
                     >
-                      <Icon size={17} className={cn('flex-shrink-0', pending && 'text-slate-400')} />
-                      <span className={cn('flex-1', pending && !isActive && 'text-slate-500')}>
+                      <Icon size={17} className={cn('flex-shrink-0', pending && 'text-faint')} />
+                      <span className={cn('flex-1', pending && !isActive && 'text-muted')}>
                         {item.label}
                       </span>
                       {pending && (
@@ -203,7 +203,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <div className="border-t border-line p-3">
           {session && (
             <div className="flex items-center gap-3 px-2 py-2">
-              <div className="w-8 h-8 rounded-md bg-slate-100 border border-line text-ink
+              <div className="w-8 h-8 rounded-md bg-surface-muted border border-line text-ink
                               flex items-center justify-center text-sm font-semibold flex-shrink-0">
                 {getInitials(session.full_name)}
               </div>
@@ -218,7 +218,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
           <button
             onClick={handleLogout}
             className="mt-1 w-full flex items-center gap-2.5 px-2.5 h-9 coarse:h-11 rounded-md text-sm
-                       text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                       text-ink-3 hover:text-danger-text hover:bg-danger-soft transition-colors"
           >
             <LogOut size={16} />
             Đăng xuất

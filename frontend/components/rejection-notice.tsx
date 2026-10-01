@@ -31,12 +31,12 @@ export function RejectionNotice({ rejected = true, title, note, noteLabel = 'Phá
       <div className="space-y-3 p-4">
         {note && (
           <div>
-            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
               {!rejected && <MessageSquareText className="h-3.5 w-3.5" />}{noteLabel}
             </p>
             <blockquote className={cn(
-              'whitespace-pre-wrap break-words rounded-lg border-l-4 bg-slate-50 px-3.5 py-3 text-sm leading-6 text-slate-800',
-              rejected ? 'border-danger-text' : 'border-slate-300',
+              'whitespace-pre-wrap break-words rounded-lg border-l-4 bg-surface-subtle px-3.5 py-3 text-sm leading-6 text-ink',
+              rejected ? 'border-danger-text' : 'border-line-strong',
             )}>{note}</blockquote>
           </div>
         )}

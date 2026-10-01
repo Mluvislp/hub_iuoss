@@ -83,9 +83,9 @@ export function PrivateImage({url, label, caption = true}:{url:string; label:str
   }, [url]);
   return <figure className="min-w-0">
     {caption && <figcaption className="mb-1.5 text-xs font-medium text-muted">{label}</figcaption>}
-    {src ? <a href={src} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-slate-50">
+    {src ? <a href={src} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-surface-subtle">
       <img src={src} alt={label} className="h-32 w-full object-contain" />
-    </a> : <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-line bg-slate-50 px-3 text-center text-xs text-muted">
+    </a> : <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-line bg-surface-subtle px-3 text-center text-xs text-muted">
       <FileImage size={16} className="mr-2 shrink-0" />{error || 'Đang tải ảnh đã nộp…'}
     </div>}
   </figure>;
@@ -132,11 +132,11 @@ export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{da
 
       {!!Object.keys(data.legacy_changes || {}).length && <details className="rounded-lg border border-line p-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink">So sánh với hồ sơ tại lần lưu gần nhất</summary>
-        <div className="mt-2 space-y-1 text-slate-600">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
+        <div className="mt-2 space-y-1 text-ink-3">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
       </details>}
       {data.history?.map((event, index) => <details key={index} className="rounded-lg border border-line p-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink">{eventLabels[event.event_type] || event.event_type} · {formatDateTime(event.created_at)}</summary>
-        <div className="mt-2 space-y-1 text-slate-600">
+        <div className="mt-2 space-y-1 text-ink-3">
           {event.payload?.previous_rejection && <p>Phản hồi từ chối trước: {event.payload.previous_rejection}</p>}
           <ChangeList changes={event.payload?.changes} images={event.payload?.images} submitted={event.event_type === 'SUBMITTED'} className="space-y-1" />
         </div>

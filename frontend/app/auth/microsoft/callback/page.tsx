@@ -60,20 +60,20 @@ function CallbackHandler() {
   }, [params, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-surface-subtle p-6">
       <div className="w-full max-w-[420px] text-center">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <GraduationCap size={16} className="text-white" />
           </div>
-          <span className="font-bold text-slate-900">IUOSS Hub</span>
+          <span className="font-bold text-ink">IUOSS Hub</span>
         </div>
 
         {error ? (
           <>
             <div
-              className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50
-                         border border-red-200 text-red-700 text-sm text-left"
+              className="flex items-start gap-2.5 p-3.5 rounded-lg bg-danger-soft
+                         border border-danger-line text-danger-text text-sm text-left"
             >
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
               <span>{error}</span>
@@ -81,14 +81,14 @@ function CallbackHandler() {
             <Link
               href="/login"
               className="inline-block mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold
-                         bg-white border border-slate-300 hover:border-slate-400
-                         hover:bg-slate-50 text-slate-700 transition-colors"
+                         bg-white border border-line-strong hover:border-line-hover
+                         hover:bg-surface-subtle text-ink-2 transition-colors"
             >
               Quay lại trang đăng nhập
             </Link>
           </>
         ) : (
-          <div className="flex items-center justify-center gap-2.5 text-sm text-slate-500">
+          <div className="flex items-center justify-center gap-2.5 text-sm text-muted">
             <Loader2 size={16} className="animate-spin" />
             Đang xác thực tài khoản Microsoft…
           </div>

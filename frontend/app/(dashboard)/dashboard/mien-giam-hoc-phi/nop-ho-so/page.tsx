@@ -392,11 +392,11 @@ export default function TuitionWaiverSubmitPage() {
           ) : (
             <div className="divide-y divide-line2">
               {plan.renewals.length > 0 && (
-                <div className="px-5 py-2 text-[0.75rem] font-medium text-muted bg-slate-50">Đối tượng bạn đang hưởng</div>
+                <div className="px-5 py-2 text-[0.75rem] font-medium text-muted bg-surface-subtle">Đối tượng bạn đang hưởng</div>
               )}
               {plan.renewals.map(option)}
               {plan.renewals.length > 0 && plan.others.length > 0 && (
-                <div className="px-5 py-2 text-[0.75rem] font-medium text-muted bg-slate-50">Đối tượng khác</div>
+                <div className="px-5 py-2 text-[0.75rem] font-medium text-muted bg-surface-subtle">Đối tượng khác</div>
               )}
               {plan.others.map(option)}
             </div>

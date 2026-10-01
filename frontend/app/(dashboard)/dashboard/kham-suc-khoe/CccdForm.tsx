@@ -42,7 +42,7 @@ export default function CccdForm({ onSaved }: { onSaved: (next: HealthCheckState
       </div>
       <div className="grid sm:grid-cols-3 gap-2">
         <div>
-          <label htmlFor="hc-cccd-number" className="block text-[0.75rem] text-ink mb-1">Số CCCD<span className="text-red-500"> *</span></label>
+          <label htmlFor="hc-cccd-number" className="block text-[0.75rem] text-ink mb-1">Số CCCD<span className="text-danger-text"> *</span></label>
           <input id="hc-cccd-number" aria-invalid={!!error} aria-describedby={error ? 'hc-cccd-error' : undefined}
                  type="text" inputMode="numeric" maxLength={12} value={number} placeholder="12 chữ số"
                  onChange={(e) => { setNumber(e.target.value.replace(/\D/g, '')); setError(''); }}

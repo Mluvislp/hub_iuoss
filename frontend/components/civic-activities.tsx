@@ -42,7 +42,7 @@ export function CivicActivitiesTable({ items }: { items: CivicActivity[] }) {
     <div className="hidden overflow-x-auto md:block">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
+          <tr className="bg-surface-subtle text-[0.78rem] text-muted border-b border-line">
             <th className="text-left font-medium px-5 py-2.5">Hoạt động</th>
             <th className="text-center font-medium px-3 py-2.5">Lần</th>
             <th className="text-left font-medium px-3 py-2.5">Kết quả</th>
@@ -53,7 +53,7 @@ export function CivicActivitiesTable({ items }: { items: CivicActivity[] }) {
           {items.map((act) => (
             <tr
               key={`${act.activity_code}-${act.attempt_no}`}
-              className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
+              className="border-b border-line2 last:border-0 hover:bg-surface-subtle transition-colors"
             >
               <td className="px-5 py-3 font-medium text-ink">{act.activity_code}</td>
               <td className="px-3 py-3 text-center text-muted">{act.attempt_no}</td>

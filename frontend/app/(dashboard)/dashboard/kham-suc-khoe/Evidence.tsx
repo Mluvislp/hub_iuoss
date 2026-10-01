@@ -22,7 +22,7 @@ export function EvidenceGuide({ hcmc, year }: { hcmc: boolean; year: string }) {
   const link = 'inline-flex items-center gap-1 font-medium text-primary-text hover:underline';
   const box = (active: boolean) => cn(
     'rounded-lg border px-4 py-3 text-[0.84rem] text-ink',
-    active ? 'border-primary-line border-l-4 border-l-primary bg-primary-soft' : 'border-line bg-slate-50',
+    active ? 'border-primary-line border-l-4 border-l-primary bg-primary-soft' : 'border-line bg-surface-subtle',
   );
   return (
     <div className="space-y-2.5">
@@ -88,7 +88,7 @@ export function EvidencePicker({
     <div>
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
         {files.map((f, i) => (
-          <div key={previews[i]} className="relative rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
+          <div key={previews[i]} className="relative rounded-lg border border-line overflow-hidden bg-surface-subtle aspect-[3/4]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
             <button type="button" aria-label="Bỏ ảnh"
@@ -104,8 +104,8 @@ export function EvidencePicker({
         {files.length < max && (
           <button type="button" onClick={() => input.current?.click()}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed aspect-[3/4] text-muted hover:bg-slate-50 hover:text-ink transition-colors',
-                    error || localError ? 'border-danger-line' : 'border-slate-300',
+                    'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed aspect-[3/4] text-muted hover:bg-surface-subtle hover:text-ink transition-colors',
+                    error || localError ? 'border-danger-line' : 'border-line-strong',
                   )}>
             <ImagePlus size={22} />
             <span className="text-[0.8rem] font-medium">Thêm ảnh</span>
@@ -145,12 +145,12 @@ export function EvidenceThumbs({ response }: { response: HealthCheckResponse }) 
     <div className="grid grid-cols-3 gap-3">
       {response.evidence.map((e, i) => (
         <a key={e.index} href={urls[i] || undefined} target="_blank" rel="noopener noreferrer"
-           className="block rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
+           className="block rounded-lg border border-line overflow-hidden bg-surface-subtle aspect-[3/4]">
           {urls[i] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={urls[i]!} alt={e.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="flex h-full items-center justify-center text-slate-400">
+            <span className="flex h-full items-center justify-center text-faint">
               <FileImage size={20} />
             </span>
           )}

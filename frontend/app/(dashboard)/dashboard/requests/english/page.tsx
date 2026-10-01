@@ -124,9 +124,9 @@ export default function EnglishRequestPage() {
     <div className="max-w-[760px] space-y-4">
       <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <Link href="/dashboard/requests/new" className="hover:text-ink">Yêu cầu giấy tờ</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Xác nhận (mẫu tiếng Anh)</span>
       </nav>
 
@@ -163,7 +163,7 @@ export default function EnglishRequestPage() {
 
           {/* Mục đích — chọn từ danh sách tiếng Anh */}
           <div>
-            <label htmlFor="eng-purpose" className={ui.fieldLabel}>Mục đích (Purpose) <span className="text-red-500">*</span></label>
+            <label htmlFor="eng-purpose" className={ui.fieldLabel}>Mục đích (Purpose) <span className="text-danger-text">*</span></label>
             <select
               id="eng-purpose"
               aria-invalid={!!fieldErrors.purpose_code}
@@ -181,7 +181,7 @@ export default function EnglishRequestPage() {
 
             {isProgram && (
               <div className="mt-3">
-                <label htmlFor="eng-program" className={ui.fieldLabel}>Tên chương trình (Program name) <span className="text-red-500">*</span></label>
+                <label htmlFor="eng-program" className={ui.fieldLabel}>Tên chương trình (Program name) <span className="text-danger-text">*</span></label>
                 <input
                   id="eng-program"
                   aria-invalid={!!fieldErrors.program_name}
@@ -241,9 +241,9 @@ export default function EnglishRequestPage() {
         </form>
       </div>
 
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-[0.85rem] text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>

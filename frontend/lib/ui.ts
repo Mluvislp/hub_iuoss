@@ -34,13 +34,13 @@ export const ui = {
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
   btnSecondary:
     'inline-flex items-center justify-center gap-2 h-9 coarse:min-h-11 px-3.5 rounded-lg ' +
-    'border border-line bg-white text-sm font-medium text-primary-text hover:bg-slate-50 transition-colors',
+    'border border-line bg-white text-sm font-medium text-primary-text hover:bg-surface-subtle transition-colors',
   btnGhost:
     'inline-flex items-center justify-center gap-2 h-10 coarse:min-h-11 px-4 rounded-lg ' +
-    'text-sm font-medium text-muted hover:text-ink hover:bg-slate-100 transition-colors',
+    'text-sm font-medium text-muted hover:text-ink hover:bg-surface-muted transition-colors',
   btnOutline:
     'inline-flex items-center justify-center gap-2 h-10 coarse:min-h-11 px-4 rounded-lg ' +
-    'border border-line bg-white text-sm font-medium text-ink hover:bg-slate-50 transition-colors',
+    'border border-line bg-white text-sm font-medium text-ink hover:bg-surface-subtle transition-colors',
 
   // Definition list row (thông tin hành chính)
   dtRow: 'flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0',
@@ -55,7 +55,7 @@ export const badge = {
   warning: 'bg-warning-soft text-warning-text border-warning-line',
   danger: 'bg-danger-soft text-danger-text border-danger-line',
   info: 'bg-primary-soft text-primary-text border-primary-line',
-  neutral: 'bg-slate-50 text-slate-600 border-slate-200',
+  neutral: 'bg-surface-subtle text-ink-3 border-line',
 };
 
 /** Icon màu accent theo section. */
@@ -64,7 +64,7 @@ export const accentIcon = {
   success: 'text-success-text',
   warning: 'text-warning-text',
   danger: 'text-danger-text',
-  neutral: 'text-slate-400',
+  neutral: 'text-faint',
 };
 
 // Backward-compat alias

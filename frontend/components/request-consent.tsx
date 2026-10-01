@@ -18,7 +18,7 @@ export function RequestConsent({
   editCount?: number;
 }) {
   return (
-    <div className="rounded-lg border border-line bg-slate-50 px-4 py-3.5">
+    <div className="rounded-lg border border-line bg-surface-subtle px-4 py-3.5">
       <label className="flex items-start gap-2.5 cursor-pointer">
         <input
           type="checkbox"
@@ -26,7 +26,7 @@ export function RequestConsent({
           onChange={(e) => onChange(e.target.checked)}
           className="mt-0.5 h-4 w-4 flex-shrink-0 cursor-pointer rounded border-line text-primary focus:ring-2 focus:ring-primary/30"
         />
-        <span className="text-[0.85rem] leading-relaxed text-slate-700">
+        <span className="text-[0.85rem] leading-relaxed text-ink-2">
           Tôi cam đoan đã kiểm tra kỹ toàn bộ thông tin trong đơn này và xác nhận các thông tin
           là đúng sự thật, kể cả những nội dung tôi yêu cầu chỉnh sửa. Tôi hoàn toàn chịu trách
           nhiệm trước Nhà trường và trước pháp luật về tính chính xác của các thông tin đã khai;
@@ -35,7 +35,7 @@ export function RequestConsent({
         </span>
       </label>
       {editCount > 0 && (
-        <p className="mt-2 pl-[26px] text-[0.78rem] text-amber-700">
+        <p className="mt-2 pl-[26px] text-[0.78rem] text-warning-text">
           Đơn này có {editCount} thông tin được yêu cầu chỉnh sửa so với hồ sơ.
         </p>
       )}

@@ -120,8 +120,8 @@ function LoginForm() {
         {/* Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center
-                            shadow-lg shadow-blue-600/40">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center
+                            shadow-lg shadow-primary/40">
               <GraduationCap size={20} className="text-white" />
             </div>
             <div>
@@ -175,22 +175,22 @@ function LoginForm() {
       </div>
 
       {/* ── Right panel: Login form ── */}
-      <div className="flex-1 flex items-center justify-center bg-slate-50 p-6 sm:p-12">
+      <div className="flex-1 flex items-center justify-center bg-surface-subtle p-6 sm:p-12">
         <div className="w-full max-w-[400px]">
 
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <GraduationCap size={16} className="text-white" />
             </div>
-            <span className="font-bold text-slate-900">IUOSS Hub</span>
+            <span className="font-bold text-ink">IUOSS Hub</span>
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-2xl font-bold text-ink tracking-tight">
               Đăng nhập
             </h2>
-            <p className="mt-1.5 text-sm text-slate-500">
+            <p className="mt-1.5 text-sm text-muted">
               Dùng tài khoản mạng nội bộ trường (MSSV + mật khẩu IU)
             </p>
           </div>
@@ -200,8 +200,8 @@ function LoginForm() {
             {/* Error banner */}
             {error && (
               <div id="login-error" role="alert"
-                   className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50
-                              border border-red-200 text-red-700 text-sm">
+                   className="flex items-start gap-2.5 p-3.5 rounded-lg bg-danger-soft
+                              border border-danger-line text-danger-text text-sm">
                 <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -211,7 +211,7 @@ function LoginForm() {
 
             {/* MSSV */}
             <div className="space-y-1.5">
-              <label htmlFor="login-uid" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="login-uid" className="block text-sm font-medium text-ink-2">
                 Tài khoản (MSSV)
               </label>
               <input
@@ -226,17 +226,17 @@ function LoginForm() {
                 placeholder="vd: BABAWE21603"
                 className={cn(
                   'w-full px-3.5 py-2.5 rounded-lg border text-sm bg-white',
-                  'text-slate-900 placeholder:text-slate-500',
-                  'focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500',
+                  'text-ink placeholder:text-muted',
+                  'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary',
                   'transition-colors duration-150',
-                  error ? 'border-red-300' : 'border-slate-300 hover:border-slate-400',
+                  error ? 'border-danger' : 'border-line-strong hover:border-line-hover',
                 )}
               />
             </div>
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label htmlFor="login-password" className="block text-sm font-medium text-slate-700">
+              <label htmlFor="login-password" className="block text-sm font-medium text-ink-2">
                 Mật khẩu
               </label>
               <div className="relative">
@@ -251,17 +251,17 @@ function LoginForm() {
                   placeholder="Mật khẩu mạng IU"
                   className={cn(
                     'w-full px-3.5 py-2.5 pr-11 rounded-lg border text-sm bg-white',
-                    'text-slate-900 placeholder:text-slate-500',
-                    'focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500',
+                    'text-ink placeholder:text-muted',
+                    'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary',
                     'transition-colors duration-150',
-                    error ? 'border-red-300' : 'border-slate-300 hover:border-slate-400',
+                    error ? 'border-danger' : 'border-line-strong hover:border-line-hover',
                   )}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
                   className="touch-target absolute right-3 top-1/2 -translate-y-1/2
-                             text-slate-500 hover:text-slate-700 transition-colors"
+                             text-muted hover:text-ink-2 transition-colors"
                   tabIndex={-1}
                 >
                   {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -276,9 +276,9 @@ function LoginForm() {
               className={cn(
                 'w-full flex items-center justify-center gap-2',
                 'px-4 py-2.5 rounded-lg text-sm font-semibold',
-                'bg-blue-600 hover:bg-blue-700 active:bg-blue-800',
-                'text-white shadow-sm shadow-blue-600/30',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                'bg-primary hover:bg-primary-hover active:bg-primary-active',
+                'text-white shadow-sm shadow-primary/30',
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                 'transition-all duration-150 mt-2',
                 'disabled:opacity-70 disabled:cursor-not-allowed',
               )}
@@ -298,9 +298,9 @@ function LoginForm() {
           {msEnabled && (
             <>
               <div className="flex items-center gap-3 my-5">
-                <span className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs text-slate-500">hoặc</span>
-                <span className="h-px flex-1 bg-slate-200" />
+                <span className="h-px flex-1 bg-line" />
+                <span className="text-xs text-muted">hoặc</span>
+                <span className="h-px flex-1 bg-line" />
               </div>
 
               <button
@@ -310,9 +310,9 @@ function LoginForm() {
                 className={cn(
                   'w-full flex items-center justify-center gap-2.5',
                   'px-4 py-2.5 rounded-lg text-sm font-semibold',
-                  'bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50',
-                  'text-slate-700',
-                  'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                  'bg-white border border-line-strong hover:border-line-hover hover:bg-surface-subtle',
+                  'text-ink-2',
+                  'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                   'transition-all duration-150',
                   'disabled:opacity-70 disabled:cursor-not-allowed',
                 )}
@@ -326,20 +326,20 @@ function LoginForm() {
                   </>
                 )}
               </button>
-              <p className="mt-2 text-center text-xs text-slate-500">
+              <p className="mt-2 text-center text-xs text-muted">
                 Dùng email sinh viên @student.hcmiu.edu.vn
               </p>
             </>
           )}
 
           {/* Forgot password */}
-          <p className="mt-5 text-center text-sm text-slate-500">
+          <p className="mt-5 text-center text-sm text-muted">
             Quên mật khẩu?{' '}
             <a
               href="https://ldap.hcmiu.edu.vn/iupwd/?action=sendtoken"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+              className="text-primary hover:text-primary-text font-medium hover:underline"
             >
               Đặt lại tại đây
             </a>

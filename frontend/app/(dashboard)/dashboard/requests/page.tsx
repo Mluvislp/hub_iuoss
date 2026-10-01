@@ -70,9 +70,9 @@ export default function RequestHistoryPage() {
       </div>
 
       {needsAction > 0 && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
-          <AlertCircle size={16} className="mt-0.5 shrink-0 text-violet-700" />
-          <p className="text-sm text-violet-900">
+        <div className="flex items-start gap-2.5 rounded-lg border border-attention-line bg-attention-soft px-4 py-3">
+          <AlertCircle size={16} className="mt-0.5 shrink-0 text-attention-text" />
+          <p className="text-sm text-attention-strong">
             <strong>{needsAction}</strong> yêu cầu cần bổ sung thông tin. Phản hồi trong phần
             trao đổi của yêu cầu để được xử lý tiếp.
           </p>
@@ -96,7 +96,7 @@ export default function RequestHistoryPage() {
       {rows !== null && rows.length === 0 && (
         <section className={ui.card}>
           <div className="px-5 py-12 text-center">
-            <FileText size={22} className="mx-auto mb-2 text-slate-300" />
+            <FileText size={22} className="mx-auto mb-2 text-line-strong" aria-hidden="true" />
             <p className="text-sm text-muted">Chưa có yêu cầu giấy tờ nào.</p>
             <Link
               href="/dashboard/requests/new"
@@ -124,14 +124,14 @@ export default function RequestHistoryPage() {
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors',
                     filter === key
                       ? 'border-primary bg-primary text-white'
-                      : 'border-line bg-white text-slate-600 hover:bg-slate-50',
+                      : 'border-line bg-white text-ink-3 hover:bg-surface-subtle',
                   )}
                 >
                   {label}
                   <span
                     className={cn(
                       'rounded-full px-1.5 text-[0.7rem]',
-                      filter === key ? 'bg-white/20' : 'bg-slate-100 text-slate-500',
+                      filter === key ? 'bg-white/20' : 'bg-surface-muted text-muted',
                     )}
                   >
                     {n}
@@ -148,7 +148,7 @@ export default function RequestHistoryPage() {
                 href={`/dashboard/requests/${req.id}`}
                 className={cn(
                   ui.card,
-                  'block px-5 py-4 transition-colors hover:border-primary-line hover:bg-slate-50/60',
+                  'block px-5 py-4 transition-colors hover:border-primary-line hover:bg-surface-subtle/60',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -167,7 +167,7 @@ export default function RequestHistoryPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 line-clamp-1 text-[0.85rem] text-slate-600" title={req.purpose}>
+                    <p className="mt-1 line-clamp-1 text-[0.85rem] text-ink-3" title={req.purpose}>
                       {req.purpose}
                     </p>
                     <p className="mt-1 text-[0.78rem] text-muted">
@@ -181,7 +181,7 @@ export default function RequestHistoryPage() {
                       </p>
                     )}
                   </div>
-                  <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
+                  <ChevronRight size={16} className="mt-1 shrink-0 text-faint" />
                 </div>
               </Link>
             ))}

@@ -22,7 +22,7 @@ export function FreshmanWarningModal({ message, onConfirm, confirmLabel = 'Tôi 
   useDialog(boxRef, confirmRef);
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-scrim/50 sm:items-center sm:p-6">
       <div
         ref={boxRef}
         role="alertdialog"
@@ -37,7 +37,7 @@ export function FreshmanWarningModal({ message, onConfirm, confirmLabel = 'Tôi 
           </div>
         </div>
         <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-4">
-          <blockquote className="whitespace-pre-wrap break-words rounded-lg border-l-4 border-danger-text bg-slate-50 px-3.5 py-3 text-sm leading-6 text-slate-800">
+          <blockquote className="whitespace-pre-wrap break-words rounded-lg border-l-4 border-danger-text bg-surface-subtle px-3.5 py-3 text-sm leading-6 text-ink">
             {message}
           </blockquote>
         </div>

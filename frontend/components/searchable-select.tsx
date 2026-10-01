@@ -134,7 +134,7 @@ export default function SearchableSelect({
         className={cn(
           ui.input,
           'flex items-center justify-between gap-2 text-left',
-          disabled && 'cursor-not-allowed bg-slate-50 text-slate-500',
+          disabled && 'cursor-not-allowed bg-surface-subtle text-muted',
           !selected && !disabled && 'text-muted',
         )}
       >
@@ -142,13 +142,13 @@ export default function SearchableSelect({
           {selected ? selected.label : placeholder}
           {selected?.hint && <span className="ml-1.5 text-xs text-muted">({selected.hint})</span>}
         </span>
-        <ChevronDown size={16} className="shrink-0 text-slate-400" />
+        <ChevronDown size={16} className="shrink-0 text-faint" />
       </button>
 
       {open && !disabled && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-line bg-white shadow-card">
           <div className="flex items-center gap-2 border-b border-line2 px-3">
-            <Search size={14} className="shrink-0 text-slate-400" />
+            <Search size={14} className="shrink-0 text-faint" />
             <input
               ref={inputRef}
               value={query}

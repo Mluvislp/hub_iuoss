@@ -110,7 +110,7 @@ export default function OtherRequestPage() {
   if (loadError) {
     return (
       <div className="max-w-[760px]">
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-strong text-sm">
           <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
           {loadError}
         </div>
@@ -125,8 +125,8 @@ export default function OtherRequestPage() {
     return (
       <div className="max-w-[760px]">
         <div className={cn(ui.card, 'p-8 text-center')}>
-          <div className="w-11 h-11 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
-            <Check size={22} className="text-green-700" />
+          <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
+            <Check size={22} className="text-success-text" />
           </div>
           <h2 className="text-lg font-semibold text-ink">Đã gửi yêu cầu</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
@@ -145,9 +145,9 @@ export default function OtherRequestPage() {
     <div className="max-w-[760px] space-y-4">
       <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <Link href="/dashboard/requests/new" className="hover:text-ink">Yêu cầu giấy tờ</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Lý do khác</span>
       </nav>
 
@@ -162,7 +162,7 @@ export default function OtherRequestPage() {
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
           {error && (
-            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-strong text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
             </div>
           )}
@@ -217,7 +217,7 @@ export default function OtherRequestPage() {
 
           {/* Mục đích */}
           <div>
-            <label htmlFor="other-purpose" className={ui.fieldLabel}>Mục đích làm giấy <span className="text-red-500">*</span></label>
+            <label htmlFor="other-purpose" className={ui.fieldLabel}>Mục đích làm giấy <span className="text-danger-text">*</span></label>
             <select
               id="other-purpose"
               value={purposeCode}
@@ -230,7 +230,7 @@ export default function OtherRequestPage() {
 
             {isProgram && (
               <div className="mt-2.5">
-                <label htmlFor="other-program" className={ui.fieldLabel}>Tên chương trình <span className="text-red-500">*</span></label>
+                <label htmlFor="other-program" className={ui.fieldLabel}>Tên chương trình <span className="text-danger-text">*</span></label>
                 <input
                   id="other-program"
                   aria-invalid={!!fieldErrors.program_name}
@@ -240,7 +240,7 @@ export default function OtherRequestPage() {
                   placeholder="Nhập tên chương trình tham gia…"
                   className={cn(ui.input, fieldErrors.program_name && ui.inputError)}
                 />
-                {fieldErrors.program_name && <p id="other-program-error" className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.program_name}</p>}
+                {fieldErrors.program_name && <p id="other-program-error" className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.program_name}</p>}
               </div>
             )}
           </div>
@@ -270,9 +270,9 @@ export default function OtherRequestPage() {
         </form>
       </div>
 
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-surface-subtle border-l-2 border-primary">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-[0.85rem] text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
         </p>
       </div>
