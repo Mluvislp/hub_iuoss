@@ -25,6 +25,7 @@ from core.models import (
     ConfirmationRequestComment,
     ExternalInsuranceDeclaration,
 )
+from core import request_quota
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
@@ -938,6 +939,20 @@ class InsuranceRegistrationView(APIView):
 
 # ── GET + POST /api/requests/ ────────────────────────────────────────────────
 
+class RequestAvailabilityView(DocumentRequestsRequiredMixin, APIView):
+    """GET /api/requests/availability/ — loại giấy nào còn lượt trong học kỳ hiện tại.
+
+    Hub KHÔNG ẩn loại giấy hết lượt: chỉ làm mờ + nêu lý do (người dùng chốt 01/10/2026).
+    """
+
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        types = [t for t, _ in ConfirmationRequest.REQUEST_TYPES] + [
+            "thuong_binh", "bank_loan", "english_form", request_quota.CONDUCT_TYPE]
+        return Response(request_quota.availability(request.user.student_id, list(dict.fromkeys(types))))
+
+
 class RequestsView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
@@ -955,7 +970,25 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
+        """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py)."""
         request_type = _get_str(request.data, "request_type")
+        sid = request.user.student_id
+        if not sid:
+            return self._create(request, request_type)
+        semester_code, semester_label = None, None
+        if request_type == request_quota.CONDUCT_TYPE:
+            semester_code = _get_str(request.data, "semester_code")
+            student = self._resolve_student(request)
+            choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)} if student else {}
+            semester_label = choices.get(semester_code)
+        # Khoá theo SV: kiểm hạn mức + tạo yêu cầu là một bước, bấm gửi hai lần không lọt.
+        with request_quota.student_lock(sid):
+            reason = request_quota.check(sid, request_type, semester_code, semester_label)
+            if reason:
+                return Response({"detail": reason, "code": "quota_exceeded"}, status=status.HTTP_409_CONFLICT)
+            return self._create(request, request_type)
+
+    def _create(self, request, request_type):
         if request_type == "other":
             return self._create_other(request)
         if request_type == "deferment":

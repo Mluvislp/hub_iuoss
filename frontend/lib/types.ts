@@ -648,3 +648,27 @@ export interface TicketDetail extends TicketSummary {
   messages: TicketMessage[];
   max_files: number;
 }
+
+// ── Hạn mức xin giấy tờ (1 lần / loại / học kỳ) ─────────────────────────────
+
+export interface QuotaBlocking {
+  request_id: number;
+  status: RequestStatus;
+  status_label: string;
+  created_at: string;
+  term: string;
+}
+
+export interface QuotaTypeState {
+  blocked: boolean;
+  reason: string;
+  blocking: QuotaBlocking | null;
+  /** Chỉ conduct_score: học kỳ bảng điểm đã xin trong học kỳ hiện tại. */
+  blocked_semesters?: Record<string, QuotaBlocking>;
+}
+
+export interface RequestAvailability {
+  term: { key: string; label: string };
+  contact_email: string;
+  types: Record<string, QuotaTypeState>;
+}

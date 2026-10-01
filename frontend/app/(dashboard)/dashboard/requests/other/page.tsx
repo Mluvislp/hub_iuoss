@@ -11,6 +11,7 @@ import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/
 import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
 import { validateDob, validateCccd, isValidDob, isValidCccd } from '@/lib/form-validators';
+import { QuotaGuard } from '@/components/request-quota';
 
 
 // Hai ô sinh viên có thể xin sửa. Giữ trùng key với payload.editable của backend.
@@ -161,6 +162,7 @@ export default function OtherRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="other">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -263,6 +265,7 @@ export default function OtherRequestPage() {
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 

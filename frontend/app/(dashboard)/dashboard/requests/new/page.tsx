@@ -6,6 +6,7 @@ import { ChevronRight, ArrowRight, Info, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import { REQUEST_TYPE_LABELS, type RequestType } from '@/lib/types';
+import { useRequestQuota } from '@/components/request-quota';
 
 // Các loại giấy chưa hỗ trợ tạo online (ẩn khỏi danh sách chọn)
 const HIDDEN_TYPES: RequestType[] = ['enrollment', 'graduation'];
@@ -37,6 +38,8 @@ const TYPE_HINTS: Record<RequestType, string> = {
 
 export default function NewRequestPage() {
   const [requestType, setRequestType] = useState<RequestType | ''>('');
+  // Loại hết lượt trong học kỳ: KHÔNG ẩn — làm mờ, không chọn được, nêu lý do ngay trên ô.
+  const quota = useRequestQuota();
   const dedicatedHref = requestType ? DEDICATED_FORMS[requestType] : undefined;
   const selectedLabel = requestType ? REQUEST_TYPE_LABELS[requestType] : '';
 
@@ -72,14 +75,19 @@ export default function NewRequestPage() {
             <div className="grid sm:grid-cols-2 gap-2.5">
               {REQUEST_TYPES.map(([value, label]) => {
                 const selected = requestType === value;
+                const lock = quota?.types[value];
+                const blocked = !!lock?.blocked;
                 return (
                   <label
                     key={value}
+                    aria-disabled={blocked}
                     className={cn(
-                      'flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-colors',
-                      selected
-                        ? 'border-primary bg-primary-soft ring-1 ring-primary-line'
-                        : 'border-line hover:border-slate-300 hover:bg-slate-50',
+                      'flex items-start gap-3 p-3.5 rounded-lg border transition-colors',
+                      blocked
+                        ? 'cursor-not-allowed border-line bg-slate-50'
+                        : selected
+                          ? 'cursor-pointer border-primary bg-primary-soft ring-1 ring-primary-line'
+                          : 'cursor-pointer border-line hover:border-slate-300 hover:bg-slate-50',
                     )}
                   >
                     <input
@@ -87,14 +95,22 @@ export default function NewRequestPage() {
                       name="request_type"
                       value={value}
                       checked={selected}
+                      disabled={blocked}
                       onChange={() => setRequestType(value)}
                       className="mt-0.5 accent-primary"
                     />
                     <span>
-                      <span className={cn('block text-sm font-medium', selected ? 'text-primary' : 'text-ink')}>
+                      <span className={cn('block text-sm font-medium', blocked ? 'text-slate-400' : selected ? 'text-primary' : 'text-ink')}>
                         {label}
                       </span>
-                      <span className="block text-[0.8rem] text-muted mt-0.5">{TYPE_HINTS[value]}</span>
+                      <span className={cn('block text-[0.8rem] mt-0.5', blocked ? 'text-slate-400' : 'text-muted')}>
+                        {TYPE_HINTS[value]}
+                      </span>
+                      {blocked && (
+                        <span className="mt-2 block rounded-md border border-warning-line bg-warning-soft px-2.5 py-2 text-[0.78rem] leading-relaxed text-warning-text">
+                          {lock!.reason}
+                        </span>
+                      )}
                     </span>
                   </label>
                 );
