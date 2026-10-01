@@ -4,7 +4,7 @@ from core.insurance_files import inspect_upload
 from core.insurance_contract import normalized, integer
 import logging
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -25,7 +25,7 @@ from core.models import (
     ConfirmationRequestComment,
     ExternalInsuranceDeclaration,
 )
-from core import request_quota
+from core import request_quota, request_edit
 from core.documents import (
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
@@ -956,6 +956,19 @@ class RequestAvailabilityView(DocumentRequestsRequiredMixin, APIView):
 class RequestsView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
 
+    # Sửa yêu cầu đang "Chờ bổ sung" (RequestDetailView.put) đi chung đường dựng
+    # payload với lúc tạo: đặt `editing` là yêu cầu cũ thì `_persist` ghi đè nó.
+    editing = None
+
+    @property
+    def _ok_status(self):
+        return status.HTTP_200_OK if self.editing is not None else status.HTTP_201_CREATED
+
+    def _persist(self, request, **fields):
+        if self.editing is None:
+            return ConfirmationRequest.objects.create(ldap_uid=request.user.ldap_uid, **fields)
+        return request_edit.apply_student_edit(self.editing, request, fields)
+
     def get_throttles(self):
         # Chỉ giới hạn thao tác TẠO (POST) để chống spam; GET danh sách không giới hạn.
         if self.request.method == "POST":
@@ -1018,9 +1031,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=request.user.student_id or 0,
-            ldap_uid=request.user.ldap_uid,
             request_type=request_type,
             purpose=purpose,
             note=note or None,
@@ -1033,7 +1045,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
         return Response(
             ConfirmationRequestSerializer(req).data,
-            status=status.HTTP_201_CREATED,
+            status=self._ok_status,
         )
 
     def _resolve_student(self, request):
@@ -1072,9 +1084,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="other",
             purpose=purpose_label,
             note=note or None,
@@ -1088,7 +1099,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
         return Response(
             ConfirmationRequestSerializer(req).data,
-            status=status.HTTP_201_CREATED,
+            status=self._ok_status,
         )
 
     def _create_deferment(self, request):
@@ -1116,9 +1127,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="deferment",
             purpose=purpose_label,
             note=note or None,
@@ -1128,7 +1138,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=deferment | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_thuongbinh(self, request):
         """GXN thương binh (ưu đãi giáo dục) — snapshot + CCCD/ngày cấp (nếu chưa có)."""
@@ -1151,9 +1161,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="thuong_binh",
             purpose=purpose_label,
             note=note or None,
@@ -1163,7 +1172,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=thuong_binh | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_bankloan(self, request):
         """GXN vay vốn ngân hàng — snapshot + DOB/CCCD/ngày cấp + mã lớp (SV nhập)."""
@@ -1188,9 +1197,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="bank_loan",
             purpose=purpose_label,
             note=note or None,
@@ -1200,7 +1208,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=bank_loan | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_english(self, request):
         """GXN tiếng Anh — snapshot (tên không dấu, School/Department…) + DOB + purpose."""
@@ -1224,9 +1232,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="english_form",
             purpose=purpose_label,
             note=note or None,
@@ -1236,7 +1243,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=english_form | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_conduct(self, request):
         """Bảng điểm rèn luyện — học kỳ + ô xin sửa (ngày sinh, CCCD, địa chỉ). Giấy xuất ở hệ thống ngoài."""
@@ -1264,9 +1271,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="conduct_score",
             purpose=semester_label,
             note=note or None,
@@ -1276,7 +1282,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=conduct_score | purpose=%s",
             request.user.ldap_uid, semester_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
@@ -1314,6 +1320,28 @@ class RequestDetailView(_OwnRequestMixin, APIView):
         if req is None:
             raise NotFound("Không tìm thấy yêu cầu này.")
         return Response(ConfirmationRequestDetailSerializer(req).data)
+
+    def put(self, request, pk):
+        """SV sửa lại yêu cầu đang "Chờ bổ sung thông tin" — cùng body với lúc tạo."""
+        with transaction.atomic():
+            req = (ConfirmationRequest.objects.select_for_update()
+                   .filter(pk=pk, ldap_uid=request.user.ldap_uid).first())
+            if req is None:
+                raise NotFound("Không tìm thấy yêu cầu này.")
+            if not request_edit.can_student_edit(req):
+                return Response(
+                    {"detail": "Chỉ sửa được yêu cầu đang ở trạng thái “Chờ bổ sung thông tin”."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            view = RequestsView()
+            view.editing = req
+            resp = view._create(request, req.request_type)
+            if resp.status_code >= 400:
+                transaction.set_rollback(True)
+                return resp
+        logger.info("REQUEST_EDIT | uid=%-20s | req=%s | type=%s",
+                    request.user.ldap_uid, req.pk, req.request_type)
+        return Response(ConfirmationRequestDetailSerializer(self.get_own_request(request, pk)).data)
 
 
 class RequestCommentsView(_OwnRequestMixin, APIView):

@@ -44,10 +44,15 @@ export function QuotaNotice({ reason, className }: { reason: string; className?:
  * Bọc nội dung form: loại giấy hết lượt ⇒ hiện lý do + khoá toàn bộ ô nhập (fieldset disabled,
  * làm mờ) thay vì ẩn form.
  */
-export function QuotaGuard({ type, children }: { type: string; children: React.ReactNode }) {
+export function QuotaGuard({ type, bypass = false, children }: {
+  type: string;
+  /** Đang sửa yêu cầu đã có (Chờ bổ sung) ⇒ không tốn thêm lượt, bỏ chặn. */
+  bypass?: boolean;
+  children: React.ReactNode;
+}) {
   const quota = useRequestQuota();
   const state = quota?.types[type];
-  const blocked = !!state?.blocked;
+  const blocked = !bypass && !!state?.blocked;
   return (
     <>
       {blocked && <QuotaNotice reason={state!.reason} />}

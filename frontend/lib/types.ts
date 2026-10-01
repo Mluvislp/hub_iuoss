@@ -146,6 +146,8 @@ export interface ConfirmationRequest {
   portal_code: string | null;
   comment_count: number;
   student_can_comment: boolean;
+  /** Chờ bổ sung thông tin ⇒ mở lại form để sửa (`?edit=<id>`). */
+  student_can_edit: boolean;
   created_at: string;
   updated_at: string;
 }

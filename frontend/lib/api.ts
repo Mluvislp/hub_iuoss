@@ -184,6 +184,13 @@ export const api = {
         body: JSON.stringify({ body }),
       });
     },
+    /** Sửa yêu cầu đang "Chờ bổ sung thông tin" — cùng body với lúc tạo (có `request_type`). */
+    update(id: number, data: Record<string, unknown>): Promise<ConfirmationRequestDetail> {
+      return request(`/requests/${id}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
     create(data: {
       request_type: RequestType;
       purpose: string;
