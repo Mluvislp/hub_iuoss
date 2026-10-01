@@ -8,7 +8,7 @@ với payload cũ ở đây:
 - Khóa payload do Dashboard ghi (`exports`, `quota_exempt`, `staff_fields`…) mà
   builder không sinh ra thì chép sang, không để mất.
 
-Sửa xong ⇒ yêu cầu về "Đang xử lý" + một lượt trao đổi của SV, giống lúc SV trả lời
+Sửa xong ⇒ yêu cầu về "Chờ xử lý" (người dùng chốt 01/10/2026) + một lượt trao đổi của SV
 (RequestCommentsView), để Dashboard thấy "SV đã phản hồi".
 """
 from rest_framework.exceptions import ParseError
@@ -70,7 +70,7 @@ def apply_student_edit(req, request, fields):
 
     req.purpose = fields["purpose"]
     req.note = fields.get("note")
-    req.status = ConfirmationRequest.STATUS_PROCESSING
+    req.status = ConfirmationRequest.STATUS_PENDING
     req.save(update_fields=["payload", "purpose", "note", "status", "updated_at"])
 
     ConfirmationRequestComment.objects.create(

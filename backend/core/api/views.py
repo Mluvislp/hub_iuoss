@@ -1379,12 +1379,11 @@ class RequestCommentsView(_OwnRequestMixin, APIView):
             body=body,
         )
 
-        # SV đã trả lời ⇒ việc quay về phía văn phòng. Nếu để nguyên
-        # `awaiting_info` thì yêu cầu nằm mãi trong nhóm "đang chờ sinh viên" dù
-        # sinh viên đã phản hồi — đúng lối Zendesk/Freshdesk: khách trả lời thì
-        # ticket mở lại.
+        # SV đã trả lời ⇒ việc quay về phía văn phòng: `awaiting_info` → `pending`
+        # (người dùng chốt 01/10/2026 — trước đó về `processing`, khiến SV bị khóa
+        # không nhắn tiếp được). Đang `pending` thì giữ nguyên.
         if req.status == ConfirmationRequest.STATUS_AWAITING_INFO:
-            req.status = ConfirmationRequest.STATUS_PROCESSING
+            req.status = ConfirmationRequest.STATUS_PENDING
             req.save(update_fields=["status", "updated_at"])
 
         logger.info("REQUEST_COMMENT | uid=%-20s | req=%s | len=%s",

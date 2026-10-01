@@ -77,7 +77,7 @@ class RequestEditTests(TestCase):
         resp = self._put(req, purpose_code=codes[1], dob="02/05/2002", note="đã sửa")
         self.assertEqual(resp.status_code, 200, resp.content)
         req.refresh_from_db()
-        self.assertEqual(req.status, ConfirmationRequest.STATUS_PROCESSING)
+        self.assertEqual(req.status, ConfirmationRequest.STATUS_PENDING)
         self.assertEqual(req.payload["purpose"]["code"], codes[1])
         self.assertEqual(req.note, "đã sửa")
         dob = req.payload["editable"]["dob"]
@@ -130,3 +130,14 @@ class RequestEditTests(TestCase):
         req = self._await(self._create(purpose_code=codes[0]))
         self.client.force_authenticate(StudentPrincipal({"ldap_uid": "OTHER", "student_id": self.student.pk}))
         self.assertEqual(self._put(req, purpose_code=codes[0]).status_code, 404)
+
+    def test_tra_loi_tin_nhan_luc_cho_bo_sung_ve_cho_xu_ly(self):
+        codes = self._purpose_codes()
+        req = self._await(self._create(purpose_code=codes[0]))
+        resp = self.client.post(f"/api/requests/{req.pk}/comments/", {"body": "đã gửi lại"}, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.json()["status"], ConfirmationRequest.STATUS_PENDING)
+        # Về Chờ xử lý thì vẫn nhắn tiếp được.
+        self.assertTrue(resp.json()["student_can_comment"])
+        resp = self.client.post(f"/api/requests/{req.pk}/comments/", {"body": "bổ sung thêm"}, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
