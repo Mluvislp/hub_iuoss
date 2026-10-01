@@ -11,6 +11,7 @@ import { ui } from '@/lib/ui';
 import type { ThuongBinhFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
+import { QuotaGuard } from '@/components/request-quota';
 
 // CCCD + ngày cấp là ô XIN SỬA (khóa sẵn, bấm "Yêu cầu chỉnh sửa" mới mở) — cùng
 // khuôn ngày sinh / địa chỉ của giấy hoãn NVQS. Chuyên viên duyệt ở Dashboard.
@@ -148,6 +149,7 @@ export default function ThuongBinhRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="thuong_binh">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -225,6 +227,7 @@ export default function ThuongBinhRequestPage() {
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 

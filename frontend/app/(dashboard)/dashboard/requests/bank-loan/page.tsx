@@ -14,6 +14,7 @@ import { ui } from '@/lib/ui';
 import type { BankLoanFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
+import { QuotaGuard } from '@/components/request-quota';
 
 // Ô XIN SỬA (khóa sẵn, "Yêu cầu chỉnh sửa"; trống / không hợp lệ thì mở sẵn) —
 // chuyên viên duyệt ở Dashboard. Các nhãn tiến độ học thuộc NHÓM CỨNG — chỉ xem.
@@ -174,6 +175,7 @@ export default function BankLoanRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="bank_loan">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -281,6 +283,7 @@ export default function BankLoanRequestPage() {
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 

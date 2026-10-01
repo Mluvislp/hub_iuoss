@@ -11,6 +11,7 @@ import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/
 import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
 import { validateDob, isValidDob } from '@/lib/form-validators';
+import { QuotaGuard } from '@/components/request-quota';
 
 // Mốc nhập học / ra trường thuộc NHÓM CỨNG — chỉ xem.
 type FieldKey = 'dob';
@@ -142,6 +143,7 @@ export default function EnglishRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="english_form">
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -232,6 +234,7 @@ export default function EnglishRequestPage() {
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 

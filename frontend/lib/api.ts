@@ -167,6 +167,10 @@ export const api = {
     list(): Promise<ConfirmationRequest[]> {
       return request('/requests/');
     },
+    /** Loại giấy nào còn lượt trong học kỳ hiện tại (1 lần / loại / học kỳ). */
+    availability(): Promise<import('./types').RequestAvailability> {
+      return request('/requests/availability/');
+    },
     detail(id: number): Promise<ConfirmationRequestDetail> {
       return request(`/requests/${id}/`);
     },
