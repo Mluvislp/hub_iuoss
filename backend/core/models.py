@@ -362,6 +362,9 @@ class HealthInsuranceConfig(models.Model):
     registration_year = models.IntegerField()
     registration_opens_at = models.DateTimeField()
     registration_closes_at = models.DateTimeField()
+    # Hạn riêng cho học viên cao học; NULL thì dùng chung registration_closes_at.
+    # Xem core/insurance_editing.py::closes_at.
+    graduate_closes_at = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
     bank_account = models.ForeignKey(
         HealthInsuranceBankAccount,
