@@ -621,7 +621,33 @@ def build_bankloan_prefill(student):
     return snap
 
 
-def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code):
+# Hai nhóm ô tích trên giấy vay vốn. Mã GIỐNG HỆT Dashboard `documents/registry.py`
+# (FEE_EXEMPTION_CHOICES / ORPHAN_CHOICES) — Dashboard tra mã này ra ô ☑ trên giấy.
+# SV chọn ⇒ `payload.student_choices` (giữ nguyên mãi); chuyên viên duyệt / sửa ⇒
+# `payload.staff_fields` — giấy in theo giá trị chuyên viên.
+BANKLOAN_FEE_EXEMPTION_CHOICES = [
+    {"code": "none", "label": "Không miễn giảm"},
+    {"code": "reduced", "label": "Giảm học phí"},
+    {"code": "exempt", "label": "Miễn học phí"},
+]
+BANKLOAN_ORPHAN_CHOICES = [
+    {"code": "yes", "label": "Mồ côi"},
+    {"code": "no", "label": "Không mồ côi"},
+]
+
+
+def _bankloan_student_choices(fee_exemption, orphan):
+    fee = (fee_exemption or "").strip()
+    orph = (orphan or "").strip()
+    if fee not in {c["code"] for c in BANKLOAN_FEE_EXEMPTION_CHOICES}:
+        raise ValueError("Vui lòng chọn Thuộc diện (miễn, giảm học phí).")
+    if orph not in {c["code"] for c in BANKLOAN_ORPHAN_CHOICES}:
+        raise ValueError("Vui lòng chọn Thuộc đối tượng (mồ côi).")
+    return {"fee_exemption": fee, "orphan": orph}
+
+
+def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code,
+                           fee_exemption, orphan):
     """Dựng payload vay vốn. Trả (payload, purpose_label).
 
     Các nhãn tiến độ học (niên khóa, học kỳ, mốc nhập học/ra trường, số năm–tháng
@@ -646,6 +672,7 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
         validate_dob(dob_field["proposed"])
 
     cid_field, issue_field = _cccd_fields(student, citizen_id, citizen_id_issue_date)
+    student_choices = _bankloan_student_choices(fee_exemption, orphan)
 
     class_code = profile_class
     snap0 = _bankloan_snapshot(student, class_code)
@@ -661,6 +688,7 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
             "citizen_id_issue_date": issue_field,
             "class_code": class_field,
         },
+        "student_choices": student_choices,
     }
     return payload, purpose_label
 

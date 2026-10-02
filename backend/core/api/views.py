@@ -27,6 +27,8 @@ from core.models import (
 )
 from core import request_quota, request_edit
 from core.documents import (
+    BANKLOAN_FEE_EXEMPTION_CHOICES,
+    BANKLOAN_ORPHAN_CHOICES,
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
     build_other_payload,
@@ -1193,6 +1195,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
                 citizen_id=_get_str(request.data, "citizen_id"),
                 citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
                 class_code=_get_str(request.data, "class_code"),
+                fee_exemption=_get_str(request.data, "fee_exemption"),
+                orphan=_get_str(request.data, "orphan"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1480,7 +1484,11 @@ class BankLoanRequestFormView(DocumentRequestsRequiredMixin, APIView):
                 {"detail": "Không tìm thấy hồ sơ sinh viên."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response({"prefill": build_bankloan_prefill(student)})
+        return Response({
+            "prefill": build_bankloan_prefill(student),
+            "fee_exemption_choices": BANKLOAN_FEE_EXEMPTION_CHOICES,
+            "orphan_choices": BANKLOAN_ORPHAN_CHOICES,
+        })
 
 
 # ── GET /api/requests/english/form/ — prefill cho form tiếng Anh ──────────────

@@ -23,7 +23,7 @@ type FieldKey = 'dob' | 'class_code' | 'citizen_id' | 'citizen_id_issue_date';
 const FIELD_KEYS: FieldKey[] = ['dob', 'class_code', 'citizen_id', 'citizen_id_issue_date'];
 const EMPTY: Record<FieldKey, string> = { dob: '', class_code: '', citizen_id: '', citizen_id_issue_date: '' };
 
-type FErr = Partial<Record<FieldKey, string>>;
+type FErr = Partial<Record<FieldKey | 'fee_exemption' | 'orphan', string>>;
 
 export default function BankLoanRequestPage() {
   const [form, setForm] = useState<BankLoanFormData | null>(null);
@@ -34,6 +34,9 @@ export default function BankLoanRequestPage() {
     { dob: false, class_code: false, citizen_id: false, citizen_id_issue_date: false });
   const [note, setNote] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  // Thuộc diện / Thuộc đối tượng — SV chọn, Phòng CTSV duyệt hoặc sửa trước khi in giấy.
+  const [feeExemption, setFeeExemption] = useState('');
+  const [orphan, setOrphan] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -49,6 +52,10 @@ export default function BankLoanRequestPage() {
     if (!form || !r || editApplied.current) return;
     editApplied.current = true;
     setNote(r.note ?? '');
+    const sc = ((r.payload ?? {}) as { student_choices?: { fee_exemption?: string; orphan?: string } })
+      .student_choices ?? {};
+    setFeeExemption(sc.fee_exemption ?? '');
+    setOrphan(sc.orphan ?? '');
     FIELD_KEYS.forEach((k) => {
       const v = pendingValue(r, k);
       if (v !== null) {
@@ -108,6 +115,8 @@ export default function BankLoanRequestPage() {
     if (cidChanged || issueChanged || !isValidIssueDate(pf.citizen_id_issue_date)) {
       const ie = validateIssueDate(values.citizen_id_issue_date); if (ie) errs.citizen_id_issue_date = ie;
     }
+    if (!feeExemption) errs.fee_exemption = 'Vui lòng chọn Thuộc diện.';
+    if (!orphan) errs.orphan = 'Vui lòng chọn Thuộc đối tượng.';
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
@@ -118,6 +127,8 @@ export default function BankLoanRequestPage() {
         citizen_id: values.citizen_id.trim(),
         citizen_id_issue_date: values.citizen_id_issue_date.trim(),
         class_code: values.class_code.trim(),
+        fee_exemption: feeExemption,
+        orphan,
         note: note.trim() || undefined,
       });
       setSuccess(true);
@@ -284,6 +295,26 @@ export default function BankLoanRequestPage() {
           </div>
 
           {/* Ghi chú — component dùng chung cho 5 form */}
+          {/* Thuộc diện / Thuộc đối tượng — hai nhóm ô tích trên giấy */}
+          <div>
+            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Diện ưu đãi</h2>
+            <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
+              <ChoiceGroup
+                label="Thuộc diện" name="fee_exemption"
+                choices={form.fee_exemption_choices} value={feeExemption} error={fieldErrors.fee_exemption}
+                onChange={(v) => { setFeeExemption(v); setFieldErrors((f) => ({ ...f, fee_exemption: undefined })); }}
+              />
+              <ChoiceGroup
+                label="Thuộc đối tượng" name="orphan"
+                choices={form.orphan_choices} value={orphan} error={fieldErrors.orphan}
+                onChange={(v) => { setOrphan(v); setFieldErrors((f) => ({ ...f, orphan: undefined })); }}
+              />
+            </div>
+            <p className="mt-3 text-[0.78rem] text-muted leading-relaxed">
+              Phòng CTSV đối chiếu và có thể điều chỉnh lựa chọn trước khi in lên giấy.
+            </p>
+          </div>
+
           <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
@@ -316,5 +347,42 @@ export default function BankLoanRequestPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+
+/** Một nhóm lựa chọn bắt buộc (radio) — hiển thị dạng thẻ bấm được. */
+function ChoiceGroup({ label, name, choices, value, error, onChange }: {
+  label: string;
+  name: string;
+  choices: { code: string; label: string }[];
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className={ui.fieldLabel}>{label} <span className="text-red-500">*</span></legend>
+      <div className="space-y-1.5">
+        {choices.map((c) => (
+          <label
+            key={c.code}
+            className={cn(
+              'flex items-center gap-2.5 rounded-lg border px-3 h-10 text-sm cursor-pointer transition-colors',
+              value === c.code ? 'border-primary bg-primary-soft text-ink' : 'border-line bg-white hover:border-slate-400',
+              error && value !== c.code && 'border-danger-line',
+            )}
+          >
+            <input
+              type="radio" name={name} value={c.code} checked={value === c.code}
+              onChange={() => onChange(c.code)}
+              className="accent-primary"
+            />
+            {c.label}
+          </label>
+        ))}
+      </div>
+      {error && <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
+    </fieldset>
   );
 }
