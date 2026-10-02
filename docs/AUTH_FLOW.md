@@ -279,12 +279,12 @@ login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize
 
 Quy ước của trường: tiền tố email = MSSV (`FAFBIU24144@student.hcmiu.edu.vn` → `FAFBIU24144`).
 
-**Học viên cao học dùng email `@hcmiu.edu.vn`** (`MS_GRADUATE_EMAIL_DOMAIN`, từ 01/10/2026) — tên miền chung với cán bộ, nên **không tin tiền tố**. `login_policy.find_graduate_code_by_email()` chỉ nhận khi email trỏ đúng tới một hồ sơ MASTER/DOCTOR:
+**Học viên cao học dùng email `@mp.hcmiu.edu.vn`** (`MS_GRADUATE_EMAIL_DOMAIN`, đổi từ `@hcmiu.edu.vn` ngày 02/10/2026) — **không tin tiền tố**. `login_policy.find_graduate_code_by_email()` chỉ nhận khi email trỏ đúng tới một hồ sơ MASTER/DOCTOR:
 
 1. tiền tố email = MSSV hiện tại của một học viên cao học, hoặc
 2. email trùng một dòng `student_contact_points` (`is_current = 1`, mọi loại) của **đúng một** học viên cao học — trùng nhiều người thì không đoán.
 
-Cán bộ, hoặc sinh viên đại học có email `@hcmiu.edu.vn`, vẫn bị chặn với thông báo riêng. ⚠️ Live 01/10/2026 chỉ 45 học viên cao học có email `@hcmiu.edu.vn` trong hồ sơ, 0 cái có tiền tố = MSSV — học viên chưa có email trong hồ sơ thì chưa vào được cho tới khi nạp email.
+Email `@mp.hcmiu.edu.vn` không trỏ tới hồ sơ học viên cao học nào thì bị chặn với thông báo riêng; email cán bộ `@hcmiu.edu.vn` không khớp tên miền nào nên bị chặn như mọi email lạ. ⚠️ Học viên chưa có email `@mp.hcmiu.edu.vn` trong `student_contact_points` (và tiền tố không phải MSSV) thì chưa vào được cho tới khi nạp email — cần đo lại số học viên có email này trên live.
 
 Xét lần lượt `upn` → `preferred_username` → `email`, lấy giá trị **đầu tiên đúng tên miền** `MS_ALLOWED_EMAIL_DOMAIN`. Duyệt nhiều claim vì `preferred_username` có thể là alternate login ID; mọi giá trị vẫn phải qua đúng một phép kiểm tên miền.
 
@@ -301,7 +301,7 @@ Microsoft khuyến cáo dùng `oid` làm khoá định danh bền vững thay v�
 | `MS_CLIENT_SECRET` | Hết hạn **08/08/2028** — đặt lịch gia hạn, hết hạn là sập đường Microsoft |
 | `MS_REDIRECT_URI` | prod `https://hub.iuoss.com/auth/microsoft/callback`, dev `http://localhost:3000/...` |
 | `MS_ALLOWED_EMAIL_DOMAIN` | `student.hcmiu.edu.vn` |
-| `MS_GRADUATE_EMAIL_DOMAIN` | mặc định `hcmiu.edu.vn` (học viên cao học); đặt rỗng = tắt đường này |
+| `MS_GRADUATE_EMAIL_DOMAIN` | mặc định `mp.hcmiu.edu.vn` (học viên cao học); đặt rỗng = tắt đường này |
 
 Thiếu 3 biến đầu → `settings.MS_LOGIN_ENABLED = False` → endpoint trả 404 và `GET /api/features/` trả `microsoft_login: false` nên frontend ẩn nút. LDAP không bị ảnh hưởng.
 
