@@ -97,7 +97,7 @@ const schema = z.object({
     .regex(/^(0|\+84)\d{9,10}$/, "Số điện thoại không hợp lệ"),
   social_insurance_number: z
     .string()
-    .regex(/^\d{10}$/, "Mã BHXH phải bao gồm đúng 10 chữ số cuối của mã BHYT"),
+    .regex(/^(?:\d{10}|\d{12})$/, "Mã BHXH gồm 10 hoặc 12 chữ số (mã thẻ BHYT bỏ 5 ký tự đầu)"),
   citizen_id: z.string().regex(/^\d{12}$/, "Số CCCD là 12 số"),
   permanent: z.object({
     provinceCode: z.string().min(1, "Vui lòng chọn tỉnh/thành"),
@@ -120,7 +120,8 @@ const schema = z.object({
 
 const externalBase = schema.extend({
   payment_receipt_image: z.any().optional(),
-  medical_insurance_code: z.string().regex(/^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$/, "Mã thẻ gồm 10 số hoặc 2 chữ cái và 13 số"),
+  // Thẻ 15 ký tự kết thúc bằng mã BHXH (10 số); thẻ 17 ký tự thay mã BHXH bằng số CCCD (12 số).
+  medical_insurance_code: z.string().regex(/^(?:[A-Z]{2}(?:[0-9]{13}|[0-9]{15})|[0-9]{10})$/, "Mã thẻ gồm 10 số, hoặc 2 chữ cái và 13 hay 15 số"),
   valid_from: z.string().min(1, "Vui lòng nhập ngày bắt đầu"),
   valid_until: z.string().min(1, "Vui lòng nhập ngày hết hạn"),
 });
@@ -133,9 +134,9 @@ const withExternalRules = <T extends z.ZodType<ExternalValues>>(base: T) => base
   .refine((v) => !v.valid_from || !v.valid_until || v.valid_until >= v.valid_from, {
     message: "Ngày hết hạn phải từ ngày bắt đầu trở đi", path: ["valid_until"], when: () => true,
   })
-  .refine((v) => !/^\d{10}$/.test(v.social_insurance_number ?? "") || !v.medical_insurance_code
-    || v.medical_insurance_code.endsWith(v.social_insurance_number), {
-    message: "Mã thẻ BHYT phải khớp mã số BHXH (10 số cuối)", path: ["medical_insurance_code"], when: () => true,
+  .refine((v) => !/^(?:\d{10}|\d{12})$/.test(v.social_insurance_number ?? "") || !v.medical_insurance_code
+    || socialInsuranceFromCard(v.medical_insurance_code) === v.social_insurance_number, {
+    message: "Mã thẻ BHYT phải khớp mã số BHXH (bỏ 5 ký tự đầu)", path: ["medical_insurance_code"], when: () => true,
   });
 const externalSchema = withExternalRules(externalBase);
 // Sửa hồ sơ đã nộp: ảnh cũ được giữ, chỉ gửi ảnh khi sinh viên chọn ảnh thay thế.
@@ -217,9 +218,14 @@ function EditLink({ active, label = "Chỉnh sửa", onClick, disabled = false }
   );
 }
 
-/** Mã BHYT dán vào có thể dài 15 số (hoặc kèm khoảng trắng/chữ) → chỉ giữ chữ số, lấy 10 số cuối. */
-function lastTenDigits(raw: string): string {
-  return raw.replace(/\D/g, "").slice(-10);
+/**
+ * Dán mã thẻ BHYT (15 hoặc 17 ký tự, có thể kèm khoảng trắng) → bỏ 5 ký tự đầu, còn mã BHXH
+ * 10 số hoặc 12 số (số CCCD). Gõ tay thì chỉ giữ chữ số, tối đa 12.
+ */
+function socialInsuranceFromCard(raw: string): string {
+  const compact = raw.replace(/\s/g, "");
+  const body = /^[A-Za-z]{2}/.test(compact) ? compact.slice(5) : compact;
+  return body.replace(/\D/g, "").slice(0, 12);
 }
 
 function FieldError({ message }: { message?: unknown }) {
@@ -993,15 +999,15 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 </div>
                 <div className="min-w-0">
                   <label className={ui.fieldLabel}>
-                    Số sổ BHXH (10 số cuối của BHYT)
+                    Số sổ BHXH (mã BHYT bỏ 5 ký tự đầu)
                   </label>
                   <input
                     {...sinField}
                     inputMode="numeric"
                     autoComplete="off"
-                    placeholder="Dán mã BHYT 15 số, hệ thống tự lấy 10 số cuối"
+                    placeholder="Dán mã thẻ BHYT, hệ thống tự bỏ 5 ký tự đầu"
                     onChange={(e) => {
-                      e.target.value = lastTenDigits(e.target.value);
+                      e.target.value = socialInsuranceFromCard(e.target.value);
                       void sinField.onChange(e);
                     }}
                     disabled={personalLocked(prefill?.social_insurance_number)}
@@ -1027,8 +1033,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                           và nhập <strong>số CCCD</strong> để tra cứu.
                         </li>
                         <li>
-                          Sao chép <strong>mã thẻ BHYT (15 ký tự)</strong> rồi dán vào ô trên,
-                          hệ thống tự lấy <strong>10 số cuối</strong>.
+                          Sao chép <strong>mã thẻ BHYT (15 hoặc 17 ký tự)</strong> rồi dán vào ô trên,
+                          hệ thống tự <strong>bỏ 5 ký tự đầu</strong> (còn 10 hoặc 12 số).
                         </li>
                         <li>
                           Chụp màn hình kết quả tra cứu và tải lên ở mục ảnh BHYT

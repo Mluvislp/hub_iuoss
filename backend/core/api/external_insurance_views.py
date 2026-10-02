@@ -18,11 +18,13 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
     registration_year = None
     registration_period = None
     payment_receipt_image = None
-    medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$', max_length=64, error_messages={
-        'invalid': 'Mã thẻ gồm 10 số hoặc 2 chữ cái và 13 số.', 'blank': 'Vui lòng nhập mã thẻ BHYT.',
+    # Thẻ 15 ký tự: 2 chữ + 3 số + mã BHXH (10 số). Thẻ 17 ký tự: mã BHXH thay bằng số CCCD (12 số).
+    medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}(?:[0-9]{13}|[0-9]{15})|[0-9]{10})$', max_length=64, error_messages={
+        'invalid': 'Mã thẻ gồm 10 số, hoặc 2 chữ cái và 13 hay 15 số.', 'blank': 'Vui lòng nhập mã thẻ BHYT.',
         'required': 'Vui lòng nhập mã thẻ BHYT.'})
-    social_insurance_number = serializers.RegexField(r'^[0-9]{10}$', max_length=15, error_messages={
-        'invalid': 'Mã BHXH phải bao gồm đúng 10 chữ số cuối của mã BHYT.', 'blank': 'Vui lòng nhập mã số BHXH.',
+    # Mã BHXH = mã thẻ bỏ 5 ký tự đầu: 10 số (mã BHXH cũ) hoặc 12 số (số CCCD).
+    social_insurance_number = serializers.RegexField(r'^(?:[0-9]{10}|[0-9]{12})$', max_length=15, error_messages={
+        'invalid': 'Mã BHXH gồm 10 hoặc 12 chữ số (mã thẻ BHYT bỏ 5 ký tự đầu).', 'blank': 'Vui lòng nhập mã số BHXH.',
         'required': 'Vui lòng nhập mã số BHXH.'})
     valid_from = serializers.DateField(error_messages={
         'invalid': 'Ngày bắt đầu không hợp lệ.', 'required': 'Vui lòng nhập ngày bắt đầu.'})
@@ -34,7 +36,8 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
         errors = {}
         if attrs['valid_until'] < attrs['valid_from']:
             errors['valid_until'] = 'Ngày hết hạn phải từ ngày bắt đầu trở đi.'
-        if not attrs['medical_insurance_code'].endswith(attrs['social_insurance_number']):
+        code = attrs['medical_insurance_code']
+        if (code[5:] if code[:2].isalpha() else code) != attrs['social_insurance_number']:
             errors['medical_insurance_code'] = 'Mã thẻ BHYT phải khớp mã số BHXH.'
         if not VnWard.objects.filter(code=attrs['permanent_ward'],
                                      province_code=attrs['permanent_province'], is_active=True).exists():
