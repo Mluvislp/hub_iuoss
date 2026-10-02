@@ -117,9 +117,9 @@ def extract_student_code(claims: dict) -> str:
 
     - `@student.hcmiu.edu.vn` (sinh viên đại học): tiền tố email = MSSV
       (`FAFBIU24144@student.hcmiu.edu.vn` → `FAFBIU24144`).
-    - `@hcmiu.edu.vn` (học viên cao học, từ 01/10/2026): tên miền này dùng chung
-      với cán bộ nên KHÔNG tin tiền tố — chỉ nhận khi email trỏ đúng tới một hồ sơ
-      sau đại học (`login_policy.find_graduate_code_by_email`). Cán bộ vẫn bị chặn.
+    - `@mp.hcmiu.edu.vn` (học viên cao học): KHÔNG tin tiền tố — chỉ nhận khi email
+      trỏ đúng tới một hồ sơ sau đại học (`login_policy.find_graduate_code_by_email`).
+      Email cán bộ `@hcmiu.edu.vn` không khớp tên miền nào nên vẫn bị chặn.
 
     Xét lần lượt `upn` → `preferred_username` → `email`, lấy cái ĐẦU TIÊN qua được
     phép kiểm. Duyệt nhiều claim vì `preferred_username` có thể là alternate
