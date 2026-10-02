@@ -801,12 +801,45 @@ def build_english_payload(student, *, dob, purpose_code, program_name):
 CONDUCT_FALLBACK_YEARS = 4
 
 
+# Mã lựa chọn: "YYYYS" = một học kỳ (S = 1/2), "YYYYN" = cả năm học YYYY-(YYYY+1).
+CONDUCT_YEAR_SUFFIX = "N"
+
+# Hình thức nhận bảng điểm (01/10/2026).
+CONDUCT_DELIVERY_CHOICES = [
+    {"code": "online", "label": "Bản mềm (bản online)"},
+    {"code": "paper", "label": "Bản cứng (giấy)"},
+]
+
+
 def _semester_label(year, semester):
     return f"Học kỳ {semester}, năm học {year}-{year + 1}"
 
 
+def _year_label(year):
+    return f"Cả năm học {year}-{year + 1}"
+
+
+def conduct_overlapping_codes(code):
+    """Các mã lựa chọn trùng phạm vi với `code` (kể cả chính nó) — dùng cho hạn mức.
+
+    Cả năm học YYYY trùng với HK1, HK2 của năm đó và ngược lại (người dùng chốt
+    01/10/2026: đã xin cả năm thì không xin lẻ học kỳ của năm đó nữa, và ngược lại).
+    """
+    code = str(code or "")
+    if len(code) != 5 or not code[:4].isdigit():
+        return {code} if code else set()
+    year, part = code[:4], code[4]
+    whole = year + CONDUCT_YEAR_SUFFIX
+    if part == CONDUCT_YEAR_SUFFIX:
+        return {whole, year + "1", year + "2"}
+    return {code, whole}
+
+
 def conduct_semester_choices(student, today=None):
-    """Các học kỳ SV được xin bảng điểm rèn luyện, MỚI NHẤT trước.
+    """Các lựa chọn SV được xin bảng điểm rèn luyện, MỚI NHẤT trước.
+
+    Gồm từng học kỳ lẻ và, từ 01/10/2026, "Cả năm học" (mã `YYYYN`) cho năm học có
+    ĐỦ cả HK1 lẫn HK2 trong danh sách — đứng ngay trước HK2 của năm đó.
 
     Chỉ học kỳ chính (HK1, HK2) ĐÃ KẾT THÚC — điểm rèn luyện chỉ có sau khi học
     kỳ đóng. Mốc kết thúc theo `current_semester` (HK1 = T9–T1, HK2 = T2–T6):
@@ -829,9 +862,20 @@ def conduct_semester_choices(student, today=None):
     choices = []
     year, sem = last
     while (year, sem) >= first:
-        choices.append({"code": f"{year}{sem}", "label": _semester_label(year, sem)})
+        if sem == 2 and (year, 1) >= first:
+            choices.append({"code": f"{year}{CONDUCT_YEAR_SUFFIX}", "label": _year_label(year),
+                            "kind": "year"})
+        choices.append({"code": f"{year}{sem}", "label": _semester_label(year, sem),
+                        "kind": "semester"})
         year, sem = (year, 1) if sem == 2 else (year - 1, 2)
     return choices
+
+
+def resolve_conduct_delivery(code):
+    for choice in CONDUCT_DELIVERY_CHOICES:
+        if choice["code"] == code:
+            return choice
+    raise ValueError("Vui lòng chọn hình thức nhận bảng điểm (bản mềm hoặc bản cứng).")
 
 
 def _conduct_snapshot(student):
@@ -852,12 +896,13 @@ def build_conduct_prefill(student):
     }
 
 
-def build_conduct_payload(student, *, semester_code, dob, citizen_id,
+def build_conduct_payload(student, *, semester_code, delivery, dob, citizen_id,
                           citizen_id_issue_date, province_code, ward_code, street):
     choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)}
     if semester_code not in choices:
         raise ValueError("Vui lòng chọn học kỳ cấp bảng điểm rèn luyện hợp lệ.")
     label = choices[semester_code]
+    delivery_choice = resolve_conduct_delivery(delivery)
 
     dob_field = _editable_field(format_student_birth_date(student), dob)
     if dob_field["changed"]:
@@ -868,7 +913,9 @@ def build_conduct_payload(student, *, semester_code, dob, citizen_id,
     payload = {
         "doc_type": "conduct_score",
         "purpose": {"code": semester_code, "label": label, "program_name": None},
-        "snapshot": {**_conduct_snapshot(student), "semester": label},
+        "delivery": dict(delivery_choice),
+        "snapshot": {**_conduct_snapshot(student), "semester": label,
+                     "delivery": delivery_choice["label"]},
         "editable": {
             "dob": dob_field,
             "citizen_id": cid_field,

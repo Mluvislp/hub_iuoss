@@ -32,7 +32,7 @@ const TYPE_HINTS: Record<RequestType, string> = {
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
   bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
   english_form: 'Giấy xác nhận bằng tiếng Anh (du học, xin việc, visa…).',
-  conduct_score: 'Bảng điểm rèn luyện theo học kỳ.',
+  conduct_score: 'Bảng điểm rèn luyện theo học kỳ hoặc cả năm học, bản mềm hoặc bản cứng.',
   other: 'Các mục đích khác (du học, xin việc, visa…).',
 };
 
