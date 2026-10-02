@@ -164,6 +164,14 @@ export const api = {
   },
 
   requests: {
+    /** PDF bản mềm bảng điểm RL — cần token nên tải qua fetch rồi mở bằng blob URL. */
+    async softCopy(id: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/requests/${id}/soft-copy/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
+    },
     list(): Promise<ConfirmationRequest[]> {
       return request('/requests/');
     },

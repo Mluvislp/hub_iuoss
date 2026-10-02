@@ -108,16 +108,36 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
     # Mã hiển thị cho sinh viên; `id` chỉ dùng làm đường dẫn nội bộ.
     code = serializers.CharField(read_only=True)
     student_can_edit = serializers.BooleanField(read_only=True)
+    payload = serializers.SerializerMethodField()
+    soft_copy = serializers.SerializerMethodField()
 
     class Meta:
         model = ConfirmationRequest
         fields = [
             "id", "code", "request_type", "purpose", "note", "payload",
             "status", "portal_code", "comment_count", "student_can_comment",
-            "student_can_edit",
+            "student_can_edit", "soft_copy",
             "created_at", "updated_at",
         ]
         read_only_fields = fields
+
+    def get_payload(self, obj):
+        # `soft_copy` mang đường dẫn lưu trữ + tên chuyên viên — không trả cho sinh viên.
+        payload = dict(obj.payload or {})
+        payload.pop("soft_copy", None)
+        return payload
+
+    def get_soft_copy(self, obj):
+        """Bản mềm PDF (bảng điểm RL) — chỉ lộ ra khi yêu cầu đã Hoàn thành.
+
+        Dashboard ghi `payload.soft_copy` (dashboard documents/soft_copy.py); tải qua
+        `GET /api/requests/<id>/soft-copy/`.
+        """
+        data = (obj.payload or {}).get("soft_copy")
+        if obj.status != ConfirmationRequest.STATUS_DONE or not isinstance(data, dict) \
+                or not data.get("storage_key"):
+            return None
+        return {"filename": data.get("filename") or "", "size": data.get("size") or 0}
 
     def get_comment_count(self, obj):
         # Đã prefetch ở view danh sách nên không sinh thêm query mỗi dòng.

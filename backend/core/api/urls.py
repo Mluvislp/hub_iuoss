@@ -33,6 +33,7 @@ urlpatterns = [
     path("requests/availability/", views.RequestAvailabilityView.as_view(), name="api_request_availability"),
     path("requests/<int:pk>/",          views.RequestDetailView.as_view(),   name="api_request_detail"),
     path("requests/<int:pk>/comments/", views.RequestCommentsView.as_view(), name="api_request_comments"),
+    path("requests/<int:pk>/soft-copy/", views.RequestSoftCopyView.as_view(), name="api_request_soft_copy"),
     path("requests/other/form/",      views.OtherRequestFormView.as_view(),      name="api_other_request_form"),
     path("requests/deferment/form/",   views.DefermentRequestFormView.as_view(),   name="api_deferment_request_form"),
     path("requests/thuong-binh/form/", views.ThuongBinhRequestFormView.as_view(),  name="api_thuongbinh_request_form"),
