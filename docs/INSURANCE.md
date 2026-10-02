@@ -48,6 +48,14 @@ Frontend còn `lib/insurance-periods.ts` để hiển thị: trang BHYT hiện *
 đợt kế tiếp**; không có đợt mở thì hiện đợt vừa hết hạn + kế tiếp. Đợt đang mở luôn
 hiện hạn cuối.
 
+**Học viên cao học có hạn đóng riêng.** Mỗi slot có cột `graduate_closes_at` (NULL = dùng
+chung `registration_closes_at`), staff nhập trên trang quản lý đợt của Dashboard. Với người
+`is_graduate` (MASTER/DOCTOR), mọi chỗ xét hạn đều dùng hạn riêng này qua
+`core/insurance_editing.py::closes_at` — mở form, nộp đơn, `status`/`end_date` trả về
+frontend, cửa sổ sửa đơn (`window`) và khai BHYT nơi khác (`active_config`). Hết hạn riêng là
+học viên không nộp và **không sửa đơn** được nữa. Giờ mở, cờ bật, phí, tài khoản và thời hạn
+thẻ vẫn dùng chung với sinh viên đại học.
+
 Nếu `academic_entry_year` của sinh viên trùng năm hiện tại (`timezone.localdate().year`), Hub hiển thị
 `freshman_warning` của slot trong popup đỏ nhạt cùng tông RejectionNotice (`components/freshman-warning-modal.tsx`,
 bottom sheet trên mobile) ngay khi mở form đăng ký; sinh viên phải bấm xác nhận để đóng.
@@ -102,6 +110,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `external_insurance_upgrade.sql` | tạo bảng khai ngoài trường |
 | `external_insurance_review_upgrade.sql` | dùng **thay** file tạo bảng nếu bảng đã có từ bản trước |
 | `external_insurance_validity_fix.sql` | sửa thời hạn |
+| `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
 
 `.gitignore` chặn `*.sql` (dump chứa dữ liệu thật) và **whitelist từng file** ở trên —
 thêm file SQL mới phải thêm một dòng `!docs/<tên>.sql`, nếu không git bỏ qua im lặng.

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import ComingSoon from '@/components/coming-soon';
-import { getSession } from '@/lib/auth';
+import { BHYT_HOME, getSession, isBhytOnly } from '@/lib/auth';
 import { useFeatures, featureForRoute, FEATURE_META } from '@/lib/features';
 import type { StudentSession } from '@/lib/types';
 
@@ -35,13 +35,27 @@ function titleFor(pathname: string): string {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [session, setSession] = useState<StudentSession | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const { features, ready } = useFeatures();
 
   useEffect(() => {
     setSession(getSession() as StudentSession | null);
+    setSessionReady(true);
   }, []);
+
+  // Học viên cao học chỉ dùng phần Bảo hiểm y tế: mọi trang khác (kể cả
+  // /dashboard) chuyển về đó. Backend cũng chặn API ngoài BHYT, đây chỉ để không
+  // ai thấy trang trống báo lỗi.
+  const bhytOnly = isBhytOnly(session as Record<string, unknown> | null);
+  const outsideBhyt = bhytOnly
+    && pathname !== BHYT_HOME && !pathname.startsWith(BHYT_HOME + '/');
+
+  useEffect(() => {
+    if (outsideBhyt) router.replace(BHYT_HOME);
+  }, [outsideBhyt, router]);
 
   // Chặn ở MỘT chỗ cho mọi tính năng chưa mở: route thuộc tính năng đang tắt thì
   // thay nội dung bằng trang chờ, không cần từng page tự kiểm tra.
@@ -66,7 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="flex-1">
           <div className="max-w-content px-5 sm:px-8 py-6 sm:py-8">
             {/* Chưa biết cờ → chờ, tránh chớp nội dung rồi đổi sang trang chờ. */}
-            {!ready && routeFeature ? (
+            {!sessionReady || outsideBhyt || (!ready && routeFeature) ? (
               <div className="flex items-center justify-center h-64 text-muted">
                 <Loader2 size={26} className="animate-spin" />
               </div>

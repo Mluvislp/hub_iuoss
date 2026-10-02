@@ -5,6 +5,8 @@ export interface StudentSession {
   student_id: number | null;
   student_code: string;
   full_name: string;
+  /** Học viên cao học: chỉ dùng phần Bảo hiểm y tế (claim `bhyt_only` trong JWT). */
+  bhyt_only?: boolean;
 }
 
 export interface Department {

@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `registration_year` INT NOT NULL,
   `registration_opens_at` DATETIME(6) NOT NULL,
   `registration_closes_at` DATETIME(6) NOT NULL,
+  `graduate_closes_at` DATETIME(6) NULL COMMENT 'Hạn đóng riêng cho học viên cao học; NULL = dùng registration_closes_at',
   `is_active` TINYINT(1) NOT NULL DEFAULT 0,
   `bank_account_id` BIGINT NULL,
   `description` TEXT NULL,

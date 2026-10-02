@@ -2,6 +2,7 @@ from core.insurance_submission import submission
 from core.insurance_history import append_event
 from core.insurance_files import inspect_upload
 from core.insurance_contract import normalized, integer
+from core.insurance_editing import closes_at
 import logging
 from django.conf import settings
 from django.db import connection, transaction
@@ -17,7 +18,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from core import microsoft_auth
 from core.auth import verify_ldap
-from core.login_policy import check_login
+from core.login_policy import check_login, is_bhyt_only
 from core import address_service
 from core.models import (
     HubStudent,
@@ -143,6 +144,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
     viên đổi mã.
     """
     uid = student.current_student_code
+    bhyt_only = is_bhyt_only(student)
 
     HubStudent.record_login(student_code=uid, student_id=student.pk, channel=channel)
 
@@ -151,6 +153,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
         student_id=student.pk,
         student_code=uid,
         full_name=student.full_name,
+        bhyt_only=bhyt_only,
     )
 
     logger.info(
@@ -166,6 +169,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
             "student_id": student.pk,
             "student_code": uid,
             "full_name": student.full_name,
+            "bhyt_only": bhyt_only,
         },
     })
 
@@ -407,6 +411,7 @@ class HubTokenRefreshView(APIView):
             student_id=student.pk,
             student_code=student.current_student_code,
             full_name=student.full_name,
+            bhyt_only=is_bhyt_only(student),
         )
         return Response({"access": str(token.access_token), "refresh": str(token)})
 
@@ -526,9 +531,9 @@ def _coverage_dates(period: str, year: int):
     return date(year, start_month, 1), date(year, 12, 31)
 
 
-def _insurance_config_status(cfg, now=None):
+def _insurance_config_status(cfg, now=None, student=None):
     now = now or timezone.now()
-    if now > cfg.registration_closes_at:
+    if now > closes_at(cfg, student):
         return "expired"
     if now < cfg.registration_opens_at:
         return "upcoming"
@@ -537,7 +542,7 @@ def _insurance_config_status(cfg, now=None):
     return "open" if cfg.is_active else "upcoming"
 
 
-def _insurance_config_error(cfg):
+def _insurance_config_error(cfg, student=None):
     if cfg is None:
         return "Đợt đăng ký không tồn tại hoặc chưa được cấu hình."
     if not cfg.is_active:
@@ -545,7 +550,7 @@ def _insurance_config_error(cfg):
     now = timezone.now()
     if now < cfg.registration_opens_at:
         return "Đợt đăng ký chưa mở."
-    if now > cfg.registration_closes_at:
+    if now > closes_at(cfg, student):
         return "Đợt đăng ký đã kết thúc."
     return ""
 
@@ -560,10 +565,10 @@ def _insurance_config_payload(cfg, *, include_payment, student=None):
         "registration_year": cfg.registration_year,
         "name": f"Đợt {_PERIOD_NUMBER[cfg.registration_period]} năm {cfg.registration_year}",
         "start_date": cfg.registration_opens_at.isoformat(),
-        "end_date": cfg.registration_closes_at.isoformat(),
+        "end_date": closes_at(cfg, student).isoformat(),
         "coverage_start": coverage_start.isoformat(),
         "coverage_end": coverage_end.isoformat(),
-        "status": _insurance_config_status(cfg),
+        "status": _insurance_config_status(cfg, student=student),
         "is_active": cfg.is_active,
         "freshman_warning": (
             cfg.freshman_warning or ""
@@ -791,7 +796,7 @@ class InsuranceRegistrationView(APIView):
         cfg = HealthInsuranceConfig.objects.select_related("bank_account").filter(
             registration_period=period,
         ).first()
-        error = _insurance_config_error(cfg)
+        error = _insurance_config_error(cfg, student)
         if error:
             return Response({"detail": error}, status=status.HTTP_409_CONFLICT)
         blocking_registration = _blocking_insurance_registration(
@@ -824,7 +829,7 @@ class InsuranceRegistrationView(APIView):
         cfg = HealthInsuranceConfig.objects.select_related("bank_account").filter(
             registration_period=data["registration_period"],
         ).first()
-        config_error = _insurance_config_error(cfg)
+        config_error = _insurance_config_error(cfg, student)
         if config_error:
             return Response({"detail": config_error}, status=status.HTTP_409_CONFLICT)
         if data["registration_year"] != cfg.registration_year:
