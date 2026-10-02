@@ -112,3 +112,34 @@ class GraduateDeadlineTests(SimpleTestCase):
             objects.filter.return_value.first.return_value = self.cfg
             self.assertFalse(insurance_editing.window(2026, "Q4", None, GRADUATE)["can_edit"])
             self.assertTrue(insurance_editing.window(2026, "Q4", None, UNDERGRAD)["can_edit"])
+
+
+class GraduateEmailDomainTests(SimpleTestCase):
+    """Học viên cao học đăng nhập Microsoft bằng @mp.hcmiu.edu.vn; @hcmiu.edu.vn bị chặn."""
+
+    def _extract(self, email, code="MTESTIU99001"):
+        from core import microsoft_auth
+        with mock.patch("core.login_policy.find_graduate_code_by_email", return_value=code) as lookup:
+            try:
+                return microsoft_auth.extract_student_code({"upn": email}), lookup
+            except microsoft_auth.MicrosoftAuthError:
+                return None, lookup
+
+    def test_graduate_domain_maps_to_profile(self):
+        code, lookup = self._extract("hocvien@mp.hcmiu.edu.vn")
+        self.assertEqual(code, "MTESTIU99001")
+        lookup.assert_called_once_with("hocvien@mp.hcmiu.edu.vn")
+
+    def test_staff_domain_is_rejected_without_lookup(self):
+        code, lookup = self._extract("canbo@hcmiu.edu.vn")
+        self.assertIsNone(code)
+        lookup.assert_not_called()
+
+    def test_graduate_domain_without_profile_is_rejected(self):
+        code, _ = self._extract("nguoila@mp.hcmiu.edu.vn", code=None)
+        self.assertIsNone(code)
+
+    def test_undergraduate_domain_unchanged(self):
+        code, lookup = self._extract("fafbiu24144@student.hcmiu.edu.vn")
+        self.assertEqual(code, "FAFBIU24144")
+        lookup.assert_not_called()

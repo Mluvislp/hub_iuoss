@@ -146,10 +146,10 @@ MS_REDIRECT_URI = os.getenv(
 # Chỉ chấp nhận email sinh viên. Tên miền nhân viên (hcmiu.edu.vn) nằm CÙNG một
 # tenant nên kiểm `tid` không phân biệt được — bắt buộc lọc theo hậu tố này.
 MS_ALLOWED_EMAIL_DOMAIN = os.getenv("MS_ALLOWED_EMAIL_DOMAIN", "student.hcmiu.edu.vn")
-# Học viên cao học dùng email tên miền trường (chung với cán bộ). Email này chỉ được
+# Học viên cao học dùng email @mp.hcmiu.edu.vn (cùng tenant). Email này chỉ được
 # nhận khi trỏ đúng tới một hồ sơ sau đại học — xem
 # core/login_policy.py::find_graduate_code_by_email. Để trống = tắt đường này.
-MS_GRADUATE_EMAIL_DOMAIN = os.getenv("MS_GRADUATE_EMAIL_DOMAIN", "hcmiu.edu.vn")
+MS_GRADUATE_EMAIL_DOMAIN = os.getenv("MS_GRADUATE_EMAIL_DOMAIN", "mp.hcmiu.edu.vn")
 MS_LOGIN_ENABLED = bool(MS_TENANT_ID and MS_CLIENT_ID and MS_CLIENT_SECRET)
 
 # ── Bảo mật & Reverse proxy ──────────────────────────────────────────────────

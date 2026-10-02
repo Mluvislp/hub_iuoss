@@ -320,7 +320,7 @@ function LoginForm() {
                 )}
               </button>
               <p className="mt-2 text-center text-xs text-slate-400">
-                Sinh viên dùng email @student.hcmiu.edu.vn · Học viên cao học dùng email @hcmiu.edu.vn
+                Sinh viên dùng email @student.hcmiu.edu.vn · Học viên cao học dùng email @mp.hcmiu.edu.vn
               </p>
             </>
           )}

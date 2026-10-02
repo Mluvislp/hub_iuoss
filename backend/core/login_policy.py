@@ -152,15 +152,15 @@ def is_bhyt_only(student: Student) -> bool:
 
 
 def find_graduate_code_by_email(email: str) -> str | None:
-    """Email @hcmiu.edu.vn → MSSV hiện tại của học viên cao học, None nếu không phải.
+    """Email @mp.hcmiu.edu.vn → MSSV hiện tại của học viên cao học, None nếu không phải.
 
-    Tên miền này dùng chung với cán bộ, giảng viên (cùng tenant Microsoft), nên
-    CHỈ nhận khi email trỏ đúng tới một hồ sơ sau đại học — mọi trường hợp khác
-    (cán bộ, sinh viên đại học dùng email này) đều trả None. Xét lần lượt:
+    Không tin tiền tố email: CHỈ nhận khi email trỏ đúng tới một hồ sơ sau đại học
+    — mọi trường hợp khác (không có hồ sơ, hồ sơ sinh viên đại học) đều trả None.
+    Xét lần lượt:
 
-    1. Tiền tố email = MSSV của một học viên cao học (`mbaiu25025@hcmiu.edu.vn`).
+    1. Tiền tố email = MSSV của một học viên cao học (`mbaiu25025@mp.hcmiu.edu.vn`).
     2. Email trùng một email đang dùng trong hồ sơ của ĐÚNG MỘT học viên cao học
-       (`student_contact_points`) — email kiểu cán bộ (`ntlchi@hcmiu.edu.vn`).
+       (`student_contact_points`) — email không theo MSSV (`ntlchi@mp.hcmiu.edu.vn`).
        Trùng nhiều người thì không đoán, trả None.
     """
     email = (email or "").strip().lower()
