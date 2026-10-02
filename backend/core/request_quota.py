@@ -4,7 +4,9 @@ Luật (người dùng chốt 01/10/2026):
   - Mỗi loại giấy chỉ xin được MỘT lần trong học kỳ hiện tại.
   - Yêu cầu bị TỪ CHỐI không tính lượt ⇒ xin lại được.
   - Bảng điểm rèn luyện (`conduct_score`) tính riêng theo TỪNG HỌC KỲ CỦA BẢNG ĐIỂM:
-    trong một học kỳ, mỗi học kỳ bảng điểm xin được 1 lần.
+    trong một học kỳ, mỗi học kỳ bảng điểm xin được 1 lần. "Cả năm học" (mã `YYYYN`,
+    01/10/2026) trùng phạm vi với HK1, HK2 của năm đó: đã xin cả năm thì không xin lẻ
+    học kỳ của năm đó nữa, và ngược lại (`documents.conduct_overlapping_codes`).
   - Chuyên viên bấm "Mở lại lượt xin" trên Dashboard ⇒ yêu cầu đó được đánh dấu
     `payload.quota_exempt` và KHÔNG tính lượt nữa ⇒ SV xin thêm được đúng một lần.
 
@@ -24,6 +26,7 @@ from django.utils import timezone
 
 from students.timeline import current_academic_year, current_semester
 
+from .documents import conduct_overlapping_codes
 from .models import ConfirmationRequest
 
 CONTACT_EMAIL = "oss@hcmiu.edu.vn"
@@ -65,7 +68,9 @@ def _counted(student_id, term):
 
 
 def _blocking_info(req, term):
+    purpose = (req.payload or {}).get("purpose") or {}
     return {
+        "semester_label": purpose.get("label") or "",
         "request_id": req.id,
         "code": req.code,
         "status": req.status,
@@ -90,8 +95,9 @@ def availability(student_id, request_types, today=None):
             sems = {}
             for r in mine:
                 code = ((r.payload or {}).get("purpose") or {}).get("code")
-                if code:
-                    sems.setdefault(str(code), _blocking_info(r, term))
+                # Khoá cả những lựa chọn trùng phạm vi (cả năm ↔ học kỳ lẻ của năm đó).
+                for c in sorted(conduct_overlapping_codes(code)):
+                    sems.setdefault(c, _blocking_info(r, term))
             out[t] = {"blocked": False, "reason": "", "blocking": None, "blocked_semesters": sems}
             continue
         if mine:
@@ -103,12 +109,15 @@ def availability(student_id, request_types, today=None):
 
 
 def block_message(request_type, info, semester_label=None):
-    what = (f"Bảng điểm rèn luyện {semester_label.lower()}" if semester_label
-            else "Loại giấy này")
+    # Bảng điểm RL: nêu lựa chọn ĐÃ xin — có thể khác lựa chọn đang xin (cả năm ↔ học kỳ lẻ).
+    used = info.get("semester_label") or semester_label
+    what = f"Bảng điểm rèn luyện {used.lower()}" if used else "Loại giấy này"
+    overlap = (" Cả năm học và từng học kỳ của cùng năm học chỉ được xin một trong hai."
+               if semester_label and used and used != semester_label else "")
     return (f"{what} đã được xin trong {info['term'].lower()} (mã yêu cầu {info['code']}, "
             f"{info['status_label'].lower()}). Mỗi loại giấy chỉ được xin 1 lần trong một học kỳ; "
             f"được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ "
-            f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.")
+            f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.{overlap}")
 
 
 def check(student_id, request_type, semester_code=None, semester_label=None):

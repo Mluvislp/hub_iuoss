@@ -236,9 +236,15 @@ export default function RequestDetailPage() {
         </div>
         <div className="px-5 py-2">
           <div className={ui.dtRow}>
-            <span className={ui.dtLabel}>{data.request_type === 'conduct_score' ? 'Học kỳ' : 'Mục đích'}</span>
+            <span className={ui.dtLabel}>{data.request_type === 'conduct_score' ? 'Học kỳ / năm học' : 'Mục đích'}</span>
             <span className={ui.dtValue}>{data.purpose}</span>
           </div>
+          {snapshot.delivery ? (
+            <div className={ui.dtRow}>
+              <span className={ui.dtLabel}>Hình thức nhận</span>
+              <span className={ui.dtValue}>{String(snapshot.delivery)}</span>
+            </div>
+          ) : null}
           {snapshot.student_name ? (
             <div className={ui.dtRow}>
               <span className={ui.dtLabel}>Họ tên</span>

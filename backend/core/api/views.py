@@ -47,6 +47,7 @@ from core.documents import (
     build_conduct_payload,
     build_conduct_prefill,
     conduct_semester_choices,
+    CONDUCT_DELIVERY_CHOICES,
 )
 from core import offcampus
 from students.models import (
@@ -1270,6 +1271,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             payload, semester_label = build_conduct_payload(
                 student,
                 semester_code=_get_str(request.data, "semester_code"),
+                delivery=_get_str(request.data, "delivery"),
                 dob=_get_str(request.data, "dob"),
                 citizen_id=_get_str(request.data, "citizen_id"),
                 citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
@@ -1541,6 +1543,7 @@ class ConductScoreRequestFormView(DocumentRequestsRequiredMixin, APIView):
             )
         return Response({
             "semester_choices": conduct_semester_choices(student),
+            "delivery_choices": CONDUCT_DELIVERY_CHOICES,
             "prefill": build_conduct_prefill(student),
         })
 
