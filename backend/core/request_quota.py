@@ -4,9 +4,9 @@ Luật (người dùng chốt 01/10/2026):
   - Mỗi loại giấy chỉ xin được MỘT lần trong học kỳ hiện tại.
   - Yêu cầu bị TỪ CHỐI không tính lượt ⇒ xin lại được.
   - Bảng điểm rèn luyện (`conduct_score`) tính riêng theo TỪNG HỌC KỲ CỦA BẢNG ĐIỂM:
-    trong một học kỳ, mỗi học kỳ bảng điểm xin được 1 lần. "Cả năm học" (mã `YYYYN`,
-    01/10/2026) trùng phạm vi với HK1, HK2 của năm đó: đã xin cả năm thì không xin lẻ
-    học kỳ của năm đó nữa, và ngược lại (`documents.conduct_overlapping_codes`).
+    trong một học kỳ, mỗi học kỳ bảng điểm xin được 1 lần. "Cả năm học" (mã `YYYYN`):
+    đã xin cả năm thì không xin lẻ HK1, HK2 của năm đó nữa; đã xin một học kỳ thì VẪN
+    xin được cả năm (một chiều, chốt 02/10/2026 — `documents.conduct_overlapping_codes`).
   - Chuyên viên bấm "Mở lại lượt xin" trên Dashboard ⇒ yêu cầu đó được đánh dấu
     `payload.quota_exempt` và KHÔNG tính lượt nữa ⇒ SV xin thêm được đúng một lần.
 
@@ -95,7 +95,7 @@ def availability(student_id, request_types, today=None):
             sems = {}
             for r in mine:
                 code = ((r.payload or {}).get("purpose") or {}).get("code")
-                # Khoá cả những lựa chọn trùng phạm vi (cả năm ↔ học kỳ lẻ của năm đó).
+                # Đã xin cả năm ⇒ khoá luôn học kỳ lẻ của năm đó (một chiều).
                 for c in sorted(conduct_overlapping_codes(code)):
                     sems.setdefault(c, _blocking_info(r, term))
             out[t] = {"blocked": False, "reason": "", "blocking": None, "blocked_semesters": sems}
@@ -112,7 +112,7 @@ def block_message(request_type, info, semester_label=None):
     # Bảng điểm RL: nêu lựa chọn ĐÃ xin — có thể khác lựa chọn đang xin (cả năm ↔ học kỳ lẻ).
     used = info.get("semester_label") or semester_label
     what = f"Bảng điểm rèn luyện {used.lower()}" if used else "Loại giấy này"
-    overlap = (" Cả năm học và từng học kỳ của cùng năm học chỉ được xin một trong hai."
+    overlap = (" Đã xin cả năm học thì không xin lẻ từng học kỳ của năm học đó."
                if semester_label and used and used != semester_label else "")
     return (f"{what} đã được xin trong {info['term'].lower()} (mã yêu cầu {info['code']}, "
             f"{info['status_label'].lower()}). Mỗi loại giấy chỉ được xin 1 lần trong một học kỳ; "

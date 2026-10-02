@@ -310,7 +310,7 @@ export default function ConductScoreRequestPage() {
                   <option value="">— Chọn học kỳ hoặc cả năm học —</option>
                   {form.semester_choices.map((c) => {
                     const used = !isEdit ? usedSemesters[c.code] : undefined;
-                    // Cả năm ↔ học kỳ lẻ cùng năm khoá lẫn nhau ⇒ nêu lựa chọn đã xin nếu khác.
+                    // Đã xin cả năm ⇒ học kỳ lẻ của năm đó bị khoá ⇒ nêu lựa chọn đã xin nếu khác.
                     const usedLabel = used?.semester_label;
                     const suffix = !used ? ''
                       : usedLabel && usedLabel !== c.label ? ` — đã xin ${usedLabel.toLowerCase()}`
@@ -326,7 +326,7 @@ export default function ConductScoreRequestPage() {
                 {!isEdit && Object.keys(usedSemesters).length > 0 && quota && (
                   <QuotaNotice
                     className="mt-2"
-                    reason={`Lựa chọn đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, cả năm học và từng học kỳ của cùng năm học chỉ được xin một trong hai, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
+                    reason={`Lựa chọn đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, đã xin cả năm học thì không xin lẻ từng học kỳ của năm học đó, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
                   />
                 )}
               </>

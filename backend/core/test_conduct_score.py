@@ -88,7 +88,7 @@ class ConductWholeYearTests(SimpleTestCase):
 
     def test_overlapping_codes(self):
         self.assertEqual(conduct_overlapping_codes("2025N"), {"2025N", "20251", "20252"})
-        self.assertEqual(conduct_overlapping_codes("20251"), {"20251", "2025N"})
+        self.assertEqual(conduct_overlapping_codes("20251"), {"20251"})
         self.assertEqual(conduct_overlapping_codes(""), set())
 
 
@@ -170,7 +170,7 @@ class ConductPayloadTests(TestCase):
 
 
 class ConductQuotaOverlapTests(TestCase):
-    """Cả năm học khoá HK lẻ của năm đó và ngược lại (người dùng chốt 01/10/2026)."""
+    """Cả năm học khoá HK lẻ của năm đó; học kỳ lẻ KHÔNG khoá cả năm (chốt 02/10/2026)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -188,17 +188,19 @@ class ConductQuotaOverlapTests(TestCase):
         msg = request_quota.check(self.student.pk, "conduct_score", "20251",
                                   "Học kỳ 1, năm học 2025-2026")
         self.assertIn("cả năm học 2025-2026", msg)
-        self.assertIn("chỉ được xin một trong hai", msg)
+        self.assertIn("không xin lẻ từng học kỳ", msg)
         self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "20241", "x"))
 
-    def test_semester_blocks_year_but_not_other_semester(self):
+    def test_semester_does_not_block_year(self):
+        # Chốt 02/10/2026: đã xin một học kỳ thì vẫn xin được cả năm học đó.
         self._request("20252", "Học kỳ 2, năm học 2025-2026")
-        self.assertIsNotNone(request_quota.check(self.student.pk, "conduct_score", "2025N",
-                                                 "Cả năm học 2025-2026"))
+        self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "2025N",
+                                              "Cả năm học 2025-2026"))
         self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "20251", "x"))
+        self.assertIsNotNone(request_quota.check(self.student.pk, "conduct_score", "20252", "x"))
         blocked = request_quota.availability(self.student.pk, ["conduct_score"])[
             "types"]["conduct_score"]["blocked_semesters"]
-        self.assertEqual(set(blocked), {"20252", "2025N"})
+        self.assertEqual(set(blocked), {"20252"})
 
     def test_rejected_frees_overlap(self):
         self._request("2025N", "Cả năm học 2025-2026", status=ConfirmationRequest.STATUS_REJECTED)

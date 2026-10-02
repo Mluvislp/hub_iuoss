@@ -820,19 +820,18 @@ def _year_label(year):
 
 
 def conduct_overlapping_codes(code):
-    """Các mã lựa chọn trùng phạm vi với `code` (kể cả chính nó) — dùng cho hạn mức.
+    """Các mã lựa chọn bị KHOÁ khi đã có yêu cầu `code` (kể cả chính nó) — dùng cho hạn mức.
 
-    Cả năm học YYYY trùng với HK1, HK2 của năm đó và ngược lại (người dùng chốt
-    01/10/2026: đã xin cả năm thì không xin lẻ học kỳ của năm đó nữa, và ngược lại).
+    Một chiều (người dùng chốt 02/10/2026): đã xin CẢ NĂM học YYYY thì khoá luôn HK1,
+    HK2 của năm đó; đã xin MỘT học kỳ thì chỉ khoá đúng học kỳ đó — vẫn xin được cả năm.
     """
     code = str(code or "")
     if len(code) != 5 or not code[:4].isdigit():
         return {code} if code else set()
     year, part = code[:4], code[4]
-    whole = year + CONDUCT_YEAR_SUFFIX
     if part == CONDUCT_YEAR_SUFFIX:
-        return {whole, year + "1", year + "2"}
-    return {code, whole}
+        return {code, year + "1", year + "2"}
+    return {code}
 
 
 def conduct_semester_choices(student, today=None):
