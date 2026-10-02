@@ -300,8 +300,15 @@ export interface ConductScorePrefill {
   street: string;
 }
 
+/** Mã `YYYYS` = một học kỳ, `YYYYN` = cả năm học (kind 'year'). */
+export interface ConductSemesterChoice extends PurposeChoice {
+  kind: 'semester' | 'year';
+}
+
 export interface ConductScoreFormData {
-  semester_choices: PurposeChoice[];
+  semester_choices: ConductSemesterChoice[];
+  /** Hình thức nhận: online = bản mềm, paper = bản cứng. */
+  delivery_choices: PurposeChoice[];
   prefill: ConductScorePrefill;
 }
 
@@ -668,6 +675,8 @@ export interface QuotaBlocking {
   status_label: string;
   created_at: string;
   term: string;
+  /** Chỉ conduct_score: học kỳ / năm học của yêu cầu đang chiếm lượt. */
+  semester_label?: string;
 }
 
 export interface QuotaTypeState {

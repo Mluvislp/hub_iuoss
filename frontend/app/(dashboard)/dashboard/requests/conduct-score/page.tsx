@@ -27,13 +27,14 @@ import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purpos
 type FieldKey = 'dob' | 'citizen_id' | 'citizen_id_issue_date';
 const FIELD_KEYS: FieldKey[] = ['dob', 'citizen_id', 'citizen_id_issue_date'];
 
-type FErr = Partial<Record<FieldKey | 'semester' | 'province' | 'ward' | 'street', string>>;
+type FErr = Partial<Record<FieldKey | 'semester' | 'delivery' | 'province' | 'ward' | 'street', string>>;
 
 export default function ConductScoreRequestPage() {
   const [form, setForm] = useState<ConductScoreFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
   const [semesterCode, setSemesterCode] = useState('');
+  const [delivery, setDelivery] = useState('');
   // Học kỳ bảng điểm đã xin trong học kỳ hiện tại — làm mờ trong danh sách, không ẩn.
   const quota = useRequestQuota();
   const usedSemesters = quota?.types.conduct_score?.blocked_semesters ?? {};
@@ -75,6 +76,8 @@ export default function ConductScoreRequestPage() {
       }
     });
     setSemesterCode(purposeOf(r).code);
+    const prevDelivery = ((r.payload ?? {}) as { delivery?: { code?: string } }).delivery?.code;
+    if (prevDelivery) setDelivery(prevDelivery);
     const a = pendingAddress(r);
     if (a) {
       setStreet(a.street);
@@ -160,7 +163,8 @@ export default function ConductScoreRequestPage() {
     const pf = form.prefill;
 
     const errs: FErr = {};
-    if (!semesterCode) errs.semester = 'Vui lòng chọn học kỳ.';
+    if (!semesterCode) errs.semester = 'Vui lòng chọn học kỳ hoặc cả năm học.';
+    if (!delivery) errs.delivery = 'Vui lòng chọn hình thức nhận.';
     const de = validateDob(values.dob); if (de) errs.dob = de;
     const ce = validateCccd(values.citizen_id, pf.citizen_id); if (ce) errs.citizen_id = ce;
     // Ngày cấp soi khi SV đổi số / đổi ngày, hoặc ngày trong hồ sơ không dùng được —
@@ -182,6 +186,7 @@ export default function ConductScoreRequestPage() {
     try {
       await submitOrUpdate(edit, 'conduct_score', api.requests.createConductScore, {
         semester_code: semesterCode,
+        delivery,
         dob: values.dob.trim(),
         citizen_id: values.citizen_id.trim(),
         citizen_id_issue_date: values.citizen_id_issue_date.trim(),
@@ -264,7 +269,7 @@ export default function ConductScoreRequestPage() {
             Bảng điểm rèn luyện
           </h1>
           <p className="text-sm text-muted mt-1">
-            Thông tin lấy từ hồ sơ. Chọn học kỳ, kiểm tra thông tin, yêu cầu chỉnh sửa nếu sai rồi gửi.
+            Thông tin lấy từ hồ sơ. Chọn học kỳ hoặc cả năm học và hình thức nhận, kiểm tra thông tin, yêu cầu chỉnh sửa nếu sai rồi gửi.
           </p>
         </div>
 
@@ -289,7 +294,7 @@ export default function ConductScoreRequestPage() {
 
           {/* Học kỳ */}
           <div className="sm:max-w-[360px]">
-            <label className={ui.fieldLabel}>Học kỳ cấp bảng điểm rèn luyện <span className="text-red-500">*</span></label>
+            <label className={ui.fieldLabel}>Học kỳ / năm học cấp bảng điểm rèn luyện <span className="text-red-500">*</span></label>
             {noSemester ? (
               <p className="text-[0.85rem] text-muted">
                 Chưa có học kỳ nào kết thúc để cấp bảng điểm rèn luyện. Liên hệ Phòng CTSV nếu cần hỗ trợ.
@@ -302,22 +307,58 @@ export default function ConductScoreRequestPage() {
                   disabled={isEdit}
                   className={cn(ui.input, fieldErrors.semester && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
                 >
-                  <option value="">— Chọn học kỳ —</option>
-                  {form.semester_choices.map((c) => (
-                    <option key={c.code} value={c.code} disabled={!isEdit && !!usedSemesters[c.code]}>
-                      {c.label}{!isEdit && usedSemesters[c.code] ? ' — đã xin trong học kỳ này' : ''}
-                    </option>
-                  ))}
+                  <option value="">— Chọn học kỳ hoặc cả năm học —</option>
+                  {form.semester_choices.map((c) => {
+                    const used = !isEdit ? usedSemesters[c.code] : undefined;
+                    // Cả năm ↔ học kỳ lẻ cùng năm khoá lẫn nhau ⇒ nêu lựa chọn đã xin nếu khác.
+                    const usedLabel = used?.semester_label;
+                    const suffix = !used ? ''
+                      : usedLabel && usedLabel !== c.label ? ` — đã xin ${usedLabel.toLowerCase()}`
+                      : ' — đã xin trong học kỳ này';
+                    return (
+                      <option key={c.code} value={c.code} disabled={!!used}>
+                        {c.label}{suffix}
+                      </option>
+                    );
+                  })}
                 </select>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
                 {!isEdit && Object.keys(usedSemesters).length > 0 && quota && (
                   <QuotaNotice
                     className="mt-2"
-                    reason={`Học kỳ bảng điểm đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
+                    reason={`Lựa chọn đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, cả năm học và từng học kỳ của cùng năm học chỉ được xin một trong hai, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
                   />
                 )}
               </>
             )}
+          </div>
+
+          {/* Hình thức nhận */}
+          <div>
+            <span className={ui.fieldLabel}>Hình thức nhận <span className="text-red-500">*</span></span>
+            <div className="grid sm:grid-cols-2 gap-2 sm:max-w-[480px]">
+              {form.delivery_choices.map((d) => (
+                <label
+                  key={d.code}
+                  className={cn(
+                    'flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-sm cursor-pointer transition-colors',
+                    delivery === d.code
+                      ? 'border-primary bg-primary-soft text-primary-text font-medium'
+                      : 'border-line bg-white text-ink hover:border-slate-400',
+                    fieldErrors.delivery && delivery !== d.code && 'border-danger-line',
+                  )}
+                >
+                  <input
+                    type="radio" name="delivery" value={d.code}
+                    checked={delivery === d.code}
+                    onChange={() => { setDelivery(d.code); setFieldErrors((f) => ({ ...f, delivery: undefined })); }}
+                    className="accent-primary"
+                  />
+                  {d.label}
+                </label>
+              ))}
+            </div>
+            {fieldErrors.delivery && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.delivery}</p>}
           </div>
 
           {/* Ngày sinh */}

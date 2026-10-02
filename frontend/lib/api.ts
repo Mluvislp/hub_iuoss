@@ -280,6 +280,7 @@ export const api = {
     },
     createConductScore(data: {
       semester_code: string;
+      delivery: string;
       dob: string;
       citizen_id: string;
       citizen_id_issue_date: string;
