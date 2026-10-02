@@ -1,7 +1,8 @@
 from core.insurance_submission import submission
 from core.insurance_history import append_event
 from core.insurance_files import inspect_upload
-from core.insurance_contract import normalized, integer
+from core.insurance_contract import normalized, integer, safe_path
+from django.http import FileResponse
 from core.insurance_editing import closes_at
 import logging
 from django.conf import settings
@@ -1321,6 +1322,28 @@ class _OwnRequestMixin(DocumentRequestsRequiredMixin):
                 .filter(pk=pk, ldap_uid=request.user.ldap_uid)
                 .prefetch_related(_visible_comments())
                 .first())
+
+
+class RequestSoftCopyView(_OwnRequestMixin, APIView):
+    """GET /api/requests/<id>/soft-copy/ — PDF bản mềm bảng điểm RL do Phòng CTSV tải lên.
+
+    Chỉ khi yêu cầu của CHÍNH sinh viên đã Hoàn thành. File nằm dưới MEDIA_ROOT của Hub
+    (Dashboard ghi vào qua HUB_MEDIA_ROOT). Cần token nên frontend tải qua fetch.
+    """
+
+    def get(self, request, pk):
+        req = self.get_own_request(request, pk)
+        data = (req.payload or {}).get("soft_copy") if req else None
+        if req is None or req.status != ConfirmationRequest.STATUS_DONE or not isinstance(data, dict):
+            raise NotFound("Không tìm thấy file.")
+        path = safe_path(settings.MEDIA_ROOT, data.get("storage_key"))
+        if path is None:
+            raise NotFound("Không tìm thấy file.")
+        response = FileResponse(open(path, "rb"), content_type="application/pdf",
+                                filename=data.get("filename") or f"{req.code}.pdf")
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class RequestDetailView(_OwnRequestMixin, APIView):

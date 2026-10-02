@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  AlertCircle, ArrowLeft, Lock, Loader2, MessageSquare, PencilLine, Send, Ticket,
+  AlertCircle, ArrowLeft, Download, FileText, Lock, Loader2, MessageSquare, PencilLine, Send, Ticket,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, accentIcon } from '@/lib/ui';
@@ -215,6 +215,8 @@ export default function RequestDetailPage() {
         </section>
       )}
 
+      {data.soft_copy && <SoftCopyCard id={data.id} code={data.code} file={data.soft_copy} />}
+
       {data.student_can_edit && editHref(data) && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-line bg-warning-soft px-5 py-4">
           <div className="min-w-0">
@@ -364,5 +366,54 @@ export default function RequestDetailPage() {
         Cập nhật lần cuối: {formatDate(data.updated_at)}
       </p>
     </div>
+  );
+}
+
+
+/** Bản mềm PDF bảng điểm rèn luyện — Phòng CTSV tải lên, chỉ hiện khi yêu cầu đã Hoàn thành. */
+function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { filename: string; size: number } }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function open(download: boolean) {
+    setBusy(true);
+    setError('');
+    try {
+      const blob = await api.requests.softCopy(id);
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      if (download) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.filename || `${code}.pdf`;
+        a.click();
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setError('Không tải được file. Vui lòng thử lại.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const size = file.size >= 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+  return (
+    <section className="rounded-lg border border-success-line bg-success-soft px-5 py-4">
+      <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-success-text">
+        <FileText size={14} />
+        BẢN MỀM BẢNG ĐIỂM RÈN LUYỆN
+      </p>
+      <p className="mt-1.5 text-[0.88rem] text-ink break-all">{file.filename} · {size}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => open(false)} disabled={busy} className={ui.btnSecondary}>
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />} Xem
+        </button>
+        <button type="button" onClick={() => open(true)} disabled={busy} className={ui.btnPrimary}>
+          <Download size={15} /> Tải về
+        </button>
+      </div>
+      {error && <p className="mt-2 text-[0.8rem] text-danger-text">{error}</p>}
+    </section>
   );
 }
