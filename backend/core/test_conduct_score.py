@@ -125,4 +125,5 @@ class ConductPayloadTests(TestCase):
         # Ngày cấp ở tương lai ⇒ `_cccd_fields` chặn cho cả vay vốn.
         with self.assertRaises(ValueError):
             build_bankloan_payload(self.student, dob="01/05/2002", citizen_id="079202000001",
-                                   citizen_id_issue_date="01/01/2099", class_code="ITIT20A1")
+                                   citizen_id_issue_date="01/01/2099", class_code="ITIT20A1",
+                                   fee_exemption="none", orphan="no")

@@ -252,6 +252,8 @@ export const api = {
       citizen_id: string;
       citizen_id_issue_date: string;
       class_code: string;
+      fee_exemption: string;
+      orphan: string;
       note?: string;
     }): Promise<ConfirmationRequest> {
       return request('/requests/', {

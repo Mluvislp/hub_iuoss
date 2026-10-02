@@ -260,6 +260,10 @@ export interface BankLoanPrefill {
 
 export interface BankLoanFormData {
   prefill: BankLoanPrefill;
+  /** "Thuộc diện" (miễn / giảm học phí) — SV chọn, Phòng CTSV duyệt hoặc sửa. */
+  fee_exemption_choices: PurposeChoice[];
+  /** "Thuộc đối tượng" (mồ côi). */
+  orphan_choices: PurposeChoice[];
 }
 
 export interface EnglishPrefill {

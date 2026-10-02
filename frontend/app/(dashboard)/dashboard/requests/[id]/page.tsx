@@ -36,6 +36,13 @@ const FIELD_LABELS: Record<string, string> = {
   class_code: 'Mã lớp',
 };
 
+/** Vay vốn — lựa chọn của SV (`payload.student_choices`); mã khớp backend BANKLOAN_*_CHOICES. */
+const AID_LABELS: Record<string, Record<string, string>> = {
+  fee_exemption: { none: 'Không miễn giảm', reduced: 'Giảm học phí', exempt: 'Miễn học phí' },
+  orphan: { yes: 'Mồ côi', no: 'Không mồ côi' },
+};
+const AID_FIELDS: [string, string][] = [['fee_exemption', 'Thuộc diện'], ['orphan', 'Thuộc đối tượng']];
+
 /** Nhãn cho lượt trao đổi sinh ra từ một lần đổi trạng thái. */
 const EVENT_LABELS: Record<string, string> = {
   awaiting_info: 'Yêu cầu bổ sung thông tin',
@@ -168,6 +175,7 @@ export default function RequestDetailPage() {
   const payload = (data.payload ?? {}) as Record<string, unknown>;
   const snapshot = (payload.snapshot ?? {}) as Record<string, unknown>;
   const editable = (payload.editable ?? {}) as Record<string, unknown>;
+  const studentChoices = (payload.student_choices ?? {}) as Record<string, string>;
 
   return (
     <div className="space-y-5">
@@ -256,6 +264,16 @@ export default function RequestDetailPage() {
               <div key={key} className={ui.dtRow}>
                 <span className={ui.dtLabel}>{label}</span>
                 <span className={ui.dtValue}>{value}</span>
+              </div>
+            );
+          })}
+          {AID_FIELDS.map(([key, label]) => {
+            const code = studentChoices[key];
+            if (!code) return null;
+            return (
+              <div key={key} className={ui.dtRow}>
+                <span className={ui.dtLabel}>{label}</span>
+                <span className={ui.dtValue}>{AID_LABELS[key][code] ?? code}</span>
               </div>
             );
           })}

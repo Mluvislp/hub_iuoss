@@ -16,7 +16,7 @@ from students.models import Student, StudentIdentityDocument
 
 
 @override_settings(FEATURE_DOCUMENT_REQUESTS=True)
-class RequestEditTests(TestCase):
+class _RequestTestBase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.student = Student.objects.create(
@@ -53,6 +53,9 @@ class RequestEditTests(TestCase):
         req.save()
         return req
 
+
+
+class RequestEditTests(_RequestTestBase):
     def _put(self, req, **over):
         body = dict(request_type="other", purpose_code="scholarship", dob="01/05/2002",
                     citizen_id="079202000001")
@@ -141,3 +144,36 @@ class RequestEditTests(TestCase):
         self.assertTrue(resp.json()["student_can_comment"])
         resp = self.client.post(f"/api/requests/{req.pk}/comments/", {"body": "bổ sung thêm"}, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
+
+
+class BankLoanStudentChoiceTests(_RequestTestBase):
+    """Vay vốn: SV chọn Thuộc diện / Thuộc đối tượng ⇒ payload.student_choices."""
+
+    def _bank(self, **over):
+        body = dict(request_type="bank_loan", dob="01/05/2002", citizen_id="079202000001",
+                    citizen_id_issue_date="10/04/2021", class_code="ITIT20A1",
+                    fee_exemption="reduced", orphan="no")
+        body.update(over)
+        return self.client.post("/api/requests/", body, format="json")
+
+    def test_bat_buoc_chon(self):
+        self.assertEqual(self._bank(fee_exemption="").status_code, 400)
+        self.assertEqual(self._bank(orphan="maybe").status_code, 400)
+
+    def test_luu_lua_chon_sinh_vien(self):
+        resp = self._bank()
+        self.assertEqual(resp.status_code, 201, resp.content)
+        req = ConfirmationRequest.objects.get(pk=resp.json()["id"])
+        self.assertEqual(req.payload["student_choices"], {"fee_exemption": "reduced", "orphan": "no"})
+
+    def test_sua_lai_giu_gia_tri_chuyen_vien(self):
+        req = ConfirmationRequest.objects.get(pk=self._bank().json()["id"])
+        self._await(req, staff_fields={"fee_exemption": "exempt", "orphan": "no"})
+        body = dict(request_type="bank_loan", dob="01/05/2002", citizen_id="079202000001",
+                    citizen_id_issue_date="10/04/2021", class_code="ITIT20A1",
+                    fee_exemption="exempt", orphan="yes")
+        resp = self.client.put(f"/api/requests/{req.pk}/", body, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        req.refresh_from_db()
+        self.assertEqual(req.payload["student_choices"], {"fee_exemption": "exempt", "orphan": "yes"})
+        self.assertEqual(req.payload["staff_fields"], {"fee_exemption": "exempt", "orphan": "no"})
