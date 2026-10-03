@@ -229,8 +229,8 @@ export default function BankLoanRequestPage() {
               <ReadonlyField label="Học kỳ hiện tại" value={p.current_semester} />
               <ReadonlyField label="Thời gian nhập học" value={p.start_label} />
               <ReadonlyField label="Ra trường đúng tiến độ" value={p.graduation_label} />
-              <ReadonlyField label="Số năm / tháng đào tạo" value={p.course_year_number && p.course_month_number ? `${p.course_year_number} năm (${p.course_month_number} tháng)` : (p.course_year_number || '—')} />
-              <ReadonlyField label="Tối đa (năm / tháng)" value={p.max_year_number && p.max_month_number ? `${p.max_year_number} năm (${p.max_month_number} tháng)` : (p.max_year_number || '—')} />
+              <ReadonlyField label="Số năm / tháng đào tạo" value={durationText(p.course_month_number, p.course_year_number, true)} />
+              <ReadonlyField label="Tối đa (năm / tháng)" value={durationText(p.max_month_number, p.max_year_number)} />
             </div>
           </div>
 
@@ -385,4 +385,18 @@ function ChoiceGroup({ label, name, choices, value, error, onChange }: {
       {error && <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
     </fieldset>
   );
+}
+
+
+/** Số tháng → "4 năm 6 tháng (53 tháng)" — khớp giấy vay vốn (Dashboard registry.duration_label).
+ *  Thời gian đào tạo (`onTime`) cộng bù 1 tháng khi không tròn năm (53 tháng = 4,5 năm), cùng luật
+ *  mốc ra trường; thời gian tối đa cộng thẳng (80 tháng = 6 năm 8 tháng). */
+function durationText(months: string, years: string, onTime = false): string {
+  const raw = parseInt(months, 10);
+  if (!raw || raw <= 0) return years ? `${years} năm` : '—';
+  const m = onTime && raw % 12 ? raw + 1 : raw;
+  const y = Math.floor(m / 12);
+  const rest = m % 12;
+  const label = !y ? `${rest} tháng` : rest ? `${y} năm ${rest} tháng` : `${y} năm`;
+  return `${label} (${raw} tháng)`;
 }
