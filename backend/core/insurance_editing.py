@@ -8,6 +8,7 @@ from .insurance_contract import Conflict, WorkflowError, fingerprint
 from .insurance_history import (require_active, replay, check_version, ensure_legacy, append_event,
                                 readable_changes)
 from .insurance_files import inspect_uploads, store_evidence
+from . import student_images
 
 FIELDS = ('full_name', 'gender', 'dob', 'ethnicity', 'phone_number', 'citizen_id',
           'social_insurance_number', 'permanent_province', 'permanent_ward',
@@ -134,9 +135,17 @@ def edit_registration(pk, student_id, data, files):
                                  key=data.get('request_key'), payload={'request_digest': digest, 'changes': changes,
                                      'previous_profile_comparison': previous_comparison})
             for name, content in checked.items():
-                evidence = store_evidence(reg, event, files[name], content, written)
-                changes[name] = {'before': str(getattr(reg, name) or ''), 'after': evidence.storage_key}
-                setattr(reg, name, evidence.storage_key)
+                kind = student_images.REGISTRATION_IMAGE_KINDS.get(name)
+                if kind:
+                    # Ảnh profile → kho student_images; cột của đơn giữ cùng storage_key.
+                    key = student_images.save_image(
+                        reg.student, kind, student_images.SELF, content,
+                        original_filename=files[name].name, source=student_images.SOURCE_BHYT_REGISTRATION,
+                        written=written).storage_key
+                else:
+                    key = store_evidence(reg, event, files[name], content, written).storage_key
+                changes[name] = {'before': str(getattr(reg, name) or ''), 'after': key}
+                setattr(reg, name, key)
             # Event objects are append-only: include image changes in a separate event.
             if checked:
                 append_event(reg, 'IMAGES_REPLACED', source='Hub', actor_id=student_id,

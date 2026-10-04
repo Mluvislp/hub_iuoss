@@ -97,6 +97,39 @@ class EditingTests(TestCase):
                 self.edit(rollback_row, payment_receipt_image=picture(color='green'))
         self.assertEqual(set(Path(self.temp.name).rglob('*.png')), files)
 
+    def test_edit_cccd_goes_to_student_images_receipt_stays_evidence(self):
+        from core.models import StudentImage
+        row = self.registration()
+        response = self.edit(row, cccd_image=picture(color='blue'), payment_receipt_image=picture(color='green'))
+        self.assertEqual(response.status_code, 200, response.data)
+        row.refresh_from_db()
+        image = StudentImage.objects.get(student=self.student, kind='cccd_front', is_current=True)
+        self.assertEqual(str(row.cccd_image), image.storage_key)
+        self.assertEqual(image.source, 'bhyt_registration')
+        self.assertEqual(list(row.evidences.values_list('storage_key', flat=True)), [str(row.payment_receipt_image)])
+
+    def test_external_images_go_to_student_images(self):
+        from core.models import StudentImage
+        response = self.client.post(self.url, self.payload(), format='multipart')
+        self.assertEqual(response.status_code, 201, response.data)
+        row = ExternalInsuranceDeclaration.objects.get()
+        images = {i.kind: i for i in StudentImage.objects.filter(student=self.student, is_current=True)}
+        self.assertEqual(set(images), {'cccd_front', 'cccd_back', 'bhyt_card'})
+        self.assertEqual(row.images['cccd_image'], {'storage_key': images['cccd_front'].storage_key,
+                                                    'mime_type': 'image/png'})
+        # Sửa bản khai, thay CCCD mặt sau: thêm dòng kho mới, dòng cũ về is_current=0, file cũ còn
+        # trên đĩa; JSON của bản khai trỏ file mới.
+        old = images['cccd_back']
+        response = self.edit(row, cccd_image_back=picture(color='blue'))
+        self.assertEqual(response.status_code, 200, response.data)
+        row.refresh_from_db()
+        old.refresh_from_db()
+        back = StudentImage.objects.get(student=self.student, kind='cccd_back', is_current=True)
+        self.assertNotEqual(back.pk, old.pk)
+        self.assertFalse(old.is_current)
+        self.assertEqual(row.images['cccd_image_back']['storage_key'], back.storage_key)
+        self.assertTrue((Path(self.temp.name) / old.storage_key).is_file())
+
     def test_unchanged_registration_and_external_are_rejected(self):
         row = self.registration()
         data = self.payload()
@@ -233,6 +266,7 @@ class ConcurrentEditingTests(TransactionTestCase):
     setUp = ExternalInsuranceTests.setUp
     payload = ExternalInsuranceTests.payload
     registration = EditingTests.registration
+    payload = ExternalInsuranceTests.payload
     external = EditingTests.external
     url = '/api/health-insurance/external/'
 
@@ -266,3 +300,4 @@ class ConcurrentEditingTests(TransactionTestCase):
 
     def test_external_two_sessions_do_not_overwrite(self):
         self.race(self.external(), external=True)
+
