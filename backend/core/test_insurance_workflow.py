@@ -359,6 +359,22 @@ class HubWorkflowTests(TestCase):
         response=self.client.post(url,self.submission_data(uuid4().hex),format='multipart')
         self.assertEqual(response.status_code,409)
 
+    def test_new_submission_stores_profile_images_in_student_images(self):
+        from core.models import StudentImage
+        self.prepare_submission()
+        response=self.client.post(reverse('api_health_insurance_registrations'),self.submission_data(uuid4().hex),format='multipart')
+        self.assertEqual(response.status_code,201,response.data)
+        reg=Registration.objects.get(pk=response.data['id'])
+        images={i.kind:i for i in StudentImage.objects.filter(student=self.student,is_current=True)}
+        self.assertEqual(set(images),{'cccd_front','cccd_back','bhyt_card'})
+        # Cột của đơn ghi CÙNG file với kho — Dashboard đọc cột vẫn ra đúng ảnh.
+        self.assertEqual(reg.cccd_image.name,images['cccd_front'].storage_key)
+        self.assertEqual(reg.cccd_image_back.name,images['cccd_back'].storage_key)
+        self.assertEqual(reg.bhyt_image.name,images['bhyt_card'].storage_key)
+        self.assertTrue(all(i.source=='bhyt_registration' for i in images.values()))
+        # Biên lai gắn với đơn, không vào kho.
+        self.assertFalse(reg.payment_receipt_image.name.startswith('insurance_private/student_images/'))
+
     def test_new_submission_requires_all_four_images(self):
         self.prepare_submission();data=self.submission_data(uuid4().hex);data.pop('bhyt_image')
         response=self.client.post(reverse('api_health_insurance_registrations'),data,format='multipart')

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import health_check_views, ticket_views, views
+from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
 
@@ -65,6 +66,10 @@ urlpatterns = [
     path("tickets/<int:pk>/close/",  ticket_views.TicketCloseView.as_view(),   name="api_ticket_close"),
     path("tickets/<int:pk>/attachments/<int:att_id>/", ticket_views.TicketAttachmentView.as_view(),
          name="api_ticket_attachment"),
+
+    # Kho ảnh cố định của SV (CCCD, thẻ BHYT, ảnh thẻ, avatar) — core/student_images.py
+    path("student-images/",               StudentImagesView.as_view(),    name="api_student_images"),
+    path("student-images/<int:pk>/file/", StudentImageFileView.as_view(), name="api_student_image_file"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

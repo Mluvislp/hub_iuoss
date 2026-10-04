@@ -78,16 +78,13 @@ Sửa contract là phải chạy test **cả hai** app.
 
 - File mới nằm dưới `MEDIA_ROOT/insurance_private/` (khai ngoài trường:
   `insurance_private/external`); ảnh legacy vẫn ở `insurance_data/`.
-- Dashboard đọc qua biến `HUB_MEDIA_ROOT` — phải trỏ đúng `MEDIA_ROOT` của Hub. Prod:
-  `/var/www/apps/hub_iuoss/backend/media`.
-- Django đã chặn URL thô. **Nginx phục vụ static trực tiếp thì phải thêm**, trên mọi
-  vhost đang expose cùng media:
-
-  ```nginx
-  location ^~ /media/insurance_private/ { return 404; }
-  location ^~ /media/insurance_data/    { return 404; }
-  ```
-
+- **Từ 04/10/2026, CCCD hai mặt + thẻ BHYT** (cả đơn đăng ký lẫn khai ngoài trường, lúc nộp
+  và lúc sửa) được lưu vào kho ảnh profile `student_images` (`insurance_private/student_images/…`,
+  xem `dashboard_iuoss/docs/ARCHITECTURE.md` §10) để các luồng khác dùng lại. Cột
+  `cccd_image`/`cccd_image_back`/`bhyt_image` và JSON `images` của đơn vẫn được ghi **cùng
+  storage_key** và là bản ghi lúc nộp của đơn — Dashboard đọc các cột này, không đổi gì.
+  Biên lai và minh chứng thanh toán vẫn lưu theo đơn. Ảnh của đơn cũ nạp vào kho bằng
+  `manage.py backfill_student_images` (mặc định chỉ xem trước).
 - Mỗi file lưu SHA-256 và MIME **xác minh từ nội dung**, không tin đuôi file. Nhận
   JPEG/PNG/WebP và **HEIC của iPhone** (nhờ `Pillow` + `pillow-heif` trong
   `requirements.txt`). Thiếu gói thì HEIC bị từ chối chứ không sập.

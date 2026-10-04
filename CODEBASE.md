@@ -26,7 +26,8 @@ hai app **không gọi API của nhau**, mọi thứ trao đổi qua DB.
    None, "students": None}`). Đổi schema → viết SQL → người dùng chạy tay → cập nhật
    `docs/schema.sql`. `django.contrib.sessions` vẫn migrate bình thường.
 3. **`students/` là read-only.** Hub không ghi vào bảng Dashboard sở hữu; Hub chỉ ghi
-   `hub_*` và các bảng được giao (khai báo địa chỉ, sửa hồ sơ cá nhân).
+   `hub_*` và các bảng được giao (khai báo địa chỉ, sửa hồ sơ cá nhân, kho ảnh
+   `student_images`).
 4. **`next.config.mjs` cố ý KHÔNG rewrite `/api/`.** Next.js strip trailing slash trước
    khi rewrite chạy → Django nhận URL sai → 301 → redirect loop với POST. Định tuyến
    nằm ở Nginx, đúng một tầng.
@@ -56,6 +57,8 @@ backend/
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
   core/address_service.py · address_validators.py   ← BẢN SAO của Dashboard, sửa cả hai
   core/cccd.py              ← đọc QR căn cước
+  core/student_images.py · student_image_models.py   ← kho ảnh profile của SV (CCCD SV + cha mẹ,
+                              thẻ BHYT, ảnh thẻ, avatar) — luồng mới lấy ảnh ở đây, đừng tự lưu file
 
   core/insurance_contract.py        ← trạng thái/event/lý do BHYT — GIỐNG HỆT bản Dashboard
   core/insurance_workflow.py        ← nộp đơn, bổ sung, gửi lại
@@ -63,8 +66,9 @@ backend/
   core/insurance_submission.py · insurance_files.py         ← nhận ảnh, xác minh MIME/HEIC
   core/external_insurance_models.py ← khai BHYT tại nơi khác
   core/management/commands/backfill_insurance_workflow.py   ← dựng timeline cho đơn cũ
+  core/management/commands/backfill_student_images.py      ← nạp CCCD/thẻ BHYT của đơn cũ vào kho ảnh (mặc định chỉ xem trước)
 
-  core/api/urls.py          ← 37 endpoint
+  core/api/urls.py          ← 46 endpoint
   core/api/views.py         ← phần lớn view (1.480 dòng)
   core/api/insurance_views.py · external_insurance_views.py
   core/api/serializers.py · authentication.py · throttling.py · tokens.py
@@ -103,7 +107,7 @@ frontend/
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
 
-### 37 endpoint — `core/api/urls.py`
+### 46 endpoint — `core/api/urls.py`
 
 `health/` · `features/` (không cần auth) · `auth/{login,logout,token/refresh}` ·
 `auth/microsoft/{start,callback}` · `dashboard/` · `health-insurance/` ·
@@ -112,7 +116,8 @@ frontend/
 5 endpoint `requests/<loại>/form/` · `offcampus/` + `offcampus/request-reopen/` ·
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
 `tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` +
-`<id>/attachments/<id>/` · `locations/{provinces,wards,ethnicities}` · `hospitals/`
+`<id>/attachments/<id>/` · `student-images/` (GET) + `<id>/file/` ·
+`locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
 

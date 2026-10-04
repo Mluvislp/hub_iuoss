@@ -1,6 +1,4 @@
 """Declarations tied to intake windows, with in-place edits and audit events."""
-from pathlib import Path
-from uuid import uuid4
 
 from django.conf import settings
 from django.db import transaction
@@ -10,6 +8,7 @@ from students.models import Hospital, Student, VnProvince, VnWard
 from core.models import ExternalInsuranceDeclaration
 from core.insurance_contract import WorkflowError, Conflict, fingerprint, request_key
 from core.insurance_files import inspect_uploads
+from core import student_images
 from .serializers import InsuranceRegistrationSerializer
 from .views import InsuranceRegistrationView
 
@@ -187,14 +186,13 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                 before = {'snapshot': dict(row.snapshot or {}), 'images': dict(images), 'status': row.status,
                           'review_note': row.review_note} if row else {}
                 for field, checked_file in checked.items():
-                    content, ext, mime, _ = checked_file
-                    storage_key = f'insurance_private/external/{uuid4().hex}.{ext}'
-                    target = Path(settings.MEDIA_ROOT).resolve() / storage_key
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    with target.open('xb') as stream:
-                        written.append(target)
-                        stream.write(content)
-                    images[field] = {'storage_key': storage_key, 'mime_type': mime}
+                    # Ảnh profile → kho student_images. JSON `images` giữ {storage_key, mime_type}
+                    # làm bản ghi lúc nộp (Dashboard đọc JSON này).
+                    image = student_images.save_image(
+                        student, student_images.REGISTRATION_IMAGE_KINDS[field], student_images.SELF,
+                        checked_file, original_filename=request.FILES[field].name,
+                        source=student_images.SOURCE_EXTERNAL_INSURANCE, written=written)
+                    images[field] = {'storage_key': image.storage_key, 'mime_type': image.mime_type}
                 snapshot = dict(row.snapshot or {}) if row else {}
                 snapshot.update({k: str(v) for k, v in data.items() if k not in EXTERNAL_IMAGES})
                 if row:
