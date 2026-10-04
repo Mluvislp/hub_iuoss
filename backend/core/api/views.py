@@ -27,7 +27,7 @@ from core.models import (
     ConfirmationRequestComment,
     ExternalInsuranceDeclaration,
 )
-from core import request_quota, request_edit
+from core import request_quota, request_edit, student_images
 from core.documents import (
     BANKLOAN_FEE_EXEMPTION_CHOICES,
     BANKLOAN_ORPHAN_CHOICES,
@@ -903,19 +903,26 @@ class InsuranceRegistrationView(APIView):
             fee_amount_vnd=integer(cfg.insurance_fee),
             workflow_version=2,
         )
-        reg.cccd_image = data["cccd_image"]
-        reg.cccd_image_back = data["cccd_image_back"]
+        # CCCD + thẻ BHYT là ảnh profile: lưu vào kho student_images, cột của đơn ghi CÙNG
+        # storage_key làm bản ghi lúc nộp (Dashboard đọc cột này). Biên lai gắn với đơn
+        # này nên vẫn lưu riêng như trước.
+        for field, kind in student_images.REGISTRATION_IMAGE_KINDS.items():
+            upload = data.get(field)
+            if not upload:
+                continue
+            image = student_images.save_image(
+                student, kind, student_images.SELF, inspect_upload(upload),
+                original_filename=upload.name, source=student_images.SOURCE_BHYT_REGISTRATION,
+                written=request.insurance_written_files)
+            setattr(reg, field, image.storage_key)
         reg.payment_receipt_image = data["payment_receipt_image"]
-        if data.get("bhyt_image"):
-            reg.bhyt_image = data["bhyt_image"]
         # Save files explicitly so a later DB failure can clean up only new writes.
         from pathlib import Path
-        for field in ('cccd_image', 'cccd_image_back', 'payment_receipt_image', 'bhyt_image'):
-            file = getattr(reg, field)
-            if file and not file._committed:
-                ext = inspect_upload(file.file)[1]
-                file.save(f"attachment.{ext}", file.file, save=False)
-                request.insurance_written_files.append(Path(file.path))
+        file = reg.payment_receipt_image
+        if file and not file._committed:
+            ext = inspect_upload(file.file)[1]
+            file.save(f"attachment.{ext}", file.file, save=False)
+            request.insurance_written_files.append(Path(file.path))
         reg.save()
         append_event(reg, 'SUBMITTED', source='Hub', actor_id=student.pk,
             old=None, new='iu_processing', key=request.data.get('request_key'),

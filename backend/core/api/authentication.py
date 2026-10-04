@@ -59,6 +59,9 @@ BHYT_ONLY_URL_NAMES = frozenset({
     "api_external_insurance",
     "api_external_insurance_detail",
     "api_external_insurance_image",
+    # Form BHYT gợi ý lại ảnh CCCD/thẻ BHYT đã có trong kho ảnh.
+    "api_student_images",
+    "api_student_image_file",
     "api_provinces",
     "api_wards",
     "api_ethnicities",

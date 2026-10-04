@@ -396,3 +396,4 @@ class HealthInsuranceConfig(models.Model):
 
 
 from .insurance_history_models import InsuranceEvent, InsuranceAssessment, InsuranceEvidence  # noqa: E402,F401
+from .student_image_models import StudentImage  # noqa: E402,F401

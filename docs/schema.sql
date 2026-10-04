@@ -419,3 +419,29 @@ CREATE TABLE `support_topic_assignees` (
   CONSTRAINT `fk_stassign_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_stassign_user` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════ Ảnh cố định của sinh viên — 04/10/2026 ════════
+-- Nguồn (kèm quy ước đầy đủ): dashboard_iuoss/docs/sql/20261004_student_images.sql
+-- Dòng bất biến; thay ảnh = dòng mới + hạ is_current dòng cũ về 0. Hub ghi.
+CREATE TABLE `student_images` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `student_id` bigint NOT NULL,
+  `kind` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL
+    COMMENT 'cccd_front | cccd_back | bhyt_card | portrait | avatar — registry ở Hub core/student_images.py',
+  `subject` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'SELF'
+    COMMENT 'Ảnh của ai: SELF | FATHER | MOTHER | GUARDIAN (khớp student_family_members.relationship)',
+  `storage_key` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Đường dẫn tương đối dưới MEDIA_ROOT của Hub',
+  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size_bytes` bigint NOT NULL,
+  `sha256` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `source` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL
+    COMMENT 'Luồng tải lên: bhyt_registration | external_insurance | mghp | backfill',
+  `is_current` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1 = ảnh đang dùng của ô (student_id, kind, subject); 0 = đã bị ảnh mới thay',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_si_slot` (`student_id`, `kind`, `subject`, `is_current`),
+  CONSTRAINT `fk_si_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_si_subject` CHECK (`subject` IN ('SELF','FATHER','MOTHER','GUARDIAN')),
+  CONSTRAINT `chk_si_size` CHECK (`file_size_bytes` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
