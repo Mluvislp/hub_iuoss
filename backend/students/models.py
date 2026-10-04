@@ -71,6 +71,10 @@ class Student(models.Model):
     # (Trước 09/2026 nó nằm ở `student_academic_enrollments` mà Hub không có model,
     #  nên form vay vốn phải bắt sinh viên tự gõ mã lớp.)
     class_code = models.CharField(max_length=64, null=True, blank=True)
+    # Mã ngành CHI TIẾT (kèm chuyên ngành/hướng chuyên sâu) — chỉ phục vụ HIỂN THỊ
+    # trên giấy tờ (xem documents.py::_bankloan_snapshot). Cột do Dashboard sở hữu;
+    # Hub CHỈ ĐỌC. KHÔNG dùng để tính mốc đào tạo (vẫn qua infer_major_for_student).
+    detailed_major_code = models.CharField(max_length=32, null=True, blank=True)
     current_department = models.ForeignKey(
         Department, on_delete=models.SET_NULL,
         null=True, blank=True, db_column="current_department_id",

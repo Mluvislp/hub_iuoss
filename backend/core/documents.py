@@ -575,12 +575,17 @@ def _bankloan_snapshot(student, class_code):
     prog = build_academic_progress(student)
     nums = build_course_numbers(student)
     major = infer_major_for_student(student)
+    # Ưu tiên mã ngành CHI TIẾT (kèm chuyên ngành) do Dashboard import vào
+    # `students.detailed_major_code`; chưa có thì tạm lùi về mã suy từ MSSV như
+    # trước (4 ký tự đầu đối chiếu `majors.code`) để giấy không bị để trống.
+    detailed_major = (student.detailed_major_code or "").strip()
+    major_code_display = detailed_major or (major.code if major else "")
     return {
         "student_name": student.full_name or "",
         "student_id": student.current_student_code or "",
         "sex": student.sex or "",
         "department": student.current_department.name_vi if student.current_department else "",
-        "major_code": major.code if major else "",
+        "major_code": major_code_display,
         "cur_status_vi": student.current_status.name_vi if student.current_status else "",
         "course_year": course_year_label(student),
         "current_semester": prog["current_semester"],
