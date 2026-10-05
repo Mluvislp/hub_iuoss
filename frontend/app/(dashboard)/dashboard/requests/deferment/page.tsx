@@ -13,7 +13,7 @@ import {
   ReadonlyField, EditableField, LockedBox, RequestEditButton, CancelEditButton, ChangedTag,
 } from '@/components/editable-field';
 import { validateDob, isValidDob } from '@/lib/form-validators';
-import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
+import { PermanentAddressCccdNote, STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 import { QuotaGuard } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, pendingAddress } from '@/components/request-edit';
 
@@ -274,6 +274,7 @@ export default function DefermentRequestPage() {
               Địa chỉ thường trú
               {addressChanged && <ChangedTag />}
             </h2>
+            <PermanentAddressCccdNote />
 
             {addressOpen ? (
               <>
