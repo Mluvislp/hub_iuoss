@@ -16,7 +16,7 @@ import {
   validateDob, validateCccd, validateIssueDate,
   isValidDob, isValidIssueDate,
 } from '@/lib/form-validators';
-import { STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
+import { PermanentAddressCccdNote, STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
 import { QuotaGuard, QuotaNotice, useRequestQuota } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf, pendingAddress } from '@/components/request-edit';
 
@@ -413,6 +413,7 @@ export default function ConductScoreRequestPage() {
               Địa chỉ thường trú
               {addressChanged && <ChangedTag />}
             </h2>
+            <PermanentAddressCccdNote />
 
             {addressOpen ? (
               <>
