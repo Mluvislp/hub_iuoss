@@ -218,3 +218,24 @@ class BackfillStudentImagesTests(MediaTestCase):
         self.assertIn('students=1', out)
         with self.assertRaises(CommandError):
             self.run_command('--student-code', 'NOPE')
+
+    def test_student_in_two_periods_gets_one_current_image_per_kind(self):
+        """Một SV đăng ký 2 đợt (đủ 3 ảnh mỗi đợt) → mỗi loại ảnh đúng MỘT dòng, đúng một dòng is_current."""
+        HealthInsuranceRegistration.objects.all().delete()
+        ExternalInsuranceDeclaration.objects.all().delete()
+        now = timezone.now()
+        for period, days, color in (('MAIN', 200, 'red'), ('Q2', 10, 'blue')):
+            row = HealthInsuranceRegistration.objects.create(student=self.student, registration_year=2026,
+                registration_period=period, hospital_code='1', payment_receipt_image='r.png',
+                cccd_image=self.file(f'insurance_private/{period}_front.png', color),
+                cccd_image_back=self.file(f'insurance_private/{period}_back.png', color),
+                bhyt_image=self.file(f'insurance_private/{period}_bhyt.png', color))
+            HealthInsuranceRegistration.objects.filter(pk=row.pk).update(created_at=now - timedelta(days=days))
+        self.apply()
+        self.apply()
+        rows = StudentImage.objects.filter(student=self.student)
+        self.assertEqual(rows.count(), 3)
+        self.assertEqual(rows.filter(is_current=True).count(), 3)
+        self.assertEqual(set(rows.values_list('kind', flat=True)), {'cccd_front', 'cccd_back', 'bhyt_card'})
+        # Ảnh của đợt MỚI HƠN (Q2) được chọn.
+        self.assertTrue(all('Q2' in key for key in rows.values_list('storage_key', flat=True)))
