@@ -31,6 +31,7 @@ const FILTERS: { key: 'all' | RequestStatus; label: string }[] = [
   { key: 'processing', label: 'Đang xử lý' },
   { key: 'awaiting_info', label: 'Cần bổ sung' },
   { key: 'done', label: 'Hoàn thành' },
+  { key: 'returned', label: 'Đã trả giấy' },
   { key: 'rejected', label: 'Từ chối' },
 ];
 

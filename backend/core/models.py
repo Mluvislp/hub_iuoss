@@ -17,18 +17,25 @@ class ConfirmationRequest(models.Model):
     STATUS_AWAITING_INFO = "awaiting_info"
     STATUS_DONE = "done"
     STATUS_REJECTED = "rejected"
+    # Sinh viên đã nhận giấy tại văn phòng — Dashboard đặt, gửi email kèm biên nhận PDF và
+    # khoá yêu cầu (dashboard documents/locking.py). Hub chỉ hiển thị.
+    STATUS_RETURNED = "returned"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Chờ xử lý"),
         (STATUS_PROCESSING, "Đang xử lý"),
         (STATUS_AWAITING_INFO, "Chờ bổ sung thông tin"),
         (STATUS_DONE, "Hoàn thành"),
+        (STATUS_RETURNED, "Đã trả giấy"),
         (STATUS_REJECTED, "Từ chối"),
     ]
+    # Giấy đã làm xong — bản mềm tải được.
+    FINISHED_STATUSES = (STATUS_DONE, STATUS_RETURNED)
     STATUS_BADGE = {
         "pending": "warning",
         "processing": "info",
         "awaiting_info": "warning",
         "done": "success",
+        "returned": "success",
         "rejected": "danger",
     }
 

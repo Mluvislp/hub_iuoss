@@ -95,6 +95,10 @@ class RequestCommentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# Khoá trong `payload` do Dashboard ghi, chỉ dùng nội bộ — lọc khỏi API sinh viên.
+INTERNAL_PAYLOAD_KEYS = ("soft_copy", "return_receipts", "return_reopens")
+
+
 class ConfirmationRequestSerializer(serializers.ModelSerializer):
     """Dữ liệu yêu cầu trả cho sinh viên.
 
@@ -122,19 +126,21 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_payload(self, obj):
-        # `soft_copy` mang đường dẫn lưu trữ + tên chuyên viên — không trả cho sinh viên.
+        # Khoá nội bộ của Dashboard — không trả cho sinh viên: `soft_copy` / `return_receipts`
+        # mang đường dẫn lưu trữ + tên chuyên viên; `return_reopens` là lý do mở lại (nội bộ).
         payload = dict(obj.payload or {})
-        payload.pop("soft_copy", None)
+        for key in INTERNAL_PAYLOAD_KEYS:
+            payload.pop(key, None)
         return payload
 
     def get_soft_copy(self, obj):
-        """Bản mềm PDF (bảng điểm RL) — chỉ lộ ra khi yêu cầu đã Hoàn thành.
+        """Bản mềm PDF (bảng điểm RL) — chỉ lộ ra khi yêu cầu đã Hoàn thành / Đã trả giấy.
 
         Dashboard ghi `payload.soft_copy` (dashboard documents/soft_copy.py); tải qua
         `GET /api/requests/<id>/soft-copy/`.
         """
         data = (obj.payload or {}).get("soft_copy")
-        if obj.status != ConfirmationRequest.STATUS_DONE or not isinstance(data, dict) \
+        if obj.status not in ConfirmationRequest.FINISHED_STATUSES or not isinstance(data, dict) \
                 or not data.get("storage_key"):
             return None
         return {"filename": data.get("filename") or "", "size": data.get("size") or 0}
