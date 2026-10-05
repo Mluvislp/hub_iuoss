@@ -54,6 +54,19 @@ class SoftCopyDownloadTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(b"".join(resp.streaming_content), b"%PDF-1.4 test")
 
+    def test_da_tra_giay_van_tai_duoc_va_khong_lo_du_lieu_noi_bo(self):
+        self.req.status = ConfirmationRequest.STATUS_RETURNED
+        self.req.payload = {**self.req.payload,
+                            "return_receipts": [{"storage_key": "document_requests/1/r.pdf", "returned_by": "Lan Lê"}],
+                            "return_reopens": [{"by": "Admin", "note": "Ghi nhầm"}]}
+        self.req.save()
+        body = self._detail()
+        self.assertEqual(body["status"], "returned")
+        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13})
+        for key in ("soft_copy", "return_receipts", "return_reopens"):
+            self.assertNotIn(key, body["payload"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
+
     def test_khong_tai_duoc_cua_nguoi_khac(self):
         self.req.status = ConfirmationRequest.STATUS_DONE
         self.req.save()

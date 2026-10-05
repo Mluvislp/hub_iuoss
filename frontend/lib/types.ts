@@ -133,7 +133,7 @@ export interface CivicActivity {
 }
 
 export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'conduct_score' | 'other';
-export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' | 'rejected';
+export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' | 'returned' | 'rejected';
 
 export interface ConfirmationRequest {
   id: number;
@@ -461,6 +461,7 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   processing: 'Đang xử lý',
   awaiting_info: 'Chờ bổ sung thông tin',
   done: 'Hoàn thành',
+  returned: 'Đã trả giấy',
   rejected: 'Từ chối',
 };
 
@@ -472,6 +473,8 @@ export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   // phải nhìn ra ngay giữa một danh sách toàn màu vàng "chờ xử lý".
   awaiting_info: 'bg-violet-50 text-violet-700 border-violet-200',
   done:       'bg-success-soft text-success-text border-success-line',
+  // Bước cuối (đã nhận giấy) — xanh ngọc, khác xanh lá "Hoàn thành"; cùng màu với Dashboard.
+  returned:   'bg-teal-50 text-teal-700 border-teal-200',
   rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };
 

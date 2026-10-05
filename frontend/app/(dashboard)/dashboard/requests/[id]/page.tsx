@@ -48,6 +48,7 @@ const EVENT_LABELS: Record<string, string> = {
   awaiting_info: 'Yêu cầu bổ sung thông tin',
   rejected: 'Từ chối yêu cầu',
   done: 'Hoàn thành',
+  returned: 'Đã trả giấy',
   processing: 'Chuyển sang đang xử lý',
 };
 

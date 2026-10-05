@@ -1334,14 +1334,14 @@ class _OwnRequestMixin(DocumentRequestsRequiredMixin):
 class RequestSoftCopyView(_OwnRequestMixin, APIView):
     """GET /api/requests/<id>/soft-copy/ — PDF bản mềm bảng điểm RL do Phòng CTSV tải lên.
 
-    Chỉ khi yêu cầu của CHÍNH sinh viên đã Hoàn thành. File nằm dưới MEDIA_ROOT của Hub
+    Chỉ khi yêu cầu của CHÍNH sinh viên đã Hoàn thành / Đã trả giấy. File nằm dưới MEDIA_ROOT của Hub
     (Dashboard ghi vào qua HUB_MEDIA_ROOT). Cần token nên frontend tải qua fetch.
     """
 
     def get(self, request, pk):
         req = self.get_own_request(request, pk)
         data = (req.payload or {}).get("soft_copy") if req else None
-        if req is None or req.status != ConfirmationRequest.STATUS_DONE or not isinstance(data, dict):
+        if req is None or req.status not in ConfirmationRequest.FINISHED_STATUSES or not isinstance(data, dict):
             raise NotFound("Không tìm thấy file.")
         path = safe_path(settings.MEDIA_ROOT, data.get("storage_key"))
         if path is None:
