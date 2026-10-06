@@ -10,7 +10,7 @@ import { ReadonlyField } from '@/components/editable-field';
 import { RejectionNotice } from '@/components/rejection-notice';
 import SearchableSelect from '@/components/searchable-select';
 import type {
-  BankAccountValue, CitizenIdValue, HighSchoolValue, ParentValue, PersonalInfoData,
+  BankAccountValue, CitizenIdValue, HighSchoolValue, ParentStatus, ParentValue, PersonalInfoData,
   PersonalInfoGroup, PersonalInfoKey, PersonalInfoValue, Province,
 } from '@/lib/types';
 
@@ -25,8 +25,8 @@ const EMPTY: Record<PersonalInfoKey, PersonalInfoValue> = {
   mobile_phone: '',
   citizen_id: { number: '', issue_place: '', issue_date: '' },
   bank_account: { bank_name: '', account_number: '', branch_address: '' },
-  father: { orphan: false, full_name: '', phone: '', email: '', occupation: '' },
-  mother: { orphan: false, full_name: '', phone: '', email: '', occupation: '' },
+  father: { status: '', full_name: '', phone: '', email: '', occupation: '' },
+  mother: { status: '', full_name: '', phone: '', email: '', occupation: '' },
   high_school: { province: '', school_name: '' },
 };
 
@@ -47,6 +47,13 @@ function initialDrafts(groups: PersonalInfoGroup[]): Drafts {
   }
   return d;
 }
+
+const PARENT_STATUS_OPTIONS: { value: ParentStatus; label: string }[] = [
+  { value: '', label: 'Còn sống' },
+  { value: 'DECEASED', label: 'Đã mất' },
+  { value: 'NONE', label: 'Không có' },
+];
+const PARENT_STATUS_LABEL: Record<ParentStatus, string> = { '': 'Còn sống', DECEASED: 'Đã mất', NONE: 'Không có' };
 
 function fmtDateTime(iso: string | null | undefined): string {
   return iso ? new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '';
@@ -128,17 +135,18 @@ function LockedView({ k, value }: { k: PersonalInfoKey; value: PersonalInfoValue
     case 'father':
     case 'mother': {
       const v = value as ParentValue;
+      const status = (v.status ?? '') as ParentStatus;
       return (
         <div className="grid sm:grid-cols-2 gap-3">
-          {v.orphan && (
+          {status && (
             <div className="sm:col-span-2">
-              <span className={cn(badge.base, badge.neutral)}>{k === 'father' ? 'Mồ côi cha' : 'Mồ côi mẹ'}</span>
+              <span className={cn(badge.base, badge.neutral)}>{PARENT_STATUS_LABEL[status]}</span>
             </div>
           )}
-          <LockedRow label="Họ tên" value={v.full_name} />
-          {!v.orphan && <LockedRow label="Số điện thoại" value={v.phone} />}
-          {!v.orphan && <LockedRow label="Nghề nghiệp" value={v.occupation} />}
-          {!v.orphan && <LockedRow label="Email" value={v.email} />}
+          {status !== 'NONE' && <LockedRow label="Họ tên" value={v.full_name} />}
+          {!status && <LockedRow label="Số điện thoại" value={v.phone} />}
+          {!status && <LockedRow label="Nghề nghiệp" value={v.occupation} />}
+          {!status && <LockedRow label="Email" value={v.email} />}
         </div>
       );
     }
@@ -219,18 +227,30 @@ function EditView({ k, value, onChange, provinces, bankSuggestions }: {
       const v = value as ParentValue;
       const set = (p: Partial<ParentValue>) => onChange({ ...v, ...p });
       const who = k === 'father' ? 'cha' : 'mẹ';
+      const status = (v.status ?? '') as ParentStatus;
       return (
         <div className="space-y-3">
-          <label className="inline-flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
-            <input type="checkbox" checked={v.orphan} onChange={(e) => set({ orphan: e.target.checked })}
-                   className="h-4 w-4 rounded border-line accent-[var(--color-primary,#155e75)]" />
-            Mồ côi {who}
-          </label>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Field label={`Họ tên ${who}`} required={!v.orphan}>
+          <div>
+            <div className={ui.fieldLabel}>Tình trạng</div>
+            <div className="flex flex-wrap gap-2">
+              {PARENT_STATUS_OPTIONS.map((o) => (
+                <label key={o.value || 'alive'}
+                       className={cn(
+                         'inline-flex items-center gap-2 h-9 px-3 rounded-lg border text-sm cursor-pointer select-none',
+                         status === o.value ? 'border-primary bg-primary-soft text-primary-text' : 'border-line text-ink hover:bg-slate-50',
+                       )}>
+                  <input type="radio" name={`pi-status-${k}`} className="sr-only"
+                         checked={status === o.value} onChange={() => set({ status: o.value })} />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          {status !== 'NONE' && <div className="grid sm:grid-cols-2 gap-3">
+            <Field label={`Họ tên ${who}`} required={!status}>
               <TextInput value={v.full_name} onChange={(x) => set({ full_name: x })} />
             </Field>
-            {!v.orphan && (
+            {!status && (
               <>
                 <Field label="Số điện thoại" required>
                   <TextInput value={v.phone} onChange={(x) => set({ phone: x })} inputMode="tel" maxLength={15} />
@@ -243,7 +263,7 @@ function EditView({ k, value, onChange, provinces, bankSuggestions }: {
                 </Field>
               </>
             )}
-          </div>
+          </div>}
         </div>
       );
     }

@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from core import cccd_rules
 from students.models import (
-    ProfileChangeRequest, Student, StudentBankAccount, StudentContactPoint,
+    ProfileChangeRequest, StudentBankAccount, StudentContactPoint,
     StudentFamilyMember, StudentHighSchool, StudentIdentityDocument,
 )
 
@@ -339,13 +339,16 @@ def _clean_bank(value, student):
     return {"bank_name": name, "account_number": number, "branch_address": branch}
 
 
-def _orphan_flags(student):
-    """(mồ côi cha, mồ côi mẹ) đọc thẳng từ DB — đối tượng `student` có thể cũ."""
-    status = (
-        Student.objects.filter(pk=student.pk)
-        .values_list("orphan_status", flat=True).first()
-    ) or ""
-    return status in ("FATHER", "BOTH"), status in ("MOTHER", "BOTH")
+PARENT_STATUSES = ("", "DECEASED", "NONE")   # "" = còn sống (NULL trong DB)
+
+
+def _parent_status(value):
+    """Đọc tình trạng từ payload. Payload cũ (trước khi có 2 loại) dùng `orphan`
+    true/false — coi như "Đã mất" để dòng chờ duyệt cũ vẫn duyệt được."""
+    status = (value.get("status") or "").strip().upper()
+    if not status and value.get("orphan") is True:
+        status = "DECEASED"
+    return status
 
 
 def _parent_row(student, relationship):
@@ -358,9 +361,8 @@ def _parent_row(student, relationship):
 
 def _current_parent(student, relationship):
     row = _parent_row(student, relationship)
-    father, mother = _orphan_flags(student)
     return {
-        "orphan": father if relationship == StudentFamilyMember.REL_FATHER else mother,
+        "status": ((row.parent_status if row else "") or ""),
         "full_name": ((row.full_name if row else "") or "").strip(),
         "phone": ((row.phone if row else "") or "").strip(),
         "email": ((row.email if row else "") or "").strip(),
@@ -369,13 +371,19 @@ def _current_parent(student, relationship):
 
 
 def _clean_parent(value, student, relationship):
-    """Chọn "mồ côi" ⇒ không bắt buộc gì, chỉ giữ họ tên (nếu có); SĐT/email/nghề
-    nghiệp bị xoá vì không còn dùng để liên hệ."""
+    """`status`: "" = còn sống (bắt buộc họ tên, SĐT, nghề nghiệp) · "DECEASED" =
+    đã mất (chỉ giữ họ tên nếu có) · "NONE" = không có (xoá hết). Hai trường hợp
+    sau SĐT/email/nghề nghiệp bị xoá vì không còn dùng để liên hệ."""
     label = PARENT_LABELS[relationship]
     value = _require_dict(value, f"thông tin {label}")
+    status = _parent_status(value)
+    if status not in PARENT_STATUSES:
+        raise ChangeError(f"Tình trạng của {label} không hợp lệ.")
     full_name = _clip(value.get("full_name"), 255, f"Họ tên {label}")
-    if value.get("orphan") is True:
-        return {"orphan": True, "full_name": full_name, "phone": "", "email": "", "occupation": ""}
+    if status == "NONE":
+        return {"status": "NONE", "full_name": "", "phone": "", "email": "", "occupation": ""}
+    if status == "DECEASED":
+        return {"status": "DECEASED", "full_name": full_name, "phone": "", "email": "", "occupation": ""}
 
     if not full_name:
         raise ChangeError(f"Chưa nhập họ tên {label}.")
@@ -392,7 +400,7 @@ def _clean_parent(value, student, relationship):
     occupation = _clip(value.get("occupation"), 255, f"Nghề nghiệp của {label}")
     if not occupation:
         raise ChangeError(f"Chưa nhập nghề nghiệp của {label}.")
-    return {"orphan": False, "full_name": full_name, "phone": phone,
+    return {"status": "", "full_name": full_name, "phone": phone,
             "email": email, "occupation": occupation}
 
 
@@ -430,9 +438,13 @@ def _describe_bank(v):
     return " · ".join(p for p in parts if p)
 
 
+PARENT_STATUS_LABELS = {"DECEASED": "Đã mất", "NONE": "Không có"}
+
+
 def _describe_parent(v):
-    if v.get("orphan"):
-        return "Mồ côi" + (f" · {v['full_name']}" if v.get("full_name") else "")
+    status = _parent_status(v)
+    if status:
+        return PARENT_STATUS_LABELS[status] + (f" · {v['full_name']}" if v.get("full_name") else "")
     parts = [v.get("full_name"), v.get("phone"), v.get("email"), v.get("occupation")]
     return " · ".join(p for p in parts if p)
 
@@ -448,7 +460,7 @@ def _parent_target(relationship, label):
         "approval": True,
         "read": lambda s: _current_parent(s, relationship),
         "clean": lambda v, s: _clean_parent(v, s, relationship),
-        "is_blank": lambda c: not (c or {}).get("orphan") and not (c or {}).get("full_name"),
+        "is_blank": lambda c: not (c or {}).get("status") and not (c or {}).get("full_name"),
         "describe": _describe_parent,
     }
 
@@ -463,8 +475,8 @@ PERSONAL_TARGETS = {
         "is_blank": lambda c: not (c or {}).get("account_number"),
         "describe": _describe_bank,
     },
-    # {orphan, full_name, phone, email, occupation} — `orphan` sống ở
-    # students.orphan_status, phần còn lại ở student_family_members.
+    # {status, full_name, phone, email, occupation} — tất cả ở student_family_members
+    # (status = cột parent_status); duyệt xong suy lại students.orphan_status.
     "family.father": _parent_target(StudentFamilyMember.REL_FATHER, "Thông tin cha"),
     "family.mother": _parent_target(StudentFamilyMember.REL_MOTHER, "Thông tin mẹ"),
     "school.high_school": {

@@ -703,8 +703,10 @@ export interface RequestAvailability {
 
 export interface CitizenIdValue { number: string; issue_place: string; issue_date: string }
 export interface BankAccountValue { bank_name: string; account_number: string; branch_address: string }
+/** Tình trạng cha/mẹ: '' = còn sống · DECEASED = đã mất · NONE = không có. */
+export type ParentStatus = '' | 'DECEASED' | 'NONE';
 export interface ParentValue {
-  orphan: boolean; full_name: string; phone: string; email: string; occupation: string;
+  status: ParentStatus; full_name: string; phone: string; email: string; occupation: string;
 }
 export interface HighSchoolValue { province: string; school_name: string }
 
