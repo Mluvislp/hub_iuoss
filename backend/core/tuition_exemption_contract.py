@@ -62,6 +62,11 @@ EVENT_LABELS = {
     'REJECTED': 'Từ chối',
     'REOPENED': 'Mở lại đơn',
     'BANK_SYNCED': 'Cập nhật tài khoản vào hồ sơ',
+    # Event của bộ trạng thái cũ (trước 06/10/2026) — giữ nhãn để timeline đơn cũ đọc được.
+    'REVIEW_STARTED': 'Bắt đầu xét',
+    'CATEGORY_REVIEWED': 'Xét đối tượng',
+    'SUPPLEMENT_REQUESTED': 'Yêu cầu bổ sung',
+    'APPROVED': 'Duyệt đơn',
 }
 
 # Hệ thống tự xác định (SV không chọn): chưa từng hưởng → first_time; có trong danh

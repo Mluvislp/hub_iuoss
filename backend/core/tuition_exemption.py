@@ -288,6 +288,13 @@ def serialize_application(app, *, with_details=False):
             for link in app.categories.select_related("category").order_by("category__sort_order", "category__code")
         ],
     }
+    # Có cả ở danh sách: trang tổng quan nhắc SV bổ sung mà không cần mở chi tiết.
+    fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
+    open_ = round_is_open(app.round)
+    data["can_supplement"] = contract.can_resubmit(app.status, app.rejection_reason_code, open_)
+    data["supplement_overdue"] = fixable and not open_
+    data["supplement_closes_at"] = app.round.closes_at.isoformat()
+    data["rejection_reason"] = contract.REASONS.get(app.rejection_reason_code or "", "")
     if with_details:
         labels = {}
         for link in app.categories.select_related("category"):
@@ -306,13 +313,7 @@ def serialize_application(app, *, with_details=False):
         ]
         data["snapshot"] = {f: (getattr(app, f).isoformat() if f == "citizen_id_issued_on" and app.citizen_id_issued_on
                                 else getattr(app, f) or "") for f in SNAPSHOT_FIELDS}
-        fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
-        open_ = round_is_open(app.round)
-        data["can_supplement"] = contract.can_resubmit(app.status, app.rejection_reason_code, open_)
-        data["supplement_overdue"] = fixable and not open_
-        data["supplement_closes_at"] = app.round.closes_at.isoformat()
         data["supplement_targets"] = supplement_targets(app) if fixable else []
-        data["rejection_reason"] = contract.REASONS.get(app.rejection_reason_code or "", "")
         link = app.categories.select_related("category").first()
         data["category_details"] = [
             {"label": label, "value": value}

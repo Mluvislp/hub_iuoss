@@ -800,14 +800,14 @@ export interface TuitionExemptionApplication {
                 original_filename: string; mime_type: string; expires_at: string | null }[];
   snapshot?: Record<string, string>;
   /** Đơn Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
-  can_supplement?: boolean;
+  can_supplement: boolean;
   /** Như trên nhưng đợt đã đóng. */
-  supplement_overdue?: boolean;
+  supplement_overdue: boolean;
   /** Hạn bổ sung = giờ đóng đợt. */
-  supplement_closes_at?: string;
+  supplement_closes_at: string;
   /** Đối tượng trong đơn kèm danh sách giấy tờ để bổ sung. */
   supplement_targets?: (TuitionExemptionCategory & { link_id: number; review_note: string })[];
-  rejection_reason?: string;
+  rejection_reason: string;
   /** Thông tin riêng theo đối tượng đã khai (nhãn + giá trị chữ). */
   category_details?: { label: string; value: string }[];
 }

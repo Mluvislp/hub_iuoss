@@ -92,6 +92,17 @@ function RoundCard({ state }: { state: TuitionExemptionState }) {
             ) : state.plan ? (
               <PlanBlock state={state} />
             ) : null}
+            {app && app.can_supplement && (
+              <div className="rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-text">
+                <p className="font-medium">Đơn bị từ chối{app.rejection_reason ? `: ${app.rejection_reason}` : ''}.</p>
+                <p className="mt-0.5">
+                  Bổ sung giấy tờ trước {fmtDateTime(app.supplement_closes_at)} (giờ đóng đợt) để đơn được xử lý lại.
+                </p>
+                <Link href={`${BASE}/ho-so/${app.id}`} className={cn(ui.btnPrimary, 'mt-2')}>
+                  <FileUp size={16} /> Bổ sung giấy tờ
+                </Link>
+              </div>
+            )}
           </>
         )}
       </div>
