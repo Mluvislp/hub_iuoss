@@ -372,7 +372,7 @@ export default function RequestDetailPage() {
 
 
 /** Bản mềm PDF bảng điểm rèn luyện — Phòng CTSV tải lên, chỉ hiện khi yêu cầu đã Hoàn thành. */
-function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { filename: string; size: number } }) {
+function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { filename: string; size: number; sent_at?: string } }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -403,9 +403,10 @@ function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { fi
     <section className="rounded-lg border border-success-line bg-success-soft px-5 py-4">
       <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-success-text">
         <FileText size={14} />
-        BẢN MỀM BẢNG ĐIỂM RÈN LUYỆN
+        BẢN MỀM (PDF)
       </p>
       <p className="mt-1.5 text-[0.88rem] text-ink break-all">{file.filename} · {size}</p>
+      {file.sent_at && <p className="mt-0.5 text-[0.78rem] text-muted">Gửi lúc {file.sent_at}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => open(false)} disabled={busy} className={ui.btnSecondary}>
           {busy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />} Xem

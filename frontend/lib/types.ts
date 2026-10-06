@@ -151,7 +151,7 @@ export interface ConfirmationRequest {
   /** Chờ bổ sung thông tin ⇒ mở lại form để sửa (`?edit=<id>`). */
   student_can_edit: boolean;
   /** Bảng điểm RL nhận bản mềm: PDF Phòng CTSV tải lên — chỉ có khi đã Hoàn thành. */
-  soft_copy: { filename: string; size: number } | null;
+  soft_copy: { filename: string; size: number; sent_at?: string } | null;
   created_at: string;
   updated_at: string;
 }

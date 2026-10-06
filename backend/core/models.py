@@ -77,6 +77,22 @@ class ConfirmationRequest(models.Model):
         return encode(self.pk, self.created_at)
 
     @property
+    def visible_soft_copy(self):
+        """`payload.soft_copy` nếu sinh viên được thấy/tải bản mềm PDF, ngược lại None.
+
+        Luật GIỐNG dashboard `documents/soft_copy.py` — sửa cả hai: yêu cầu đã Hoàn thành / Đã trả
+        giấy VÀ chuyên viên đã bấm "Gửi cho sinh viên" (`sent_at`); riêng bảng điểm RL chọn bản mềm
+        thì không cần `sent_at` (hoàn thành trước 06/10/2026 chưa có dấu này)."""
+        payload = self.payload or {}
+        data = payload.get("soft_copy")
+        if (self.status not in self.FINISHED_STATUSES or not isinstance(data, dict)
+                or not data.get("storage_key")):
+            return None
+        conduct_online = (self.request_type == "conduct_score"
+                          and ((payload.get("delivery") or {}).get("code") == "online"))
+        return data if (data.get("sent_at") or conduct_online) else None
+
+    @property
     def student_can_comment(self):
         return self.status in self.STUDENT_CAN_COMMENT_STATUSES
 
