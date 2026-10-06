@@ -48,6 +48,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     // Trang chỉ để XEM thông tin cá nhân — tách khỏi nhóm dịch vụ (nơi SV phải nộp gì đó).
     label: 'Hồ sơ của tôi',
     items: [
+      featureItem('personal_info'),
       { href: '/dashboard/bao-hiem-y-te', icon: ShieldCheck, label: 'Bảo hiểm y tế' },
       featureItem('civic_activities'),
     ],

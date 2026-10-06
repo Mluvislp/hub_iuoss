@@ -75,6 +75,9 @@ class Student(models.Model):
     # trên giấy tờ (xem documents.py::_bankloan_snapshot). Cột do Dashboard sở hữu;
     # Hub CHỈ ĐỌC. KHÔNG dùng để tính mốc đào tạo (vẫn qua infer_major_for_student).
     detailed_major_code = models.CharField(max_length=32, null=True, blank=True)
+    # Diện mồ côi: ENUM FATHER / MOTHER / BOTH, NULL = không thuộc diện. Dashboard
+    # ghi khi duyệt cụm cha/mẹ của trang "Thông tin cá nhân"; Hub CHỈ ĐỌC.
+    orphan_status = models.CharField(max_length=6, null=True, blank=True)
     current_department = models.ForeignKey(
         Department, on_delete=models.SET_NULL,
         null=True, blank=True, db_column="current_department_id",
@@ -361,6 +364,7 @@ class ProfileChangeRequest(models.Model):
 
     SOURCE_OFFCAMPUS = "ngoai_tru"
     SOURCE_HEALTH_CHECK = "kham_suc_khoe"   # bổ sung CCCD trong luồng khám sức khỏe
+    SOURCE_PERSONAL_INFO = "thong_tin_ca_nhan"  # trang Thông tin cá nhân — luôn chờ duyệt
 
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,
@@ -386,6 +390,66 @@ class ProfileChangeRequest(models.Model):
 
     def __str__(self):
         return f"{self.target} #{self.pk} — {self.status}"
+
+
+class StudentFamilyMember(models.Model):
+    """Cha / mẹ / người giám hộ — Dashboard sở hữu, Hub CHỈ ĐỌC (SV sửa qua trang
+    "Thông tin cá nhân", nhân viên duyệt mới ghi). Mỗi SV một dòng cho mỗi quan hệ."""
+
+    REL_FATHER = "FATHER"
+    REL_MOTHER = "MOTHER"
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="family_members",
+    )
+    relationship = models.CharField(max_length=16)
+    full_name = models.CharField(max_length=255, null=True, blank=True)
+    phone = models.CharField(max_length=50, null=True, blank=True)
+    email = models.CharField(max_length=255, null=True, blank=True)
+    occupation = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_family_members"
+
+
+class StudentHighSchool(models.Model):
+    """Trường THPT — Dashboard sở hữu, Hub CHỈ ĐỌC."""
+
+    student = models.OneToOneField(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="high_school",
+    )
+    province = models.CharField(max_length=255, null=True, blank=True)
+    school_name = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_high_schools"
+
+
+class StudentBankAccount(models.Model):
+    """Tài khoản ngân hàng — Dashboard sở hữu, Hub CHỈ ĐỌC. `bank_name` là chữ tự do."""
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="bank_accounts",
+    )
+    bank_name = models.CharField(max_length=255)
+    account_number = models.CharField(max_length=64)
+    branch_address = models.CharField(max_length=500, null=True, blank=True)
+    is_current = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_bank_accounts"
 
 
 class VnProvince(models.Model):
