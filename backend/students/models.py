@@ -404,6 +404,8 @@ class StudentFamilyMember(models.Model):
         db_column="student_id", related_name="family_members",
     )
     relationship = models.CharField(max_length=16)
+    # NULL = còn sống, DECEASED = đã mất, NONE = không có.
+    parent_status = models.CharField(max_length=8, null=True, blank=True)
     full_name = models.CharField(max_length=255, null=True, blank=True)
     phone = models.CharField(max_length=50, null=True, blank=True)
     email = models.CharField(max_length=255, null=True, blank=True)

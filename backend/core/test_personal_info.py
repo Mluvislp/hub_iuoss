@@ -12,7 +12,7 @@ from students.models import (
     ProfileChangeRequest, Student, StudentContactPoint, StudentFamilyMember,
 )
 
-FATHER = {"orphan": False, "full_name": "Nguyễn Văn Ba", "phone": "0901234567",
+FATHER = {"status": "", "full_name": "Nguyễn Văn Ba", "phone": "0901234567",
           "email": "", "occupation": "Kỹ sư"}
 
 
@@ -22,14 +22,14 @@ class PersonalInfoApiTests(TestCase):
     def setUpTestData(cls):
         cls.student = Student.objects.create(
             current_student_code="ITITIU20001", full_name="Nguyễn Văn A", sex="Nam",
-            date_of_birth=date(2002, 5, 1), orphan_status="MOTHER",
+            date_of_birth=date(2002, 5, 1),
         )
         StudentContactPoint.objects.create(
             student=cls.student, contact_type=StudentContactPoint.TYPE_MOBILE_PHONE,
             contact_value="0911111111", normalized_contact_value="0911111111", is_current=True,
         )
         StudentFamilyMember.objects.create(student=cls.student, relationship="MOTHER",
-                                           full_name="Trần Thị B")
+                                           full_name="Trần Thị B", parent_status="DECEASED")
 
     def setUp(self):
         self.client = APIClient()
@@ -49,9 +49,9 @@ class PersonalInfoApiTests(TestCase):
         self.assertTrue(self.group(data, "personal_email")["is_blank"])
         self.assertFalse(self.group(data, "mobile_phone")["is_blank"])
         mother = self.group(data, "mother")["value"]
-        self.assertTrue(mother["orphan"])
+        self.assertEqual(mother["status"], "DECEASED")
         self.assertEqual(mother["full_name"], "Trần Thị B")
-        self.assertFalse(self.group(data, "father")["value"]["orphan"])
+        self.assertEqual(self.group(data, "father")["value"]["status"], "")
 
     def test_submit_creates_pending_and_touches_nothing(self):
         resp = self.post({"personal_email": "a@gmail.com", "father": FATHER})
@@ -70,7 +70,7 @@ class PersonalInfoApiTests(TestCase):
         resp = self.post({"personal_email": "a@gmail.com",
                           "citizen_id": {"number": "079202000001", "issue_place": "",
                                          "issue_date": "10/04/2021"},
-                          "mother": {"orphan": False, "full_name": "Trần Thị B"}})
+                          "mother": {"status": "", "full_name": "Trần Thị B"}})
         self.assertEqual(resp.status_code, 400)
         errors = resp.json()["errors"]
         self.assertIn("citizen_id", errors)
@@ -78,9 +78,10 @@ class PersonalInfoApiTests(TestCase):
         self.assertNotIn("personal_email", errors)
         self.assertFalse(ProfileChangeRequest.objects.exists())
 
-    def test_orphan_needs_no_details(self):
-        resp = self.post({"father": {"orphan": True}})
-        self.assertEqual(resp.status_code, 200, resp.content)
+    def test_deceased_or_none_needs_no_details(self):
+        self.assertEqual(self.post({"father": {"status": "NONE"}}).status_code, 200)
+        ProfileChangeRequest.objects.all().delete()
+        self.assertEqual(self.post({"father": {"status": "DECEASED"}}).status_code, 200)
 
     def test_pending_group_is_locked(self):
         self.post({"personal_email": "a@gmail.com"})
