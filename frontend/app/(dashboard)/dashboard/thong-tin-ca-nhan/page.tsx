@@ -7,7 +7,6 @@ import { api, ApiError } from '@/lib/api';
 import { ui, badge } from '@/lib/ui';
 import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
 import { ReadonlyField } from '@/components/editable-field';
-import { RejectionNotice } from '@/components/rejection-notice';
 import SearchableSelect from '@/components/searchable-select';
 import type {
   BankAccountValue, CitizenIdValue, HighSchoolValue, ParentStatus, ParentValue, PersonalInfoData,
@@ -48,8 +47,8 @@ function initialDrafts(groups: PersonalInfoGroup[]): Drafts {
   return d;
 }
 
+/* Không chọn ô nào = còn sống; bấm lại ô đang chọn để bỏ chọn. */
 const PARENT_STATUS_OPTIONS: { value: ParentStatus; label: string }[] = [
-  { value: '', label: 'Còn sống' },
   { value: 'DECEASED', label: 'Đã mất' },
   { value: 'NONE', label: 'Không có' },
 ];
@@ -234,15 +233,14 @@ function EditView({ k, value, onChange, provinces, bankSuggestions }: {
             <div className={ui.fieldLabel}>Tình trạng</div>
             <div className="flex flex-wrap gap-2">
               {PARENT_STATUS_OPTIONS.map((o) => (
-                <label key={o.value || 'alive'}
-                       className={cn(
-                         'inline-flex items-center gap-2 h-9 px-3 rounded-lg border text-sm cursor-pointer select-none',
-                         status === o.value ? 'border-primary bg-primary-soft text-primary-text' : 'border-line text-ink hover:bg-slate-50',
-                       )}>
-                  <input type="radio" name={`pi-status-${k}`} className="sr-only"
-                         checked={status === o.value} onChange={() => set({ status: o.value })} />
+                <button key={o.value} type="button" aria-pressed={status === o.value}
+                        onClick={() => set({ status: status === o.value ? '' : o.value })}
+                        className={cn(
+                          'inline-flex items-center h-9 px-3 rounded-lg border text-sm select-none transition-colors',
+                          status === o.value ? 'border-primary bg-primary-soft text-primary-text' : 'border-line text-ink hover:bg-slate-50',
+                        )}>
                   {o.label}
-                </label>
+                </button>
               ))}
             </div>
           </div>
@@ -328,11 +326,6 @@ function GroupBlock({ group, draft, error, onOpen, onCancel, onChange, provinces
             </button>
           ))}
       </div>
-
-      {group.rejection && !group.pending && (
-        <RejectionNotice className="mb-3" title="Yêu cầu cập nhật trước chưa được chấp nhận"
-                         noteLabel="Lý do" note={group.rejection.note} />
-      )}
 
       {group.pending ? (
         <>
