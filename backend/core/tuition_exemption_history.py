@@ -12,7 +12,7 @@ from .tuition_exemption_models import TuitionExemptionEvent
 
 # Event SV được thấy lý do/ghi chú (phản hồi của cán bộ gửi SV). Các event khác chỉ
 # hiện nhãn — không lộ tên cán bộ hay ghi chú nội bộ trong payload.
-_STUDENT_VISIBLE_REASON = {'SUPPLEMENT_REQUESTED', 'REJECTED', 'CATEGORY_REVIEWED', 'REOPENED'}
+_STUDENT_VISIBLE_REASON = {'REJECTED', 'REOPENED', 'COMPLETED'}
 
 
 def replay(application, key, digest, actor_id, source):
@@ -56,8 +56,8 @@ def timeline(application):
     items = []
     for event in application.events.order_by('event_no'):
         note = ''
-        if event.event_type in _STUDENT_VISIBLE_REASON or event.event_type == 'APPROVED':
-            # `detail` do Dashboard ghi sẵn dạng SV đọc được ("DT03: Cần bổ sung", "Đạt: DT01…").
+        if event.event_type in _STUDENT_VISIBLE_REASON:
+            # `detail` do Dashboard ghi sẵn dạng SV đọc được ("Đạt: TSKK").
             note = ' — '.join(p for p in ((event.payload or {}).get('detail', ''),
                                           REASONS.get(event.reason_code or '', ''),
                                           event.reason_text or '') if p)

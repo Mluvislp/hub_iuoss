@@ -21,9 +21,9 @@ const SNAPSHOT_ROWS: [string, string][] = [
 ];
 
 /**
- * Chi tiết một đơn Miễn giảm học phí của chính SV: kết quả xét từng đối tượng,
- * thông tin đã khai, giấy tờ đã nộp, lịch sử xử lý, và khu bổ sung khi CÁN BỘ yêu cầu
- * (đơn "Cần bổ sung"): mỗi diện cần bổ sung hiện đủ ô giấy tờ như lúc nộp.
+ * Chi tiết một đơn Miễn giảm học phí của chính SV: kết quả, thông tin đã khai, giấy tờ
+ * đã nộp, lịch sử xử lý, và khu bổ sung khi đơn bị Từ chối vì thiếu / sai / hết hạn giấy
+ * (như BHYT): SV bổ sung tới giờ đóng đợt, đơn về "Đang xử lý".
  */
 
 const ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp,image/heic,.heic';
@@ -57,9 +57,9 @@ function SupplementBox({ app, onDone }: { app: TuitionExemptionApplication; onDo
   return (
     <section className={cn(ui.card, 'border-danger-line')}>
       <div className={ui.cardHeader}>
-        <h2 className={ui.sectionTitle}><FileUp size={17} className="text-danger-text" />Cán bộ yêu cầu bổ sung hồ sơ</h2>
-        {app.supplement_deadline && (
-          <span className="text-xs text-muted">Hạn: {fmtDateTime(app.supplement_deadline)}</span>
+        <h2 className={ui.sectionTitle}><FileUp size={17} className="text-danger-text" />Bổ sung giấy tờ</h2>
+        {app.supplement_closes_at && (
+          <span className="text-xs text-muted">Hạn (giờ đóng đợt): {fmtDateTime(app.supplement_closes_at)}</span>
         )}
       </div>
       <div className="px-5 py-4 space-y-4">
@@ -70,7 +70,7 @@ function SupplementBox({ app, onDone }: { app: TuitionExemptionApplication; onDo
           </div>
         )}
         {app.supplement_overdue ? (
-          <p className="text-sm text-danger-text">Đã quá hạn bổ sung. Vui lòng liên hệ Phòng Công tác Sinh viên.</p>
+          <p className="text-sm text-danger-text">Đợt đã đóng nên không bổ sung được nữa. Vui lòng liên hệ Phòng Công tác Sinh viên.</p>
         ) : (
           <>
             {(app.supplement_targets ?? []).map((c) => (
@@ -97,7 +97,7 @@ function SupplementBox({ app, onDone }: { app: TuitionExemptionApplication; onDo
                 })}
               </div>
             ))}
-            <p className="text-xs text-muted">File mới sẽ thay file cùng loại đã nộp trước đó.</p>
+            <p className="text-xs text-muted">File mới sẽ thay file cùng loại đã nộp trước đó. Gửi xong, đơn quay về “Đang xử lý”.</p>
             {error && <ErrorBox text={error} />}
             <div className="flex justify-end">
               <button type="button" className={ui.btnPrimary} onClick={send} disabled={saving}>
@@ -150,7 +150,10 @@ export default function TuitionWaiverDetailPage() {
               <StatusBadge status={app.status} label={app.status_label} />
             </div>
             <div className="px-5 py-3 text-meta text-muted">{app.round_title} · Nộp lúc {fmtDateTime(app.submitted_at)}</div>
-            {(app.status === 'approved' || app.status === 'rejected') && (app.review_note || app.rejection_reason) && (
+            {app.supplement_pending && (
+              <div className="px-5 pb-3 text-meta text-muted">Đã gửi bổ sung — Phòng CTSV đang kiểm tra.</div>
+            )}
+            {(app.status === 'done' || app.status === 'rejected') && (app.review_note || app.rejection_reason) && (
               <div className="px-5 pb-3 text-sm text-ink whitespace-pre-line">
                 {app.status === 'rejected' && app.rejection_reason && (
                   <span className="font-medium">Lý do: {app.rejection_reason}. </span>
@@ -160,7 +163,9 @@ export default function TuitionWaiverDetailPage() {
             )}
           </section>
 
-          {app.status === 'need_supplement' && <SupplementBox key={app.row_version} app={app} onDone={setApp} />}
+          {(app.can_supplement || app.supplement_overdue) && (
+            <SupplementBox key={app.row_version} app={app} onDone={setApp} />
+          )}
 
           <section className={ui.card}>
             <div className={ui.cardHeader}>

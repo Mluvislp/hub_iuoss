@@ -9,7 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { TuitionExemptionApplication, TuitionExemptionState } from '@/lib/types';
-import { BASE, Breadcrumb, ErrorBox, fmtDate, fmtDateTime, MODE_BADGE, StatusBadge } from './shared';
+import { BASE, Breadcrumb, ErrorBox, fmtDateTime, MODE_BADGE, StatusBadge } from './shared';
 
 /**
  * Trang tổng quan Miễn giảm học phí: đợt đang mở, đơn của đợt này, lịch sử đơn,
@@ -152,11 +152,6 @@ export default function TuitionWaiverPage() {
             )}
           </section>
 
-          {state.application?.supplement_deadline && (
-            <p className="text-meta text-muted">
-              Hạn bổ sung hồ sơ: {fmtDate(state.application.supplement_deadline)}
-            </p>
-          )}
         </>
       )}
     </div>

@@ -14,41 +14,40 @@ import hashlib
 import json
 import re
 
-# ── Trạng thái đơn ───────────────────────────────────────────────────────────
-# TODO(mghp): chốt bộ trạng thái với nghiệp vụ trước khi viết workflow thật.
+# ── Trạng thái đơn — cùng khuôn BHYT (ĐHQT xử lý → Chờ BHXH → Phát hành / Từ chối) ──
 STATUS_LABELS = {
-    'submitted': 'Đã nộp',
-    'under_review': 'Đang xét',
-    'need_supplement': 'Cần bổ sung',
-    'approved': 'Đã duyệt',
-    'rejected': 'Không duyệt',
+    'processing': 'Đang xử lý',
+    'waiting_result': 'Chờ kết quả',
+    'done': 'Hoàn thành',
+    'rejected': 'Từ chối',
 }
 TRANSITIONS = {
-    'submitted': {'under_review', 'need_supplement', 'approved', 'rejected'},
-    'under_review': {'need_supplement', 'approved', 'rejected'},
-    'need_supplement': {'under_review'},      # SV bổ sung (SUPPLEMENTED)
-    'rejected': {'under_review'},             # cán bộ tiếp nhận lại (REOPENED)
-    'approved': {'under_review'},             # superuser mở lại, bắt buộc lý do
+    'processing': {'waiting_result', 'rejected'},
+    'waiting_result': {'done', 'rejected'},
+    'rejected': {'processing'},   # SV bổ sung (RESUBMITTED) hoặc cán bộ mở lại (REOPENED)
+    'done': {'processing'},       # superuser mở lại, bắt buộc lý do
 }
-# Trạng thái mà SV còn sửa/bổ sung được từ Hub.
-STUDENT_EDITABLE = {'submitted', 'need_supplement'}
+# Đơn đã chốt (trên danh sách hiện mờ, như BHYT).
+FINAL_STATUSES = {'done', 'rejected'}
 
-# ── Kết quả xét từng đối tượng trong đơn ─────────────────────────────────────
+# ── Kết quả của đối tượng trong đơn (cột review_status — Dashboard ghi theo trạng thái đơn) ──
 REVIEW_LABELS = {
     'pending': 'Chờ xét',
     'approved': 'Đạt',
     'rejected': 'Không đạt',
-    'need_supplement': 'Cần bổ sung',
 }
 
-# ── Lý do không duyệt / yêu cầu bổ sung ──────────────────────────────────────
+# ── Lý do từ chối ────────────────────────────────────────────────────────────
 REASONS = {
     'MISSING_DOCUMENTS': 'Thiếu giấy tờ',
-    'INVALID_DOCUMENTS': 'Giấy tờ không hợp lệ',
-    'EXPIRED_DOCUMENTS': 'Giấy tờ hết hiệu lực',
-    'NOT_ELIGIBLE': 'Không thuộc đối tượng',
+    'INVALID_DOCUMENTS': 'Giấy tờ sai / không hợp lệ',
+    'EXPIRED_DOCUMENTS': 'Giấy tờ hết hạn',
+    'NOT_ELIGIBLE': 'Không thuộc đối tượng được miễn giảm',
     'OTHER': 'Lý do khác',
 }
+# Lý do SV tự sửa được: bổ sung giấy trên Hub khi đợt còn mở → đơn về Đang xử lý kèm cờ
+# "SV đã bổ sung" (như BHYT). Lý do khác: SV liên hệ Phòng CTSV, cán bộ mở lại đơn.
+RESUBMITTABLE_REASONS = {'MISSING_DOCUMENTS', 'INVALID_DOCUMENTS', 'EXPIRED_DOCUMENTS'}
 
 # ── Timeline (hub_tuition_exemption_events.event_type) ───────────────────────
 EVENT_LABELS = {
@@ -56,12 +55,11 @@ EVENT_LABELS = {
     'STUDENT_UPDATED': 'Sinh viên chỉnh sửa',
     'DOCUMENT_REPLACED': 'Thay giấy tờ',
     'SUPPLEMENTED': 'Sinh viên bổ sung',
-    'REVIEW_STARTED': 'Bắt đầu xét',
-    'CATEGORY_REVIEWED': 'Xét đối tượng',
+    'SUPPLEMENT_REVIEWED': 'Đã kiểm tra bổ sung',
     'DOCUMENT_VERIFIED': 'Xác minh giấy tờ',
-    'SUPPLEMENT_REQUESTED': 'Yêu cầu bổ sung',
-    'APPROVED': 'Duyệt đơn',
-    'REJECTED': 'Không duyệt',
+    'SENT_TO_RESULT': 'Chuyển chờ kết quả',
+    'COMPLETED': 'Hoàn thành',
+    'REJECTED': 'Từ chối',
     'REOPENED': 'Mở lại đơn',
     'BANK_SYNCED': 'Cập nhật tài khoản vào hồ sơ',
 }
@@ -83,19 +81,6 @@ RESUBMIT_POLICIES = {
     'every_term': 'Nộp lại mỗi học kỳ',
     'every_year': 'Nộp lại mỗi năm học',
     'once': 'Nộp một lần cho cả khóa',
-}
-
-# ── Kết quả tính (tuition_exemption_results.status) — A3' ────────────────────
-RESULT_STATUS_LABELS = {
-    'draft': 'Nháp',
-    'previewed': 'Đã xem trước',
-    'committed': 'Đã chốt',
-    'superseded': 'Đã thay thế',
-}
-RESULT_TRANSITIONS = {
-    'draft': {'previewed'},
-    'previewed': {'committed', 'draft'},
-    'committed': {'superseded'},
 }
 
 # Giấy tờ: giới hạn upload dùng chung cho cả kiểm tra phía Hub lẫn hiển thị Dashboard.
@@ -136,7 +121,7 @@ def fingerprint(data):
 
 
 def validate_reason(code, text):
-    """Kiểm mã lý do + nội dung khi không duyệt / yêu cầu bổ sung. `OTHER` bắt buộc
+    """Kiểm mã lý do + nội dung khi từ chối. `OTHER` bắt buộc
     nội dung; tối đa 2.000 ký tự. Trả (code, text đã strip)."""
     if code not in REASONS:
         raise WorkflowError('Chọn lý do hợp lệ.')
@@ -398,8 +383,7 @@ def renewal_mode(policy, last_verified, current):
     return 'supplement'
 
 
-def supplement_deadline(requested_at, days):
-    """Hạn bổ sung = requested_at + `days` ngày (datetime có múi giờ do app truyền).
-    TODO(mghp): số ngày lấy từ cấu hình đợt khi Dashboard cài yêu cầu bổ sung."""
-    from datetime import timedelta
-    return requested_at + timedelta(days=days)
+def can_resubmit(status, reason_code, round_open):
+    """SV được bổ sung từ Hub: đơn Từ chối vì lý do sửa được và đợt của đơn còn mở —
+    hạn bổ sung chính là giờ đóng đợt (như BHYT), không có số ngày riêng."""
+    return status == 'rejected' and reason_code in RESUBMITTABLE_REASONS and bool(round_open)

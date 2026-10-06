@@ -84,6 +84,13 @@ def open_round(now=None):
             .order_by("-opens_at").first())
 
 
+def round_is_open(round_, now=None):
+    """Đợt còn nhận hồ sơ/bổ sung: bật và đang trong khung giờ — đọc SỐNG từ đợt, nên
+    cán bộ gia hạn giờ đóng đợt là hạn bổ sung cũng lùi theo (như BHYT)."""
+    now = now or timezone.now()
+    return bool(round_ and round_.is_active and round_.opens_at <= now <= round_.closes_at)
+
+
 def serialize_round(round_):
     if round_ is None:
         return None
@@ -113,7 +120,7 @@ def participation(student, *, exclude_round_id=None):
     Hai nguồn, lấy kỳ muộn nhất cho mỗi diện:
       1. `tuition_exemption_beneficiaries` status='active' (Dashboard nạp danh sách cũ /
          cập nhật khi duyệt) — nguồn chính;
-      2. diện được duyệt trong đơn ĐÃ DUYỆT ở đợt khác — phòng khi bước 1 chưa kịp ghi.
+      2. diện Đạt trong đơn ĐÃ HOÀN THÀNH ở đợt khác — phòng khi bước 1 chưa kịp ghi.
     """
     history = {}
 
@@ -125,7 +132,7 @@ def participation(student, *, exclude_round_id=None):
               .select_related("last_verified_term")):
         keep(b.category_id, _term_key(b.last_verified_term))
     approved = (TuitionExemptionApplicationCategory.objects
-                .filter(application__student=student, application__status="approved",
+                .filter(application__student=student, application__status="done",
                         review_status="approved")
                 .select_related("application__round__academic_term"))
     if exclude_round_id:
@@ -271,7 +278,7 @@ def serialize_application(app, *, with_details=False):
         "status_label": contract.status_label(app.status),
         "submitted_at": app.submitted_at.isoformat(),
         "review_note": app.review_note or "",
-        "supplement_deadline": app.supplement_deadline.isoformat() if app.supplement_deadline else None,
+        "supplement_pending": app.supplement_pending,
         "row_version": app.row_version,
         "categories": [
             {"code": link.category.code, "name": link.category.name_vi,
@@ -299,10 +306,12 @@ def serialize_application(app, *, with_details=False):
         ]
         data["snapshot"] = {f: (getattr(app, f).isoformat() if f == "citizen_id_issued_on" and app.citizen_id_issued_on
                                 else getattr(app, f) or "") for f in SNAPSHOT_FIELDS}
-        overdue = bool(app.supplement_deadline and timezone.now() > app.supplement_deadline)
-        data["can_supplement"] = app.status == "need_supplement" and not overdue
-        data["supplement_overdue"] = app.status == "need_supplement" and overdue
-        data["supplement_targets"] = supplement_targets(app) if app.status == "need_supplement" else []
+        fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
+        open_ = round_is_open(app.round)
+        data["can_supplement"] = contract.can_resubmit(app.status, app.rejection_reason_code, open_)
+        data["supplement_overdue"] = fixable and not open_
+        data["supplement_closes_at"] = app.round.closes_at.isoformat()
+        data["supplement_targets"] = supplement_targets(app) if fixable else []
         data["rejection_reason"] = contract.REASONS.get(app.rejection_reason_code or "", "")
         link = app.categories.select_related("category").first()
         data["category_details"] = [
@@ -501,13 +510,13 @@ def submit(student, data, uploads, *, request_key):
                 submission_kind=plan["submission_kind"],
                 previous_review_note=cleaned["previous_review_note"] or None,
                 category_details=details,
-                status="submitted", submitted_at=now,
+                status="processing", submitted_at=now,
                 **{f: (cleaned[f] or None) for f in SNAPSHOT_FIELDS},
             )
             links = {code: TuitionExemptionApplicationCategory.objects.create(
                 application=app, category_id=offered[code]["id"]) for code in codes}
             event = append_event(
-                app, "SUBMITTED", source="Hub", actor_id=student.pk, new="submitted",
+                app, "SUBMITTED", source="Hub", actor_id=student.pk, new="processing",
                 key=request_key,
                 payload={"request_digest": digest, "submission_kind": plan["submission_kind"],
                          "categories": modes, "files": len(checked)})
@@ -525,21 +534,20 @@ def submit(student, data, uploads, *, request_key):
 
 
 def supplement_targets(app):
-    """Diện SV được nộp bổ sung: diện cán bộ đánh "Cần bổ sung"; không đánh diện nào thì
-    mọi diện trong đơn. Mỗi diện kèm danh sách giấy tờ (như lúc nộp)."""
-    links = list(app.categories.select_related("category").order_by("category__sort_order", "category__code"))
-    flagged = [l for l in links if l.review_status == "need_supplement"]
+    """Đối tượng trong đơn kèm danh sách giấy tờ (như lúc nộp) — để SV bổ sung/thay giấy."""
+    links = app.categories.select_related("category").order_by("category__sort_order", "category__code")
     return [{"link_id": l.pk, **_serialize_category(l.category), "review_note": l.review_note or ""}
-            for l in (flagged or links)]
+            for l in links]
 
 
 def supplement(student, application, data, uploads, *, request_key, row_version):
-    """SV bổ sung/thay giấy tờ khi CÁN BỘ yêu cầu (đơn need_supplement) → under_review,
-    event SUPPLEMENTED; file cũ cùng (diện, doc_type) → is_superseded=True.
+    """SV bổ sung/thay giấy tờ khi đơn bị Từ chối vì lý do sửa được và đợt còn mở → Đang xử
+    lý kèm cờ "SV đã bổ sung" (như BHYT), event SUPPLEMENTED; file cũ cùng (diện, doc_type)
+    → is_superseded=True.
 
     Bổ sung giấy ở ĐỢT MỚI (diện every_term/every_year) không đi đường này mà là đơn
-    gia hạn — xem `submit`. Hub ghi `status`/`row_version` ở đây là ngoại lệ đã ghi
-    trong schema (SV gửi bổ sung).
+    gia hạn — xem `submit`. Hub ghi status/cờ bổ sung/row_version ở đây là ngoại lệ đã
+    ghi trong schema (SV gửi bổ sung), như `insurance_workflow.resubmit`.
     """
     try:
         contract.request_key(request_key)
@@ -591,16 +599,19 @@ def supplement(student, application, data, uploads, *, request_key, row_version)
             except (TypeError, ValueError):
                 raise TuitionExemptionError("Đơn vừa được cán bộ cập nhật. Hãy tải lại trang rồi gửi lại.",
                                             code="conflict")
-            if app.status != "need_supplement":
-                raise TuitionExemptionError("Đơn hiện không ở trạng thái cần bổ sung.", code="conflict")
-            if app.supplement_deadline and timezone.now() > app.supplement_deadline:
-                raise TuitionExemptionError("Đã quá hạn bổ sung. Liên hệ Phòng CTSV để được mở lại.",
+            if app.status != "rejected" or app.rejection_reason_code not in contract.RESUBMITTABLE_REASONS:
+                raise TuitionExemptionError("Đơn hiện không bổ sung được. Liên hệ Phòng CTSV nếu cần.",
+                                            code="conflict")
+            if not round_is_open(app.round):
+                raise TuitionExemptionError("Đợt đã đóng nên không bổ sung được nữa. Liên hệ Phòng CTSV.",
                                             code="closed")
-            contract.validate_transition(app.status, "under_review")
+            contract.validate_transition(app.status, "processing")
             event = append_event(app, "SUPPLEMENTED", source="Hub", actor_id=student.pk,
-                                 old="need_supplement", new="under_review", key=request_key,
+                                 old="rejected", new="processing", key=request_key,
+                                 reason_code=app.rejection_reason_code,
                                  payload={"request_digest": digest, "files": len(checked),
-                                          "categories": sorted({c for (c, _, _) in checked})})
+                                          "categories": sorted({c for (c, _, _) in checked}),
+                                          "previous_note": app.review_note or ""})
             replaced = 0
             for (code, doc_type, _), (upload, chk) in checked.items():
                 link_id = targets[code]["link_id"]
@@ -610,9 +621,14 @@ def supplement(student, application, data, uploads, *, request_key, row_version)
                              .update(is_superseded=True))
                 link = TuitionExemptionApplicationCategory.objects.get(pk=link_id)
                 _store(app, event, link, doc_type, upload, chk, written)
-            app.status = "under_review"
+            app.status = "processing"
+            app.rejection_reason_code = None
+            app.review_note = None
+            app.supplement_pending = True
+            app.supplemented_at = timezone.now()
             app.row_version += 1
-            app.save(update_fields=["status", "row_version", "updated_at"])
+            app.save(update_fields=["status", "rejection_reason_code", "review_note", "supplement_pending",
+                                    "supplemented_at", "row_version", "updated_at"])
             return app
     except Exception:
         for path in written:

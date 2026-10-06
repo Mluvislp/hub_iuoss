@@ -55,10 +55,13 @@ class TuitionExemptionApplication(models.Model):
     category_details = models.JSONField(null=True, blank=True)
     # Workflow — cột status..bank_synced_by_id do Dashboard ghi, Hub chỉ đọc
     # (trừ lúc tạo đơn và lúc SV gửi bổ sung, theo tuition_exemption_contract.py).
-    status = models.CharField(max_length=24, default="submitted")
+    status = models.CharField(max_length=24, default="processing")
     rejection_reason_code = models.CharField(max_length=32, null=True, blank=True)
     review_note = models.TextField(null=True, blank=True)
-    supplement_deadline = models.DateTimeField(null=True, blank=True)
+    # Cờ "SV đã bổ sung" (như BHYT): Hub bật khi SV gửi bổ sung; Dashboard tắt khi xác nhận.
+    supplement_pending = models.BooleanField(default=False)
+    supplemented_at = models.DateTimeField(null=True, blank=True)
+    supplement_reviewed_at = models.DateTimeField(null=True, blank=True)
     reviewed_by_id = models.IntegerField(null=True, blank=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
     bank_synced_at = models.DateTimeField(null=True, blank=True)

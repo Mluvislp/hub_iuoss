@@ -14,18 +14,16 @@ import type { TuitionCategoryMode, TuitionCategoryReview, TuitionExemptionStatus
 export const BASE = '/dashboard/mien-giam-hoc-phi';
 
 export const STATUS_BADGE: Record<TuitionExemptionStatus, string> = {
-  submitted: badge.info,
-  under_review: badge.warning,
-  need_supplement: badge.danger,
-  approved: badge.success,
-  rejected: badge.neutral,
+  processing: badge.info,
+  waiting_result: badge.warning,
+  done: badge.success,
+  rejected: badge.danger,
 };
 
 export const REVIEW_BADGE: Record<TuitionCategoryReview, string> = {
   pending: badge.neutral,
   approved: badge.success,
   rejected: badge.neutral,
-  need_supplement: badge.danger,
 };
 
 export const MODE_BADGE: Record<TuitionCategoryMode, string> = {
@@ -38,7 +36,6 @@ export const REVIEW_LABEL: Record<TuitionCategoryReview, string> = {
   pending: 'Chờ xét',
   approved: 'Đạt',
   rejected: 'Không đạt',
-  need_supplement: 'Cần bổ sung',
 };
 
 export function fmtDate(iso: string | null | undefined) {

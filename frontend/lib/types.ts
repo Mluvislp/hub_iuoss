@@ -702,10 +702,10 @@ export interface RequestAvailability {
 // ── Miễn giảm học phí (MGHP) ─────────────────────────────────────────────────
 // Khớp `core/tuition_exemption.py` (build_state / build_plan / serialize_application).
 
-export type TuitionExemptionStatus =
-  | 'submitted' | 'under_review' | 'need_supplement' | 'approved' | 'rejected';
+/** Cùng khuôn BHYT: Đang xử lý → Chờ kết quả → Hoàn thành; Từ chối kèm lý do. */
+export type TuitionExemptionStatus = 'processing' | 'waiting_result' | 'done' | 'rejected';
 
-export type TuitionCategoryReview = 'pending' | 'approved' | 'rejected' | 'need_supplement';
+export type TuitionCategoryReview = 'pending' | 'approved' | 'rejected';
 
 /** Việc SV phải làm với một diện: xác nhận gia hạn / bổ sung giấy tờ / đăng ký mới. */
 export type TuitionCategoryMode = 'confirm' | 'supplement' | 'new';
@@ -783,7 +783,8 @@ export interface TuitionExemptionApplication {
   status_label: string;
   submitted_at: string;
   review_note: string;
-  supplement_deadline: string | null;
+  /** SV vừa bổ sung, cán bộ chưa xác nhận. */
+  supplement_pending: boolean;
   row_version: number;
   categories: {
     code: string;
@@ -798,10 +799,13 @@ export interface TuitionExemptionApplication {
   documents?: { id: number; doc_type: string; doc_label: string; category_code: string;
                 original_filename: string; mime_type: string; expires_at: string | null }[];
   snapshot?: Record<string, string>;
-  /** Đơn "Cần bổ sung" và còn hạn — hiện khu nộp bổ sung. */
+  /** Đơn Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
   can_supplement?: boolean;
+  /** Như trên nhưng đợt đã đóng. */
   supplement_overdue?: boolean;
-  /** Diện được nộp bổ sung (cán bộ đánh "Cần bổ sung", hoặc mọi diện nếu không đánh). */
+  /** Hạn bổ sung = giờ đóng đợt. */
+  supplement_closes_at?: string;
+  /** Đối tượng trong đơn kèm danh sách giấy tờ để bổ sung. */
   supplement_targets?: (TuitionExemptionCategory & { link_id: number; review_note: string })[];
   rejection_reason?: string;
   /** Thông tin riêng theo đối tượng đã khai (nhãn + giá trị chữ). */
