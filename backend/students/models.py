@@ -545,25 +545,3 @@ class StudentTuitionFee(models.Model):
     class Meta:
         managed = False
         db_table = "student_tuition_fees"
-
-
-class TuitionExemptionResult(models.Model):
-    """Kết quả tính MGHP. Hub CHỈ hiện dòng `status='committed'` — draft/previewed là
-    việc nội bộ của cán bộ. Không khai cột sinh `committed_guard`."""
-
-    id = models.BigAutoField(primary_key=True)
-    student = models.ForeignKey(Student, on_delete=models.DO_NOTHING,
-                                related_name="tuition_exemption_results")
-    academic_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
-    application_id = models.BigIntegerField(null=True)
-    status = models.CharField(max_length=16)
-    fee_amount_vnd = models.BigIntegerField()
-    applied_category = models.ForeignKey(TuitionExemptionCategory, on_delete=models.DO_NOTHING,
-                                         null=True, related_name="+")
-    percent = models.DecimalField(max_digits=5, decimal_places=2)
-    exemption_amount_vnd = models.BigIntegerField()
-    committed_at = models.DateTimeField(null=True)
-
-    class Meta:
-        managed = False
-        db_table = "tuition_exemption_results"

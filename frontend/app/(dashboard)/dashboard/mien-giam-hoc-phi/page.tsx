@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  CalendarClock, ChevronRight, FilePlus2, FileUp, History, Loader2, Lock, RefreshCw, Wallet,
+  CalendarClock, ChevronRight, FilePlus2, FileUp, History, Loader2, Lock, RefreshCw,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { TuitionExemptionApplication, TuitionExemptionState } from '@/lib/types';
-import { BASE, Breadcrumb, ErrorBox, fmtDate, fmtDateTime, fmtVnd, MODE_BADGE, StatusBadge } from './shared';
+import { BASE, Breadcrumb, ErrorBox, fmtDate, fmtDateTime, MODE_BADGE, StatusBadge } from './shared';
 
 /**
  * Trang tổng quan Miễn giảm học phí: đợt đang mở, đơn của đợt này, lịch sử đơn,
@@ -150,68 +150,6 @@ export default function TuitionWaiverPage() {
                 {state.history.map((a) => <ApplicationRow key={a.id} app={a} />)}
               </div>
             )}
-          </section>
-
-          <section className={ui.card}>
-            <div className={ui.cardHeader}>
-              <h2 className={ui.sectionTitle}><Wallet size={17} className="text-primary" />Kết quả miễn giảm</h2>
-            </div>
-            {state.results.length === 0 ? (
-              <p className="px-5 py-4 text-sm text-muted">Chưa có kết quả miễn giảm nào được chốt.</p>
-            ) : (
-              <>
-              {/* Điện thoại: 5 cột tiền không vừa màn hình → mỗi học kỳ một thẻ,
-                  số tiền được miễn giảm (thứ SV tìm) đứng đầu bên phải. */}
-              <ul className="divide-y divide-line2 md:hidden">
-                {state.results.map((r) => (
-                  <li key={r.term_code} className="px-4 py-3.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-ink">{r.term_code}</p>
-                        <p className="mt-0.5 text-meta text-ink">{r.category || '—'}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs text-muted">Được miễn giảm</p>
-                        <p className="text-sm font-semibold tabular-nums text-success-text">
-                          {fmtVnd(r.exemption_amount_vnd)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-1.5 text-xs text-muted tabular-nums">
-                      Mức {Number(r.percent)}% · Học phí {fmtVnd(r.fee_amount_vnd)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted">
-                    <tr className="border-b border-line2">
-                      <th className="text-left font-medium px-5 py-2">Học kỳ</th>
-                      <th className="text-left font-medium px-3 py-2">Đối tượng áp dụng</th>
-                      <th className="text-right font-medium px-3 py-2">Mức</th>
-                      <th className="text-right font-medium px-3 py-2">Học phí</th>
-                      <th className="text-right font-medium px-5 py-2">Được miễn giảm</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {state.results.map((r) => (
-                      <tr key={r.term_code} className="border-b border-line2 last:border-0">
-                        <td className="px-5 py-2.5 text-ink">{r.term_code}</td>
-                        <td className="px-3 py-2.5 text-ink">{r.category || '—'}</td>
-                        <td className="px-3 py-2.5 text-right text-ink">{Number(r.percent)}%</td>
-                        <td className="px-3 py-2.5 text-right text-muted">{fmtVnd(r.fee_amount_vnd)}</td>
-                        <td className={cn('px-5 py-2.5 text-right font-semibold text-success-text')}>
-                          {fmtVnd(r.exemption_amount_vnd)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              </>
-            )}
-            {/* TODO(mghp): ghi chú thời điểm hoàn tiền về tài khoản khi quy trình chi trả được chốt. */}
           </section>
 
           {state.application?.supplement_deadline && (

@@ -35,7 +35,6 @@ from students.models import (
     StudentBankAccount,
     TuitionExemptionBeneficiary,
     TuitionExemptionCategory,
-    TuitionExemptionResult,
     TuitionExemptionRound,
 )
 
@@ -312,20 +311,6 @@ def serialize_application(app, *, with_details=False):
     return data
 
 
-def committed_results(student):
-    """Kết quả ĐÃ CHỐT của SV (draft/previewed là việc nội bộ, không hiện)."""
-    rows = (TuitionExemptionResult.objects.filter(student=student, status="committed")
-            .select_related("academic_term", "applied_category")
-            .order_by("-academic_term__academic_year", "-academic_term__semester"))
-    return [
-        {"term_code": r.academic_term.term_code,
-         "category": r.applied_category.name_vi if r.applied_category else "",
-         "percent": str(r.percent), "fee_amount_vnd": r.fee_amount_vnd,
-         "exemption_amount_vnd": r.exemption_amount_vnd}
-        for r in rows
-    ]
-
-
 def build_state(student):
     """Toàn bộ dữ liệu trang MGHP của SV."""
     round_ = open_round()
@@ -337,7 +322,6 @@ def build_state(student):
         "plan": build_plan(student, round_) if round_ else None,
         "application": serialize_application(current) if current else None,
         "history": [serialize_application(a) for a in apps],
-        "results": committed_results(student),
         "prefill": build_prefill(student),
         "limits": {"max_files": contract.MAX_FILES_PER_APPLICATION,
                    "max_pdf_mb": contract.MAX_FILE_SIZE_BYTES // (1024 * 1024),

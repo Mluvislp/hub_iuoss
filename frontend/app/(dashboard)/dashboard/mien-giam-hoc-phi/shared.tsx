@@ -51,10 +51,6 @@ export function fmtDateTime(iso: string) {
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + fmtDate(iso);
 }
 
-export function fmtVnd(n: number) {
-  return n.toLocaleString('vi-VN') + ' đ';
-}
-
 export function Breadcrumb({ trail }: { trail: { label: string; href?: string }[] }) {
   const items = [{ label: 'Bảng thông tin', href: '/dashboard' }, ...trail];
   return (

@@ -808,14 +808,6 @@ export interface TuitionExemptionApplication {
   category_details?: { label: string; value: string }[];
 }
 
-export interface TuitionExemptionResult {
-  term_code: string;
-  category: string;
-  percent: string;
-  fee_amount_vnd: number;
-  exemption_amount_vnd: number;
-}
-
 export interface TuitionExemptionPrefill {
   student_code: string;
   full_name: string;
@@ -836,7 +828,6 @@ export interface TuitionExemptionState {
   plan: TuitionExemptionPlan | null;
   application: TuitionExemptionApplication | null;
   history: TuitionExemptionApplication[];
-  results: TuitionExemptionResult[];
   prefill: TuitionExemptionPrefill;
   limits: { max_files: number; max_pdf_mb: number; max_image_mb: number };
   /** Chỉ có trong phản hồi POST nộp đơn. */
