@@ -134,16 +134,16 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
         return payload
 
     def get_soft_copy(self, obj):
-        """Bản mềm PDF (bảng điểm RL) — chỉ lộ ra khi yêu cầu đã Hoàn thành / Đã trả giấy.
+        """Bản mềm PDF — chỉ lộ ra khi Phòng CTSV đã gửi (`ConfirmationRequest.visible_soft_copy`).
 
         Dashboard ghi `payload.soft_copy` (dashboard documents/soft_copy.py); tải qua
-        `GET /api/requests/<id>/soft-copy/`.
+        `GET /api/requests/<id>/soft-copy/`. Không trả đường dẫn lưu trữ / tên chuyên viên.
         """
-        data = (obj.payload or {}).get("soft_copy")
-        if obj.status not in ConfirmationRequest.FINISHED_STATUSES or not isinstance(data, dict) \
-                or not data.get("storage_key"):
+        data = obj.visible_soft_copy
+        if data is None:
             return None
-        return {"filename": data.get("filename") or "", "size": data.get("size") or 0}
+        return {"filename": data.get("filename") or "", "size": data.get("size") or 0,
+                "sent_at": data.get("sent_at") or ""}
 
     def get_comment_count(self, obj):
         # Đã prefetch ở view danh sách nên không sinh thêm query mỗi dòng.

@@ -47,7 +47,7 @@ class SoftCopyDownloadTests(TestCase):
         self.req.status = ConfirmationRequest.STATUS_DONE
         self.req.save()
         body = self._detail()
-        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13})
+        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13, "sent_at": ""})
         # Không lộ đường dẫn lưu trữ / tên chuyên viên.
         self.assertNotIn("soft_copy", body["payload"])
         resp = self.client.get(f"/api/requests/{self.req.pk}/soft-copy/")
@@ -62,9 +62,24 @@ class SoftCopyDownloadTests(TestCase):
         self.req.save()
         body = self._detail()
         self.assertEqual(body["status"], "returned")
-        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13})
+        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13, "sent_at": ""})
         for key in ("soft_copy", "return_receipts", "return_reopens"):
             self.assertNotIn(key, body["payload"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
+
+    def test_giay_khac_chi_thay_khi_da_gui(self):
+        # Mọi loại giấy (06/10/2026): tải lên rồi mà chưa "Gửi cho sinh viên" thì chưa thấy.
+        self.req.request_type = "enrollment"
+        self.req.status = ConfirmationRequest.STATUS_DONE
+        self.req.payload = {"soft_copy": {**self.req.payload["soft_copy"]}}
+        self.req.save()
+        self.assertIsNone(self._detail()["soft_copy"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 404)
+
+        self.req.payload["soft_copy"]["sent_at"] = "06/10/2026 09:00"
+        self.req.save()
+        self.assertEqual(self._detail()["soft_copy"],
+                         {"filename": "bd.pdf", "size": 13, "sent_at": "06/10/2026 09:00"})
         self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
 
     def test_khong_tai_duoc_cua_nguoi_khac(self):
