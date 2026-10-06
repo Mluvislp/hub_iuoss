@@ -82,6 +82,17 @@ class SoftCopyDownloadTests(TestCase):
                          {"filename": "bd.pdf", "size": 13, "sent_at": "06/10/2026 09:00"})
         self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
 
+    def test_da_gui_thi_thay_du_chua_hoan_thanh_tu_choi_thi_an(self):
+        self.req.request_type = "enrollment"
+        self.req.payload = {"soft_copy": {**self.req.payload["soft_copy"], "sent_at": "06/10/2026 09:00"}}
+        self.req.save()  # đang xử lý
+        self.assertIsNotNone(self._detail()["soft_copy"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
+        self.req.status = ConfirmationRequest.STATUS_REJECTED
+        self.req.save()
+        self.assertIsNone(self._detail()["soft_copy"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 404)
+
     def test_khong_tai_duoc_cua_nguoi_khac(self):
         self.req.status = ConfirmationRequest.STATUS_DONE
         self.req.save()
