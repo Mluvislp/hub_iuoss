@@ -412,6 +412,7 @@ export interface FeatureFlags {
   civic_activities: boolean;
   health_check: boolean;
   support_tickets: boolean;
+  personal_info: boolean;
 }
 
 /**
@@ -696,4 +697,41 @@ export interface RequestAvailability {
   term: { key: string; label: string };
   contact_email: string;
   types: Record<string, QuotaTypeState>;
+}
+
+// ── Thông tin cá nhân (GET/POST /api/personal-info/) ─────────────────────────
+
+export interface CitizenIdValue { number: string; issue_place: string; issue_date: string }
+export interface BankAccountValue { bank_name: string; account_number: string; branch_address: string }
+export interface ParentValue {
+  orphan: boolean; full_name: string; phone: string; email: string; occupation: string;
+}
+export interface HighSchoolValue { province: string; school_name: string }
+
+export type PersonalInfoKey =
+  | 'personal_email' | 'mobile_phone' | 'citizen_id' | 'bank_account'
+  | 'father' | 'mother' | 'high_school';
+
+/** Chuỗi với ô đơn (email, SĐT), object với cụm nhiều ô. */
+export type PersonalInfoValue = string | CitizenIdValue | BankAccountValue | ParentValue | HighSchoolValue;
+
+export interface PersonalInfoGroup {
+  key: PersonalInfoKey;
+  label: string;
+  value: PersonalInfoValue;
+  is_blank: boolean;
+  /** Đang chờ duyệt ⇒ cụm khóa, hiện giá trị đã gửi. */
+  pending: { value: PersonalInfoValue; submitted_at: string } | null;
+  /** Lần gửi gần nhất bị từ chối ⇒ cụm mở sẵn với giá trị đã gửi để sửa lại. */
+  rejection: { value: PersonalInfoValue; note: string; reviewed_at: string | null } | null;
+}
+
+export interface PersonalInfoData {
+  readonly: {
+    full_name: string; student_code: string; sex: string; date_of_birth: string;
+    department: string; university_email: string;
+  };
+  groups: PersonalInfoGroup[];
+  bank_suggestions: string[];
+  sent?: number;
 }

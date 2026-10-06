@@ -22,7 +22,8 @@ from django.utils import timezone
 
 from core import cccd_rules
 from students.models import (
-    ProfileChangeRequest, StudentContactPoint, StudentIdentityDocument,
+    ProfileChangeRequest, Student, StudentBankAccount, StudentContactPoint,
+    StudentFamilyMember, StudentHighSchool, StudentIdentityDocument,
 )
 
 CCCD_RE = re.compile(r"^\d{12}$")
@@ -280,6 +281,206 @@ CHANGE_TARGETS = {
 }
 
 
+# ── Trang "Thông tin cá nhân" (Hub) ──────────────────────────────────────────
+#
+# Mọi cụm trên trang này đều CHỜ DUYỆT, kể cả khai lần đầu (người dùng chốt
+# 06/10/2026) — trang gọi `submit_change(..., require_approval=True)`. Ba target
+# ở CHANGE_TARGETS dùng chung với luồng ngoại trú / khám sức khỏe / giấy tờ, các
+# luồng đó vẫn ghi thẳng như cũ. Bốn target dưới đây CHỈ trang này gửi.
+#
+# ⚠️ Bản song sinh của Dashboard (students/profile_changes.py) — read/clean phải
+# giống hệt. Bên này KHÔNG có apply: Hub chỉ gửi, nhân viên duyệt bên Dashboard.
+
+BANK_ACCOUNT_RE = re.compile(r"^\d{6,20}$")
+
+PARENT_LABELS = {
+    StudentFamilyMember.REL_FATHER: "cha",
+    StudentFamilyMember.REL_MOTHER: "mẹ",
+}
+
+
+def _clip(text, limit, label):
+    text = " ".join((text or "").split())
+    if len(text) > limit:
+        raise ChangeError(f"{label} quá dài (tối đa {limit} ký tự).")
+    return text
+
+
+def _require_dict(value, label):
+    if not isinstance(value, dict):
+        raise ChangeError(f"Dữ liệu {label} không hợp lệ.")
+    return value
+
+
+def _current_bank(student):
+    row = (
+        StudentBankAccount.objects
+        .filter(student=student, is_current=True)
+        .order_by("-updated_at", "-id").first()
+    )
+    if row is None:
+        return {"bank_name": "", "account_number": "", "branch_address": ""}
+    return {
+        "bank_name": (row.bank_name or "").strip(),
+        "account_number": (row.account_number or "").strip(),
+        "branch_address": (row.branch_address or "").strip(),
+    }
+
+
+def _clean_bank(value, student):
+    value = _require_dict(value, "tài khoản ngân hàng")
+    name = _clip(value.get("bank_name"), 255, "Tên ngân hàng")
+    number = re.sub(r"[\s.\-]", "", value.get("account_number") or "")
+    branch = _clip(value.get("branch_address"), 500, "Chi nhánh")
+    if not name:
+        raise ChangeError("Chưa nhập tên ngân hàng.")
+    if not BANK_ACCOUNT_RE.match(number):
+        raise ChangeError("Số tài khoản chỉ gồm chữ số, dài 6–20 ký tự.")
+    return {"bank_name": name, "account_number": number, "branch_address": branch}
+
+
+def _orphan_flags(student):
+    """(mồ côi cha, mồ côi mẹ) đọc thẳng từ DB — đối tượng `student` có thể cũ."""
+    status = (
+        Student.objects.filter(pk=student.pk)
+        .values_list("orphan_status", flat=True).first()
+    ) or ""
+    return status in ("FATHER", "BOTH"), status in ("MOTHER", "BOTH")
+
+
+def _parent_row(student, relationship):
+    return (
+        StudentFamilyMember.objects
+        .filter(student=student, relationship=relationship)
+        .order_by("-id").first()
+    )
+
+
+def _current_parent(student, relationship):
+    row = _parent_row(student, relationship)
+    father, mother = _orphan_flags(student)
+    return {
+        "orphan": father if relationship == StudentFamilyMember.REL_FATHER else mother,
+        "full_name": ((row.full_name if row else "") or "").strip(),
+        "phone": ((row.phone if row else "") or "").strip(),
+        "email": ((row.email if row else "") or "").strip(),
+        "occupation": ((row.occupation if row else "") or "").strip(),
+    }
+
+
+def _clean_parent(value, student, relationship):
+    """Chọn "mồ côi" ⇒ không bắt buộc gì, chỉ giữ họ tên (nếu có); SĐT/email/nghề
+    nghiệp bị xoá vì không còn dùng để liên hệ."""
+    label = PARENT_LABELS[relationship]
+    value = _require_dict(value, f"thông tin {label}")
+    full_name = _clip(value.get("full_name"), 255, f"Họ tên {label}")
+    if value.get("orphan") is True:
+        return {"orphan": True, "full_name": full_name, "phone": "", "email": "", "occupation": ""}
+
+    if not full_name:
+        raise ChangeError(f"Chưa nhập họ tên {label}.")
+    try:
+        phone = _clean_phone(value.get("phone"), student)
+    except ChangeError:
+        raise ChangeError(
+            f"Số điện thoại của {label} không hợp lệ — cần 10 chữ số, bắt đầu bằng "
+            "03, 05, 07, 08 hoặc 09."
+        )
+    email = (value.get("email") or "").strip().lower()
+    if email and (not EMAIL_RE.match(email) or len(email) > 255):
+        raise ChangeError(f"Email của {label} không hợp lệ.")
+    occupation = _clip(value.get("occupation"), 255, f"Nghề nghiệp của {label}")
+    if not occupation:
+        raise ChangeError(f"Chưa nhập nghề nghiệp của {label}.")
+    return {"orphan": False, "full_name": full_name, "phone": phone,
+            "email": email, "occupation": occupation}
+
+
+def _current_high_school(student):
+    row = StudentHighSchool.objects.filter(student=student).first()
+    return {
+        "province": ((row.province if row else "") or "").strip(),
+        "school_name": ((row.school_name if row else "") or "").strip(),
+    }
+
+
+def _clean_high_school(value, student):
+    value = _require_dict(value, "trường THPT")
+    province = _clip(value.get("province"), 255, "Tỉnh/thành")
+    school = _clip(value.get("school_name"), 255, "Tên trường")
+    if not province:
+        raise ChangeError("Chưa chọn tỉnh/thành của trường THPT.")
+    if not school:
+        raise ChangeError("Chưa nhập tên trường THPT.")
+    return {"province": province, "school_name": school}
+
+
+
+
+
+
+
+
+
+
+def _describe_bank(v):
+    parts = [v.get("bank_name") or "", v.get("account_number") or ""]
+    if v.get("branch_address"):
+        parts.append("chi nhánh: " + v["branch_address"])
+    return " · ".join(p for p in parts if p)
+
+
+def _describe_parent(v):
+    if v.get("orphan"):
+        return "Mồ côi" + (f" · {v['full_name']}" if v.get("full_name") else "")
+    parts = [v.get("full_name"), v.get("phone"), v.get("email"), v.get("occupation")]
+    return " · ".join(p for p in parts if p)
+
+
+def _describe_high_school(v):
+    return " · ".join(p for p in (v.get("school_name"), v.get("province")) if p)
+
+
+def _parent_target(relationship, label):
+    return {
+        "label": label,
+        "shape": "json",
+        "approval": True,
+        "read": lambda s: _current_parent(s, relationship),
+        "clean": lambda v, s: _clean_parent(v, s, relationship),
+        "is_blank": lambda c: not (c or {}).get("orphan") and not (c or {}).get("full_name"),
+        "describe": _describe_parent,
+    }
+
+
+PERSONAL_TARGETS = {
+    "bank.account": {
+        "label": "Tài khoản ngân hàng",
+        "shape": "json",       # {bank_name, account_number, branch_address}
+        "approval": True,
+        "read": _current_bank,
+        "clean": _clean_bank,
+        "is_blank": lambda c: not (c or {}).get("account_number"),
+        "describe": _describe_bank,
+    },
+    # {orphan, full_name, phone, email, occupation} — `orphan` sống ở
+    # students.orphan_status, phần còn lại ở student_family_members.
+    "family.father": _parent_target(StudentFamilyMember.REL_FATHER, "Thông tin cha"),
+    "family.mother": _parent_target(StudentFamilyMember.REL_MOTHER, "Thông tin mẹ"),
+    "school.high_school": {
+        "label": "Trường THPT",
+        "shape": "json",       # {province, school_name}
+        "approval": True,
+        "read": _current_high_school,
+        "clean": _clean_high_school,
+        "is_blank": lambda c: not (c or {}).get("school_name"),
+        "describe": _describe_high_school,
+    },
+}
+
+ALL_TARGETS = {**CHANGE_TARGETS, **PERSONAL_TARGETS}
+
+
 # Vé "mở lại form khai báo" do nhân viên cấp. Không phải một đề xuất sửa field
 # nên KHÔNG nằm trong CHANGE_TARGETS — sinh viên không thể tự tạo qua API.
 #   status='approved'  = vé còn hiệu lực
@@ -308,7 +509,7 @@ def consume_reopen(student):
 
 def spec(target):
     try:
-        return CHANGE_TARGETS[target]
+        return ALL_TARGETS[target]
     except KeyError:
         raise ChangeError(f"Không hỗ trợ sửa trường «{target}».")
 
@@ -347,8 +548,13 @@ def cccd_missing(student):
     return conf["is_blank"](conf["read"](student))
 
 
-def submit_change(student, target, value, *, source, group_key=None):
-    """Trả về (ProfileChangeRequest, applied_ngay) hoặc (None, False) nếu không đổi."""
+def submit_change(student, target, value, *, source, group_key=None,
+                  require_approval=False):
+    """Trả về (ProfileChangeRequest, applied_ngay) hoặc (None, False) nếu không đổi.
+
+    `require_approval=True` (trang "Thông tin cá nhân") ⇒ LUÔN chờ duyệt, kể cả
+    target vốn ghi thẳng và kể cả khi hồ sơ đang trống.
+    """
     conf = spec(target)
     current = conf["read"](student)
     cleaned = conf["clean"](value, student)
@@ -359,7 +565,8 @@ def submit_change(student, target, value, *, source, group_key=None):
     old_raw = dump_value(conf, current) if current else None
     new_raw = dump_value(conf, cleaned)
 
-    if not conf.get("approval", True) or conf["is_blank"](current):
+    direct = not conf.get("approval", True) or conf["is_blank"](current)
+    if direct and not require_approval:
         conf["apply"](student, cleaned)
         return ProfileChangeRequest.objects.create(
             student=student, target=target, old_value=old_raw,

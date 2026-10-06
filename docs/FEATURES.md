@@ -324,6 +324,16 @@ thời đề xuất sửa CCCD / email cá nhân / SĐT.
 
 ---
 
+## 3c. Thông tin cá nhân — `/dashboard/thong-tin-ca-nhan`
+
+Cờ `FEATURE_PERSONAL_INFO`. API `GET/POST /api/personal-info/` (`core/personal_info.py`).
+6 ô chỉ đọc + 7 cụm gửi duyệt (email cá nhân, SĐT, CCCD, tài khoản ngân hàng, cha, mẹ,
+THPT). **Mọi cụm chờ duyệt kể cả khai lần đầu**; Hub không ghi gì vào hồ sơ — mỗi cụm
+là một dòng `hub_profile_change_requests` (`source = thong_tin_ca_nhan`), nhân viên
+duyệt bên Dashboard. Cụm đang chờ bị khóa; cụm bị từ chối mở sẵn kèm lý do. Lỗi trả
+theo từng cụm (`errors: {key: message}`), có lỗi thì không cụm nào được ghi. Luật
+read/clean là bản song sinh của Dashboard — chi tiết ở `dashboard_iuoss/docs/OFFCAMPUS.md` §2.
+
 ## 4. Logging
 
 **Files:** `config/settings.py` (LOGGING config), `core/auth.py`, `core/api/views.py`

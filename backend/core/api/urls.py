@@ -3,6 +3,7 @@ from . import health_check_views, ticket_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
+from .personal_info_views import PersonalInfoView
 
 urlpatterns = [
     path('health-insurance/external/<int:pk>/', ExternalInsuranceView.as_view(), name='api_external_insurance_detail'),
@@ -43,6 +44,7 @@ urlpatterns = [
     path("requests/conduct-score/form/", views.ConductScoreRequestFormView.as_view(), name="api_conduct_request_form"),
 
     # Khai báo thông tin ngoại trú
+    path("personal-info/", PersonalInfoView.as_view(), name="api_personal_info"),
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
     path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
          name="api_offcampus_request_reopen"),

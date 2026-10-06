@@ -20,6 +20,9 @@ import type {
   OffCampusForm,
   OffCampusSubmit,
   OffCampusResult,
+  PersonalInfoData,
+  PersonalInfoKey,
+  PersonalInfoValue,
   InsuranceRegistrationPrefill,
   TicketDetail,
   TicketMessage,
@@ -339,6 +342,15 @@ export const api = {
       });
       if (!res.ok) throw new Error('Không tải được file.');
       return res.blob();
+    },
+  },
+
+  personalInfo: {
+    get(): Promise<PersonalInfoData> {
+      return request('/personal-info/');
+    },
+    submit(groups: Partial<Record<PersonalInfoKey, PersonalInfoValue>>): Promise<PersonalInfoData> {
+      return request('/personal-info/', { method: 'POST', body: JSON.stringify({ groups }) });
     },
   },
 
