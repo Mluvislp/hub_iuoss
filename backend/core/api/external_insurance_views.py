@@ -1,6 +1,4 @@
 """Declarations tied to intake windows, with in-place edits and audit events."""
-from pathlib import Path
-from uuid import uuid4
 
 from django.conf import settings
 from django.db import transaction
@@ -10,6 +8,7 @@ from students.models import Hospital, Student, VnProvince, VnWard
 from core.models import ExternalInsuranceDeclaration
 from core.insurance_contract import WorkflowError, Conflict, fingerprint, request_key
 from core.insurance_files import inspect_uploads
+from core import student_images
 from .serializers import InsuranceRegistrationSerializer
 from .views import InsuranceRegistrationView
 
@@ -18,11 +17,13 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
     registration_year = None
     registration_period = None
     payment_receipt_image = None
-    medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}[0-9]{13}|[0-9]{10})$', max_length=64, error_messages={
-        'invalid': 'Mã thẻ gồm 10 số hoặc 2 chữ cái và 13 số.', 'blank': 'Vui lòng nhập mã thẻ BHYT.',
+    # Thẻ 15 ký tự: 2 chữ + 3 số + mã BHXH (10 số). Thẻ 17 ký tự: mã BHXH thay bằng số CCCD (12 số).
+    medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}(?:[0-9]{13}|[0-9]{15})|[0-9]{10})$', max_length=64, error_messages={
+        'invalid': 'Mã thẻ gồm 10 số, hoặc 2 chữ cái và 13 hay 15 số.', 'blank': 'Vui lòng nhập mã thẻ BHYT.',
         'required': 'Vui lòng nhập mã thẻ BHYT.'})
-    social_insurance_number = serializers.RegexField(r'^[0-9]{10}$', max_length=15, error_messages={
-        'invalid': 'Mã BHXH phải bao gồm đúng 10 chữ số cuối của mã BHYT.', 'blank': 'Vui lòng nhập mã số BHXH.',
+    # Mã BHXH = mã thẻ bỏ 5 ký tự đầu: 10 số (mã BHXH cũ) hoặc 12 số (số CCCD).
+    social_insurance_number = serializers.RegexField(r'^(?:[0-9]{10}|[0-9]{12})$', max_length=15, error_messages={
+        'invalid': 'Mã BHXH gồm 10 hoặc 12 chữ số (mã thẻ BHYT bỏ 5 ký tự đầu).', 'blank': 'Vui lòng nhập mã số BHXH.',
         'required': 'Vui lòng nhập mã số BHXH.'})
     valid_from = serializers.DateField(error_messages={
         'invalid': 'Ngày bắt đầu không hợp lệ.', 'required': 'Vui lòng nhập ngày bắt đầu.'})
@@ -34,7 +35,8 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
         errors = {}
         if attrs['valid_until'] < attrs['valid_from']:
             errors['valid_until'] = 'Ngày hết hạn phải từ ngày bắt đầu trở đi.'
-        if not attrs['medical_insurance_code'].endswith(attrs['social_insurance_number']):
+        code = attrs['medical_insurance_code']
+        if (code[5:] if code[:2].isalpha() else code) != attrs['social_insurance_number']:
             errors['medical_insurance_code'] = 'Mã thẻ BHYT phải khớp mã số BHXH.'
         if not VnWard.objects.filter(code=attrs['permanent_ward'],
                                      province_code=attrs['permanent_province'], is_active=True).exists():
@@ -49,7 +51,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from core.models import HealthInsuranceConfig
 from core.external_insurance_models import ExternalInsuranceEvent
-from core.insurance_editing import window
+from core.insurance_editing import closes_at, window
 from core.insurance_history import check_version, readable_payloads, require_active
 from core.insurance_contract import safe_path
 from .views import _insurance_config_payload
@@ -57,10 +59,12 @@ from .views import _insurance_config_payload
 EXTERNAL_IMAGES = ('cccd_image', 'cccd_image_back', 'bhyt_image')
 
 
-def active_config():
+def active_config(student=None):
+    # Hạn đóng tùy người (học viên cao học có hạn riêng) nên lọc giờ đóng bằng Python;
+    # tối đa 4 dòng config.
     now = timezone.now()
-    rows = list(HealthInsuranceConfig.objects.select_related('bank_account').filter(
-        is_active=True, registration_opens_at__lte=now, registration_closes_at__gte=now)[:2])
+    rows = [cfg for cfg in HealthInsuranceConfig.objects.select_related('bank_account').filter(
+        is_active=True, registration_opens_at__lte=now) if closes_at(cfg, student) >= now]
     return rows[0] if len(rows) == 1 else None
 
 
@@ -83,7 +87,7 @@ def external_detail(row):
         social_insurance_number=row.social_insurance_code, medical_insurance_code=row.medical_insurance_code,
         hospital_code=row.hospital_code, hospital_province=hospital.province_code if hospital else '',
         valid_from=str(row.valid_from), valid_until=str(row.valid_until))
-    win = window(row.intake_year, row.intake_period, row.intake_snapshot)
+    win = window(row.intake_year, row.intake_period, row.intake_snapshot, row.student)
     return dict(id=row.pk, status=row.status, row_version=row.row_version,
         prefill=prefill, config=row.intake_snapshot, window=win,
         display={'permanent_province': province.name if province else 'Chưa xác định',
@@ -106,7 +110,7 @@ class ExternalInsuranceView(InsuranceRegistrationView):
         student = self._student(request)
         if student is None:
             raise Http404
-        cfg = active_config()
+        cfg = active_config(student)
         if cfg is None:
             cfg = (HealthInsuranceConfig.objects.select_related('bank_account')
                    .order_by('-is_active', '-registration_opens_at', '-id').first())
@@ -150,11 +154,11 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                     if legacy.request_digest != digest:
                         raise Conflict('Yêu cầu này đã được dùng cho nội dung khác.')
                     return Response({'id': legacy.pk, 'status': legacy.status})
-                cfg = active_config()
+                cfg = active_config(student)
                 if row:
                     check_version(row, request.data.get('row_version'))
                     resubmitted = row.status == 'rejected' and request.data.get('action') == 'resubmit'
-                    if not resubmitted and not window(row.intake_year, row.intake_period, row.intake_snapshot)['can_edit']:
+                    if not resubmitted and not window(row.intake_year, row.intake_period, row.intake_snapshot, student)['can_edit']:
                         raise Conflict('Đã hết hạn chỉnh sửa bản khai.')
                     previous_edit = row.events.filter(event_type='STUDENT_UPDATED').order_by('created_at').first()
                     if not resubmitted and previous_edit:
@@ -182,14 +186,13 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                 before = {'snapshot': dict(row.snapshot or {}), 'images': dict(images), 'status': row.status,
                           'review_note': row.review_note} if row else {}
                 for field, checked_file in checked.items():
-                    content, ext, mime, _ = checked_file
-                    storage_key = f'insurance_private/external/{uuid4().hex}.{ext}'
-                    target = Path(settings.MEDIA_ROOT).resolve() / storage_key
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    with target.open('xb') as stream:
-                        written.append(target)
-                        stream.write(content)
-                    images[field] = {'storage_key': storage_key, 'mime_type': mime}
+                    # Ảnh profile → kho student_images. JSON `images` giữ {storage_key, mime_type}
+                    # làm bản ghi lúc nộp (Dashboard đọc JSON này).
+                    image = student_images.save_image(
+                        student, student_images.REGISTRATION_IMAGE_KINDS[field], student_images.SELF,
+                        checked_file, original_filename=request.FILES[field].name,
+                        source=student_images.SOURCE_EXTERNAL_INSURANCE, written=written)
+                    images[field] = {'storage_key': image.storage_key, 'mime_type': image.mime_type}
                 snapshot = dict(row.snapshot or {}) if row else {}
                 snapshot.update({k: str(v) for k, v in data.items() if k not in EXTERNAL_IMAGES})
                 if row:

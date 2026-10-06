@@ -1,10 +1,12 @@
 from core.insurance_submission import submission
 from core.insurance_history import append_event
 from core.insurance_files import inspect_upload
-from core.insurance_contract import normalized, integer
+from core.insurance_contract import normalized, integer, safe_path
+from django.http import FileResponse
+from core.insurance_editing import closes_at
 import logging
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Prefetch
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -17,7 +19,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from core import microsoft_auth
 from core.auth import verify_ldap
-from core.login_policy import check_login
+from core.login_policy import check_login, is_bhyt_only
 from core import address_service
 from core.models import (
     HubStudent,
@@ -25,7 +27,10 @@ from core.models import (
     ConfirmationRequestComment,
     ExternalInsuranceDeclaration,
 )
+from core import request_quota, request_edit, student_images
 from core.documents import (
+    BANKLOAN_FEE_EXEMPTION_CHOICES,
+    BANKLOAN_ORPHAN_CHOICES,
     OTHER_PURPOSE_CHOICES,
     PROGRAM_PURPOSE_CODE,
     build_other_payload,
@@ -40,6 +45,10 @@ from core.documents import (
     build_english_prefill,
     ENGLISH_PURPOSE_CHOICES,
     ENGLISH_PROGRAM_CODE,
+    build_conduct_payload,
+    build_conduct_prefill,
+    conduct_semester_choices,
+    CONDUCT_DELIVERY_CHOICES,
 )
 from core import offcampus
 from students.models import (
@@ -71,6 +80,7 @@ def feature_flags() -> dict:
         "civic_activities": settings.FEATURE_CIVIC_ACTIVITIES,
         "health_check": settings.FEATURE_HEALTH_CHECK,
         "tuition_waiver": settings.FEATURE_TUITION_WAIVER,
+        "support_tickets": settings.FEATURE_SUPPORT_TICKETS,
         # Không phải cờ FEATURE_* bật/tắt bằng tay: tự suy ra từ việc đã cấu hình
         # app registration hay chưa, để không bao giờ hiện nút dẫn tới endpoint chết.
         "microsoft_login": settings.MS_LOGIN_ENABLED,
@@ -137,6 +147,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
     viên đổi mã.
     """
     uid = student.current_student_code
+    bhyt_only = is_bhyt_only(student)
 
     HubStudent.record_login(student_code=uid, student_id=student.pk, channel=channel)
 
@@ -145,6 +156,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
         student_id=student.pk,
         student_code=uid,
         full_name=student.full_name,
+        bhyt_only=bhyt_only,
     )
 
     logger.info(
@@ -160,6 +172,7 @@ def issue_session(student, *, ip: str, channel: str) -> Response:
             "student_id": student.pk,
             "student_code": uid,
             "full_name": student.full_name,
+            "bhyt_only": bhyt_only,
         },
     })
 
@@ -401,6 +414,7 @@ class HubTokenRefreshView(APIView):
             student_id=student.pk,
             student_code=student.current_student_code,
             full_name=student.full_name,
+            bhyt_only=is_bhyt_only(student),
         )
         return Response({"access": str(token.access_token), "refresh": str(token)})
 
@@ -520,9 +534,9 @@ def _coverage_dates(period: str, year: int):
     return date(year, start_month, 1), date(year, 12, 31)
 
 
-def _insurance_config_status(cfg, now=None):
+def _insurance_config_status(cfg, now=None, student=None):
     now = now or timezone.now()
-    if now > cfg.registration_closes_at:
+    if now > closes_at(cfg, student):
         return "expired"
     if now < cfg.registration_opens_at:
         return "upcoming"
@@ -531,7 +545,7 @@ def _insurance_config_status(cfg, now=None):
     return "open" if cfg.is_active else "upcoming"
 
 
-def _insurance_config_error(cfg):
+def _insurance_config_error(cfg, student=None):
     if cfg is None:
         return "Đợt đăng ký không tồn tại hoặc chưa được cấu hình."
     if not cfg.is_active:
@@ -539,7 +553,7 @@ def _insurance_config_error(cfg):
     now = timezone.now()
     if now < cfg.registration_opens_at:
         return "Đợt đăng ký chưa mở."
-    if now > cfg.registration_closes_at:
+    if now > closes_at(cfg, student):
         return "Đợt đăng ký đã kết thúc."
     return ""
 
@@ -554,10 +568,10 @@ def _insurance_config_payload(cfg, *, include_payment, student=None):
         "registration_year": cfg.registration_year,
         "name": f"Đợt {_PERIOD_NUMBER[cfg.registration_period]} năm {cfg.registration_year}",
         "start_date": cfg.registration_opens_at.isoformat(),
-        "end_date": cfg.registration_closes_at.isoformat(),
+        "end_date": closes_at(cfg, student).isoformat(),
         "coverage_start": coverage_start.isoformat(),
         "coverage_end": coverage_end.isoformat(),
-        "status": _insurance_config_status(cfg),
+        "status": _insurance_config_status(cfg, student=student),
         "is_active": cfg.is_active,
         "freshman_warning": (
             cfg.freshman_warning or ""
@@ -785,7 +799,7 @@ class InsuranceRegistrationView(APIView):
         cfg = HealthInsuranceConfig.objects.select_related("bank_account").filter(
             registration_period=period,
         ).first()
-        error = _insurance_config_error(cfg)
+        error = _insurance_config_error(cfg, student)
         if error:
             return Response({"detail": error}, status=status.HTTP_409_CONFLICT)
         blocking_registration = _blocking_insurance_registration(
@@ -818,7 +832,7 @@ class InsuranceRegistrationView(APIView):
         cfg = HealthInsuranceConfig.objects.select_related("bank_account").filter(
             registration_period=data["registration_period"],
         ).first()
-        config_error = _insurance_config_error(cfg)
+        config_error = _insurance_config_error(cfg, student)
         if config_error:
             return Response({"detail": config_error}, status=status.HTTP_409_CONFLICT)
         if data["registration_year"] != cfg.registration_year:
@@ -890,19 +904,26 @@ class InsuranceRegistrationView(APIView):
             fee_amount_vnd=integer(cfg.insurance_fee),
             workflow_version=2,
         )
-        reg.cccd_image = data["cccd_image"]
-        reg.cccd_image_back = data["cccd_image_back"]
+        # CCCD + thẻ BHYT là ảnh profile: lưu vào kho student_images, cột của đơn ghi CÙNG
+        # storage_key làm bản ghi lúc nộp (Dashboard đọc cột này). Biên lai gắn với đơn
+        # này nên vẫn lưu riêng như trước.
+        for field, kind in student_images.REGISTRATION_IMAGE_KINDS.items():
+            upload = data.get(field)
+            if not upload:
+                continue
+            image = student_images.save_image(
+                student, kind, student_images.SELF, inspect_upload(upload),
+                original_filename=upload.name, source=student_images.SOURCE_BHYT_REGISTRATION,
+                written=request.insurance_written_files)
+            setattr(reg, field, image.storage_key)
         reg.payment_receipt_image = data["payment_receipt_image"]
-        if data.get("bhyt_image"):
-            reg.bhyt_image = data["bhyt_image"]
         # Save files explicitly so a later DB failure can clean up only new writes.
         from pathlib import Path
-        for field in ('cccd_image', 'cccd_image_back', 'payment_receipt_image', 'bhyt_image'):
-            file = getattr(reg, field)
-            if file and not file._committed:
-                ext = inspect_upload(file.file)[1]
-                file.save(f"attachment.{ext}", file.file, save=False)
-                request.insurance_written_files.append(Path(file.path))
+        file = reg.payment_receipt_image
+        if file and not file._committed:
+            ext = inspect_upload(file.file)[1]
+            file.save(f"attachment.{ext}", file.file, save=False)
+            request.insurance_written_files.append(Path(file.path))
         reg.save()
         append_event(reg, 'SUBMITTED', source='Hub', actor_id=student.pk,
             old=None, new='iu_processing', key=request.data.get('request_key'),
@@ -935,8 +956,35 @@ class InsuranceRegistrationView(APIView):
 
 # ── GET + POST /api/requests/ ────────────────────────────────────────────────
 
+class RequestAvailabilityView(DocumentRequestsRequiredMixin, APIView):
+    """GET /api/requests/availability/ — loại giấy nào còn lượt trong học kỳ hiện tại.
+
+    Hub KHÔNG ẩn loại giấy hết lượt: chỉ làm mờ + nêu lý do (người dùng chốt 01/10/2026).
+    """
+
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        types = [t for t, _ in ConfirmationRequest.REQUEST_TYPES] + [
+            "thuong_binh", "bank_loan", "english_form", request_quota.CONDUCT_TYPE]
+        return Response(request_quota.availability(request.user.student_id, list(dict.fromkeys(types))))
+
+
 class RequestsView(DocumentRequestsRequiredMixin, APIView):
     permission_classes = [IsHubAuthenticated]
+
+    # Sửa yêu cầu đang "Chờ bổ sung" (RequestDetailView.put) đi chung đường dựng
+    # payload với lúc tạo: đặt `editing` là yêu cầu cũ thì `_persist` ghi đè nó.
+    editing = None
+
+    @property
+    def _ok_status(self):
+        return status.HTTP_200_OK if self.editing is not None else status.HTTP_201_CREATED
+
+    def _persist(self, request, **fields):
+        if self.editing is None:
+            return ConfirmationRequest.objects.create(ldap_uid=request.user.ldap_uid, **fields)
+        return request_edit.apply_student_edit(self.editing, request, fields)
 
     def get_throttles(self):
         # Chỉ giới hạn thao tác TẠO (POST) để chống spam; GET danh sách không giới hạn.
@@ -952,7 +1000,25 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
+        """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py)."""
         request_type = _get_str(request.data, "request_type")
+        sid = request.user.student_id
+        if not sid:
+            return self._create(request, request_type)
+        semester_code, semester_label = None, None
+        if request_type == request_quota.CONDUCT_TYPE:
+            semester_code = _get_str(request.data, "semester_code")
+            student = self._resolve_student(request)
+            choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)} if student else {}
+            semester_label = choices.get(semester_code)
+        # Khoá theo SV: kiểm hạn mức + tạo yêu cầu là một bước, bấm gửi hai lần không lọt.
+        with request_quota.student_lock(sid):
+            reason = request_quota.check(sid, request_type, semester_code, semester_label)
+            if reason:
+                return Response({"detail": reason, "code": "quota_exceeded"}, status=status.HTTP_409_CONFLICT)
+            return self._create(request, request_type)
+
+    def _create(self, request, request_type):
         if request_type == "other":
             return self._create_other(request)
         if request_type == "deferment":
@@ -963,6 +1029,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             return self._create_bankloan(request)
         if request_type == "english_form":
             return self._create_english(request)
+        if request_type == "conduct_score":
+            return self._create_conduct(request)
 
         purpose = _get_str(request.data, "purpose")
         note = _get_str(request.data, "note")
@@ -980,9 +1048,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=request.user.student_id or 0,
-            ldap_uid=request.user.ldap_uid,
             request_type=request_type,
             purpose=purpose,
             note=note or None,
@@ -995,7 +1062,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
         return Response(
             ConfirmationRequestSerializer(req).data,
-            status=status.HTTP_201_CREATED,
+            status=self._ok_status,
         )
 
     def _resolve_student(self, request):
@@ -1034,9 +1101,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="other",
             purpose=purpose_label,
             note=note or None,
@@ -1050,7 +1116,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
         return Response(
             ConfirmationRequestSerializer(req).data,
-            status=status.HTTP_201_CREATED,
+            status=self._ok_status,
         )
 
     def _create_deferment(self, request):
@@ -1078,9 +1144,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="deferment",
             purpose=purpose_label,
             note=note or None,
@@ -1090,7 +1155,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=deferment | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_thuongbinh(self, request):
         """GXN thương binh (ưu đãi giáo dục) — snapshot + CCCD/ngày cấp (nếu chưa có)."""
@@ -1113,9 +1178,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="thuong_binh",
             purpose=purpose_label,
             note=note or None,
@@ -1125,7 +1189,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=thuong_binh | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_bankloan(self, request):
         """GXN vay vốn ngân hàng — snapshot + DOB/CCCD/ngày cấp + mã lớp (SV nhập)."""
@@ -1146,13 +1210,14 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
                 citizen_id=_get_str(request.data, "citizen_id"),
                 citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
                 class_code=_get_str(request.data, "class_code"),
+                fee_exemption=_get_str(request.data, "fee_exemption"),
+                orphan=_get_str(request.data, "orphan"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="bank_loan",
             purpose=purpose_label,
             note=note or None,
@@ -1162,7 +1227,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=bank_loan | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
     def _create_english(self, request):
         """GXN tiếng Anh — snapshot (tên không dấu, School/Department…) + DOB + purpose."""
@@ -1186,9 +1251,8 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        req = ConfirmationRequest.objects.create(
+        req = self._persist(request,
             student_id=student.pk,
-            ldap_uid=request.user.ldap_uid,
             request_type="english_form",
             purpose=purpose_label,
             note=note or None,
@@ -1198,7 +1262,47 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             "CONFIRMATION_REQUEST | uid=%-20s | type=english_form | purpose=%s",
             request.user.ldap_uid, purpose_label,
         )
-        return Response(ConfirmationRequestSerializer(req).data, status=status.HTTP_201_CREATED)
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
+
+    def _create_conduct(self, request):
+        """Bảng điểm rèn luyện — học kỳ + ô xin sửa (ngày sinh, CCCD, địa chỉ). Giấy xuất ở hệ thống ngoài."""
+        student = self._resolve_student(request)
+        if student is None:
+            return Response({"detail": "Không tìm thấy hồ sơ sinh viên."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        note = _get_str(request.data, "note")
+        if len(note) > 1000:
+            return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload, semester_label = build_conduct_payload(
+                student,
+                semester_code=_get_str(request.data, "semester_code"),
+                delivery=_get_str(request.data, "delivery"),
+                dob=_get_str(request.data, "dob"),
+                citizen_id=_get_str(request.data, "citizen_id"),
+                citizen_id_issue_date=_get_str(request.data, "citizen_id_issue_date"),
+                province_code=_get_str(request.data, "province_code"),
+                ward_code=_get_str(request.data, "ward_code"),
+                street=_get_str(request.data, "street"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        req = self._persist(request,
+            student_id=student.pk,
+            request_type="conduct_score",
+            purpose=semester_label,
+            note=note or None,
+            payload=payload,
+        )
+        logger.info(
+            "CONFIRMATION_REQUEST | uid=%-20s | type=conduct_score | purpose=%s",
+            request.user.ldap_uid, semester_label,
+        )
+        return Response(ConfirmationRequestSerializer(req).data, status=self._ok_status)
 
 
 # ── GET /api/requests/other/form/ — prefill cho form 'Lý do khác' ─────────────
@@ -1228,6 +1332,29 @@ class _OwnRequestMixin(DocumentRequestsRequiredMixin):
                 .first())
 
 
+class RequestSoftCopyView(_OwnRequestMixin, APIView):
+    """GET /api/requests/<id>/soft-copy/ — PDF bản mềm do Phòng CTSV gửi.
+
+    Chỉ yêu cầu của CHÍNH sinh viên, và chỉ khi đã gửi (`ConfirmationRequest.visible_soft_copy`).
+    File nằm dưới MEDIA_ROOT của Hub (Dashboard ghi vào qua HUB_MEDIA_ROOT). Cần token nên frontend
+    tải qua fetch.
+    """
+
+    def get(self, request, pk):
+        req = self.get_own_request(request, pk)
+        data = req.visible_soft_copy if req else None
+        if data is None:
+            raise NotFound("Không tìm thấy file.")
+        path = safe_path(settings.MEDIA_ROOT, data.get("storage_key"))
+        if path is None:
+            raise NotFound("Không tìm thấy file.")
+        response = FileResponse(open(path, "rb"), content_type="application/pdf",
+                                filename=data.get("filename") or f"{req.code}.pdf")
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class RequestDetailView(_OwnRequestMixin, APIView):
     """Chi tiết một yêu cầu của chính sinh viên, kèm toàn bộ dòng trao đổi."""
 
@@ -1236,6 +1363,28 @@ class RequestDetailView(_OwnRequestMixin, APIView):
         if req is None:
             raise NotFound("Không tìm thấy yêu cầu này.")
         return Response(ConfirmationRequestDetailSerializer(req).data)
+
+    def put(self, request, pk):
+        """SV sửa lại yêu cầu đang "Chờ bổ sung thông tin" — cùng body với lúc tạo."""
+        with transaction.atomic():
+            req = (ConfirmationRequest.objects.select_for_update()
+                   .filter(pk=pk, ldap_uid=request.user.ldap_uid).first())
+            if req is None:
+                raise NotFound("Không tìm thấy yêu cầu này.")
+            if not request_edit.can_student_edit(req):
+                return Response(
+                    {"detail": "Chỉ sửa được yêu cầu đang ở trạng thái “Chờ bổ sung thông tin”."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            view = RequestsView()
+            view.editing = req
+            resp = view._create(request, req.request_type)
+            if resp.status_code >= 400:
+                transaction.set_rollback(True)
+                return resp
+        logger.info("REQUEST_EDIT | uid=%-20s | req=%s | type=%s",
+                    request.user.ldap_uid, req.pk, req.request_type)
+        return Response(ConfirmationRequestDetailSerializer(self.get_own_request(request, pk)).data)
 
 
 class RequestCommentsView(_OwnRequestMixin, APIView):
@@ -1273,12 +1422,11 @@ class RequestCommentsView(_OwnRequestMixin, APIView):
             body=body,
         )
 
-        # SV đã trả lời ⇒ việc quay về phía văn phòng. Nếu để nguyên
-        # `awaiting_info` thì yêu cầu nằm mãi trong nhóm "đang chờ sinh viên" dù
-        # sinh viên đã phản hồi — đúng lối Zendesk/Freshdesk: khách trả lời thì
-        # ticket mở lại.
+        # SV đã trả lời ⇒ việc quay về phía văn phòng: `awaiting_info` → `pending`
+        # (người dùng chốt 01/10/2026 — trước đó về `processing`, khiến SV bị khóa
+        # không nhắn tiếp được). Đang `pending` thì giữ nguyên.
         if req.status == ConfirmationRequest.STATUS_AWAITING_INFO:
-            req.status = ConfirmationRequest.STATUS_PROCESSING
+            req.status = ConfirmationRequest.STATUS_PENDING
             req.save(update_fields=["status", "updated_at"])
 
         logger.info("REQUEST_COMMENT | uid=%-20s | req=%s | len=%s",
@@ -1375,7 +1523,11 @@ class BankLoanRequestFormView(DocumentRequestsRequiredMixin, APIView):
                 {"detail": "Không tìm thấy hồ sơ sinh viên."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response({"prefill": build_bankloan_prefill(student)})
+        return Response({
+            "prefill": build_bankloan_prefill(student),
+            "fee_exemption_choices": BANKLOAN_FEE_EXEMPTION_CHOICES,
+            "orphan_choices": BANKLOAN_ORPHAN_CHOICES,
+        })
 
 
 # ── GET /api/requests/english/form/ — prefill cho form tiếng Anh ──────────────
@@ -1400,6 +1552,31 @@ class EnglishRequestFormView(DocumentRequestsRequiredMixin, APIView):
             "purpose_choices": ENGLISH_PURPOSE_CHOICES,
             "program_purpose_code": ENGLISH_PROGRAM_CODE,
             "prefill": build_english_prefill(student),
+        })
+
+
+# ── GET /api/requests/conduct-score/form/ — prefill cho form bảng điểm rèn luyện ─
+
+class ConductScoreRequestFormView(DocumentRequestsRequiredMixin, APIView):
+    permission_classes = [IsHubAuthenticated]
+
+    def get(self, request):
+        student = (
+            Student.objects
+            .select_related("current_department", "current_status", "admission_term")
+            .filter(pk=request.user.student_id)
+            .first()
+            if request.user.student_id else None
+        )
+        if student is None:
+            return Response(
+                {"detail": "Không tìm thấy hồ sơ sinh viên."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({
+            "semester_choices": conduct_semester_choices(student),
+            "delivery_choices": CONDUCT_DELIVERY_CHOICES,
+            "prefill": build_conduct_prefill(student),
         })
 
 

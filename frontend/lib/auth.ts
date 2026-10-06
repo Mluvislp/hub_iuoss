@@ -38,6 +38,13 @@ export function clearAuth(): void {
 // ── Session — decode từ JWT, không dùng sessionStorage ───────────────────────
 // Ưu điểm: sống qua page refresh, tab mới, không cần lưu riêng.
 
+/** Trang duy nhất phiên `bhyt_only` (học viên cao học) được vào — kể cả trang con. */
+export const BHYT_HOME = '/dashboard/bao-hiem-y-te';
+
+export function isBhytOnly(session: Record<string, unknown> | null): boolean {
+  return session?.bhyt_only === true;
+}
+
 export function getSession(): Record<string, unknown> | null {
   const token = getToken();
   if (!token) return null;

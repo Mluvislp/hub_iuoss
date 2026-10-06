@@ -9,7 +9,7 @@ import logging
 
 from dataclasses import dataclass
 
-from students.models import Student, StudentCodeHistory
+from students.models import Student, StudentCodeHistory, StudentContactPoint
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 # Bị chặn: WITHDRAWN (đã nghỉ học/rút hồ sơ), UNKNOWN (chưa xác định), và cả hồ
 # sơ không có trạng thái.
 ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "SUSPENDED", "GRADUATED"})
+
+# Học viên cao học (thạc sĩ, tiến sĩ) — quyết định 01/10/2026:
+# - KHÔNG xét trạng thái: gần như toàn bộ hồ sơ sau đại học đang là "Chưa xác
+#   định" vì luồng sync trạng thái chỉ chạy cho đại học.
+# - Chỉ dùng phần Bảo hiểm y tế (xem `is_bhyt_only` + IsHubAuthenticated).
+GRADUATE_DEGREE_CODES = frozenset({"MASTER", "DOCTOR"})
 
 # Lý do bị chặn — chỉ dùng cho log, không hiện cho sinh viên.
 REASON_OLD_CODE = "old_code"
@@ -59,7 +65,7 @@ def check_login(uid: str, *, follow_old_code: bool = False) -> LoginDecision:
     """
     student = (
         Student.objects
-        .select_related("current_status")
+        .select_related("current_status", "current_degree_level")
         .filter(current_student_code__iexact=uid)
         .first()
     )
@@ -88,6 +94,9 @@ def check_login(uid: str, *, follow_old_code: bool = False) -> LoginDecision:
             ),
         )
 
+    if is_graduate(student):
+        return LoginDecision(student=student, remapped_from=remapped_from)
+
     status_group = student.current_status.status_group if student.current_status else None
     if status_group not in ALLOWED_STATUS_GROUPS:
         status_name = (
@@ -112,7 +121,7 @@ def _find_by_old_code(uid: str) -> Student | None:
     """Tra sinh viên theo mã cũ. None nếu uid không phải mã cũ của ai."""
     row = (
         StudentCodeHistory.objects
-        .select_related("student__current_status")
+        .select_related("student__current_status", "student__current_degree_level")
         .filter(student_code__iexact=uid)
         .first()
     )
@@ -125,3 +134,63 @@ def _find_by_old_code(uid: str) -> Student | None:
     if student is None or student.current_student_code.lower() == uid.lower():
         return None
     return student
+
+
+def is_graduate(student: Student) -> bool:
+    """Học viên cao học (thạc sĩ / tiến sĩ) theo `students.current_degree_level`."""
+    level = student.current_degree_level
+    return level is not None and level.code in GRADUATE_DEGREE_CODES
+
+
+def is_bhyt_only(student: Student) -> bool:
+    """Phiên của người này chỉ được dùng phần Bảo hiểm y tế.
+
+    Ghi vào JWT (`bhyt_only`) lúc cấp phiên; backend chặn mọi API ngoài BHYT
+    (`core/api/authentication.py`), frontend ẩn mọi mục khác.
+    """
+    return is_graduate(student)
+
+
+def find_graduate_code_by_email(email: str) -> str | None:
+    """Email @mp.hcmiu.edu.vn → MSSV hiện tại của học viên cao học, None nếu không phải.
+
+    Không tin tiền tố email: CHỈ nhận khi email trỏ đúng tới một hồ sơ sau đại học
+    — mọi trường hợp khác (không có hồ sơ, hồ sơ sinh viên đại học) đều trả None.
+    Xét lần lượt:
+
+    1. Tiền tố email = MSSV của một học viên cao học (`mbaiu25025@mp.hcmiu.edu.vn`).
+    2. Email trùng một email đang dùng trong hồ sơ của ĐÚNG MỘT học viên cao học
+       (`student_contact_points`) — email không theo MSSV (`ntlchi@mp.hcmiu.edu.vn`).
+       Trùng nhiều người thì không đoán, trả None.
+    """
+    email = (email or "").strip().lower()
+    local, sep, _host = email.partition("@")
+    if not sep or not local:
+        return None
+
+    by_code = (
+        Student.objects
+        .filter(
+            current_student_code__iexact=local,
+            current_degree_level__code__in=GRADUATE_DEGREE_CODES,
+        )
+        .values_list("current_student_code", flat=True)
+        .first()
+    )
+    if by_code:
+        return by_code
+
+    codes = set(
+        StudentContactPoint.objects
+        .filter(
+            contact_value__iexact=email,
+            is_current=True,
+            student__current_degree_level__code__in=GRADUATE_DEGREE_CODES,
+        )
+        .values_list("student__current_student_code", flat=True)
+    )
+    if len(codes) == 1:
+        return codes.pop()
+    if len(codes) > 1:
+        logger.warning("GRAD_EMAIL_AMBIG  | email=%s | ma=%s", email, sorted(codes))
+    return None

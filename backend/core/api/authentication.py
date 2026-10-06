@@ -17,6 +17,7 @@ class StudentPrincipal:
         self.student_id = payload.get("student_id")
         self.student_code: str = payload.get("student_code", self.ldap_uid)
         self.full_name: str = payload.get("full_name", self.ldap_uid)
+        self.bhyt_only: bool = payload.get("bhyt_only") is True
 
 
 class HubJWTAuthentication(BaseAuthentication):
@@ -45,8 +46,43 @@ class HubJWTAuthentication(BaseAuthentication):
         return (StudentPrincipal(token.payload), token)
 
 
+# API mà phiên `bhyt_only` (học viên cao học) được gọi — theo tên route trong
+# core/api/urls.py. Danh sách CHO PHÉP, không phải danh sách chặn: thêm endpoint
+# mới thì mặc định học viên cao học không gọi được.
+BHYT_ONLY_URL_NAMES = frozenset({
+    "api_logout",
+    "api_health_insurance",
+    "api_health_insurance_registrations",
+    "api_insurance_detail",
+    "api_insurance_image",
+    "api_insurance_evidence",
+    "api_external_insurance",
+    "api_external_insurance_detail",
+    "api_external_insurance_image",
+    # Form BHYT gợi ý lại ảnh CCCD/thẻ BHYT đã có trong kho ảnh.
+    "api_student_images",
+    "api_student_image_file",
+    "api_provinces",
+    "api_wards",
+    "api_ethnicities",
+    "api_hospitals",
+})
+
+
 class IsHubAuthenticated(BasePermission):
-    """Chỉ cho phép StudentPrincipal đã xác thực."""
+    """Chỉ cho phép StudentPrincipal đã xác thực.
+
+    Phiên `bhyt_only` còn bị giới hạn trong BHYT_ONLY_URL_NAMES — chặn ở đây vì
+    mọi view của Hub đều dùng permission này (mặc định trong settings).
+    """
+
+    message = "Tài khoản học viên cao học chỉ sử dụng được chức năng Bảo hiểm y tế."
 
     def has_permission(self, request, view):
-        return isinstance(request.user, StudentPrincipal)
+        user = request.user
+        if not isinstance(user, StudentPrincipal):
+            return False
+        if user.bhyt_only:
+            match = getattr(request, "resolver_match", None)
+            return match is not None and match.url_name in BHYT_ONLY_URL_NAMES
+        return True

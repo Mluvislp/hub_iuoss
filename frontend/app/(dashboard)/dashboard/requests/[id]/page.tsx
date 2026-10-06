@@ -12,11 +12,12 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  AlertCircle, ArrowLeft, Lock, Loader2, MessageSquare, Send, Ticket,
+  AlertCircle, ArrowLeft, Download, FileText, Lock, Loader2, MessageSquare, PencilLine, Send, Ticket,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, accentIcon } from '@/lib/ui';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
+import { editHref } from '@/components/request-edit';
 import {
   REQUEST_TYPE_LABELS,
   REQUEST_STATUS_LABELS,
@@ -24,6 +25,7 @@ import {
   type ConfirmationRequestDetail,
   type RequestComment,
 } from '@/lib/types';
+import { RequestCode } from '@/components/request-code';
 
 /** Nhãn cho các ô sinh viên đã khai / xin sửa (khớp EDITABLE_FIELD_LABELS bên Dashboard). */
 const FIELD_LABELS: Record<string, string> = {
@@ -34,11 +36,19 @@ const FIELD_LABELS: Record<string, string> = {
   class_code: 'Mã lớp',
 };
 
+/** Vay vốn — lựa chọn của SV (`payload.student_choices`); mã khớp backend BANKLOAN_*_CHOICES. */
+const AID_LABELS: Record<string, Record<string, string>> = {
+  fee_exemption: { none: 'Không miễn giảm', reduced: 'Giảm học phí', exempt: 'Miễn học phí' },
+  orphan: { yes: 'Mồ côi', no: 'Không mồ côi' },
+};
+const AID_FIELDS: [string, string][] = [['fee_exemption', 'Thuộc diện'], ['orphan', 'Thuộc đối tượng']];
+
 /** Nhãn cho lượt trao đổi sinh ra từ một lần đổi trạng thái. */
 const EVENT_LABELS: Record<string, string> = {
   awaiting_info: 'Yêu cầu bổ sung thông tin',
   rejected: 'Từ chối yêu cầu',
   done: 'Hoàn thành',
+  returned: 'Đã trả giấy',
   processing: 'Chuyển sang đang xử lý',
 };
 
@@ -166,6 +176,7 @@ export default function RequestDetailPage() {
   const payload = (data.payload ?? {}) as Record<string, unknown>;
   const snapshot = (payload.snapshot ?? {}) as Record<string, unknown>;
   const editable = (payload.editable ?? {}) as Record<string, unknown>;
+  const studentChoices = (payload.student_choices ?? {}) as Record<string, string>;
 
   return (
     <div className="space-y-5">
@@ -179,8 +190,10 @@ export default function RequestDetailPage() {
           <h1 className="text-title font-semibold text-ink">
             {REQUEST_TYPE_LABELS[data.request_type]}
           </h1>
-          <p className="mt-1 text-sm text-muted">
-            Mã #{data.id} · Gửi {formatDateTime(data.created_at)}
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span className="text-[0.75rem] font-medium uppercase tracking-wide">Mã yêu cầu</span>
+            <RequestCode code={data.code} size="lg" />
+            <span>· Gửi {formatDateTime(data.created_at)}</span>
           </p>
         </div>
         <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status], 'text-meta')}>
@@ -203,15 +216,38 @@ export default function RequestDetailPage() {
         </section>
       )}
 
+      {data.soft_copy && <SoftCopyCard id={data.id} code={data.code} file={data.soft_copy} />}
+
+      {data.student_can_edit && editHref(data) && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-line bg-warning-soft px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[0.88rem] font-semibold text-warning-text">Phòng CTSV yêu cầu bổ sung thông tin</p>
+            <p className="mt-0.5 text-[0.82rem] text-ink">
+              Sửa lại thông tin trên form theo nội dung trao đổi bên dưới, hoặc trả lời bằng tin nhắn.
+            </p>
+          </div>
+          <Link href={editHref(data)!} className={cn(ui.btnPrimary, 'shrink-0')}>
+            <PencilLine size={15} />
+            Sửa yêu cầu
+          </Link>
+        </section>
+      )}
+
       <section className={ui.card}>
         <div className={ui.cardHeader}>
           <h2 className={ui.sectionTitle}>Thông tin đã gửi</h2>
         </div>
         <div className="px-5 py-2">
           <div className={ui.dtRow}>
-            <span className={ui.dtLabel}>Mục đích</span>
+            <span className={ui.dtLabel}>{data.request_type === 'conduct_score' ? 'Học kỳ / năm học' : 'Mục đích'}</span>
             <span className={ui.dtValue}>{data.purpose}</span>
           </div>
+          {snapshot.delivery ? (
+            <div className={ui.dtRow}>
+              <span className={ui.dtLabel}>Hình thức nhận</span>
+              <span className={ui.dtValue}>{String(snapshot.delivery)}</span>
+            </div>
+          ) : null}
           {snapshot.student_name ? (
             <div className={ui.dtRow}>
               <span className={ui.dtLabel}>Họ tên</span>
@@ -237,6 +273,16 @@ export default function RequestDetailPage() {
               <div key={key} className={ui.dtRow}>
                 <span className={ui.dtLabel}>{label}</span>
                 <span className={ui.dtValue}>{value}</span>
+              </div>
+            );
+          })}
+          {AID_FIELDS.map(([key, label]) => {
+            const code = studentChoices[key];
+            if (!code) return null;
+            return (
+              <div key={key} className={ui.dtRow}>
+                <span className={ui.dtLabel}>{label}</span>
+                <span className={ui.dtValue}>{AID_LABELS[key][code] ?? code}</span>
               </div>
             );
           })}
@@ -321,5 +367,55 @@ export default function RequestDetailPage() {
         Cập nhật lần cuối: {formatDate(data.updated_at)}
       </p>
     </div>
+  );
+}
+
+
+/** Bản mềm PDF bảng điểm rèn luyện — Phòng CTSV tải lên, chỉ hiện khi yêu cầu đã Hoàn thành. */
+function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { filename: string; size: number; sent_at?: string } }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function open(download: boolean) {
+    setBusy(true);
+    setError('');
+    try {
+      const blob = await api.requests.softCopy(id);
+      const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      if (download) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.filename || `${code}.pdf`;
+        a.click();
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setError('Không tải được file. Vui lòng thử lại.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const size = file.size >= 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+  return (
+    <section className="rounded-lg border border-success-line bg-success-soft px-5 py-4">
+      <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-success-text">
+        <FileText size={14} />
+        BẢN MỀM (PDF)
+      </p>
+      <p className="mt-1.5 text-[0.88rem] text-ink break-all">{file.filename} · {size}</p>
+      {file.sent_at && <p className="mt-0.5 text-[0.78rem] text-muted">Gửi lúc {file.sent_at}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => open(false)} disabled={busy} className={ui.btnSecondary}>
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />} Xem
+        </button>
+        <button type="button" onClick={() => open(true)} disabled={busy} className={ui.btnPrimary}>
+          <Download size={15} /> Tải về
+        </button>
+      </div>
+      {error && <p className="mt-2 text-[0.8rem] text-danger-text">{error}</p>}
+    </section>
   );
 }

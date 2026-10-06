@@ -25,7 +25,9 @@ export default function Topbar({ title, session, onMenuClick }: TopbarProps) {
 
       {session && (
         <div className="ml-auto flex items-center gap-2 text-sm">
-          <span className="text-muted hidden sm:inline">Mã số sinh viên</span>
+          <span className="text-muted hidden sm:inline">
+            {session.bhyt_only ? 'Mã số học viên' : 'Mã số sinh viên'}
+          </span>
           <span className="font-medium text-ink bg-surface-muted border border-line-strong rounded-md
                            px-2.5 py-1 font-mono text-meta">
             {session.student_code}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
@@ -14,6 +14,8 @@ import { ui } from '@/lib/ui';
 import type { BankLoanFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
+import { QuotaGuard } from '@/components/request-quota';
+import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue } from '@/components/request-edit';
 
 // Ô XIN SỬA (khóa sẵn, "Yêu cầu chỉnh sửa"; trống / không hợp lệ thì mở sẵn) —
 // chuyên viên duyệt ở Dashboard. Các nhãn tiến độ học thuộc NHÓM CỨNG — chỉ xem.
@@ -21,7 +23,7 @@ type FieldKey = 'dob' | 'class_code' | 'citizen_id' | 'citizen_id_issue_date';
 const FIELD_KEYS: FieldKey[] = ['dob', 'class_code', 'citizen_id', 'citizen_id_issue_date'];
 const EMPTY: Record<FieldKey, string> = { dob: '', class_code: '', citizen_id: '', citizen_id_issue_date: '' };
 
-type FErr = Partial<Record<FieldKey, string>>;
+type FErr = Partial<Record<FieldKey | 'fee_exemption' | 'orphan', string>>;
 
 export default function BankLoanRequestPage() {
   const [form, setForm] = useState<BankLoanFormData | null>(null);
@@ -32,11 +34,37 @@ export default function BankLoanRequestPage() {
     { dob: false, class_code: false, citizen_id: false, citizen_id_issue_date: false });
   const [note, setNote] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  // Thuộc diện / Thuộc đối tượng — SV chọn, Phòng CTSV duyệt hoặc sửa trước khi in giấy.
+  const [feeExemption, setFeeExemption] = useState('');
+  const [orphan, setOrphan] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FErr>({});
+
+  // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
+  const edit = useEditRequest('bank_loan');
+  const isEdit = edit.id !== null;
+  const editApplied = useRef(false);
+  useEffect(() => {
+    const r = edit.request;
+    if (!form || !r || editApplied.current) return;
+    editApplied.current = true;
+    setNote(r.note ?? '');
+    const sc = ((r.payload ?? {}) as { student_choices?: { fee_exemption?: string; orphan?: string } })
+      .student_choices ?? {};
+    setFeeExemption(sc.fee_exemption ?? '');
+    setOrphan(sc.orphan ?? '');
+    FIELD_KEYS.forEach((k) => {
+      const v = pendingValue(r, k);
+      if (v !== null) {
+        setValues((s) => ({ ...s, [k]: v }));
+        setOpenFields((s) => ({ ...s, [k]: true }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, edit.request]);
 
   useEffect(() => {
     api.requests.bankloanForm()
@@ -87,16 +115,20 @@ export default function BankLoanRequestPage() {
     if (cidChanged || issueChanged || !isValidIssueDate(pf.citizen_id_issue_date)) {
       const ie = validateIssueDate(values.citizen_id_issue_date); if (ie) errs.citizen_id_issue_date = ie;
     }
+    if (!feeExemption) errs.fee_exemption = 'Vui lòng chọn Thuộc diện.';
+    if (!orphan) errs.orphan = 'Vui lòng chọn Thuộc đối tượng.';
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
     setLoading(true);
     try {
-      await api.requests.createBankLoan({
+      await submitOrUpdate(edit, 'bank_loan', api.requests.createBankLoan, {
         dob: values.dob.trim(),
         citizen_id: values.citizen_id.trim(),
         citizen_id_issue_date: values.citizen_id_issue_date.trim(),
         class_code: values.class_code.trim(),
+        fee_exemption: feeExemption,
+        orphan,
         note: note.trim() || undefined,
       });
       setSuccess(true);
@@ -127,9 +159,9 @@ export default function BankLoanRequestPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-title font-semibold text-ink">Đã gửi yêu cầu</h2>
+          <h2 className="text-title font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
-          <div className="mt-6"><Link href="/dashboard" className={ui.btnPrimary}>Về Bảng thông tin</Link></div>
+          <div className="mt-6"><Link href={isEdit ? `/dashboard/requests/${edit.id}` : '/dashboard'} className={ui.btnPrimary}>{isEdit ? 'Xem yêu cầu' : 'Về Bảng thông tin'}</Link></div>
         </div>
       </div>
     );
@@ -164,6 +196,8 @@ export default function BankLoanRequestPage() {
         <span className="text-ink font-medium">Vay vốn ngân hàng</span>
       </nav>
 
+      <EditRequestBanner edit={edit} />
+
       <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
@@ -174,6 +208,7 @@ export default function BankLoanRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
+          <QuotaGuard type="bank_loan" bypass={isEdit}>
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -194,8 +229,8 @@ export default function BankLoanRequestPage() {
               <ReadonlyField label="Học kỳ hiện tại" value={p.current_semester} />
               <ReadonlyField label="Thời gian nhập học" value={p.start_label} />
               <ReadonlyField label="Ra trường đúng tiến độ" value={p.graduation_label} />
-              <ReadonlyField label="Số năm / tháng đào tạo" value={p.course_year_number && p.course_month_number ? `${p.course_year_number} năm (${p.course_month_number} tháng)` : (p.course_year_number || '—')} />
-              <ReadonlyField label="Tối đa (năm / tháng)" value={p.max_year_number && p.max_month_number ? `${p.max_year_number} năm (${p.max_month_number} tháng)` : (p.max_year_number || '—')} />
+              <ReadonlyField label="Số năm / tháng đào tạo" value={durationText(p.course_month_number, p.course_year_number)} />
+              <ReadonlyField label="Tối đa (năm / tháng)" value={durationText(p.max_month_number, p.max_year_number)} />
             </div>
           </div>
 
@@ -260,6 +295,26 @@ export default function BankLoanRequestPage() {
           </div>
 
           {/* Ghi chú — component dùng chung cho 5 form */}
+          {/* Thuộc diện / Thuộc đối tượng — hai nhóm ô tích trên giấy */}
+          <div>
+            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Diện ưu đãi</h2>
+            <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
+              <ChoiceGroup
+                label="Thuộc diện" name="fee_exemption"
+                choices={form.fee_exemption_choices} value={feeExemption} error={fieldErrors.fee_exemption}
+                onChange={(v) => { setFeeExemption(v); setFieldErrors((f) => ({ ...f, fee_exemption: undefined })); }}
+              />
+              <ChoiceGroup
+                label="Thuộc đối tượng" name="orphan"
+                choices={form.orphan_choices} value={orphan} error={fieldErrors.orphan}
+                onChange={(v) => { setOrphan(v); setFieldErrors((f) => ({ ...f, orphan: undefined })); }}
+              />
+            </div>
+            <p className="mt-3 text-[0.78rem] text-muted leading-relaxed">
+              Phòng CTSV đối chiếu và có thể điều chỉnh lựa chọn trước khi in lên giấy.
+            </p>
+          </div>
+
           <RequestNoteField value={note} onChange={setNote} />
 
           {/* Cam đoan — chưa tích thì chưa hiện nút gửi */}
@@ -275,21 +330,73 @@ export default function BankLoanRequestPage() {
               <ArrowLeft size={15} /> Quay lại
             </Link>
             <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading} className={ui.btnPrimary}>
+              <button type="submit" disabled={loading || (isEdit && !edit.request)} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
-                {loading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+                {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>
             </ConsentGate>
           </div>
+        </QuotaGuard>
         </form>
       </div>
 
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-line bg-surface-subtle">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
         <p className="text-sm text-ink-3 leading-relaxed">
-          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.
         </p>
       </div>
     </div>
   );
+}
+
+
+/** Một nhóm lựa chọn bắt buộc (radio) — hiển thị dạng thẻ bấm được. */
+function ChoiceGroup({ label, name, choices, value, error, onChange }: {
+  label: string;
+  name: string;
+  choices: { code: string; label: string }[];
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className={ui.fieldLabel}>{label} <span className="text-red-500">*</span></legend>
+      <div className="space-y-1.5">
+        {choices.map((c) => (
+          <label
+            key={c.code}
+            className={cn(
+              'flex items-center gap-2.5 rounded-lg border px-3 h-10 text-sm cursor-pointer transition-colors',
+              value === c.code ? 'border-primary bg-primary-soft text-ink' : 'border-line bg-white hover:border-slate-400',
+              error && value !== c.code && 'border-danger-line',
+            )}
+          >
+            <input
+              type="radio" name={name} value={c.code} checked={value === c.code}
+              onChange={() => onChange(c.code)}
+              className="accent-primary"
+            />
+            {c.label}
+          </label>
+        ))}
+      </div>
+      {error && <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
+    </fieldset>
+  );
+}
+
+
+/** Số tháng → "4 năm 6 tháng (53 tháng)" — khớp giấy vay vốn (Dashboard registry.duration_label).
+ *  Không tròn năm thì cộng bù 1 tháng, cùng luật mốc ra trường: 53 tháng = 4 năm 6 tháng,
+ *  80 tháng = 6 năm 9 tháng. */
+function durationText(months: string, years: string): string {
+  const raw = parseInt(months, 10);
+  if (!raw || raw <= 0) return years ? `${years} năm` : '—';
+  const m = raw % 12 ? raw + 1 : raw;
+  const y = Math.floor(m / 12);
+  const rest = m % 12;
+  const label = !y ? `${rest} tháng` : rest ? `${y} năm ${rest} tháng` : `${y} năm`;
+  return `${label} (${raw} tháng)`;
 }

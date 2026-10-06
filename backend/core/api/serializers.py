@@ -95,6 +95,10 @@ class RequestCommentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# Khoá trong `payload` do Dashboard ghi, chỉ dùng nội bộ — lọc khỏi API sinh viên.
+INTERNAL_PAYLOAD_KEYS = ("soft_copy", "return_receipts", "return_reopens")
+
+
 class ConfirmationRequestSerializer(serializers.ModelSerializer):
     """Dữ liệu yêu cầu trả cho sinh viên.
 
@@ -105,15 +109,41 @@ class ConfirmationRequestSerializer(serializers.ModelSerializer):
 
     comment_count = serializers.SerializerMethodField()
     student_can_comment = serializers.BooleanField(read_only=True)
+    # Mã hiển thị cho sinh viên; `id` chỉ dùng làm đường dẫn nội bộ.
+    code = serializers.CharField(read_only=True)
+    student_can_edit = serializers.BooleanField(read_only=True)
+    payload = serializers.SerializerMethodField()
+    soft_copy = serializers.SerializerMethodField()
 
     class Meta:
         model = ConfirmationRequest
         fields = [
-            "id", "request_type", "purpose", "note", "payload",
+            "id", "code", "request_type", "purpose", "note", "payload",
             "status", "portal_code", "comment_count", "student_can_comment",
+            "student_can_edit", "soft_copy",
             "created_at", "updated_at",
         ]
         read_only_fields = fields
+
+    def get_payload(self, obj):
+        # Khoá nội bộ của Dashboard — không trả cho sinh viên: `soft_copy` / `return_receipts`
+        # mang đường dẫn lưu trữ + tên chuyên viên; `return_reopens` là lý do mở lại (nội bộ).
+        payload = dict(obj.payload or {})
+        for key in INTERNAL_PAYLOAD_KEYS:
+            payload.pop(key, None)
+        return payload
+
+    def get_soft_copy(self, obj):
+        """Bản mềm PDF — chỉ lộ ra khi Phòng CTSV đã gửi (`ConfirmationRequest.visible_soft_copy`).
+
+        Dashboard ghi `payload.soft_copy` (dashboard documents/soft_copy.py); tải qua
+        `GET /api/requests/<id>/soft-copy/`. Không trả đường dẫn lưu trữ / tên chuyên viên.
+        """
+        data = obj.visible_soft_copy
+        if data is None:
+            return None
+        return {"filename": data.get("filename") or "", "size": data.get("size") or 0,
+                "sent_at": data.get("sent_at") or ""}
 
     def get_comment_count(self, obj):
         # Đã prefetch ở view danh sách nên không sinh thêm query mỗi dòng.

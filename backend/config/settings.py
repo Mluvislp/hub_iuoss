@@ -35,6 +35,11 @@ FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS
 FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
 FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
 FEATURE_TUITION_WAIVER = env_bool("FEATURE_TUITION_WAIVER", default=not IS_PRODUCTION)
+FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
+
+# Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
+# Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.
+DASHBOARD_PUBLIC_URL = os.getenv("DASHBOARD_PUBLIC_URL", "https://dashboard.iuoss.com").strip().rstrip("/")
 
 # Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
 FRONTEND_ORIGINS = env_list(
@@ -142,6 +147,10 @@ MS_REDIRECT_URI = os.getenv(
 # Chỉ chấp nhận email sinh viên. Tên miền nhân viên (hcmiu.edu.vn) nằm CÙNG một
 # tenant nên kiểm `tid` không phân biệt được — bắt buộc lọc theo hậu tố này.
 MS_ALLOWED_EMAIL_DOMAIN = os.getenv("MS_ALLOWED_EMAIL_DOMAIN", "student.hcmiu.edu.vn")
+# Học viên cao học dùng email @mp.hcmiu.edu.vn (cùng tenant). Email này chỉ được
+# nhận khi trỏ đúng tới một hồ sơ sau đại học — xem
+# core/login_policy.py::find_graduate_code_by_email. Để trống = tắt đường này.
+MS_GRADUATE_EMAIL_DOMAIN = os.getenv("MS_GRADUATE_EMAIL_DOMAIN", "mp.hcmiu.edu.vn")
 MS_LOGIN_ENABLED = bool(MS_TENANT_ID and MS_CLIENT_ID and MS_CLIENT_SECRET)
 
 # ── Bảo mật & Reverse proxy ──────────────────────────────────────────────────
@@ -193,6 +202,9 @@ REST_FRAMEWORK = {
         # Nới rộng để tránh chặn nhầm khi nhiều SV dùng chung IP (NAT ký túc xá/wifi trường)
         "login": os.getenv("THROTTLE_LOGIN", "30/min"),
         "create_request": os.getenv("THROTTLE_CREATE_REQUEST", "60/hour"),
+        # Ticket hỏi đáp: tạo mới chặt, nhắn trong ticket nới hơn (đang trò chuyện).
+        "ticket_create": os.getenv("THROTTLE_TICKET_CREATE", "10/hour"),
+        "ticket_message": os.getenv("THROTTLE_TICKET_MESSAGE", "120/hour"),
     },
 }
 

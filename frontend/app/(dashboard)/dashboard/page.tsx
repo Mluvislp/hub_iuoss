@@ -36,8 +36,8 @@ function Panel({
   return (
     <section className={ui.card}>
       <div className={ui.cardHeader}>
-        <h2 className={ui.sectionTitle}>
-          {Icon && <Icon size={16} className={accentIcon[accent]} />}
+        <h2 className={cn(ui.sectionTitle, 'min-w-0')}>
+          {Icon && <Icon size={16} className={cn('shrink-0', accentIcon[accent])} />}
           {title}
         </h2>
         {action}
@@ -218,14 +218,24 @@ export default function DashboardPage() {
         accent="primary"
         bodyClassName={confirmation_requests?.length ? 'p-0' : 'px-5 py-4'}
         action={
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard/requests" className={ui.btnSecondary}>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/dashboard/requests"
+              className={cn(ui.btnSecondary, 'whitespace-nowrap')}
+              aria-label="Lịch sử"
+              title="Lịch sử"
+            >
               <History size={15} />
-              Lịch sử
+              <span className="hidden sm:inline">Lịch sử</span>
             </Link>
-            <Link href="/dashboard/requests/new" className={ui.btnSecondary}>
+            <Link
+              href="/dashboard/requests/new"
+              className={cn(ui.btnSecondary, 'whitespace-nowrap')}
+              aria-label="Tạo yêu cầu"
+              title="Tạo yêu cầu"
+            >
               <Plus size={15} />
-              Tạo yêu cầu
+              <span className="hidden sm:inline">Tạo yêu cầu</span>
             </Link>
           </div>
         }

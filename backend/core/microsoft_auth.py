@@ -113,15 +113,24 @@ def exchange_code(code: str, state: str) -> dict:
 def extract_student_code(claims: dict) -> str:
     """Lấy MSSV từ email trong claims. Ném MicrosoftAuthError nếu không hợp lệ.
 
-    Quy ước của trường: tiền tố email = MSSV
-    (`FAFBIU24144@student.hcmiu.edu.vn` → `FAFBIU24144`).
+    Hai tên miền được nhận:
 
-    Xét lần lượt `upn` → `preferred_username` → `email`, lấy cái ĐẦU TIÊN đúng tên
-    miền sinh viên. Duyệt nhiều claim vì `preferred_username` có thể là alternate
+    - `@student.hcmiu.edu.vn` (sinh viên đại học): tiền tố email = MSSV
+      (`FAFBIU24144@student.hcmiu.edu.vn` → `FAFBIU24144`).
+    - `@mp.hcmiu.edu.vn` (học viên cao học): KHÔNG tin tiền tố — chỉ nhận khi email
+      trỏ đúng tới một hồ sơ sau đại học (`login_policy.find_graduate_code_by_email`).
+      Email cán bộ `@hcmiu.edu.vn` không khớp tên miền nào nên vẫn bị chặn.
+
+    Xét lần lượt `upn` → `preferred_username` → `email`, lấy cái ĐẦU TIÊN qua được
+    phép kiểm. Duyệt nhiều claim vì `preferred_username` có thể là alternate
     login ID (email khác) — chứ không phải để nới lỏng: giá trị nào cũng phải qua
     đúng một phép kiểm tên miền.
     """
+    # Import trễ: login_policy kéo theo models, module này chỉ lo giao thức.
+    from core.login_policy import find_graduate_code_by_email
+
     domain = settings.MS_ALLOWED_EMAIL_DOMAIN.lower()
+    graduate_domain = settings.MS_GRADUATE_EMAIL_DOMAIN.lower()
     seen = []
     for key in ("upn", "preferred_username", "email"):
         value = (claims.get(key) or "").strip().lower()
@@ -129,13 +138,29 @@ def extract_student_code(claims: dict) -> str:
             continue
         seen.append(value)
         local, sep, host = value.partition("@")
-        if sep and host == domain and local:
+        if not sep or not local:
+            continue
+        if host == domain:
             return local.upper()
+        if graduate_domain and host == graduate_domain:
+            code = find_graduate_code_by_email(value)
+            if code:
+                return code
 
     logger.warning("MS_BAD_DOMAIN     | candidates=%s", seen)
+    if graduate_domain and any(v.endswith("@" + graduate_domain) for v in seen):
+        raise MicrosoftAuthError(
+            f"Email @{graduate_domain} chỉ dùng được cho học viên cao học đã có hồ sơ "
+            "tại Phòng Công tác sinh viên. Tài khoản vừa dùng chưa gắn với hồ sơ "
+            "học viên cao học nào."
+        )
     raise MicrosoftAuthError(
+        f"Chỉ chấp nhận email sinh viên (@{settings.MS_ALLOWED_EMAIL_DOMAIN}) "
+        f"hoặc email học viên cao học (@{graduate_domain}). "
+        "Tài khoản vừa dùng không thuộc các nhóm này."
+        if graduate_domain else
         f"Chỉ chấp nhận email sinh viên (@{settings.MS_ALLOWED_EMAIL_DOMAIN}). "
-        "Tài khoản bạn vừa dùng không thuộc nhóm này."
+        "Tài khoản vừa dùng không thuộc nhóm này."
     )
 
 

@@ -18,6 +18,7 @@ Mặc định: **production → tắt (hiện trang chờ)**, **local/staging �
 | `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
 | `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được |
 | `FEATURE_TUITION_WAIVER` | Route `/dashboard/mien-giam-hoc-phi/*` và toàn bộ `/api/tuition-exemption/*` (404 khi tắt). Trang quản lý bên Dashboard (`/tuition/`) KHÔNG bị cờ này chặn — phòng cấu hình đợt/danh mục trước được |
+| `FEATURE_SUPPORT_TICKETS` | Route `/dashboard/hoi-dap/*`, badge tin mới ở sidebar và toàn bộ `/api/tickets/*` (404 khi tắt). Nghiệp vụ: `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 
 **Nguồn sự thật là backend** — `config/settings.py`, mặc định `not IS_PRODUCTION`
 (suy từ `DJANGO_ENV`). Không phải flag phía frontend, nên sửa `sessionStorage`
@@ -47,6 +48,7 @@ Thêm vào `backend/.env` rồi `sudo systemctl restart iuoss_hub`:
 FEATURE_DOCUMENT_REQUESTS=True
 FEATURE_CIVIC_ACTIVITIES=True
 FEATURE_HEALTH_CHECK=True
+FEATURE_SUPPORT_TICKETS=True
 ```
 
 **Không cần build lại frontend** — cờ đọc lúc chạy qua API chứ không nhúng vào

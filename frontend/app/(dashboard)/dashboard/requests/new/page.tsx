@@ -6,6 +6,7 @@ import { ChevronRight, ArrowRight, Info, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import { REQUEST_TYPE_LABELS, type RequestType } from '@/lib/types';
+import { useRequestQuota } from '@/components/request-quota';
 
 // Các loại giấy chưa hỗ trợ tạo online (ẩn khỏi danh sách chọn)
 const HIDDEN_TYPES: RequestType[] = ['enrollment', 'graduation'];
@@ -16,6 +17,7 @@ const DEDICATED_FORMS: Record<string, string> = {
   thuong_binh: '/dashboard/requests/thuong-binh',
   bank_loan: '/dashboard/requests/bank-loan',
   english_form: '/dashboard/requests/english',
+  conduct_score: '/dashboard/requests/conduct-score',
   other: '/dashboard/requests/other',
 };
 
@@ -30,11 +32,15 @@ const TYPE_HINTS: Record<RequestType, string> = {
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
   bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
   english_form: 'Giấy xác nhận bằng tiếng Anh (du học, xin việc, visa…).',
-  other: 'Các mục đích khác (du học, xin việc, visa…).',
+  conduct_score: 'Bảng điểm rèn luyện theo học kỳ hoặc cả năm học, bản mềm hoặc bản cứng.',
+  // Liệt kê theo OTHER_PURPOSE_CHOICES (backend/core/documents.py) — thêm/bớt mục đích thì xem lại câu này.
+  other: 'Xác nhận cho vé Metro ưu đãi, xin visa, xin việc, thực tập, du học, thi Tiếng Anh đầu ra, giảm trừ gia cảnh, vay vốn theo nhu cầu, kết nạp Đảng…',
 };
 
 export default function NewRequestPage() {
   const [requestType, setRequestType] = useState<RequestType | ''>('');
+  // Loại hết lượt trong học kỳ: KHÔNG ẩn — làm mờ, không chọn được, nêu lý do ngay trên ô.
+  const quota = useRequestQuota();
   const dedicatedHref = requestType ? DEDICATED_FORMS[requestType] : undefined;
   const selectedLabel = requestType ? REQUEST_TYPE_LABELS[requestType] : '';
 
@@ -71,14 +77,19 @@ export default function NewRequestPage() {
             <div role="radiogroup" aria-labelledby="request-type-label" className="grid sm:grid-cols-2 gap-2.5">
               {REQUEST_TYPES.map(([value, label]) => {
                 const selected = requestType === value;
+                const lock = quota?.types[value];
+                const blocked = !!lock?.blocked;
                 return (
                   <label
                     key={value}
+                    aria-disabled={blocked}
                     className={cn(
-                      'flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-colors',
-                      selected
-                        ? 'border-primary bg-primary-soft ring-1 ring-primary-line'
-                        : 'border-line hover:border-line-strong hover:bg-surface-subtle',
+                      'flex items-start gap-3 p-3.5 rounded-lg border transition-colors',
+                      blocked
+                        ? 'cursor-not-allowed border-line bg-surface-subtle'
+                        : selected
+                          ? 'cursor-pointer border-primary bg-primary-soft ring-1 ring-primary-line'
+                          : 'cursor-pointer border-line hover:border-line-strong hover:bg-surface-subtle',
                     )}
                   >
                     <input
@@ -86,14 +97,22 @@ export default function NewRequestPage() {
                       name="request_type"
                       value={value}
                       checked={selected}
+                      disabled={blocked}
                       onChange={() => setRequestType(value)}
                       className="mt-0.5 accent-primary"
                     />
                     <span>
-                      <span className={cn('block text-sm font-medium', selected ? 'text-primary' : 'text-ink')}>
+                      <span className={cn('block text-sm font-medium', blocked ? 'text-slate-400' : selected ? 'text-primary' : 'text-ink')}>
                         {label}
                       </span>
-                      <span className="block text-meta text-muted mt-0.5">{TYPE_HINTS[value]}</span>
+                      <span className={cn('block text-meta mt-0.5', blocked ? 'text-faint' : 'text-muted')}>
+                        {TYPE_HINTS[value]}
+                      </span>
+                      {blocked && (
+                        <span className="mt-2 block rounded-md border border-warning-line bg-warning-soft px-2.5 py-2 text-xs leading-relaxed text-warning-text">
+                          {lock!.reason}
+                        </span>
+                      )}
                     </span>
                   </label>
                 );
@@ -131,7 +150,7 @@ export default function NewRequestPage() {
         <p className="text-sm text-ink-3 leading-relaxed">
           Sau khi gửi biểu mẫu, theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
-          Thời gian xử lý: <strong className="text-ink font-medium">3–4 ngày làm việc</strong>.
+          Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.
         </p>
       </div>
     </div>

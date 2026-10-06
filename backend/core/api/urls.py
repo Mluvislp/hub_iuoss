@@ -1,5 +1,6 @@
 from django.urls import path
-from . import health_check_views, tuition_exemption_views, views
+from . import health_check_views, ticket_views, tuition_exemption_views, views
+from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
 
@@ -30,13 +31,16 @@ urlpatterns = [
     path("health-insurance/", views.HealthInsuranceView.as_view(), name="api_health_insurance"),
     path("health-insurance/registrations/", views.InsuranceRegistrationView.as_view(), name="api_health_insurance_registrations"),
     path("requests/",             views.RequestsView.as_view(),          name="api_requests"),
+    path("requests/availability/", views.RequestAvailabilityView.as_view(), name="api_request_availability"),
     path("requests/<int:pk>/",          views.RequestDetailView.as_view(),   name="api_request_detail"),
     path("requests/<int:pk>/comments/", views.RequestCommentsView.as_view(), name="api_request_comments"),
+    path("requests/<int:pk>/soft-copy/", views.RequestSoftCopyView.as_view(), name="api_request_soft_copy"),
     path("requests/other/form/",      views.OtherRequestFormView.as_view(),      name="api_other_request_form"),
     path("requests/deferment/form/",   views.DefermentRequestFormView.as_view(),   name="api_deferment_request_form"),
     path("requests/thuong-binh/form/", views.ThuongBinhRequestFormView.as_view(),  name="api_thuongbinh_request_form"),
     path("requests/bank-loan/form/",   views.BankLoanRequestFormView.as_view(),    name="api_bankloan_request_form"),
     path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
+    path("requests/conduct-score/form/", views.ConductScoreRequestFormView.as_view(), name="api_conduct_request_form"),
 
     # Khai báo thông tin ngoại trú
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
@@ -66,6 +70,20 @@ urlpatterns = [
     path("tuition-exemption/applications/<int:pk>/documents/<int:document_id>/",
          tuition_exemption_views.TuitionExemptionDocumentView.as_view(),
          name="api_tuition_exemption_document"),
+
+    # Hỏi đáp (ticket) — core/tickets.py
+    path("tickets/",                 ticket_views.TicketsView.as_view(),       name="api_tickets"),
+    path("tickets/topics/",          ticket_views.TicketTopicsView.as_view(),  name="api_ticket_topics"),
+    path("tickets/unread/",          ticket_views.TicketUnreadView.as_view(),  name="api_ticket_unread"),
+    path("tickets/<int:pk>/",        ticket_views.TicketDetailView.as_view(),  name="api_ticket_detail"),
+    path("tickets/<int:pk>/messages/", ticket_views.TicketMessagesView.as_view(), name="api_ticket_messages"),
+    path("tickets/<int:pk>/close/",  ticket_views.TicketCloseView.as_view(),   name="api_ticket_close"),
+    path("tickets/<int:pk>/attachments/<int:att_id>/", ticket_views.TicketAttachmentView.as_view(),
+         name="api_ticket_attachment"),
+
+    # Kho ảnh cố định của SV (CCCD, thẻ BHYT, ảnh thẻ, avatar) — core/student_images.py
+    path("student-images/",               StudentImagesView.as_view(),    name="api_student_images"),
+    path("student-images/<int:pk>/file/", StudentImageFileView.as_view(), name="api_student_image_file"),
 
     # Danh mục đơn vị hành chính (2025)
     path("locations/provinces/",  views.ProvinceListView.as_view(),  name="api_provinces"),

@@ -248,7 +248,7 @@ function LoginForm() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mật khẩu mạng IU"
+                  placeholder="Mật khẩu LDAP"
                   className={cn(
                     'w-full px-3.5 py-2.5 pr-11 rounded-lg border text-sm bg-white',
                     'text-ink placeholder:text-muted',
@@ -326,15 +326,15 @@ function LoginForm() {
                   </>
                 )}
               </button>
-              <p className="mt-2 text-center text-xs text-muted">
-                Dùng email sinh viên @student.hcmiu.edu.vn
+              <p className="mt-2 text-center text-xs text-faint">
+                Sinh viên dùng email @student.hcmiu.edu.vn · Học viên cao học dùng email @mp.hcmiu.edu.vn
               </p>
             </>
           )}
 
           {/* Forgot password */}
           <p className="mt-5 text-center text-sm text-muted">
-            Quên mật khẩu?{' '}
+            Quên mật khẩu LDAP?{' '}
             <a
               href="https://ldap.hcmiu.edu.vn/iupwd/?action=sendtoken"
               target="_blank"

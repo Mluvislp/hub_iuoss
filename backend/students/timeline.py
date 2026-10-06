@@ -119,14 +119,45 @@ def resolve_training_duration(major_code, intake_year):
     return duration.training_months, duration.max_training_months
 
 
+# Ký tự 5–6 của MSSV là mã chương trình đào tạo; `IU` = trường cấp bằng. Khác `IU`
+# (AD / WE / DK …) là CHƯƠNG TRÌNH LIÊN KẾT ⇒ luôn 48 / 72 tháng, ưu tiên hơn bảng
+# `major_training_durations` (người dùng chốt 03/10/2026, cùng luật app XNVQS2026 và
+# dashboard students/timeline.py — sửa phải sửa cả ba).
+STANDARD_PROGRAM_CODE = "IU"
+JOINT_PROGRAM_MONTHS = (48, 72)
+
+
+def joint_program_code(student_code):
+    """'ITITWE24066' → 'WE'; '' nếu không phải diện liên kết.
+
+    Ký tự 5–6 phải là HAI CHỮ CÁI khác `IU` — để không nhầm khuôn MSSV khác: học viên
+    cao học `MBAIU25025` ('U2'), MSSV kiểu cũ `IT060092` ('60').
+    """
+    cleaned = "".join(ch for ch in (student_code or "") if ch.isalnum()).upper()
+    code = cleaned[4:6]
+    if len(code) == 2 and code.isalpha() and code != STANDARD_PROGRAM_CODE:
+        return code
+    return ""
+
+
+def training_duration_for(student, major, entry_year):
+    """(training_months, max_training_months) cho MỘT sinh viên — đường DUY NHẤT."""
+    if not entry_year:
+        return None, None
+    if joint_program_code(student.current_student_code):
+        return JOINT_PROGRAM_MONTHS
+    if not major:
+        return None, None
+    return resolve_training_duration(major.code, entry_year)
+
+
 def build_study_timeline(student):
     major = infer_major_for_student(student)
     entry_year, start_year, start_month, _ = admission_start(student)
 
-    training_months = max_training_months = None
     graduation_year = max_year = None
-    if major and entry_year:
-        training_months, max_training_months = resolve_training_duration(major.code, entry_year)
+    training_months, max_training_months = training_duration_for(student, major, entry_year)
+    if training_months:
         graduation_year, _ = graduation_milestone(start_year, start_month, training_months)
         max_year, _ = add_training_duration(start_year, start_month, max_training_months)
 
@@ -163,8 +194,8 @@ def build_timeline_labels(student):
     entry_year, start_year, start_month, _ = admission_start(student)
 
     grad_y = grad_m = max_y = max_m = None
-    if major and entry_year:
-        training_months, max_training_months = resolve_training_duration(major.code, entry_year)
+    training_months, max_training_months = training_duration_for(student, major, entry_year)
+    if training_months:
         grad_y, grad_m = graduation_milestone(start_year, start_month, training_months)
         max_y, max_m = add_training_duration(start_year, start_month, max_training_months)
 
@@ -212,9 +243,7 @@ def build_course_numbers(student):
     """Số năm đào tạo / tối đa (từ số tháng, làm tròn)."""
     major = infer_major_for_student(student)
     entry_year, _, _, _ = admission_start(student)
-    training_months = max_training_months = None
-    if major and entry_year:
-        training_months, max_training_months = resolve_training_duration(major.code, entry_year)
+    training_months, max_training_months = training_duration_for(student, major, entry_year)
 
     def years(months):
         return str(round(months / 12)) if months else ""

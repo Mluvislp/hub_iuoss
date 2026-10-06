@@ -220,6 +220,20 @@ ALLOWED_STATUS_GROUPS = frozenset({"ACTIVE", "SUSPENDED", "GRADUATED"})
 
 `student_code` là UNIQUE trên toàn bảng `student_code_history` nên tra ngược từ mã cũ luôn ra đúng một sinh viên — đã đo trên dữ liệu thật: 0 trường hợp mã cũ trùng mã hiện tại của sinh viên khác.
 
+### Học viên cao học — không xét trạng thái, chỉ dùng BHYT (01/10/2026)
+
+Hồ sơ có `students.current_degree_level` là `MASTER` hoặc `DOCTOR` (`GRADUATE_DEGREE_CODES`) **bỏ qua bước xét trạng thái** — gần như toàn bộ đang "Chưa xác định" (live 01/10/2026: 2.692 UNKNOWN · 12 WITHDRAWN · 3 ACTIVE) vì luồng sync trạng thái chỉ chạy cho đại học. Áp cho **cả hai** đường đăng nhập vì nằm trong `check_login()`.
+
+Đổi lại, phiên của họ chỉ dùng được phần **Bảo hiểm y tế**:
+
+| Tầng | Cách chặn |
+|---|---|
+| JWT | claim `bhyt_only: true` (`is_bhyt_only()`), tính lại mỗi lần cấp/gia hạn phiên |
+| Backend | `IsHubAuthenticated` — phiên `bhyt_only` chỉ gọi được route trong `BHYT_ONLY_URL_NAMES` (`core/api/authentication.py`), còn lại 403. Là danh sách **cho phép**: endpoint mới mặc định bị chặn với học viên |
+| Frontend | sidebar chỉ còn mục "Bảo hiểm y tế"; `app/(dashboard)/layout.tsx` chuyển mọi trang khác (kể cả `/dashboard`) về `/dashboard/bao-hiem-y-te`; tắt polling ticket |
+
+Token phát trước khi có claim (không có `bhyt_only`) được coi là phiên đầy đủ — chỉ 3 học viên ACTIVE vào được trước đây, và token sống tối đa 8 giờ.
+
 **Bị chặn thì không để lại dấu vết:** không tạo/cập nhật `hub_students`, không phát token, không tạo session. Chỉ ghi một dòng `LOGIN_DENIED` kèm `reason` vào `logs/auth.log`.
 
 ---
@@ -265,6 +279,13 @@ login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize
 
 Quy ước của trường: tiền tố email = MSSV (`FAFBIU24144@student.hcmiu.edu.vn` → `FAFBIU24144`).
 
+**Học viên cao học dùng email `@mp.hcmiu.edu.vn`** (`MS_GRADUATE_EMAIL_DOMAIN`, đổi từ `@hcmiu.edu.vn` ngày 02/10/2026) — **không tin tiền tố**. `login_policy.find_graduate_code_by_email()` chỉ nhận khi email trỏ đúng tới một hồ sơ MASTER/DOCTOR:
+
+1. tiền tố email = MSSV hiện tại của một học viên cao học, hoặc
+2. email trùng một dòng `student_contact_points` (`is_current = 1`, mọi loại) của **đúng một** học viên cao học — trùng nhiều người thì không đoán.
+
+Email `@mp.hcmiu.edu.vn` không trỏ tới hồ sơ học viên cao học nào thì bị chặn với thông báo riêng; email cán bộ `@hcmiu.edu.vn` không khớp tên miền nào nên bị chặn như mọi email lạ. ⚠️ Học viên chưa có email `@mp.hcmiu.edu.vn` trong `student_contact_points` (và tiền tố không phải MSSV) thì chưa vào được cho tới khi nạp email — cần đo lại số học viên có email này trên live.
+
 Xét lần lượt `upn` → `preferred_username` → `email`, lấy giá trị **đầu tiên đúng tên miền** `MS_ALLOWED_EMAIL_DOMAIN`. Duyệt nhiều claim vì `preferred_username` có thể là alternate login ID; mọi giá trị vẫn phải qua đúng một phép kiểm tên miền.
 
 > ⚠️ `hcmiu.edu.vn` (nhân viên) và `student.hcmiu.edu.vn` (sinh viên) nằm **cùng một tenant** — kiểm `tid` KHÔNG phân biệt được hai nhóm. Việc lọc theo hậu tố email là bắt buộc, không phải trang trí.
@@ -280,6 +301,7 @@ Microsoft khuyến cáo dùng `oid` làm khoá định danh bền vững thay v�
 | `MS_CLIENT_SECRET` | Hết hạn **08/08/2028** — đặt lịch gia hạn, hết hạn là sập đường Microsoft |
 | `MS_REDIRECT_URI` | prod `https://hub.iuoss.com/auth/microsoft/callback`, dev `http://localhost:3000/...` |
 | `MS_ALLOWED_EMAIL_DOMAIN` | `student.hcmiu.edu.vn` |
+| `MS_GRADUATE_EMAIL_DOMAIN` | mặc định `mp.hcmiu.edu.vn` (học viên cao học); đặt rỗng = tắt đường này |
 
 Thiếu 3 biến đầu → `settings.MS_LOGIN_ENABLED = False` → endpoint trả 404 và `GET /api/features/` trả `microsoft_login: false` nên frontend ẩn nút. LDAP không bị ảnh hưởng.
 

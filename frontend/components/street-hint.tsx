@@ -13,3 +13,16 @@ export function StreetHint() {
     </ul>
   );
 }
+
+/**
+ * Nhắc ở mục "Địa chỉ thường trú" của các giấy xác nhận (hoãn NVQS, bảng điểm rèn
+ * luyện) — giấy in địa chỉ thường trú nên phải khớp CCCD. KHÔNG dùng cho form khai
+ * báo ngoại trú (địa chỉ tạm trú không theo CCCD).
+ */
+export function PermanentAddressCccdNote() {
+  return (
+    <p className="-mt-1 mb-2.5 text-[0.78rem] font-medium text-warning-text">
+      Địa chỉ thường trú phải đúng với địa chỉ trên căn cước công dân.
+    </p>
+  );
+}

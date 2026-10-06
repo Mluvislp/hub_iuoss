@@ -13,6 +13,7 @@ class ConfirmationRequest(models.Model):
         ("enrollment", "Xác nhận đang học"),
         ("graduation", "Xác nhận tốt nghiệp"),
         ("deferment", "Hoãn nghĩa vụ quân sự"),
+        ("conduct_score", "Bảng điểm rèn luyện"),
         ("other", "Khác"),
     ]
     STATUS_PENDING = "pending"
@@ -20,18 +21,25 @@ class ConfirmationRequest(models.Model):
     STATUS_AWAITING_INFO = "awaiting_info"
     STATUS_DONE = "done"
     STATUS_REJECTED = "rejected"
+    # Sinh viên đã nhận giấy tại văn phòng — Dashboard đặt, gửi email kèm biên nhận PDF và
+    # khoá yêu cầu (dashboard documents/locking.py). Hub chỉ hiển thị.
+    STATUS_RETURNED = "returned"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Chờ xử lý"),
         (STATUS_PROCESSING, "Đang xử lý"),
         (STATUS_AWAITING_INFO, "Chờ bổ sung thông tin"),
         (STATUS_DONE, "Hoàn thành"),
+        (STATUS_RETURNED, "Đã trả giấy"),
         (STATUS_REJECTED, "Từ chối"),
     ]
+    # Giấy đã làm xong — bản mềm tải được.
+    FINISHED_STATUSES = (STATUS_DONE, STATUS_RETURNED)
     STATUS_BADGE = {
         "pending": "warning",
         "processing": "info",
         "awaiting_info": "warning",
         "done": "success",
+        "returned": "success",
         "rejected": "danger",
     }
 
@@ -67,8 +75,39 @@ class ConfirmationRequest(models.Model):
         return self.STATUS_BADGE.get(self.status, "secondary")
 
     @property
+    def code(self):
+        """Mã yêu cầu hiển thị `GT-YYMM-XXXXX` (core/request_code.py) — trùng khớp Dashboard."""
+        from .request_code import encode
+        return encode(self.pk, self.created_at)
+
+    @property
+    def visible_soft_copy(self):
+        """`payload.soft_copy` nếu sinh viên được thấy/tải bản mềm PDF, ngược lại None.
+
+        Luật GIỐNG dashboard `documents/soft_copy.py` — sửa cả hai: yêu cầu KHÔNG bị Từ chối VÀ
+        chuyên viên đã bấm "Gửi cho sinh viên" (`sent_at`, gửi được ở mọi trạng thái — không cần Hoàn
+        thành / mã portal). Riêng bảng điểm RL chọn bản mềm đã Hoàn thành / Đã trả giấy thì không cần
+        `sent_at` (dữ liệu trước 06/10/2026 chưa có dấu này)."""
+        payload = self.payload or {}
+        data = payload.get("soft_copy")
+        if (self.status == self.STATUS_REJECTED or not isinstance(data, dict)
+                or not data.get("storage_key")):
+            return None
+        if data.get("sent_at"):
+            return data
+        conduct_online = (self.request_type == "conduct_score"
+                          and ((payload.get("delivery") or {}).get("code") == "online"))
+        return data if (conduct_online and self.status in self.FINISHED_STATUSES) else None
+
+    @property
     def student_can_comment(self):
         return self.status in self.STUDENT_CAN_COMMENT_STATUSES
+
+    @property
+    def student_can_edit(self):
+        """Chờ bổ sung thông tin ⇒ SV mở lại form để sửa (core/request_edit.py)."""
+        from core.request_edit import can_student_edit
+        return can_student_edit(self)
 
 
 class ConfirmationRequestComment(models.Model):
@@ -353,6 +392,9 @@ class HealthInsuranceConfig(models.Model):
     registration_year = models.IntegerField()
     registration_opens_at = models.DateTimeField()
     registration_closes_at = models.DateTimeField()
+    # Hạn riêng cho học viên cao học; NULL thì dùng chung registration_closes_at.
+    # Xem core/insurance_editing.py::closes_at.
+    graduate_closes_at = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=False)
     bank_account = models.ForeignKey(
         HealthInsuranceBankAccount,
@@ -384,3 +426,4 @@ class HealthInsuranceConfig(models.Model):
 
 
 from .insurance_history_models import InsuranceEvent, InsuranceAssessment, InsuranceEvidence  # noqa: E402,F401
+from .student_image_models import StudentImage  # noqa: E402,F401

@@ -119,10 +119,21 @@ class ExternalInsuranceTests(TestCase):
         for changes in [
             {'valid_until': '2025-01-01'}, {'medical_insurance_code': 'GD4799876543210'},
             {'student_code': 'ANOTHER'}, {'hospital_code': 'missing'}, {'social_insurance_number': ''},
+            {'medical_insurance_code': 'SV479012345678901'},  # thẻ 17 ký tự nhưng mã BHXH 10 số
+            {'medical_insurance_code': 'SV4790123456789012'}, {'medical_insurance_code': 'SV47901234567890'},
+            {'social_insurance_number': '01234567890'},
         ]:
             response = self.post(self.payload(**changes))
             self.assertEqual(response.status_code, 400, response.data)
         self.assertFalse(HealthInsuranceCard.objects.exists())
+
+    def test_card_code_with_12_digit_social_insurance_accepted(self):
+        response = self.post(self.payload(medical_insurance_code='SV479062206007748',
+                                          social_insurance_number='062206007748'))
+        self.assertEqual(response.status_code, 201, response.data)
+        row = ExternalInsuranceDeclaration.objects.get()
+        self.assertEqual(row.medical_insurance_code, 'SV479062206007748')
+        self.assertEqual(row.social_insurance_code, '062206007748')
 
     def test_failure_rolls_back_snapshot_and_files_without_touching_card(self):
         old = HealthInsuranceCard.objects.create(student=self.student, is_current=True,

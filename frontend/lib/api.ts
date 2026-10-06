@@ -14,12 +14,17 @@ import type {
   ThuongBinhFormData,
   BankLoanFormData,
   EnglishFormData,
+  ConductScoreFormData,
   Province,
   Ward,
   OffCampusForm,
   OffCampusSubmit,
   OffCampusResult,
   InsuranceRegistrationPrefill,
+  TicketDetail,
+  TicketMessage,
+  TicketSummary,
+  TicketTopic,
 } from './types';
 
 // Dev:  NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api  (browser gọi thẳng Django, CORS ok)
@@ -186,8 +191,20 @@ export const api = {
   },
 
   requests: {
+    /** PDF bản mềm bảng điểm RL — cần token nên tải qua fetch rồi mở bằng blob URL. */
+    async softCopy(id: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/requests/${id}/soft-copy/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
+    },
     list(): Promise<ConfirmationRequest[]> {
       return request('/requests/');
+    },
+    /** Loại giấy nào còn lượt trong học kỳ hiện tại (1 lần / loại / học kỳ). */
+    availability(): Promise<import('./types').RequestAvailability> {
+      return request('/requests/availability/');
     },
     detail(id: number): Promise<ConfirmationRequestDetail> {
       return request(`/requests/${id}/`);
@@ -200,6 +217,13 @@ export const api = {
       return request(`/requests/${id}/comments/`, {
         method: 'POST',
         body: JSON.stringify({ body }),
+      });
+    },
+    /** Sửa yêu cầu đang "Chờ bổ sung thông tin" — cùng body với lúc tạo (có `request_type`). */
+    update(id: number, data: Record<string, unknown>): Promise<ConfirmationRequestDetail> {
+      return request(`/requests/${id}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
       });
     },
     create(data: {
@@ -263,6 +287,8 @@ export const api = {
       citizen_id: string;
       citizen_id_issue_date: string;
       class_code: string;
+      fee_exemption: string;
+      orphan: string;
       note?: string;
     }): Promise<ConfirmationRequest> {
       return request('/requests/', {
@@ -283,6 +309,63 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'english_form', ...data }),
       });
+    },
+    conductScoreForm(): Promise<ConductScoreFormData> {
+      return request('/requests/conduct-score/form/');
+    },
+    createConductScore(data: {
+      semester_code: string;
+      delivery: string;
+      dob: string;
+      citizen_id: string;
+      citizen_id_issue_date: string;
+      province_code: string;
+      ward_code: string;
+      street: string;
+      note?: string;
+    }): Promise<ConfirmationRequest> {
+      return request('/requests/', {
+        method: 'POST',
+        body: JSON.stringify({ request_type: 'conduct_score', ...data }),
+      });
+    },
+  },
+
+  tickets: {
+    topics(): Promise<TicketTopic[]> {
+      return request('/tickets/topics/');
+    },
+    list(): Promise<TicketSummary[]> {
+      return request('/tickets/');
+    },
+    /** FormData: topic_id, subject, body, files (tối đa 2). */
+    create(body: FormData): Promise<{ id: number }> {
+      return requestMultipart('/tickets/', body);
+    },
+    /**
+     * Chi tiết + polling. `after` = id lượt cuối đang có → chỉ trả lượt mới.
+     * `seen=false` khi tab đang ẩn: không đánh dấu đã đọc.
+     */
+    detail(id: number, after = 0, seen = true): Promise<TicketDetail> {
+      return request(`/tickets/${id}/?after=${after}${seen ? '' : '&seen=0'}`);
+    },
+    reply(id: number, body: FormData): Promise<TicketSummary & { message: TicketMessage; can_reply: boolean }> {
+      return requestMultipart(`/tickets/${id}/messages/`, body);
+    },
+    /** Sinh viên xác nhận đã được giải đáp và đóng ticket. */
+    close(id: number): Promise<TicketSummary & { message: TicketMessage; can_reply: boolean }> {
+      return request(`/tickets/${id}/close/`, { method: 'POST' });
+    },
+    unread(): Promise<{ count: number }> {
+      return request('/tickets/unread/');
+    },
+    /** File đính kèm cần token → tải qua fetch rồi mở bằng blob URL. */
+    async attachment(ticketId: number, attachmentId: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}/attachments/${attachmentId}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
     },
   },
 

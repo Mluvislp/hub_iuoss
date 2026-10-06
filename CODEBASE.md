@@ -26,7 +26,8 @@ hai app **không gọi API của nhau**, mọi thứ trao đổi qua DB.
    None, "students": None}`). Đổi schema → viết SQL → người dùng chạy tay → cập nhật
    `docs/schema.sql`. `django.contrib.sessions` vẫn migrate bình thường.
 3. **`students/` là read-only.** Hub không ghi vào bảng Dashboard sở hữu; Hub chỉ ghi
-   `hub_*` và các bảng được giao (khai báo địa chỉ, sửa hồ sơ cá nhân).
+   `hub_*` và các bảng được giao (khai báo địa chỉ, sửa hồ sơ cá nhân, kho ảnh
+   `student_images`).
 4. **`next.config.mjs` cố ý KHÔNG rewrite `/api/`.** Next.js strip trailing slash trước
    khi rewrite chạy → Django nhận URL sai → 301 → redirect loop với POST. Định tuyến
    nằm ở Nginx, đúng một tầng.
@@ -51,9 +52,13 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
+  core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách
+  core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
   core/address_service.py · address_validators.py   ← BẢN SAO của Dashboard, sửa cả hai
   core/cccd.py              ← đọc QR căn cước
+  core/student_images.py · student_image_models.py   ← kho ảnh profile của SV (CCCD SV + cha mẹ,
+                              thẻ BHYT, ảnh thẻ, avatar) — luồng mới lấy ảnh ở đây, đừng tự lưu file
 
   core/insurance_contract.py        ← trạng thái/event/lý do BHYT — GIỐNG HỆT bản Dashboard
   core/insurance_workflow.py        ← nộp đơn, bổ sung, gửi lại
@@ -65,8 +70,9 @@ backend/
   core/tuition_exemption.py          ← MGHP: đọc đợt/danh mục/đơn/kết quả (đã cài); nộp, bổ sung (KHUNG)
   core/tuition_exemption_history.py · tuition_exemption_models.py   ← timeline (KHUNG) + 4 bảng hub_tuition_*
   core/management/commands/backfill_insurance_workflow.py   ← dựng timeline cho đơn cũ
+  core/management/commands/backfill_student_images.py      ← nạp CCCD/thẻ BHYT của đơn cũ vào kho ảnh (mặc định chỉ xem trước)
 
-  core/api/urls.py          ← 35 endpoint
+  core/api/urls.py          ← 50 endpoint
   core/api/views.py         ← phần lớn view (1.480 dòng)
   core/api/insurance_views.py · external_insurance_views.py · tuition_exemption_views.py
   core/api/serializers.py · authentication.py · throttling.py · tokens.py
@@ -99,6 +105,7 @@ frontend/
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
 | `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
+| `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
 | `/dashboard/mien-giam-hoc-phi` | MGHP — đợt đang mở, đơn đã nộp, kết quả đã chốt (cờ `tuition_waiver`) |
 | `/dashboard/mien-giam-hoc-phi/nop-ho-so` | form nộp đơn (KHUNG — backend trả 501) |
@@ -107,7 +114,7 @@ frontend/
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
 
-### 35 endpoint — `core/api/urls.py`
+### 50 endpoint — `core/api/urls.py`
 
 `health/` · `features/` (không cần auth) · `auth/{login,logout,token/refresh}` ·
 `auth/microsoft/{start,callback}` · `dashboard/` · `health-insurance/` ·
@@ -116,6 +123,8 @@ frontend/
 5 endpoint `requests/<loại>/form/` · `offcampus/` + `offcampus/request-reopen/` ·
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
 `tuition-exemption/` + `applications/<id>/` + `<id>/supplement/` + `<id>/documents/<id>/` ·
+`tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` +
+`<id>/attachments/<id>/` · `student-images/` (GET) + `<id>/file/` ·
 `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
@@ -127,6 +136,7 @@ frontend/
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
 | Miễn giảm học phí | `dashboard_iuoss/docs/TUITION_EXEMPTION.md` |
+| Hỏi đáp (ticket), realtime | `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |
 | Quan hệ với Dashboard và WordPress | `docs/ECOSYSTEM.md` |
@@ -175,7 +185,8 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_TUITION_WAIVER   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_TUITION_WAIVER · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
+DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```
 

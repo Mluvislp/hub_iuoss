@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `registration_year` INT NOT NULL,
   `registration_opens_at` DATETIME(6) NOT NULL,
   `registration_closes_at` DATETIME(6) NOT NULL,
+  `graduate_closes_at` DATETIME(6) NULL COMMENT 'Hạn đóng riêng cho học viên cao học; NULL = dùng registration_closes_at',
   `is_active` TINYINT(1) NOT NULL DEFAULT 0,
   `bank_account_id` BIGINT NULL,
   `description` TEXT NULL,
@@ -415,4 +416,163 @@ CREATE TABLE `hub_tuition_exemption_documents` (
   CONSTRAINT `fk_hted_app_category` FOREIGN KEY (`application_category_id`) REFERENCES `hub_tuition_exemption_application_categories` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_hted_event` FOREIGN KEY (`event_id`) REFERENCES `hub_tuition_exemption_events` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `chk_hted_size` CHECK (`file_size_bytes` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════════════ Hỏi đáp sinh viên (ticket) — 29/09/2026 ════════════════
+-- Nguồn: dashboard_iuoss/docs/sql/20260929_support_tickets.sql (kèm INSERT 5 mảng ban đầu).
+-- Ticket hỏi đáp sinh viên ↔ Phòng CTSV — 4 bảng mới, chạy TRƯỚC khi deploy code Dashboard + Hub.
+-- Không đụng bảng cũ nào. Chi tiết nghiệp vụ: docs/SUPPORT_TICKETS.md.
+--
+-- Mô hình tham khảo: osTicket (help topic → thread → entry → attachment) và Zendesk
+-- (ticket · comment public/private · attachment). Rút gọn cho quy mô một phòng:
+--   support_ticket_topics       mảng công việc + email người phụ trách
+--   support_tickets             một câu hỏi (số ticket = id, bắt đầu từ 10001)
+--   support_ticket_messages     dòng trao đổi phẳng: sinh viên / chuyên viên / hệ thống
+--   support_ticket_attachments  file đính kèm theo từng lượt (tối đa 2, PDF hoặc ảnh)
+
+-- Mảng công việc, tối đa HAI cấp: mảng (parent_id NULL) → mục con (parent_id = mảng).
+-- `notify_emails` nhận nhiều địa chỉ, phân cách bằng dấu phẩy hoặc xuống dòng; ticket
+-- mới + sinh viên nhắn thêm gửi tới toàn bộ danh sách. Mục con để trống = dùng email
+-- của mảng cha. Mảng có mục con thì sinh viên BẮT BUỘC chọn một mục con.
+-- Đổi người phụ trách = sửa trên Dashboard (Hỏi đáp sinh viên → Mảng công việc).
+CREATE TABLE `support_ticket_topics` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `parent_id` int DEFAULT NULL COMMENT 'NULL = mảng cấp 1; có giá trị = mục con của mảng đó',
+  `code` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Gợi ý hiện cho sinh viên khi chọn mảng',
+  `notify_emails` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email người phụ trách, phân cách bằng dấu phẩy/xuống dòng; mục con để rỗng = dùng email mảng cha',
+  `cc_emails` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Email CC, phân cách bằng dấu phẩy; mục con để trống = dùng CC mảng cha',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_stt_code` (`code`),
+  KEY `idx_stt_parent` (`parent_id`, `sort_order`),
+  CONSTRAINT `fk_stt_parent` FOREIGN KEY (`parent_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Một câu hỏi. Trạng thái nói "đang chờ ai":
+--   open      chờ Phòng CTSV trả lời (vừa tạo, hoặc sinh viên vừa nhắn thêm)
+--   answered  Phòng CTSV đã trả lời, chờ sinh viên
+--   closed    đã đóng — sinh viên không nhắn thêm được, cần hỏi tiếp thì tạo ticket mới
+-- Hai mốc last_*_message_at cùng với *_read_at cho biết "có tin mới chưa đọc" ở cả hai
+-- phía mà không cần bảng riêng. Không có cột người phụ trách: người xử lý chính là người
+-- phản hồi, đã lưu ở từng lượt (support_ticket_messages.author_user_id).
+CREATE TABLE `support_tickets` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `topic_id` int NOT NULL,
+  `student_id` bigint NOT NULL,
+  `student_code` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'MSSV lúc tạo ticket (đi vào tiêu đề email)',
+  `subject` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_student_message_at` datetime(6) DEFAULT NULL,
+  `last_staff_message_at` datetime(6) DEFAULT NULL,
+  `student_read_at` datetime(6) DEFAULT NULL,
+  `staff_read_at` datetime(6) DEFAULT NULL,
+  `first_response_at` datetime(6) DEFAULT NULL COMMENT 'Lần trả lời công khai đầu tiên của Phòng CTSV',
+  `closed_at` datetime(6) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Mốc hoạt động cuối — code tự ghi; CỐ Ý không ON UPDATE để việc ghi *_read_at không đẩy ticket lên đầu danh sách',
+  PRIMARY KEY (`id`),
+  KEY `idx_st_status` (`status`, `updated_at`),
+  KEY `idx_st_student` (`student_id`, `updated_at`),
+  KEY `idx_st_topic` (`topic_id`, `status`),
+  CONSTRAINT `fk_st_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_st_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=10001;
+
+-- Dòng trao đổi phẳng theo thời gian (không phân cấp).
+--   author_role: student | staff | system (đóng/mở lại — để dòng thời gian không thủng)
+--   author_user_id + author_name: chuyên viên nào phản hồi lượt nào
+CREATE TABLE `support_ticket_messages` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `ticket_id` bigint NOT NULL,
+  `author_role` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `author_user_id` int DEFAULT NULL COMMENT 'auth_user.id khi là chuyên viên',
+  `author_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Chụp tên lúc gửi',
+  `body` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_stm_ticket` (`ticket_id`, `id`),
+  CONSTRAINT `fk_stm_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `support_tickets` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- File đính kèm. File nằm dưới MEDIA_ROOT của Hub (`support_tickets/<ticket>/<uuid>.<ext>`);
+-- Dashboard đọc qua HUB_MEDIA_ROOT như ảnh BHYT. `ticket_id` lặp lại để kiểm quyền tải
+-- file bằng một điều kiện, không phải JOIN qua bảng trao đổi.
+CREATE TABLE `support_ticket_attachments` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `ticket_id` bigint NOT NULL,
+  `message_id` bigint NOT NULL,
+  `storage_key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size_bytes` int unsigned NOT NULL,
+  `sha256` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_sta_message` (`message_id`),
+  KEY `idx_sta_ticket` (`ticket_id`),
+  CONSTRAINT `fk_sta_message` FOREIGN KEY (`message_id`) REFERENCES `support_ticket_messages` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════ Phản hồi chung (mẫu trả lời soạn sẵn) — thêm 30/09/2026 ════════
+-- Mỗi mảng/mục con có danh sách mẫu riêng. Ticket thuộc mục con thấy mẫu của mục con + của
+-- mảng cha. `body` là HTML ĐÃ LÀM SẠCH (support/richtext.py) do CKEditor soạn.
+-- Chuyên viên thêm/sửa/xoá ngay trong ngăn "Phản hồi chung" ở trang chi tiết ticket.
+CREATE TABLE `support_canned_responses` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `topic_id` int NOT NULL,
+  `title` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Tên ngắn để chuyên viên tìm/chọn',
+  `body` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'HTML đã làm sạch',
+  `sort_order` smallint NOT NULL DEFAULT '0',
+  `created_by_id` int DEFAULT NULL,
+  `updated_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_scr_topic` (`topic_id`, `sort_order`),
+  CONSTRAINT `fk_scr_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Chỉ định mảng hỏi đáp cho tài khoản Dashboard (Hub không đọc bảng này).
+CREATE TABLE `support_topic_assignees` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `topic_id` int NOT NULL,
+  `user_id` int NOT NULL COMMENT 'auth_user.id',
+  `created_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_sta_topic_user` (`topic_id`, `user_id`),
+  KEY `idx_sta_user` (`user_id`),
+  CONSTRAINT `fk_stassign_topic` FOREIGN KEY (`topic_id`) REFERENCES `support_ticket_topics` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_stassign_user` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════ Ảnh cố định của sinh viên — 04/10/2026 ════════
+-- Nguồn (kèm quy ước đầy đủ): dashboard_iuoss/docs/sql/20261004_student_images.sql
+-- Dòng bất biến; thay ảnh = dòng mới + hạ is_current dòng cũ về 0. Hub ghi.
+CREATE TABLE `student_images` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `student_id` bigint NOT NULL,
+  `kind` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL
+    COMMENT 'cccd_front | cccd_back | bhyt_card | portrait | avatar — registry ở Hub core/student_images.py',
+  `subject` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'SELF'
+    COMMENT 'Ảnh của ai: SELF | FATHER | MOTHER | GUARDIAN (khớp student_family_members.relationship)',
+  `storage_key` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Đường dẫn tương đối dưới MEDIA_ROOT của Hub',
+  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size_bytes` bigint NOT NULL,
+  `sha256` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `source` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL
+    COMMENT 'Luồng tải lên: bhyt_registration | external_insurance | mghp | backfill',
+  `is_current` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1 = ảnh đang dùng của ô (student_id, kind, subject); 0 = đã bị ảnh mới thay',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_si_slot` (`student_id`, `kind`, `subject`, `is_current`),
+  CONSTRAINT `fk_si_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_si_subject` CHECK (`subject` IN ('SELF','FATHER','MOTHER','GUARDIAN')),
+  CONSTRAINT `chk_si_size` CHECK (`file_size_bytes` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

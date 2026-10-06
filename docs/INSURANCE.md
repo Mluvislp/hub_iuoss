@@ -48,6 +48,14 @@ Frontend còn `lib/insurance-periods.ts` để hiển thị: trang BHYT hiện *
 đợt kế tiếp**; không có đợt mở thì hiện đợt vừa hết hạn + kế tiếp. Đợt đang mở luôn
 hiện hạn cuối.
 
+**Học viên cao học có hạn đóng riêng.** Mỗi slot có cột `graduate_closes_at` (NULL = dùng
+chung `registration_closes_at`), staff nhập trên trang quản lý đợt của Dashboard. Với người
+`is_graduate` (MASTER/DOCTOR), mọi chỗ xét hạn đều dùng hạn riêng này qua
+`core/insurance_editing.py::closes_at` — mở form, nộp đơn, `status`/`end_date` trả về
+frontend, cửa sổ sửa đơn (`window`) và khai BHYT nơi khác (`active_config`). Hết hạn riêng là
+học viên không nộp và **không sửa đơn** được nữa. Giờ mở, cờ bật, phí, tài khoản và thời hạn
+thẻ vẫn dùng chung với sinh viên đại học.
+
 Nếu `academic_entry_year` của sinh viên trùng năm hiện tại (`timezone.localdate().year`), Hub hiển thị
 `freshman_warning` của slot trong popup đỏ nhạt cùng tông RejectionNotice (`components/freshman-warning-modal.tsx`,
 bottom sheet trên mobile) ngay khi mở form đăng ký; sinh viên phải bấm xác nhận để đóng.
@@ -70,16 +78,13 @@ Sửa contract là phải chạy test **cả hai** app.
 
 - File mới nằm dưới `MEDIA_ROOT/insurance_private/` (khai ngoài trường:
   `insurance_private/external`); ảnh legacy vẫn ở `insurance_data/`.
-- Dashboard đọc qua biến `HUB_MEDIA_ROOT` — phải trỏ đúng `MEDIA_ROOT` của Hub. Prod:
-  `/var/www/apps/hub_iuoss/backend/media`.
-- Django đã chặn URL thô. **Nginx phục vụ static trực tiếp thì phải thêm**, trên mọi
-  vhost đang expose cùng media:
-
-  ```nginx
-  location ^~ /media/insurance_private/ { return 404; }
-  location ^~ /media/insurance_data/    { return 404; }
-  ```
-
+- **Từ 04/10/2026, CCCD hai mặt + thẻ BHYT** (cả đơn đăng ký lẫn khai ngoài trường, lúc nộp
+  và lúc sửa) được lưu vào kho ảnh profile `student_images` (`insurance_private/student_images/…`,
+  xem `dashboard_iuoss/docs/ARCHITECTURE.md` §10) để các luồng khác dùng lại. Cột
+  `cccd_image`/`cccd_image_back`/`bhyt_image` và JSON `images` của đơn vẫn được ghi **cùng
+  storage_key** và là bản ghi lúc nộp của đơn — Dashboard đọc các cột này, không đổi gì.
+  Biên lai và minh chứng thanh toán vẫn lưu theo đơn. Ảnh của đơn cũ nạp vào kho bằng
+  `manage.py backfill_student_images` (mặc định chỉ xem trước).
 - Mỗi file lưu SHA-256 và MIME **xác minh từ nội dung**, không tin đuôi file. Nhận
   JPEG/PNG/WebP và **HEIC của iPhone** (nhờ `Pillow` + `pillow-heif` trong
   `requirements.txt`). Thiếu gói thì HEIC bị từ chối chứ không sập.
@@ -102,6 +107,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `external_insurance_upgrade.sql` | tạo bảng khai ngoài trường |
 | `external_insurance_review_upgrade.sql` | dùng **thay** file tạo bảng nếu bảng đã có từ bản trước |
 | `external_insurance_validity_fix.sql` | sửa thời hạn |
+| `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
 
 `.gitignore` chặn `*.sql` (dump chứa dữ liệu thật) và **whitelist từng file** ở trên —
 thêm file SQL mới phải thêm một dòng `!docs/<tên>.sql`, nếu không git bỏ qua im lặng.

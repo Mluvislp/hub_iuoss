@@ -12,8 +12,9 @@ import {
   X,
 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
-import { clearAuth } from '@/lib/auth';
+import { BHYT_HOME, clearAuth } from '@/lib/auth';
 import { clearFeatureCache, FEATURE_META, type FeatureKey } from '@/lib/features';
+import { useTicketUnread } from '@/lib/ticket-unread';
 import type { FeatureFlags, StudentSession } from '@/lib/types';
 
 interface SidebarProps {
@@ -67,16 +68,31 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
       featureItem('health_check'),
       featureItem('tuition_waiver'),
+      featureItem('support_tickets'),
     ],
   },
 ];
 
 export default function Sidebar({ session, features, open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  // Học viên cao học (phiên `bhyt_only`): chỉ một mục Bảo hiểm y tế, không gì khác.
+  const bhytOnly = session?.bhyt_only === true;
+  const ticketUnread = useTicketUnread(features.support_tickets && !bhytOnly);
 
   // Mục sáng = href khớp DÀI NHẤT với URL hiện tại. So khớp tuyệt đối thì vào
   // trang con là menu tắt hết; so khớp tiền tố đơn thuần thì ở /requests/new sẽ
   // sáng cả "Yêu cầu giấy tờ" lẫn "Tạo yêu cầu mới".
+  // Tính năng chưa mở (cờ FEATURE_* tắt) thì ẨN HẲN khỏi menu — trước 01/10/2026 vẫn
+  // hiện kèm chấm "Đang phát triển", sinh viên bấm vào chỉ gặp trang chưa mở.
+  const sections: { label: string; items: NavItem[] }[] = bhytOnly
+    ? [{ label: 'Hồ sơ của tôi', items: [{ href: BHYT_HOME, icon: ShieldCheck, label: 'Bảo hiểm y tế' }] }]
+    : NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.feature || features[item.feature]),
+    }))
+    .filter((section) => section.items.length > 0);
+
   const activeHref = NAV_SECTIONS
     .flatMap((section) => section.items.map((item) => item.href))
     .filter((href) => pathname === href || pathname.startsWith(href + '/'))
@@ -133,7 +149,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
 
         {/* Brand — identity IU/HCMIU */}
         <div className="flex items-center justify-between h-[55px] px-5 bg-white border-b border-line">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Link href={bhytOnly ? BHYT_HOME : '/dashboard'} className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-md bg-primary text-white flex items-center justify-center
                             text-meta font-bold tracking-tight shadow-sm shadow-primary/25">
               IU
@@ -155,7 +171,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
-          {NAV_SECTIONS.map((section, i) => (
+          {sections.map((section, i) => (
             <div key={section.label} className={cn('px-3', i > 0 && 'mt-5 pt-5 border-t border-line2')}>
               <p className="px-2.5 mb-2 text-xs font-semibold text-muted">
                 {section.label}
@@ -164,8 +180,6 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = item.href === activeHref;
-                  // Chỉ đánh dấu cái BẤT THƯỜNG: tính năng chưa mở mới có chấm.
-                  const pending = !!item.feature && !features[item.feature];
 
                   return (
                     <Link
@@ -180,19 +194,16 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                           : 'text-ink-3 hover:text-ink hover:bg-surface-muted',
                       )}
                     >
-                      <Icon size={17} className={cn('flex-shrink-0', pending && 'text-faint')} />
-                      <span className={cn('flex-1', pending && !isActive && 'text-muted')}>
-                        {item.label}
-                      </span>
-                      {pending && (
-                        <>
-                          <span
-                            className="w-1.5 h-1.5 rounded-full bg-warning-line flex-shrink-0"
-                            title="Đang phát triển"
-                            aria-hidden="true"
-                          />
-                          <span className="sr-only">(đang phát triển)</span>
-                        </>
+                      <Icon size={17} className="flex-shrink-0" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.feature === 'support_tickets' && ticketUnread > 0 && (
+                        <span
+                          className="min-w-[20px] h-5 px-1.5 rounded-full border border-danger-line bg-danger-soft
+                                     text-danger-text text-[0.7rem] font-semibold leading-[18px] text-center"
+                          aria-label={`${ticketUnread} ticket có phản hồi mới`}
+                        >
+                          {ticketUnread > 9 ? '9+' : ticketUnread}
+                        </span>
                       )}
                     </Link>
                   );

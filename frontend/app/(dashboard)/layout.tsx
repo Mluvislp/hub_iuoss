@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import ComingSoon from '@/components/coming-soon';
-import { getSession } from '@/lib/auth';
+import { BHYT_HOME, getSession, isBhytOnly } from '@/lib/auth';
 import { useFeatures, featureForRoute, FEATURE_META } from '@/lib/features';
 import type { StudentSession } from '@/lib/types';
 
@@ -24,17 +24,40 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/requests/thuong-binh': 'Yêu cầu giấy tờ',
   '/dashboard/requests/bank-loan': 'Yêu cầu giấy tờ',
   '/dashboard/requests/english': 'Yêu cầu giấy tờ',
+  '/dashboard/hoi-dap': 'Hỏi đáp',
+  '/dashboard/hoi-dap/new': 'Hỏi đáp',
 };
+
+/** Trang con có id động (/hoi-dap/123, /mien-giam-hoc-phi/ho-so/12) không nằm trong bảng trên → tên tính năng. */
+function titleFor(pathname: string): string {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  const feature = featureForRoute(pathname);
+  return feature ? FEATURE_META[feature].label : 'IUOSS Hub';
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [session, setSession] = useState<StudentSession | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const { features, ready } = useFeatures();
 
   useEffect(() => {
     setSession(getSession() as StudentSession | null);
+    setSessionReady(true);
   }, []);
+
+  // Học viên cao học chỉ dùng phần Bảo hiểm y tế: mọi trang khác (kể cả
+  // /dashboard) chuyển về đó. Backend cũng chặn API ngoài BHYT, đây chỉ để không
+  // ai thấy trang trống báo lỗi.
+  const bhytOnly = isBhytOnly(session as Record<string, unknown> | null);
+  const outsideBhyt = bhytOnly
+    && pathname !== BHYT_HOME && !pathname.startsWith(BHYT_HOME + '/');
+
+  useEffect(() => {
+    if (outsideBhyt) router.replace(BHYT_HOME);
+  }, [outsideBhyt, router]);
 
   // Chặn ở MỘT chỗ cho mọi tính năng chưa mở: route thuộc tính năng đang tắt thì
   // thay nội dung bằng trang chờ, không cần từng page tự kiểm tra.
@@ -43,8 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const title = pending && routeFeature
     ? FEATURE_META[routeFeature].label
-    // Route động (vd. /mien-giam-hoc-phi/ho-so/12) không có trong bảng → lấy tên tính năng.
-    : PAGE_TITLES[pathname] ?? (routeFeature ? FEATURE_META[routeFeature].label : 'IUOSS Hub');
+    : titleFor(pathname);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -62,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               đè lên nút / link cuối trang trên điện thoại. */}
           <div className="max-w-content px-5 sm:px-8 pt-6 sm:pt-8 pb-24">
             {/* Chưa biết cờ → chờ, tránh chớp nội dung rồi đổi sang trang chờ. */}
-            {!ready && routeFeature ? (
+            {!sessionReady || outsideBhyt || (!ready && routeFeature) ? (
               <div className="flex items-center justify-center h-64 text-muted">
                 <Loader2 size={26} className="animate-spin" />
               </div>

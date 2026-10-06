@@ -5,6 +5,8 @@ export interface StudentSession {
   student_id: number | null;
   student_code: string;
   full_name: string;
+  /** Học viên cao học: chỉ dùng phần Bảo hiểm y tế (claim `bhyt_only` trong JWT). */
+  bhyt_only?: boolean;
 }
 
 export interface Department {
@@ -130,11 +132,13 @@ export interface CivicActivity {
   completed_at: string | null;
 }
 
-export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'other';
-export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' | 'rejected';
+export type RequestType = 'enrollment' | 'graduation' | 'deferment' | 'thuong_binh' | 'bank_loan' | 'english_form' | 'conduct_score' | 'other';
+export type RequestStatus = 'pending' | 'processing' | 'awaiting_info' | 'done' | 'returned' | 'rejected';
 
 export interface ConfirmationRequest {
   id: number;
+  /** Mã yêu cầu hiển thị `GT-YYMM-XXXXX` — dùng thay cho id khi hiện cho sinh viên. */
+  code: string;
   request_type: RequestType;
   purpose: string;
   note: string | null;
@@ -144,6 +148,10 @@ export interface ConfirmationRequest {
   portal_code: string | null;
   comment_count: number;
   student_can_comment: boolean;
+  /** Chờ bổ sung thông tin ⇒ mở lại form để sửa (`?edit=<id>`). */
+  student_can_edit: boolean;
+  /** Bảng điểm RL nhận bản mềm: PDF Phòng CTSV tải lên — chỉ có khi đã Hoàn thành. */
+  soft_copy: { filename: string; size: number; sent_at?: string } | null;
   created_at: string;
   updated_at: string;
 }
@@ -254,6 +262,10 @@ export interface BankLoanPrefill {
 
 export interface BankLoanFormData {
   prefill: BankLoanPrefill;
+  /** "Thuộc diện" (miễn / giảm học phí) — SV chọn, Phòng CTSV duyệt hoặc sửa. */
+  fee_exemption_choices: PurposeChoice[];
+  /** "Thuộc đối tượng" (mồ côi). */
+  orphan_choices: PurposeChoice[];
 }
 
 export interface EnglishPrefill {
@@ -270,6 +282,36 @@ export interface EnglishFormData {
   purpose_choices: PurposeChoice[];
   program_purpose_code: string;
   prefill: EnglishPrefill;
+}
+
+// Bảng điểm rèn luyện — ngày sinh / CCCD + ngày cấp / địa chỉ là ô xin sửa.
+export interface ConductScorePrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  course_year: string;
+  dob: string;
+  cccd_valid: boolean;
+  citizen_id: string;
+  citizen_id_issue_date: string;
+  address_standardized: boolean;
+  province_code: string;
+  province_name: string;
+  ward_code: string;
+  ward_name: string;
+  street: string;
+}
+
+/** Mã `YYYYS` = một học kỳ, `YYYYN` = cả năm học (kind 'year'). */
+export interface ConductSemesterChoice extends PurposeChoice {
+  kind: 'semester' | 'year';
+}
+
+export interface ConductScoreFormData {
+  semester_choices: ConductSemesterChoice[];
+  /** Hình thức nhận: online = bản mềm, paper = bản cứng. */
+  delivery_choices: PurposeChoice[];
+  prefill: ConductScorePrefill;
 }
 
 // Đơn vị hành chính (cơ cấu 2025)
@@ -370,6 +412,7 @@ export interface FeatureFlags {
   civic_activities: boolean;
   health_check: boolean;
   tuition_waiver: boolean;
+  support_tickets: boolean;
 }
 
 /**
@@ -410,6 +453,7 @@ export const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
   thuong_binh: 'Ưu đãi giáo dục (thương binh)',
   bank_loan: 'Vay vốn ngân hàng',
   english_form: 'Xác nhận (mẫu tiếng Anh)',
+  conduct_score: 'Bảng điểm rèn luyện',
   other: 'Khác',
 };
 
@@ -418,6 +462,7 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   processing: 'Đang xử lý',
   awaiting_info: 'Chờ bổ sung thông tin',
   done: 'Hoàn thành',
+  returned: 'Đã trả giấy',
   rejected: 'Từ chối',
 };
 
@@ -429,6 +474,8 @@ export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   // phải nhìn ra ngay giữa một danh sách toàn màu vàng "chờ xử lý".
   awaiting_info: 'bg-attention-soft text-attention-text border-attention-line',
   done:       'bg-success-soft text-success-text border-success-line',
+  // Bước cuối (đã nhận giấy) — xanh ngọc, khác xanh lá "Hoàn thành"; cùng màu với Dashboard.
+  returned:   'bg-teal-50 text-teal-700 border-teal-200',
   rejected:   'bg-danger-soft text-danger-text border-danger-line',
 };
 
@@ -563,6 +610,93 @@ export interface HealthCheckState {
   data_consent_text: { examined: string; register: string };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
+}
+
+// ── Hỏi đáp (ticket) ─────────────────────────────────────────────────────────
+// Trạng thái = "đang chờ ai": open → chờ Phòng CTSV · answered → Phòng CTSV đã trả lời.
+
+export type TicketStatus = 'open' | 'answered' | 'closed';
+
+export const TICKET_STATUS_STYLES: Record<TicketStatus, string> = {
+  open: 'bg-warning-soft text-warning-text border-warning-line',
+  answered: 'bg-primary-soft text-primary-text border-primary-line',
+  closed: 'bg-slate-50 text-slate-600 border-slate-200',
+};
+
+export interface TicketSubtopic {
+  id: number;
+  name: string;
+  description: string;
+}
+
+/** Mảng công việc; `children` rỗng = chọn thẳng mảng, có mục con = bắt buộc chọn một mục con. */
+export interface TicketTopic extends TicketSubtopic {
+  children: TicketSubtopic[];
+}
+
+export interface TicketAttachment {
+  id: number;
+  name: string;
+  size: number;
+  mime_type: string;
+  is_pdf: boolean;
+}
+
+export interface TicketMessage {
+  id: number;
+  author_role: 'student' | 'staff' | 'system';
+  author_name: string;
+  body: string;
+  /** Chỉ tin chuyên viên: HTML đã được server lọc (đậm/nghiêng/link/danh sách/trích dẫn). */
+  body_html: string;
+  created_at: string;
+  attachments: TicketAttachment[];
+}
+
+export interface TicketSummary {
+  id: number;
+  subject: string;
+  topic: { id: number; name: string };
+  status: TicketStatus;
+  status_label: string;
+  unread: boolean;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  message_count?: number;
+}
+
+export interface TicketDetail extends TicketSummary {
+  can_reply: boolean;
+  messages: TicketMessage[];
+  max_files: number;
+}
+
+// ── Hạn mức xin giấy tờ (1 lần / loại / học kỳ) ─────────────────────────────
+
+export interface QuotaBlocking {
+  request_id: number;
+  code: string;
+  status: RequestStatus;
+  status_label: string;
+  created_at: string;
+  term: string;
+  /** Chỉ conduct_score: học kỳ / năm học của yêu cầu đang chiếm lượt. */
+  semester_label?: string;
+}
+
+export interface QuotaTypeState {
+  blocked: boolean;
+  reason: string;
+  blocking: QuotaBlocking | null;
+  /** Chỉ conduct_score: học kỳ bảng điểm đã xin trong học kỳ hiện tại. */
+  blocked_semesters?: Record<string, QuotaBlocking>;
+}
+
+export interface RequestAvailability {
+  term: { key: string; label: string };
+  contact_email: string;
+  types: Record<string, QuotaTypeState>;
 }
 
 // ── Miễn giảm học phí (MGHP) ─────────────────────────────────────────────────

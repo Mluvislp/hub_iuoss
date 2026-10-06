@@ -1,0 +1,101 @@
+"""Bản mềm PDF bảng điểm rèn luyện — sinh viên chỉ tải được khi yêu cầu đã Hoàn thành.
+
+Chạy: python manage.py test core.test_soft_copy --settings=config.insurance_test_settings
+"""
+import shutil
+import tempfile
+from pathlib import Path
+
+from django.test import TestCase, override_settings
+from rest_framework.test import APIClient
+
+from core.api.authentication import StudentPrincipal
+from core.models import ConfirmationRequest
+
+
+@override_settings(FEATURE_DOCUMENT_REQUESTS=True)
+class SoftCopyDownloadTests(TestCase):
+    def setUp(self):
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, ignore_errors=True)
+        override = override_settings(MEDIA_ROOT=self.media)
+        override.enable()
+        self.addCleanup(override.disable)
+        key = "document_requests/1/abc.pdf"
+        (Path(self.media) / key).parent.mkdir(parents=True)
+        (Path(self.media) / key).write_bytes(b"%PDF-1.4 test")
+        self.req = ConfirmationRequest.objects.create(
+            student_id=1, ldap_uid="ITITIU20001", request_type="conduct_score", purpose="x",
+            status=ConfirmationRequest.STATUS_PROCESSING,
+            payload={"delivery": {"code": "online", "label": "Bản mềm (bản online)"},
+                     "soft_copy": {"storage_key": key, "filename": "bd.pdf", "size": 13,
+                                   "uploaded_by": "Lan Lê"}},
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(StudentPrincipal({"ldap_uid": "ITITIU20001", "student_id": 1}))
+
+    def _detail(self):
+        return self.client.get(f"/api/requests/{self.req.pk}/").json()
+
+    def test_chua_hoan_thanh_thi_khong_thay_khong_tai(self):
+        body = self._detail()
+        self.assertIsNone(body["soft_copy"])
+        self.assertNotIn("soft_copy", body["payload"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 404)
+
+    def test_hoan_thanh_thi_tai_duoc(self):
+        self.req.status = ConfirmationRequest.STATUS_DONE
+        self.req.save()
+        body = self._detail()
+        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13, "sent_at": ""})
+        # Không lộ đường dẫn lưu trữ / tên chuyên viên.
+        self.assertNotIn("soft_copy", body["payload"])
+        resp = self.client.get(f"/api/requests/{self.req.pk}/soft-copy/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(b"".join(resp.streaming_content), b"%PDF-1.4 test")
+
+    def test_da_tra_giay_van_tai_duoc_va_khong_lo_du_lieu_noi_bo(self):
+        self.req.status = ConfirmationRequest.STATUS_RETURNED
+        self.req.payload = {**self.req.payload,
+                            "return_receipts": [{"storage_key": "document_requests/1/r.pdf", "returned_by": "Lan Lê"}],
+                            "return_reopens": [{"by": "Admin", "note": "Ghi nhầm"}]}
+        self.req.save()
+        body = self._detail()
+        self.assertEqual(body["status"], "returned")
+        self.assertEqual(body["soft_copy"], {"filename": "bd.pdf", "size": 13, "sent_at": ""})
+        for key in ("soft_copy", "return_receipts", "return_reopens"):
+            self.assertNotIn(key, body["payload"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
+
+    def test_giay_khac_chi_thay_khi_da_gui(self):
+        # Mọi loại giấy (06/10/2026): tải lên rồi mà chưa "Gửi cho sinh viên" thì chưa thấy.
+        self.req.request_type = "enrollment"
+        self.req.status = ConfirmationRequest.STATUS_DONE
+        self.req.payload = {"soft_copy": {**self.req.payload["soft_copy"]}}
+        self.req.save()
+        self.assertIsNone(self._detail()["soft_copy"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 404)
+
+        self.req.payload["soft_copy"]["sent_at"] = "06/10/2026 09:00"
+        self.req.save()
+        self.assertEqual(self._detail()["soft_copy"],
+                         {"filename": "bd.pdf", "size": 13, "sent_at": "06/10/2026 09:00"})
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
+
+    def test_da_gui_thi_thay_du_chua_hoan_thanh_tu_choi_thi_an(self):
+        self.req.request_type = "enrollment"
+        self.req.payload = {"soft_copy": {**self.req.payload["soft_copy"], "sent_at": "06/10/2026 09:00"}}
+        self.req.save()  # đang xử lý
+        self.assertIsNotNone(self._detail()["soft_copy"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 200)
+        self.req.status = ConfirmationRequest.STATUS_REJECTED
+        self.req.save()
+        self.assertIsNone(self._detail()["soft_copy"])
+        self.assertEqual(self.client.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 404)
+
+    def test_khong_tai_duoc_cua_nguoi_khac(self):
+        self.req.status = ConfirmationRequest.STATUS_DONE
+        self.req.save()
+        other = APIClient()
+        other.force_authenticate(StudentPrincipal({"ldap_uid": "ITITIU20009", "student_id": 9}))
+        self.assertEqual(other.get(f"/api/requests/{self.req.pk}/soft-copy/").status_code, 404)
