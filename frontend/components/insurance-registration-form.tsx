@@ -1158,20 +1158,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                     Ghi chú thông tin BHYT bị sai
                     <span className="text-xs font-normal text-muted">(không bắt buộc)</span>
                   </h3>
-                  {!noteLocked && (
-                    <div className="mb-3 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
-                      <p className="flex items-center gap-1.5 font-semibold">
-                        <Info size={14} className="shrink-0" /> Khi nào cần ghi chú
-                      </p>
-                      <p className="mt-1 text-slate-700">
-                        Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
-                        sai ngày sinh, sai họ tên… Ghi rõ <strong>thông tin cũ</strong> và <strong>thông tin đúng</strong>.
-                      </p>
-                    </div>
-                  )}
-                  <label htmlFor="insurance-note" className={ui.fieldLabel}>Nội dung ghi chú</label>
                   <textarea
                     id="insurance-note"
+                    aria-label="Ghi chú thông tin BHYT bị sai"
                     rows={3}
                     maxLength={1000}
                     {...register("note")}
@@ -1189,6 +1178,17 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                       <span className="ml-auto shrink-0 text-xs text-muted">{(noteValue ?? "").length}/1000</span>
                     )}
                   </div>
+                  {!noteLocked && (
+                    <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        <Info size={14} className="shrink-0" /> Khi nào cần ghi chú
+                      </p>
+                      <p className="mt-1 text-slate-700">
+                        Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
+                        sai ngày sinh, sai họ tên… Ghi rõ <strong>thông tin cũ</strong> và <strong>thông tin đúng</strong>.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
