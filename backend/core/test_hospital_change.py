@@ -135,3 +135,8 @@ class HospitalChangeTests(TestCase):
         self.client.force_authenticate(StudentPrincipal({'ldap_uid': 'TEST002', 'student_id': other.pk}))
         self.assertEqual(self.client.get(self.url + f'{row.pk}/').status_code, 404)
         self.assertEqual(self.client.get(self.url + f'{row.pk}/images/cccd_image/').status_code, 404)
+
+    def test_lookup_url_from_config(self):
+        self.cfg.hospital_lookup_url = 'https://example.com/benh-vien'
+        self.cfg.save(update_fields=['hospital_lookup_url'])
+        self.assertEqual(self.client.get(self.url).data['config']['hospital_lookup_url'], 'https://example.com/benh-vien')

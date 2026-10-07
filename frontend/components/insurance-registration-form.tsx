@@ -1297,17 +1297,20 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   {hospitalChange && (
                     <li>• Nơi KCB mới phải <b>khác</b> nơi KCB ban đầu hiện tại.</li>
                   )}
-                  <li>
-                    • <b>Link tra cứu bệnh viện:</b>{" "}
-                    <a
-                      href="https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Xem tại đây
-                    </a>
-                  </li>
+                  {/* Link do staff cập nhật theo đợt trên Dashboard (Quản lý đợt). */}
+                  {/^https?:\/\//i.test(config?.hospital_lookup_url ?? "") && (
+                    <li>
+                      • <b>Link tra cứu bệnh viện:</b>{" "}
+                      <a
+                        href={config!.hospital_lookup_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        Xem tại đây
+                      </a>
+                    </li>
+                  )}
                   <li>
                     • Sinh viên chỉ chọn các Bệnh viện tại <b>TP.HCM</b> hoặc{" "}
                     <b>Đồng Nai</b>.

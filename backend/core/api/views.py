@@ -573,6 +573,7 @@ def _insurance_config_payload(cfg, *, include_payment, student=None):
         "coverage_end": coverage_end.isoformat(),
         "status": _insurance_config_status(cfg, student=student),
         "is_active": cfg.is_active,
+        "hospital_lookup_url": cfg.hospital_lookup_url or "",
         "freshman_warning": (
             cfg.freshman_warning or ""
             if student and student.academic_entry_year == timezone.localdate().year

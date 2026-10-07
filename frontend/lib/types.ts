@@ -136,6 +136,8 @@ export interface HealthInsuranceData {
 
 export interface InsurancePeriodConfig extends InsurancePeriod {
   description: string;
+  /** Link danh sách bệnh viện do staff cập nhật trên Dashboard; rỗng = ẩn dòng link. */
+  hospital_lookup_url?: string;
   insurance_fee: number;
   bank_name: string;
   bank_bin: string;

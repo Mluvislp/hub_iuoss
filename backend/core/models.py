@@ -404,6 +404,8 @@ class HealthInsuranceConfig(models.Model):
     )
     description = models.TextField(blank=True, null=True)
     freshman_warning = models.TextField(blank=True, null=True)
+    # Link "tra cứu bệnh viện" trên form; staff sửa trên Dashboard, rỗng = ẩn.
+    hospital_lookup_url = models.CharField(max_length=500, blank=True, null=True)
     bank_name = models.CharField(max_length=255)
     # Mã BIN 6 số của Napas, dùng dựng VietQR. Bỏ trống thì frontend dò theo
     # `bank_name`; điền vào đây thì khỏi phải đoán.

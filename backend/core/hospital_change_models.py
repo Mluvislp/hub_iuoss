@@ -13,6 +13,7 @@ class HospitalChangeConfig(models.Model):
     closes_at = models.DateTimeField()
     is_active = models.BooleanField(default=False)
     description = models.TextField(null=True, blank=True)
+    hospital_lookup_url = models.CharField(max_length=500, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `bank_account_id` BIGINT NULL,
   `description` TEXT NULL,
   `freshman_warning` TEXT NULL COMMENT 'Cảnh báo khi academic_entry_year trùng registration_year',
+  `hospital_lookup_url` VARCHAR(500) NULL COMMENT 'Link danh sách bệnh viện cho SV tra cứu; NULL/rỗng = ẩn',
   `bank_name` VARCHAR(255) NOT NULL,
   `bank_bin` VARCHAR(6) NULL COMMENT 'Mã BIN 6 số của Napas, dùng dựng VietQR',
   `bank_account_number` VARCHAR(64) NOT NULL,
@@ -249,6 +250,7 @@ CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_configs (
     closes_at DATETIME(6) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT 0,
     description TEXT NULL,
+    hospital_lookup_url VARCHAR(500) NULL,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
@@ -256,12 +258,12 @@ CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_configs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO hub_insurance_hospital_change_configs
-    (change_period, change_year, opens_at, closes_at, is_active, description, created_at, updated_at)
+    (change_period, change_year, opens_at, closes_at, is_active, description, hospital_lookup_url, created_at, updated_at)
 VALUES
-    ('MAIN', YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, NOW(6), NOW(6)),
-    ('Q2',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, NOW(6), NOW(6)),
-    ('Q3',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, NOW(6), NOW(6)),
-    ('Q4',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, NOW(6), NOW(6));
+    ('MAIN', YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6)),
+    ('Q2',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6)),
+    ('Q3',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6)),
+    ('Q4',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6));
 
 -- Mỗi yêu cầu chụp lại toàn bộ đơn đăng ký tại trường làm nguồn (snapshot + ảnh)
 -- lúc gửi; sinh viên chỉ đổi được hospital_code.

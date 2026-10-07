@@ -52,6 +52,7 @@ def config_payload(cfg):
         'end_date': cfg.closes_at.isoformat(),
         'status': config_status(cfg),
         'is_active': cfg.is_active,
+        'hospital_lookup_url': cfg.hospital_lookup_url or '',
     }
 
 
