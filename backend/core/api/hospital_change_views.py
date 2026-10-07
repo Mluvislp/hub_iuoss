@@ -128,8 +128,8 @@ def change_detail(row):
                  'permanent_ward': ward.name if ward else 'Chưa xác định',
                  'hospital_code': hospital.name if hospital else 'Chưa xác định'},
         old_hospital={'code': row.old_hospital_code, 'name': hospital_name(row.old_hospital_code)},
-        # Đã xác nhận là thẻ đã đổi; sửa nữa chỉ làm lệch dữ liệu đã duyệt.
-        can_edit=win['can_edit'] and edited is None and row.status == HospitalChangeRequest.STATUS_PENDING,
+        # Chỉ sửa khi ĐHQT chưa chuyển BHXH; sau đó hồ sơ đã gửi đi.
+        can_edit=win['can_edit'] and edited is None and row.status == HospitalChangeRequest.STATUS_IU_PROCESSING,
         can_resubmit=row.status == HospitalChangeRequest.STATUS_REJECTED,
         edited_at=edited.created_at if edited else None,
         review_note=row.review_note, created_at=row.created_at, updated_at=row.updated_at,
@@ -191,8 +191,8 @@ class HospitalChangeView(InsuranceRegistrationView):
                 if row:
                     check_version(row, request.data.get('row_version'))
                     resubmitted = row.status == HospitalChangeRequest.STATUS_REJECTED and action == 'resubmit'
-                    if row.status == HospitalChangeRequest.STATUS_CONFIRMED:
-                        raise Conflict('Yêu cầu đã được xác nhận, không thể chỉnh sửa.')
+                    if row.status in (HospitalChangeRequest.STATUS_WAITING_BHXH, HospitalChangeRequest.STATUS_ISSUED):
+                        raise Conflict('Yêu cầu đã chuyển BHXH xử lý, không thể chỉnh sửa.')
                     if not resubmitted and not change_window(row.intake_year, row.intake_period,
                                                              row.intake_snapshot)['can_edit']:
                         raise Conflict('Đã hết hạn chỉnh sửa yêu cầu.')
@@ -209,8 +209,8 @@ class HospitalChangeView(InsuranceRegistrationView):
                     if HospitalChangeRequest.objects.filter(student=student, intake_year=cfg.change_year,
                                                             intake_period=cfg.change_period).exists():
                         raise Conflict('Đã có yêu cầu trong đợt này. Hãy mở yêu cầu để chỉnh sửa.')
-                    if HospitalChangeRequest.objects.filter(student=student,
-                                                            status=HospitalChangeRequest.STATUS_PENDING).exists():
+                    if HospitalChangeRequest.objects.filter(student=student, status__in=(
+                            HospitalChangeRequest.STATUS_IU_PROCESSING, HospitalChangeRequest.STATUS_WAITING_BHXH)).exists():
                         raise Conflict('Bạn đang có một yêu cầu đổi nơi khám chữa bệnh ban đầu chờ xử lý.')
                     reg = source_registration(student)
                     if reg is None:
@@ -233,7 +233,7 @@ class HospitalChangeView(InsuranceRegistrationView):
                     row.hospital_code = hospital_code
                     row.snapshot = {**(row.snapshot or {}), 'hospital_code': hospital_code}
                     if resubmitted:
-                        row.status = HospitalChangeRequest.STATUS_PENDING
+                        row.status = HospitalChangeRequest.STATUS_IU_PROCESSING
                         row.supplement_pending = True
                         row.supplemented_at = timezone.now()
                     row.row_version += 1

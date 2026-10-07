@@ -67,7 +67,7 @@ class HospitalChangeTests(TestCase):
         response = self.post(hospital_code='79002', full_name='Hacker', citizen_id='999999999999')
         self.assertEqual(response.status_code, 201, response.data)
         row = HospitalChangeRequest.objects.get()
-        self.assertEqual((row.status, row.old_hospital_code, row.hospital_code), ('pending', '79001', '79002'))
+        self.assertEqual((row.status, row.old_hospital_code, row.hospital_code), ('iu_processing', '79001', '79002'))
         self.assertEqual(row.registration_id, self.reg.pk)
         self.assertEqual(row.full_name, 'Test Student')
         self.assertEqual(row.snapshot['citizen_id'], '012345678901')
@@ -115,15 +115,21 @@ class HospitalChangeTests(TestCase):
         response = self.post(detail, hospital_code='79002', action='resubmit', row_version=row.row_version)
         self.assertEqual(response.status_code, 200, response.data)
         row.refresh_from_db()
-        self.assertEqual((row.status, row.supplement_pending, row.hospital_code), ('pending', True, '79002'))
+        self.assertEqual((row.status, row.supplement_pending, row.hospital_code), ('iu_processing', True, '79002'))
         self.assertEqual([e['event_type'] for e in self.client.get(detail).data['history']],
                          ['SUBMITTED', 'STUDENT_UPDATED', 'RESUBMITTED'])
 
-    def test_confirmed_request_is_locked(self):
+    def test_request_sent_to_bhxh_is_locked(self):
         self.post(hospital_code='79002')
         row = HospitalChangeRequest.objects.get()
-        row.status = 'confirmed'
+        row.status = 'waiting_bhxh'
         row.save(update_fields=['status'])
+        # Đang chờ BHXH vẫn chặn gửi yêu cầu mới.
+        self.cfg.change_period = 'Q3'
+        self.cfg.save(update_fields=['change_period'])
+        self.assertEqual(self.post(hospital_code='79002').status_code, 409)
+        self.cfg.change_period = 'Q2'
+        self.cfg.save(update_fields=['change_period'])
         self.assertFalse(self.client.get(self.url + f'{row.pk}/').data['can_edit'])
         self.assertEqual(self.post(self.url + f'{row.pk}/', hospital_code='79001', action='resubmit',
                                    row_version=row.row_version).status_code, 409)

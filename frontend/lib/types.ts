@@ -93,7 +93,7 @@ export interface HospitalChangeRequestRow {
   hospital_name: string | null;
   intake_year: number;
   intake_period: string;
-  status: 'pending' | 'confirmed' | 'rejected';
+  status: 'iu_processing' | 'waiting_bhxh' | 'issued' | 'rejected';
   review_note: string | null;
   created_at: string;
   reviewed_at: string | null;

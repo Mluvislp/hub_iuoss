@@ -1220,7 +1220,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
             <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
               {hospitalChange && currentHospital && (
                 <p className="rounded-lg border border-line bg-slate-50 px-3 py-2.5 text-sm text-slate-600 md:col-span-2">
-                  Nơi KCB ban đầu {submitted?.status === "confirmed" ? "trước khi đổi" : "hiện tại"}:{" "}
+                  Nơi KCB ban đầu {submitted?.status === "issued" ? "trước khi đổi" : "hiện tại"}:{" "}
                   <strong className="font-medium text-ink">{currentHospital}</strong>
                 </p>
               )}

@@ -24,8 +24,10 @@ class HospitalChangeConfig(models.Model):
 
 
 class HospitalChangeRequest(models.Model):
-    STATUS_PENDING = 'pending'
-    STATUS_CONFIRMED = 'confirmed'
+    # Cùng 3 giai đoạn đơn đăng ký BHYT (insurance_contract.STATUS_LABELS) + Từ chối.
+    STATUS_IU_PROCESSING = 'iu_processing'
+    STATUS_WAITING_BHXH = 'waiting_bhxh'
+    STATUS_ISSUED = 'issued'
     STATUS_REJECTED = 'rejected'
 
     id = models.BigAutoField(primary_key=True)
@@ -50,7 +52,7 @@ class HospitalChangeRequest(models.Model):
     images = models.JSONField()
     request_key = models.CharField(max_length=80)
     request_digest = models.CharField(max_length=64)
-    status = models.CharField(max_length=16, default=STATUS_PENDING)
+    status = models.CharField(max_length=16, default=STATUS_IU_PROCESSING)
     review_note = models.TextField(null=True)
     reviewed_by_id = models.BigIntegerField(null=True)
     reviewed_at = models.DateTimeField(null=True)

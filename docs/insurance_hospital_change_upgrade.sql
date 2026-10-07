@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_requests (
     images JSON NOT NULL,
     request_key VARCHAR(80) NOT NULL,
     request_digest VARCHAR(64) NOT NULL,
-    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    status VARCHAR(16) NOT NULL DEFAULT 'iu_processing',
     review_note TEXT NULL,
     reviewed_by_id BIGINT NULL,
     reviewed_at DATETIME(6) NULL,
