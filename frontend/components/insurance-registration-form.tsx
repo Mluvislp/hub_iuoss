@@ -25,7 +25,6 @@ import {
   History,
   Info,
   Lock,
-  NotebookPen,
   Upload,
   Send,
   RefreshCw,
@@ -1152,35 +1151,28 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                 />
               </div>
 
-            </div>
-          </section>
-
-          {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
-          {!external && (!hospitalChange || !!noteValue) && (
-            <section className={ui.card}>
-              <div className={ui.cardHeader}>
-                <h2 className={ui.sectionTitle}>
-                  <NotebookPen size={16} className="text-primary" /> Ghi chú thông tin BHYT bị sai
-                </h2>
-                <span className="text-xs text-muted">Không bắt buộc</span>
-              </div>
-              <div className="space-y-3 p-4 sm:p-5">
-                {!noteLocked && (
-                  <div className="rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
-                    <p className="flex items-center gap-1.5 font-semibold">
-                      <Info size={14} className="shrink-0" /> Khi nào cần ghi chú
-                    </p>
-                    <p className="mt-1 text-slate-700">
-                      Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
-                      sai ngày sinh, sai họ tên… Ghi rõ <strong>thông tin cũ</strong> và <strong>thông tin đúng</strong>.
-                    </p>
-                  </div>
-                )}
-                <div className="min-w-0">
+              {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
+              {!external && (!hospitalChange || !!noteValue) && (
+                <div className="pt-4 border-t border-line2">
+                  <h3 className="mb-3 flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
+                    Ghi chú thông tin BHYT bị sai
+                    <span className="text-xs font-normal text-muted">(không bắt buộc)</span>
+                  </h3>
+                  {!noteLocked && (
+                    <div className="mb-3 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        <Info size={14} className="shrink-0" /> Khi nào cần ghi chú
+                      </p>
+                      <p className="mt-1 text-slate-700">
+                        Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
+                        sai ngày sinh, sai họ tên… Ghi rõ <strong>thông tin cũ</strong> và <strong>thông tin đúng</strong>.
+                      </p>
+                    </div>
+                  )}
                   <label htmlFor="insurance-note" className={ui.fieldLabel}>Nội dung ghi chú</label>
                   <textarea
                     id="insurance-note"
-                    rows={4}
+                    rows={3}
                     maxLength={1000}
                     {...register("note")}
                     disabled={noteLocked}
@@ -1198,9 +1190,10 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                     )}
                   </div>
                 </div>
-              </div>
-            </section>
-          )}
+              )}
+            </div>
+          </section>
+
 
           <section className={ui.card}>
             <div className={ui.cardHeader}>
