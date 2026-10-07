@@ -25,6 +25,7 @@ import {
   History,
   Info,
   Lock,
+  NotebookPen,
   Upload,
   Send,
   RefreshCw,
@@ -560,6 +561,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
     recorded(prefill?.permanent_ward) &&
     recorded(prefill?.permanent_street);
   const addressLocked = hospitalChange || (editingRecord ? !unlocked : hasAddress && !infoEditable);
+  const noteValue = watch("note");
+  // Ghi chú không lấy từ hồ sơ nên đơn mới luôn nhập được; đơn đã nộp theo nút Chỉnh sửa.
+  const noteLocked = hospitalChange || (editingRecord && !unlocked);
   const submittedImages = useMemo(
     () => Object.fromEntries((submitted?.images ?? source?.images ?? []).map((i) => [i.field, i.url])) as Partial<Record<ImageName, string>>,
     [submitted, source],
@@ -1148,32 +1152,55 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                 />
               </div>
 
-              {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
-              {!external && (!hospitalChange || !!watch("note")) && (
-                <div className="pt-4 border-t border-line2">
-                  <label htmlFor="insurance-note" className="mb-1 block text-sm font-semibold">
-                    Ghi chú thông tin BHYT bị sai <span className="font-normal text-muted">(không bắt buộc)</span>
-                  </label>
-                  {!hospitalChange && (
-                    <p className="mb-2 text-xs text-muted">
-                      Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ, ví dụ: đã đổi CCCD, đổi giấy khai sinh,
-                      sai ngày sinh, sai họ tên… Ghi rõ thông tin cũ và thông tin đúng.
-                    </p>
-                  )}
-                  <textarea
-                    id="insurance-note"
-                    rows={3}
-                    maxLength={1000}
-                    {...register("note")}
-                    disabled={hospitalChange || (editingRecord && !unlocked)}
-                    placeholder="VD: Thẻ BHYT đang ghi CCCD cũ 0123..., đã đổi sang 0798..."
-                    className={fieldCls(hospitalChange || (editingRecord && !unlocked), !!errors.note)}
-                  />
-                  <FieldError message={errors.note?.message} />
-                </div>
-              )}
             </div>
           </section>
+
+          {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
+          {!external && (!hospitalChange || !!noteValue) && (
+            <section className={ui.card}>
+              <div className={ui.cardHeader}>
+                <h2 className={ui.sectionTitle}>
+                  <NotebookPen size={16} className="text-primary" /> Ghi chú thông tin BHYT bị sai
+                </h2>
+                <span className="text-xs text-muted">Không bắt buộc</span>
+              </div>
+              <div className="space-y-3 p-4 sm:p-5">
+                {!noteLocked && (
+                  <div className="rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      <Info size={14} className="shrink-0" /> Khi nào cần ghi chú
+                    </p>
+                    <p className="mt-1 text-slate-700">
+                      Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
+                      sai ngày sinh, sai họ tên… Ghi rõ <strong>thông tin cũ</strong> và <strong>thông tin đúng</strong>.
+                    </p>
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <label htmlFor="insurance-note" className={ui.fieldLabel}>Nội dung ghi chú</label>
+                  <textarea
+                    id="insurance-note"
+                    rows={4}
+                    maxLength={1000}
+                    {...register("note")}
+                    disabled={noteLocked}
+                    placeholder="VD: Thẻ BHYT đang ghi CCCD cũ 0123…, đã đổi sang 0798…"
+                    className={cn(
+                      ui.textarea,
+                      noteLocked && "bg-slate-50 text-slate-500",
+                      errors.note && "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
+                    )}
+                  />
+                  <div className="mt-1 flex items-start justify-between gap-3">
+                    <FieldError message={errors.note?.message} />
+                    {!noteLocked && (
+                      <span className="ml-auto shrink-0 text-xs text-muted">{(noteValue ?? "").length}/1000</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className={ui.card}>
             <div className={ui.cardHeader}>
