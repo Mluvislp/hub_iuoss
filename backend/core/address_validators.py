@@ -18,7 +18,10 @@ một địa chỉ hợp lệ thì sinh viên không có đường đi tiếp v�
 import re
 import unicodedata
 
-STREET_MIN = 5
+# 3 chứ không phải 5 (đổi 07/10/2026): «Ấp 5», «Tổ 3» là địa chỉ đầy đủ ở nông thôn
+# mà chỉ 4 ký tự. Đã có luật «phải có chữ cái» chặn chuỗi toàn số; mức 3 chỉ còn
+# chặn chuỗi vô nghĩa kiểu «a», «Ấp».
+STREET_MIN = 3
 STREET_MAX = 255
 
 # Tiền tố loại đơn vị trong `vn_provinces.name` / `vn_wards.name`. Bỏ đi để
