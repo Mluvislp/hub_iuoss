@@ -561,6 +561,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
     recorded(prefill?.permanent_street);
   const addressLocked = hospitalChange || (editingRecord ? !unlocked : hasAddress && !infoEditable);
   const noteValue = watch("note");
+  // Chỉ nhận http(s) để không đưa link lạ (javascript:…) vào href.
+  const hospitalLookupUrl = /^https?:\/\//i.test((config?.hospital_lookup_url ?? "").trim())
+    ? (config?.hospital_lookup_url ?? "").trim() : "";
   // Ghi chú không lấy từ hồ sơ nên đơn mới luôn nhập được; đơn đã nộp theo nút Chỉnh sửa.
   const noteLocked = hospitalChange || (editingRecord && !unlocked);
   const submittedImages = useMemo(
@@ -1297,20 +1300,24 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   {hospitalChange && (
                     <li>• Nơi KCB mới phải <b>khác</b> nơi KCB ban đầu hiện tại.</li>
                   )}
-                  {/* Link do staff cập nhật theo đợt trên Dashboard (Quản lý đợt). */}
-                  {/^https?:\/\//i.test(config?.hospital_lookup_url ?? "") && (
-                    <li>
-                      • <b>Link tra cứu bệnh viện:</b>{" "}
+                  {/* Link do staff cập nhật theo đợt trên Dashboard (Quản lý đợt); trống thì "tại đây" không bấm được. */}
+                  <li>
+                    • <b>Link tra cứu bệnh viện:</b>{" "}
+                    {hospitalLookupUrl ? (
                       <a
-                        href={config!.hospital_lookup_url}
+                        href={hospitalLookupUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline"
                       >
-                        Xem tại đây
+                        tại đây
                       </a>
-                    </li>
-                  )}
+                    ) : (
+                      <span aria-disabled="true" title="Chưa có link tra cứu, vui lòng liên hệ Phòng CTSV" className="cursor-not-allowed text-slate-400">
+                        tại đây
+                      </span>
+                    )}
+                  </li>
                   <li>
                     • Sinh viên chỉ chọn các Bệnh viện tại <b>TP.HCM</b> hoặc{" "}
                     <b>Đồng Nai</b>.
