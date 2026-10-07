@@ -36,6 +36,12 @@ cùng SV/năm/đợt**, kể cả khi đơn cũ đang `rejected`.
 Năm/đợt tiếp nhận lưu riêng với năm thẻ. Chỉnh sửa và gửi lại sau từ chối cập nhật
 chính bản khai cũ; không tạo snapshot thay thế. Chi tiết triển khai/backfill ở tài liệu trên.
 
+**Ghi chú thông tin BHYT bị sai** (`info_correction_note`, không bắt buộc, ≤1000 ký tự): ô
+cuối thẻ Thông tin cá nhân của form đăng ký tại trường, dành cho SV có thẻ BHYT/BHXH lệch hồ
+sơ (đổi CCCD, đổi khai sinh, ngày sinh, họ tên…). Lưu khi nộp và sửa được như các trường khác
+(`insurance_editing.FIELDS`). Khai ngoài trường không có ô này; yêu cầu đổi nơi KCB chép
+nguyên ghi chú của đơn gốc vào snapshot và chỉ hiển thị.
+
 **Đổi nơi KCB ban đầu** (`core/api/hospital_change_views.py`): form đăng ký dùng chung ở
 chế độ `mode="hospital-change"` — mọi thông tin lấy từ đơn tại trường mới nhất đã
 `waiting_bhxh`/`issued`, khóa hết, chỉ mở chọn bệnh viện. POST chỉ nhận `hospital_code`;
@@ -116,6 +122,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `external_insurance_review_upgrade.sql` | dùng **thay** file tạo bảng nếu bảng đã có từ bản trước |
 | `external_insurance_validity_fix.sql` | sửa thời hạn |
 | `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
+| `insurance_info_correction_note_upgrade.sql` | cột `info_correction_note` trên `hub_insurance_registrations` — chạy lại được. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 | `insurance_hospital_change_upgrade.sql` | 3 bảng đổi nơi KCB ban đầu + 4 slot đợt (tắt sẵn) — chạy lại được. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 
 `.gitignore` chặn `*.sql` (dump chứa dữ liệu thật) và **whitelist từng file** ở trên —

@@ -41,7 +41,7 @@ class HospitalChangeTests(TestCase):
             student=self.student, registration_year=now.year, registration_period='MAIN', status='issued',
             full_name='Test Student', student_code='TEST001', gender='Nam', citizen_id='012345678901',
             social_insurance_number='0123456789', permanent_province='79', permanent_ward='26734',
-            permanent_street='1 Street', hospital_code='79001', cccd_image='insurance_private/a.jpg',
+            permanent_street='1 Street', hospital_code='79001', info_correction_note='Sai ngày sinh', cccd_image='insurance_private/a.jpg',
             payment_receipt_image='insurance_private/r.png')
 
     def post(self, path=None, **data):
@@ -71,6 +71,7 @@ class HospitalChangeTests(TestCase):
         self.assertEqual(row.registration_id, self.reg.pk)
         self.assertEqual(row.full_name, 'Test Student')
         self.assertEqual(row.snapshot['citizen_id'], '012345678901')
+        self.assertEqual(row.snapshot['info_correction_note'], 'Sai ngày sinh')
         self.assertEqual(row.images['cccd_image']['mime_type'], 'image/jpeg')
         self.assertEqual(set(row.images), {'cccd_image', 'payment_receipt_image'})
         self.assertEqual(self.client.get(self.url).data['id'], row.pk)

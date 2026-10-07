@@ -12,7 +12,7 @@ from . import student_images
 
 FIELDS = ('full_name', 'gender', 'dob', 'ethnicity', 'phone_number', 'citizen_id',
           'social_insurance_number', 'permanent_province', 'permanent_ward',
-          'permanent_street', 'hospital_code', 'note')
+          'permanent_street', 'hospital_code', 'note', 'info_correction_note')
 IMAGES = ('cccd_image', 'cccd_image_back', 'bhyt_image', 'payment_receipt_image')
 
 

@@ -52,6 +52,7 @@ Thumbs.db
 !docs/external_insurance_review_upgrade.sql
 !docs/external_insurance_validity_fix.sql
 !docs/insurance_hospital_change_upgrade.sql
+!docs/insurance_info_correction_note_upgrade.sql
 
 # Rác build lọt vào repo
 encoded.txt

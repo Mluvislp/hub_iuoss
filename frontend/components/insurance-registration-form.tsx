@@ -106,6 +106,7 @@ const schema = z.object({
   }),
   hospital_code: z.string().min(1, "Vui lòng chọn nơi ĐK KCB ban đầu"),
   note: z.string().optional(),
+  info_correction_note: z.string().max(1000, "Ghi chú tối đa 1000 ký tự").optional(),
   cccd_image: fileSchema,
   cccd_image_back: fileSchema,
   bhyt_image: fileSchema,
@@ -155,7 +156,7 @@ const hospitalChangeSchema = z.object({
 type FormData = z.infer<typeof schema> | z.infer<typeof externalSchema>;
 
 type ImageName = "cccd_image" | "cccd_image_back" | "bhyt_image" | "payment_receipt_image";
-type ExtraPrefill = Partial<Record<"medical_insurance_code" | "valid_from" | "valid_until" | "hospital_code" | "hospital_province" | "note", string>>;
+type ExtraPrefill = Partial<Record<"medical_insurance_code" | "valid_from" | "valid_until" | "hospital_code" | "hospital_province" | "note" | "info_correction_note", string>>;
 const IMAGE_NAMES: ImageName[] = ["cccd_image", "cccd_image_back", "bhyt_image", "payment_receipt_image"];
 /** Tên trường backend khác tên trong form. */
 const BACKEND_FIELD: Record<string, string> = {
@@ -429,6 +430,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
     });
     setValue("hospital_code", p.hospital_code || "");
     setValue("note", p.note || "");
+    setValue("info_correction_note", p.info_correction_note || "");
     for (const field of ["medical_insurance_code", "valid_from", "valid_until"] as const) {
       setValue(field, p[field] || "");
     }
@@ -661,6 +663,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
 
       fd.append("hospital_code", data.hospital_code);
       fd.append("note", data.note || "");
+      if (!external) fd.append("info_correction_note", data.info_correction_note || "");
 
       if (data.cccd_image?.[0]) fd.append("cccd_image", data.cccd_image[0]);
       if (data.cccd_image_back?.[0]) fd.append("cccd_image_back", data.cccd_image_back[0]);
@@ -1147,6 +1150,31 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   )}
                 />
               </div>
+
+              {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
+              {!external && (!hospitalChange || !!watch("info_correction_note")) && (
+                <div className="pt-4 border-t border-line2">
+                  <label htmlFor="info_correction_note" className="mb-1 block text-sm font-semibold">
+                    Ghi chú thông tin BHYT bị sai <span className="font-normal text-muted">(không bắt buộc)</span>
+                  </label>
+                  {!hospitalChange && (
+                    <p className="mb-2 text-xs text-muted">
+                      Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ, ví dụ: đã đổi CCCD, đổi giấy khai sinh,
+                      sai ngày sinh, sai họ tên… Ghi rõ thông tin cũ và thông tin đúng.
+                    </p>
+                  )}
+                  <textarea
+                    id="info_correction_note"
+                    rows={3}
+                    maxLength={1000}
+                    {...register("info_correction_note")}
+                    disabled={hospitalChange || (editingRecord && !unlocked)}
+                    placeholder="VD: Thẻ BHYT đang ghi CCCD cũ 0123..., đã đổi sang 0798..."
+                    className={fieldCls(hospitalChange || (editingRecord && !unlocked), !!errors.info_correction_note)}
+                  />
+                  <FieldError message={errors.info_correction_note?.message} />
+                </div>
+              )}
             </div>
           </section>
 
