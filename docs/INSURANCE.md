@@ -20,6 +20,7 @@
 | chi tiết đơn + timeline + bổ sung | `GET`/`POST /api/health-insurance/registrations/<id>/` |
 | xem minh chứng đã nộp | `GET …/<id>/evidence/<evidence-id>/` |
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` — khai BHYT nơi khác | `GET/POST /api/health-insurance/external/` |
+| `/dashboard/bao-hiem-y-te/doi-noi-kcb` — yêu cầu đổi nơi KCB ban đầu | `GET/POST /api/health-insurance/hospital-change/` + `<id>/` + `<id>/images/<field>/` |
 
 **Nộp đơn mới:** `request_key` bắt buộc; backend khóa sinh viên và **chặn tạo thêm đơn
 cùng SV/năm/đợt**, kể cả khi đơn cũ đang `rejected`.
@@ -34,6 +35,13 @@ cùng SV/năm/đợt**, kể cả khi đơn cũ đang `rejected`.
 **Khai BHYT nơi khác:** tạo mới và sửa trong cùng thời gian đợt đăng ký BHYT.
 Năm/đợt tiếp nhận lưu riêng với năm thẻ. Chỉnh sửa và gửi lại sau từ chối cập nhật
 chính bản khai cũ; không tạo snapshot thay thế. Chi tiết triển khai/backfill ở tài liệu trên.
+
+**Đổi nơi KCB ban đầu** (`core/api/hospital_change_views.py`): form đăng ký dùng chung ở
+chế độ `mode="hospital-change"` — mọi thông tin lấy từ đơn tại trường mới nhất đã
+`waiting_bhxh`/`issued`, khóa hết, chỉ mở chọn bệnh viện. POST chỉ nhận `hospital_code`;
+server tự chép phần còn lại. Đợt nhận yêu cầu là bảng riêng
+`hub_insurance_hospital_change_configs` (4 slot, staff quản lý trên Dashboard). Nghiệp vụ
+duyệt: `dashboard_iuoss/docs/HEALTH_INSURANCE.md` §3b.
 
 **Chỉnh sửa:** mỗi đơn/bản khai chỉ được sửa thông thường một lần. Detail API trả
 `edited_at`, `can_edit`, tên tỉnh/phường/bệnh viện và URL ảnh riêng tư để frontend
@@ -108,6 +116,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `external_insurance_review_upgrade.sql` | dùng **thay** file tạo bảng nếu bảng đã có từ bản trước |
 | `external_insurance_validity_fix.sql` | sửa thời hạn |
 | `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
+| `insurance_hospital_change_upgrade.sql` | 3 bảng đổi nơi KCB ban đầu + 4 slot đợt (tắt sẵn) — chạy lại được. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 
 `.gitignore` chặn `*.sql` (dump chứa dữ liệu thật) và **whitelist từng file** ở trên —
 thêm file SQL mới phải thêm một dòng `!docs/<tên>.sql`, nếu không git bỏ qua im lặng.

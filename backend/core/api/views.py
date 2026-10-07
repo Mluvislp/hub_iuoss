@@ -609,6 +609,7 @@ class HealthInsuranceView(APIView):
             return Response({
                 "is_eligible": False, "current": None, "history": [], "registrations": [],
                 "external_declarations": [],
+                "hospital_change": {"config": None, "has_source": False, "requests": []},
                 "periods": periods,
             })
 
@@ -667,6 +668,32 @@ class HealthInsuranceView(APIView):
             "reviewed_at": row.reviewed_at,
 
         } for row in external_rows]
+        from core.hospital_change_models import HospitalChangeRequest
+        from .hospital_change_views import active_config as change_config, config_payload, source_registration
+        change_rows = list(HospitalChangeRequest.objects.filter(student_id=student_id)
+                           .defer("snapshot", "images", "intake_snapshot").order_by("-created_at"))
+        change_hospitals = dict(Hospital.objects.filter(
+            code__in={code for row in change_rows for code in (row.hospital_code, row.old_hospital_code) if code}
+        ).values_list("code", "name"))
+        open_change = change_config()
+        hospital_change = {
+            "config": config_payload(open_change) if open_change else None,
+            # Chỉ đơn tại trường đã gửi BHXH/phát hành mới đổi được nơi KCB ban đầu.
+            "has_source": source_registration(student) is not None,
+            "requests": [{
+                "id": row.id,
+                "old_hospital_code": row.old_hospital_code,
+                "old_hospital_name": change_hospitals.get(row.old_hospital_code),
+                "hospital_code": row.hospital_code,
+                "hospital_name": change_hospitals.get(row.hospital_code),
+                "intake_year": row.intake_year,
+                "intake_period": row.intake_period,
+                "status": row.status,
+                "review_note": row.review_note,
+                "created_at": row.created_at,
+                "reviewed_at": row.reviewed_at,
+            } for row in change_rows],
+        }
 
         # Đợt 1 (MAIN) đăng ký BHYT cho năm kế tiếp nên mọi sinh viên đều
         # được đăng ký, bất kể thẻ hiện tại còn hạn bao lâu. Điều kiện thẻ
@@ -688,6 +715,7 @@ class HealthInsuranceView(APIView):
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
             "registrations": reg_data,
             "external_declarations": external_data,
+            "hospital_change": hospital_change,
             "periods": periods,
         })
 

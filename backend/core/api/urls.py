@@ -3,6 +3,7 @@ from . import health_check_views, ticket_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
+from .hospital_change_views import HospitalChangeView, HospitalChangeImageView
 from .personal_info_views import PersonalInfoView
 
 urlpatterns = [
@@ -12,6 +13,9 @@ urlpatterns = [
     path('health-insurance/external/', ExternalInsuranceView.as_view(), name='api_external_insurance'),
     path('health-insurance/registrations/<int:pk>/', InsuranceDetailView.as_view(), name='api_insurance_detail'),
     path('health-insurance/registrations/<int:pk>/evidence/<int:evidence_id>/', InsuranceEvidenceView.as_view(), name='api_insurance_evidence'),
+    path('health-insurance/hospital-change/', HospitalChangeView.as_view(), name='api_hospital_change'),
+    path('health-insurance/hospital-change/<int:pk>/', HospitalChangeView.as_view(), name='api_hospital_change_detail'),
+    path('health-insurance/hospital-change/<int:pk>/images/<str:field>/', HospitalChangeImageView.as_view(), name='api_hospital_change_image'),
     # Health check (no auth) — cho monitor / load balancer
     path("health/",              views.HealthView.as_view(),  name="api_health"),
 

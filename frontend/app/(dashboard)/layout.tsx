@@ -13,6 +13,7 @@ import type { StudentSession } from '@/lib/types';
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Bảng thông tin',
   '/dashboard/bao-hiem-y-te': 'Bảo hiểm y tế',
+  '/dashboard/bao-hiem-y-te/doi-noi-kcb': 'Bảo hiểm y tế',
   '/dashboard/sinh-hoat-cong-dan': 'Sinh hoạt công dân',
   '/dashboard/khai-bao-ngoai-tru': 'Khai báo ngoại trú',
   '/dashboard/kham-suc-khoe': 'Khám sức khỏe',
