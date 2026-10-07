@@ -1154,10 +1154,15 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
               {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
               {!external && (!hospitalChange || !!noteValue) && (
                 <div className="pt-4 border-t border-line2">
-                  <h3 className="mb-3 flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
-                    Ghi chú thông tin BHYT bị sai
-                    <span className="text-xs font-normal text-muted">(không bắt buộc)</span>
-                  </h3>
+                  <div className="mb-3 flex items-baseline justify-between gap-3">
+                    <h3 className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
+                      Ghi chú thông tin BHYT bị sai
+                      <span className="text-xs font-normal text-muted">(không bắt buộc)</span>
+                    </h3>
+                    {!noteLocked && (
+                      <span className="shrink-0 text-xs text-muted">{(noteValue ?? "").length}/1000</span>
+                    )}
+                  </div>
                   <textarea
                     id="insurance-note"
                     aria-label="Ghi chú thông tin BHYT bị sai"
@@ -1172,12 +1177,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                       errors.note && "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
                     )}
                   />
-                  <div className="mt-1 flex items-start justify-between gap-3">
-                    <FieldError message={errors.note?.message} />
-                    {!noteLocked && (
-                      <span className="ml-auto shrink-0 text-xs text-muted">{(noteValue ?? "").length}/1000</span>
-                    )}
-                  </div>
+                  <FieldError message={errors.note?.message} />
                   {!noteLocked && (
                     <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
                       <p className="flex items-center gap-1.5 font-semibold">
