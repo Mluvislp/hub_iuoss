@@ -558,6 +558,17 @@ def _insurance_config_error(cfg, student=None):
     return ""
 
 
+def hospital_lookup_url(own=None):
+    """Link "tra cứu bệnh viện" cho form. Ưu tiên link của chính đợt; trống (đợt đổi nơi KCB
+    chưa nhập, snapshot đơn cũ…) thì lấy link của đợt đăng ký BHYT đang bật / sửa gần nhất."""
+    own = (own or "").strip()
+    if own:
+        return own
+    cfg = (HealthInsuranceConfig.objects.exclude(hospital_lookup_url__isnull=True)
+           .exclude(hospital_lookup_url="").order_by("-is_active", "-updated_at", "-id").first())
+    return cfg.hospital_lookup_url.strip() if cfg else ""
+
+
 def _insurance_config_payload(cfg, *, include_payment, student=None):
     coverage_start, coverage_end = _coverage_dates(
         cfg.registration_period, cfg.registration_year,
@@ -573,7 +584,7 @@ def _insurance_config_payload(cfg, *, include_payment, student=None):
         "coverage_end": coverage_end.isoformat(),
         "status": _insurance_config_status(cfg, student=student),
         "is_active": cfg.is_active,
-        "hospital_lookup_url": cfg.hospital_lookup_url or "",
+        "hospital_lookup_url": hospital_lookup_url(cfg.hospital_lookup_url),
         "freshman_warning": (
             cfg.freshman_warning or ""
             if student and student.academic_entry_year == timezone.localdate().year

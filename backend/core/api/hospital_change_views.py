@@ -21,7 +21,7 @@ from core.insurance_editing import FIELDS, IMAGES, snapshot_datetime
 from core.insurance_history import check_version, readable_payloads, require_active
 from core.models import HealthInsuranceRegistration
 from students.models import Hospital, Student, VnProvince, VnWard
-from .views import InsuranceRegistrationView
+from .views import InsuranceRegistrationView, hospital_lookup_url
 
 PERIOD_NUMBER = {'MAIN': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4}
 # Đơn tại trường đã qua khâu ĐHQT xử lý. Đơn còn `iu_processing` thì sinh viên đổi
@@ -52,7 +52,7 @@ def config_payload(cfg):
         'end_date': cfg.closes_at.isoformat(),
         'status': config_status(cfg),
         'is_active': cfg.is_active,
-        'hospital_lookup_url': cfg.hospital_lookup_url or '',
+        'hospital_lookup_url': hospital_lookup_url(cfg.hospital_lookup_url),
     }
 
 
@@ -121,7 +121,8 @@ def change_detail(row):
     prefill.update(hospital_code=row.hospital_code, hospital_province=hospital.province_code if hospital else '')
     return dict(
         id=row.pk, status=row.status, row_version=row.row_version, prefill=prefill,
-        config=config_payload(cfg) if cfg else row.intake_snapshot, window=win,
+        config=config_payload(cfg) if cfg else {**(row.intake_snapshot or {}), 'hospital_lookup_url': hospital_lookup_url()},
+        window=win,
         registration_year=snapshot.get('registration_year'), registration_period=snapshot.get('registration_period'),
         display={'permanent_province': province.name if province else 'Chưa xác định',
                  'permanent_ward': ward.name if ward else 'Chưa xác định',

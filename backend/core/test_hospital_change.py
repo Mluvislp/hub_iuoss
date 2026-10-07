@@ -140,3 +140,15 @@ class HospitalChangeTests(TestCase):
         self.cfg.hospital_lookup_url = 'https://example.com/benh-vien'
         self.cfg.save(update_fields=['hospital_lookup_url'])
         self.assertEqual(self.client.get(self.url).data['config']['hospital_lookup_url'], 'https://example.com/benh-vien')
+
+    def test_lookup_url_falls_back_to_registration_config(self):
+        from core.models import HealthInsuranceConfig
+        now = timezone.now()
+        HealthInsuranceConfig.objects.create(registration_period='MAIN', registration_year=now.year,
+            registration_opens_at=now, registration_closes_at=now, is_active=True, insurance_fee=0,
+            bank_name='', bank_account_number='', bank_account_name='', hospital_lookup_url='https://bhyt.example/bv')
+        self.assertEqual(self.client.get(self.url).data['config']['hospital_lookup_url'], 'https://bhyt.example/bv')
+        self.post(hospital_code='79002')
+        row = HospitalChangeRequest.objects.get()
+        self.cfg.delete()  # đợt không còn → dùng snapshot, vẫn phải có link
+        self.assertEqual(self.client.get(self.url + f'{row.pk}/').data['config']['hospital_lookup_url'], 'https://bhyt.example/bv')
