@@ -310,18 +310,16 @@ class InfoCorrectionNoteTests(TestCase):
     edit = EditingTests.edit
     url = EditingTests.url
 
-    def test_edit_saves_note_and_external_ignores_it(self):
+    def test_edit_saves_note(self):
         row = self.registration()
-        self.assertEqual(self.client.get(f'/api/health-insurance/registrations/{row.pk}/').data['prefill']['info_correction_note'], '')
-        response = self.edit(row, info_correction_note='Thẻ ghi CCCD cũ 012345678901')
+        self.assertEqual(self.client.get(f'/api/health-insurance/registrations/{row.pk}/').data['prefill']['note'], '')
+        response = self.edit(row, note='Thẻ ghi CCCD cũ 012345678901')
         self.assertEqual(response.status_code, 200, response.data)
         row.refresh_from_db()
-        self.assertEqual(row.info_correction_note, 'Thẻ ghi CCCD cũ 012345678901')
-        self.assertIn('info_correction_note', row.events.get(event_type='STUDENT_UPDATED').payload['changes'])
-        self.assertEqual(self.client.post(self.url, self.payload(info_correction_note='x'), format='multipart').status_code, 201)
-        self.assertNotIn('info_correction_note', ExternalInsuranceDeclaration.objects.get().snapshot)
+        self.assertEqual(row.note, 'Thẻ ghi CCCD cũ 012345678901')
+        self.assertIn('note', row.events.get(event_type='STUDENT_UPDATED').payload['changes'])
 
     def test_note_too_long_is_field_error(self):
-        response = self.edit(self.registration(), info_correction_note='x' * 1001)
+        response = self.edit(self.registration(), note='x' * 1001)
         self.assertEqual(response.status_code, 400)
-        self.assertIn('info_correction_note', response.data)
+        self.assertIn('note', response.data)

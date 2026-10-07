@@ -304,11 +304,9 @@ class HealthInsuranceRegistration(models.Model):
     
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="iu_processing")
     workflow_version = models.PositiveSmallIntegerField(default=2)
-    note = models.TextField(null=True, blank=True)
     # Không bắt buộc: SV ghi lại thông tin BHYT đang sai (đổi CCCD, khai sinh, ngày sinh,
     # tên…). Có nội dung thì Dashboard tô màu + nhãn "Có ghi chú".
-    # DDL: docs/insurance_info_correction_note_upgrade.sql
-    info_correction_note = models.TextField(null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
     supplement_pending = models.BooleanField(default=False)
     supplemented_at = models.DateTimeField(null=True, blank=True)
     supplement_reviewed_at = models.DateTimeField(null=True, blank=True)

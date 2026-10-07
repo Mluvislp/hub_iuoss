@@ -96,7 +96,6 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_registrations` (
   `status` VARCHAR(16) NOT NULL DEFAULT 'pending',
   `rejection_reason` TEXT NULL,
   `note` TEXT NULL,
-  `info_correction_note` TEXT NULL COMMENT 'SV ghi chú thông tin BHYT bị sai (đổi CCCD, khai sinh, ngày sinh, tên…)',
   `supplement_pending` BOOLEAN NOT NULL DEFAULT 0,
   `supplemented_at` DATETIME(6) NULL,
   `supplement_reviewed_at` DATETIME(6) NULL,

@@ -17,7 +17,6 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
     registration_year = None
     registration_period = None
     payment_receipt_image = None
-    info_correction_note = None  # chỉ đơn đăng ký tại trường có ghi chú sai thông tin
     # Thẻ 15 ký tự: 2 chữ + 3 số + mã BHXH (10 số). Thẻ 17 ký tự: mã BHXH thay bằng số CCCD (12 số).
     medical_insurance_code = serializers.RegexField(r'^(?:[A-Z]{2}(?:[0-9]{13}|[0-9]{15})|[0-9]{10})$', max_length=64, error_messages={
         'invalid': 'Mã thẻ gồm 10 số, hoặc 2 chữ cái và 13 hay 15 số.', 'blank': 'Vui lòng nhập mã thẻ BHYT.',

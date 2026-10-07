@@ -925,8 +925,7 @@ class InsuranceRegistrationView(APIView):
             # ----------------------------------------
             
             hospital_code=data["hospital_code"],
-            note=data.get("note", ""),
-            info_correction_note=(data.get("info_correction_note") or "").strip() or None,
+            note=(data.get("note") or "").strip() or None,
             change_log=change_log, # Giữ lại change_log để tiện xem chênh lệch
             config_snapshot=_insurance_config_payload(cfg, include_payment=True, student=student),
             status="iu_processing",
