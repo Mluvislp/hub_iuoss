@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { AlertCircle, AlertTriangle, ChevronRight, Construction } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Construction, Home } from 'lucide-react';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import { useDialog } from '@/lib/use-dialog';
@@ -13,9 +13,11 @@ import type { TuitionCategoryMode, TuitionCategoryReview, TuitionExemptionStatus
 
 export const BASE = '/dashboard/mien-giam-hoc-phi';
 
+// Cùng bảng màu với pill trạng thái BHYT (components/insurance-status.tsx):
+// đang xử lý ở trường = trung tính, chờ bước kế tiếp = info.
 export const STATUS_BADGE: Record<TuitionExemptionStatus, string> = {
-  processing: badge.info,
-  waiting_result: badge.warning,
+  processing: badge.neutral,
+  waiting_result: badge.info,
   done: badge.success,
   rejected: badge.danger,
 };
@@ -48,32 +50,37 @@ export function fmtDateTime(iso: string) {
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + fmtDate(iso);
 }
 
-export function Breadcrumb({ trail }: { trail: { label: string; href?: string }[] }) {
-  const items = [{ label: 'Bảng thông tin', href: '/dashboard' }, ...trail];
+/** Breadcrumb cùng khuôn form BHYT: Trang chủ › Miễn giảm học phí › trang hiện tại. */
+export function Breadcrumb({ current }: { current: string }) {
   return (
-    <nav className="flex items-center gap-1.5 text-meta text-muted flex-wrap">
-      {items.map((it, i) => (
-        <span key={it.label} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight size={14} className="text-faint" />}
-          {it.href && i < items.length - 1
-            ? <Link href={it.href} className="hover:text-ink">{it.label}</Link>
-            : <span className="text-ink font-medium">{it.label}</span>}
-        </span>
-      ))}
+    <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted" aria-label="Breadcrumb">
+      <Link href="/dashboard" className="hover:text-primary flex items-center gap-1.5">
+        <Home size={14} /> Trang chủ
+      </Link>
+      <ChevronRight size={14} />
+      <Link href={BASE} className="hover:text-primary">Miễn giảm học phí</Link>
+      <ChevronRight size={14} />
+      <span className="font-medium text-ink">{current}</span>
     </nav>
   );
 }
 
 export function ErrorBox({ text }: { text: string }) {
   return (
-    <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
-      <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{text}
+    <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">
+      <AlertTriangle size={16} className="mt-0.5 shrink-0" /> {text}
     </div>
   );
 }
 
+/** Pill trạng thái đơn — cùng dáng `InsuranceStatus` (chấm màu + chữ). */
 export function StatusBadge({ status, label }: { status: TuitionExemptionStatus; label: string }) {
-  return <span className={cn(badge.base, STATUS_BADGE[status] ?? badge.neutral)}>{label}</span>;
+  return (
+    <span className={cn(badge.base, 'max-w-full whitespace-nowrap', STATUS_BADGE[status] ?? badge.neutral)}>
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-80" />
+      {label}
+    </span>
+  );
 }
 
 /** Pop-up "Sinh viên không đủ điều kiện do …" — cùng khung với FreshmanWarningModal. */

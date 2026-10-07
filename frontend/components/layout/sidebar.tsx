@@ -46,10 +46,12 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [{ href: '/dashboard', icon: LayoutDashboard, label: 'Bảng thông tin' }],
   },
   {
-    // Trang chỉ để XEM thông tin cá nhân — tách khỏi nhóm dịch vụ (nơi SV phải nộp gì đó).
+    // Hồ sơ gắn với chính sinh viên, theo dõi theo đợt (BHYT, MGHP) hoặc chỉ để xem
+    // (SHCD) — tách khỏi nhóm dịch vụ (yêu cầu, khai báo lẻ).
     label: 'Hồ sơ của tôi',
     items: [
       { href: '/dashboard/bao-hiem-y-te', icon: ShieldCheck, label: 'Bảo hiểm y tế' },
+      featureItem('tuition_waiver'),
       featureItem('civic_activities'),
     ],
   },
@@ -67,7 +69,6 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       },
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
       featureItem('health_check'),
-      featureItem('tuition_waiver'),
       featureItem('support_tickets'),
     ],
   },

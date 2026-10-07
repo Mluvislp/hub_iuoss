@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { CheckCircle2, FileUp, Info, Loader2, Lock, Send, X } from 'lucide-react';
+import {
+  CalendarClock, CheckCircle2, CheckSquare, FileUp, Contact, Info, Landmark, ListChecks, Loader2, Lock, Percent, Send,
+  UserRound, Users, X,
+} from 'lucide-react';
 import { api, ApiError, newRequestKey } from '@/lib/api';
-import { badge, ui } from '@/lib/ui';
+import { accentIcon, badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import { FormBusy } from '@/components/form-busy';
 import type { TuitionExemptionCategory, TuitionExemptionPlan, TuitionExemptionState } from '@/lib/types';
@@ -27,9 +29,10 @@ import { BASE, Breadcrumb, ErrorBox, fmtDate, fmtDateTime, IneligibleModal, MODE
 type Errors = Record<string, string[]>;
 type Details = Record<string, string | boolean>;
 
-const FIELD_GROUPS: { section: string; items: { name: string; label: string; type?: string; required?: boolean; wide?: boolean }[] }[] = [
+const FIELD_GROUPS: { section: string; icon: React.ElementType; items: { name: string; label: string; type?: string; required?: boolean; wide?: boolean }[] }[] = [
   {
     section: 'Giấy tờ tùy thân và liên hệ',
+    icon: Contact,
     items: [
       { name: 'citizen_id', label: 'Số CCCD', required: true },
       { name: 'citizen_id_issued_on', label: 'Ngày cấp CCCD', type: 'date', required: true },
@@ -39,6 +42,7 @@ const FIELD_GROUPS: { section: string; items: { name: string; label: string; typ
   },
   {
     section: 'Tài khoản nhận tiền miễn giảm',
+    icon: Landmark,
     items: [
       { name: 'bank_account_number', label: 'Số tài khoản', required: true },
       { name: 'bank_account_holder', label: 'Tên chủ tài khoản', required: true },
@@ -47,6 +51,7 @@ const FIELD_GROUPS: { section: string; items: { name: string; label: string; typ
   },
   {
     section: 'Cha mẹ / người giám hộ',
+    icon: Users,
     items: [
       { name: 'father_full_name', label: 'Họ tên cha' },
       { name: 'father_phone', label: 'Số điện thoại cha', type: 'tel' },
@@ -207,7 +212,6 @@ function CategoryOption({
 }
 
 export default function TuitionWaiverSubmitPage() {
-  const router = useRouter();
   const [state, setState] = useState<TuitionExemptionState | null>(null);
   const [loadError, setLoadError] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -218,7 +222,10 @@ export default function TuitionWaiverSubmitPage() {
   const [errors, setErrors] = useState<Errors>({});
   const [popup, setPopup] = useState('');
   const [confirmTrue, setConfirmTrue] = useState(false);
+  const [confirmError, setConfirmError] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Mã đơn vừa nộp — hiện màn hình "Nộp hồ sơ thành công" như form BHYT. */
+  const [submittedId, setSubmittedId] = useState<number | null>(null);
   // Một key cho cả lần nộp: bấm lại sau lỗi mạng không tạo đơn thứ hai.
   const requestKey = useRef(newRequestKey());
 
@@ -251,7 +258,7 @@ export default function TuitionWaiverSubmitPage() {
     if (!chosen) { setError('Chọn một đối tượng miễn giảm.'); return; }
     const reason = ineligibleReasons(chosen, state.plan, details, true);
     if (reason) { setPopup(reason); return; }
-    if (!confirmTrue) { setError('Vui lòng xác nhận thông tin khai là đúng sự thật.'); return; }
+    if (!confirmTrue) { setConfirmError(true); setError('Vui lòng xác nhận thông tin khai là đúng sự thật.'); return; }
 
     const body = new FormData();
     body.set('request_key', requestKey.current);
@@ -278,7 +285,8 @@ export default function TuitionWaiverSubmitPage() {
     setSaving(true);
     try {
       const next = await api.tuitionExemption.submit(body);
-      router.replace(next.submitted_id ? `${BASE}/ho-so/${next.submitted_id}` : BASE);
+      setSubmittedId(next.submitted_id ?? 0);
+      window.scrollTo({ top: 0 });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.data.code === 'ineligible') { setPopup(err.message); return; }
@@ -292,23 +300,45 @@ export default function TuitionWaiverSubmitPage() {
     }
   }
 
-  const trail = [{ label: 'Miễn giảm học phí', href: BASE }, { label: 'Nộp đơn' }];
+  const crumb = <Breadcrumb current="Nộp hồ sơ" />;
 
-  if (loadError) return <div className="space-y-5"><Breadcrumb trail={trail} /><ErrorBox text={loadError} /></div>;
+  if (loadError) return <div className="max-w-4xl mx-auto space-y-5">{crumb}<ErrorBox text={loadError} /></div>;
   if (!state) {
-    return <div className="flex items-center justify-center h-48 text-muted"><Loader2 size={24} className="animate-spin" /></div>;
+    return <div className="flex justify-center h-64 text-muted"><Loader2 size={26} className="animate-spin mt-10" /></div>;
   }
+
+  if (submittedId !== null) {
+    return (
+      <div className="max-w-xl mx-auto mt-6 sm:mt-10 p-6 sm:p-8 bg-white border border-line rounded-lg shadow-card text-center">
+        <div className="w-16 h-16 bg-success-soft text-success-text rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckSquare size={32} />
+        </div>
+        <h2 className="text-title font-semibold text-ink mb-2">Nộp hồ sơ thành công</h2>
+        <p className="text-ink-3 mb-6">
+          Đơn miễn giảm học phí đã được ghi nhận. Phòng Công tác Sinh viên sẽ xét duyệt và cập nhật trạng thái
+          đơn tại trang Miễn giảm học phí.
+        </p>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
+          {submittedId > 0 && (
+            <Link href={`${BASE}?don=${submittedId}`} className={cn(ui.btnOutline, 'w-full sm:w-auto')}>Xem đơn vừa nộp</Link>
+          )}
+          <Link href={BASE} className={cn(ui.btnPrimary, 'w-full sm:w-auto')}>Quay lại trang Miễn giảm học phí</Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!state.round || !plan || state.application) {
     return (
-      <div className="space-y-5">
-        <Breadcrumb trail={trail} />
-        <section className={cn(ui.card, 'px-5 py-5 text-sm text-muted flex items-start gap-2.5')}>
-          <Lock size={16} className="flex-shrink-0 mt-0.5" />
-          <div>
-            {state.application ? 'Bạn đã gửi đơn cho đợt này.' : 'Hiện không có đợt nhận hồ sơ nào đang mở.'}{' '}
-            <Link href={BASE} className="text-primary-text font-medium hover:underline">Quay lại</Link>
-          </div>
-        </section>
+      <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
+        {crumb}
+        <div className="flex flex-col gap-3 rounded-lg border border-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2 text-ink-3">
+            <Lock size={16} className="mt-0.5 shrink-0 text-muted" />
+            {state.application ? 'Bạn đã gửi đơn cho đợt này.' : 'Hiện không có đợt nhận hồ sơ nào đang mở.'}
+          </p>
+          <Link href={BASE} className={cn(ui.btnOutline, 'w-full sm:w-auto')}>Quay lại trang Miễn giảm học phí</Link>
+        </div>
       </div>
     );
   }
@@ -322,30 +352,47 @@ export default function TuitionWaiverSubmitPage() {
   );
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
+    <form onSubmit={handleSubmit} noValidate className="max-w-4xl mx-auto">
       {popup && <IneligibleModal message={popup} onClose={() => setPopup('')} />}
-      <FormBusy busy={saving} className="space-y-5">
-        <Breadcrumb trail={trail} />
+      <FormBusy busy={saving} className="space-y-5 sm:space-y-6">
+        {crumb}
+
+        {/* Tiêu đề + mô tả của đợt — cùng khuôn đầu form đăng ký BHYT. */}
+        <div className="rounded-lg border border-primary-line bg-primary-soft p-4 text-primary-text sm:p-5">
+          <h1 className="flex items-start gap-2 text-base font-bold sm:text-lg">
+            <Percent size={20} className="mt-0.5 shrink-0" /> <span>{state.round.title}</span>
+          </h1>
+          {state.round.description && (
+            <p className="mt-3 text-sm leading-relaxed whitespace-pre-line">{state.round.description}</p>
+          )}
+          {renewal && (
+            <p className="mt-3 flex items-start gap-2 text-sm">
+              <Info size={16} className="mt-0.5 shrink-0" />
+              Bạn đang được hưởng miễn giảm học phí. Chọn lại đối tượng đang hưởng để gia hạn, hoặc chọn
+              đối tượng khác (khi đó phải nộp đầy đủ hồ sơ của đối tượng mới).
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-2 text-ink-3">
+            <CalendarClock size={16} className="mt-0.5 shrink-0 text-primary" />
+            <span>
+              {state.round.term_label} · Bắt đầu: <strong className="font-medium text-ink">{fmtDateTime(state.round.opens_at)}</strong>
+              <span className="hidden sm:inline"> · </span><br className="sm:hidden" />
+              Hạn kết thúc: <strong className="font-medium text-ink">{fmtDateTime(state.round.closes_at)}</strong>
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            <span className={cn(badge.base, renewal ? badge.success : badge.info)}>{plan.submission_kind_label}</span>
+            <span className={cn(badge.base, badge.success)}>Đang mở</span>
+          </div>
+        </div>
 
         <section className={ui.card}>
           <div className={ui.cardHeader}>
-            <h2 className={ui.sectionTitle}>{state.round.title}</h2>
-            <span className={cn(badge.base, renewal ? badge.success : badge.info)}>{plan.submission_kind_label}</span>
+            <h2 className={ui.sectionTitle}><UserRound size={16} className={accentIcon.primary} />Thông tin sinh viên</h2>
           </div>
-          <div className="px-5 py-3 text-meta text-muted space-y-1">
-            <div>{state.round.term_label} · Hạn nộp: {fmtDateTime(state.round.closes_at)}</div>
-            {renewal && (
-              <div className="flex items-start gap-1.5 text-ink">
-                <Info size={14} className="mt-0.5 flex-shrink-0 text-primary" />
-                Bạn đang được hưởng miễn giảm học phí. Chọn lại đối tượng đang hưởng để gia hạn, hoặc chọn
-                đối tượng khác (khi đó phải nộp đầy đủ hồ sơ của đối tượng mới).
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className={ui.card}>
-          <div className={ui.cardHeader}><h2 className={ui.sectionTitle}>Thông tin sinh viên</h2></div>
           <div className="px-5 py-1">
             {([
               ['Họ và tên', p.full_name], ['MSSV', p.student_code], ['Ngày sinh', fmtDate(p.date_of_birth)],
@@ -365,7 +412,9 @@ export default function TuitionWaiverSubmitPage() {
         )}
         {FIELD_GROUPS.map((group) => (
           <section key={group.section} className={ui.card}>
-            <div className={ui.cardHeader}><h2 className={ui.sectionTitle}>{group.section}</h2></div>
+            <div className={ui.cardHeader}>
+              <h2 className={ui.sectionTitle}><group.icon size={16} className={accentIcon.primary} />{group.section}</h2>
+            </div>
             <div className="px-5 py-4 grid gap-4 sm:grid-cols-2">
               {group.items.map((f) => (
                 <label key={f.name} className={f.wide ? 'sm:col-span-2' : undefined}>
@@ -384,7 +433,7 @@ export default function TuitionWaiverSubmitPage() {
 
         <section className={ui.card}>
           <div className={ui.cardHeader}>
-            <h2 className={ui.sectionTitle}>Đối tượng miễn giảm</h2>
+            <h2 className={ui.sectionTitle}><ListChecks size={16} className={accentIcon.primary} />Đối tượng miễn giảm</h2>
             <span className="text-xs text-muted">Chọn MỘT đối tượng</span>
           </div>
           {all.length === 0 ? (
@@ -409,16 +458,21 @@ export default function TuitionWaiverSubmitPage() {
           tổng cộng không quá {state.limits.max_files} file. Mẫu đơn M01–M04 tải tại iuoss.com/bieumau.
         </p>
 
-        <label className="flex items-start gap-2.5 text-sm text-ink cursor-pointer">
-          <input type="checkbox" className="mt-1 accent-primary" checked={confirmTrue}
-                 onChange={(e) => setConfirmTrue(e.target.checked)} />
-          Tôi cam đoan các thông tin đã khai và giấy tờ đã nộp là đúng sự thật, và chịu trách nhiệm nếu có sai lệch.
-        </label>
+        <div className={cn(ui.card, 'p-4 sm:p-5 transition-colors', confirmError && 'border-danger bg-danger-soft')}>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0 rounded border-line-strong accent-primary"
+                   aria-invalid={confirmError} checked={confirmTrue}
+                   onChange={(e) => { setConfirmTrue(e.target.checked); if (e.target.checked) setConfirmError(false); }} />
+            <span className={cn('text-sm font-medium', confirmError ? 'text-danger-text' : 'text-ink')}>
+              Tôi cam đoan các thông tin đã khai và giấy tờ đã nộp là đúng sự thật, và chịu trách nhiệm nếu có sai lệch.
+            </span>
+          </label>
+        </div>
 
         {error && <ErrorBox text={error} />}
-        <div className="flex justify-end gap-3">
-          <Link href={BASE} className={ui.btnGhost}>Hủy</Link>
-          <button type="submit" className={ui.btnPrimary} disabled={saving || !chosen}>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Link href={BASE} className={cn(ui.btnGhost, 'w-full sm:w-auto')}>Hủy</Link>
+          <button type="submit" className={cn(ui.btnPrimary, 'w-full sm:w-auto')} disabled={saving || !chosen}>
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             {chosen ? ACTION_LABEL[chosen.mode] : 'Chọn đối tượng để tiếp tục'}
           </button>
