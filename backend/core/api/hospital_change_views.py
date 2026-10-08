@@ -1,12 +1,16 @@
 """Yêu cầu đổi nơi KCB ban đầu.
 
 Cùng khuôn khai BHYT nơi khác (external_insurance_views): mỗi đợt một yêu cầu, sửa một
-lần trong thời gian đợt mở, bị từ chối thì gửi lại. Khác ở chỗ mọi thông tin được chép
-nguyên từ đơn đăng ký BHYT tại trường gần nhất đã gửi BHXH/phát hành — sinh viên chỉ
-đổi được `hospital_code`, nên server không nhận bất kỳ trường nào khác từ form.
+lần trong thời gian đợt mở, bị từ chối thì gửi lại. Chỉ đổi được thẻ đã mua thuộc diện
+trường ĐHQT (`CARD_TYPE_CODES`): thẻ phát hành từ đơn tại trường đã Phát hành, hoặc thẻ còn
+hạn. Mỗi yêu cầu gắn đúng một thẻ (`card_id`); Phát hành chỉ sửa nơi KCB trên thẻ đó, đơn
+đăng ký giữ nguyên làm lịch sử. Mọi thông tin được chép nguyên từ đơn đã sinh thẻ (không có
+đơn thì từ hồ sơ sinh viên + thẻ) — sinh viên chỉ đổi được `hospital_code`, nên server
+không nhận bất kỳ trường nào khác từ form.
 Đợt nhận yêu cầu là bảng riêng `hub_insurance_hospital_change_configs`.
 """
 import mimetypes
+import re
 
 from django.conf import settings
 from django.db import transaction
@@ -20,13 +24,18 @@ from core.insurance_contract import Conflict, WorkflowError, fingerprint, normal
 from core.insurance_editing import FIELDS, IMAGES, snapshot_datetime
 from core.insurance_history import check_version, readable_payloads, require_active
 from core.models import HealthInsuranceRegistration
-from students.models import Hospital, Student, VnProvince, VnWard
+from students.models import HealthInsuranceCard, Hospital, Student, VnProvince, VnWard
 from .views import InsuranceRegistrationView, hospital_lookup_url
 
 PERIOD_NUMBER = {'MAIN': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4}
-# Đơn tại trường đã qua khâu ĐHQT xử lý. Đơn còn `iu_processing` thì sinh viên đổi
-# bệnh viện bằng luồng chỉnh sửa đơn sẵn có. `done` là trạng thái cũ của `issued`.
-SOURCE_STATUSES = ('waiting_bhxh', 'issued', 'done')
+# Đơn tại trường đã Phát hành (thẻ đã mua). `done` là trạng thái cũ của `issued`.
+SOURCE_STATUSES = ('issued', 'done')
+# Diện thẻ mua tại trường ĐHQT, mang nơi KCB — cùng CARD_HOSPITAL_TYPES của Dashboard.
+CARD_TYPE_CODES = ('DHQT', 'DHQT_DN_SV')
+NO_SOURCE_MESSAGE = ('Chỉ sinh viên đã có thẻ BHYT mua tại trường (đơn đăng ký đã Phát hành hoặc thẻ '
+                     'diện ĐHQT còn hạn) mới được yêu cầu đổi nơi khám chữa bệnh ban đầu.')
+# Mã nơi KCB trên thẻ là dữ liệu thô ("79-036", "79036 Bệnh viện…").
+RAW_HOSPITAL_CODE = re.compile(r'(\d{2})\s*[-.]?\s*(\d{3})(?!\d)')
 # Cùng phạm vi bệnh viện của đăng ký tại trường (TP.HCM, Đồng Nai).
 ALLOWED_PROVINCES = {'79', '75'}
 
@@ -77,6 +86,40 @@ def source_registration(student):
             .order_by('-created_at', '-id').first())
 
 
+def change_source(student):
+    """(đơn, thẻ) của yêu cầu; thẻ None = chưa đủ điều kiện, đơn None = thẻ không có đơn nguồn.
+
+    Ưu tiên thẻ sinh từ đơn tại trường mới nhất đã Phát hành, rồi tới thẻ còn hạn
+    (`valid_until` ≥ hôm nay; `is_current` là "thẻ đang dùng", không phải còn hạn).
+    """
+    cards = HealthInsuranceCard.objects.filter(student=student, registration_type__code__in=CARD_TYPE_CODES)
+    reg = source_registration(student)
+    card = cards.filter(source_registration_id=reg.pk).order_by('-id').first() if reg else None
+    if card:
+        return reg, card
+    card = cards.filter(valid_until__gte=timezone.localdate()).order_by('-valid_until', '-id').first()
+    if card is None:
+        return None, None
+    reg = (HealthInsuranceRegistration.objects.filter(pk=card.source_registration_id, student=student,
+                                                      status__in=SOURCE_STATUSES).first()
+           if card.source_registration_id else None)
+    return reg, card
+
+
+def card_hospital_code(raw):
+    """Mã nơi KCB của thẻ quy về mã danh mục `hospitals` nếu nhận ra; không thì giữ nguyên."""
+    raw = (raw or '').strip()
+    if not raw or Hospital.objects.filter(code=raw).exists():
+        return raw
+    match = RAW_HOSPITAL_CODE.match(raw)
+    code = match.group(1) + match.group(2) if match else ''
+    return code if code and Hospital.objects.filter(code=code).exists() else raw
+
+
+def has_change_source(student):
+    return change_source(student)[1] is not None
+
+
 def hospital_name(code):
     hospital = Hospital.objects.filter(code=code).first() if code else None
     return hospital.name if hospital else ''
@@ -95,10 +138,34 @@ def registration_snapshot(reg):
     return snapshot, images
 
 
-def source_payload(reg):
-    return {'id': reg.pk, 'registration_year': reg.registration_year,
-            'registration_period': reg.registration_period, 'status': normalized(reg.status),
-            'hospital_code': reg.hospital_code, 'hospital_name': hospital_name(reg.hospital_code)}
+def card_snapshot(profile, card):
+    """Không có đơn tại trường: hồ sơ sinh viên (`_snapshot`) + mã BHXH, nơi KCB của thẻ."""
+    snapshot = {name: str(profile.get(name) or '') for name in FIELDS}
+    snapshot.update(student_code=profile.get('student_code') or '', registration_id=None, card_id=card.pk,
+                    social_insurance_number=card.social_insurance_code or '',
+                    hospital_code=card_hospital_code(card.hospital_code), note='',
+                    registration_year=card.registration_year, registration_period='')
+    return snapshot
+
+
+def source_payload(reg, card):
+    """Nơi KCB hiện tại là của thẻ — thẻ có thể đã đổi nơi KCB khác với đơn sinh ra nó."""
+    code = card_hospital_code(card.hospital_code)
+    return {'id': reg.pk if reg else None, 'card_id': card.pk,
+            'registration_year': reg.registration_year if reg else card.registration_year,
+            'registration_period': reg.registration_period if reg else '',
+            'status': normalized(reg.status) if reg else 'issued', 'valid_until': card.valid_until,
+            'hospital_code': code, 'hospital_name': hospital_name(code)}
+
+
+def snapshot_display(snapshot):
+    province_code, ward_code = snapshot.get('permanent_province', ''), snapshot.get('permanent_ward', '')
+    province = VnProvince.objects.filter(code=province_code).first()
+    ward = VnWard.objects.filter(code=ward_code, province_code=province_code).first()
+    hospital = Hospital.objects.filter(code=snapshot.get('hospital_code')).first()
+    return {'permanent_province': province.name if province else 'Chưa xác định',
+            'permanent_ward': ward.name if ward else 'Chưa xác định',
+            'hospital_code': hospital.name if hospital else 'Chưa xác định'}
 
 
 def readable_history(events):
@@ -110,9 +177,6 @@ def readable_history(events):
 
 def change_detail(row):
     snapshot = row.snapshot or {}
-    province_code, ward_code = snapshot.get('permanent_province', ''), snapshot.get('permanent_ward', '')
-    province = VnProvince.objects.filter(code=province_code).first()
-    ward = VnWard.objects.filter(code=ward_code, province_code=province_code).first()
     hospital = Hospital.objects.filter(code=row.hospital_code).first()
     edited = row.events.filter(event_type='STUDENT_UPDATED').order_by('created_at').first()
     win = change_window(row.intake_year, row.intake_period, row.intake_snapshot)
@@ -124,9 +188,7 @@ def change_detail(row):
         config=config_payload(cfg) if cfg else {**(row.intake_snapshot or {}), 'hospital_lookup_url': hospital_lookup_url()},
         window=win,
         registration_year=snapshot.get('registration_year'), registration_period=snapshot.get('registration_period'),
-        display={'permanent_province': province.name if province else 'Chưa xác định',
-                 'permanent_ward': ward.name if ward else 'Chưa xác định',
-                 'hospital_code': hospital.name if hospital else 'Chưa xác định'},
+        display=snapshot_display({**snapshot, 'hospital_code': row.hospital_code}),
         old_hospital={'code': row.old_hospital_code, 'name': hospital_name(row.old_hospital_code)},
         # Chỉ sửa khi ĐHQT chưa chuyển BHXH; sau đó hồ sơ đã gửi đi.
         can_edit=win['can_edit'] and edited is None and row.status == HospitalChangeRequest.STATUS_IU_PROCESSING,
@@ -160,14 +222,22 @@ class HospitalChangeView(InsuranceRegistrationView):
         ).order_by('-id').first() if cfg else None
         if previous:
             return Response(change_detail(previous))
-        reg = source_registration(student)
+        reg, card = change_source(student)
+        if card is None:
+            return Response({'detail': NO_SOURCE_MESSAGE}, status=409)
+        config = config_payload(cfg) if cfg else None
+        source = source_payload(reg, card)
         if reg is None:
-            return Response({'detail': 'Chưa có đơn đăng ký BHYT tại trường đã gửi BHXH hoặc đã phát hành, '
-                             'nên chưa thể yêu cầu đổi nơi khám chữa bệnh ban đầu.'}, status=409)
-        from core.insurance_editing import registration_data
-        data = registration_data(reg)
-        return Response({'prefill': data['prefill'], 'images': data['images'], 'display': data['display'],
-                         'source': source_payload(reg), 'config': config_payload(cfg) if cfg else None})
+            snapshot = card_snapshot(self._snapshot(student), card)
+            images = []
+        else:
+            from core.insurance_editing import registration_data
+            data = registration_data(reg)
+            snapshot, images = {**data['prefill'], 'hospital_code': source['hospital_code']}, data['images']
+        hospital = Hospital.objects.filter(code=snapshot['hospital_code']).first()
+        prefill = {**snapshot, 'hospital_province': hospital.province_code if hospital else ''}
+        return Response({'prefill': prefill, 'images': images, 'display': snapshot_display(snapshot),
+                         'source': source, 'config': config})
 
     def post(self, request, pk=None):
         try:
@@ -212,10 +282,10 @@ class HospitalChangeView(InsuranceRegistrationView):
                     if HospitalChangeRequest.objects.filter(student=student, status__in=(
                             HospitalChangeRequest.STATUS_IU_PROCESSING, HospitalChangeRequest.STATUS_WAITING_BHXH)).exists():
                         raise Conflict('Bạn đang có một yêu cầu đổi nơi khám chữa bệnh ban đầu chờ xử lý.')
-                    reg = source_registration(student)
-                    if reg is None:
-                        raise Conflict('Chưa có đơn đăng ký BHYT tại trường đã gửi BHXH hoặc đã phát hành.')
-                    current = reg.hospital_code
+                    reg, card = change_source(student)
+                    if card is None:
+                        raise Conflict(NO_SOURCE_MESSAGE)
+                    current = card_hospital_code(card.hospital_code)
                 if not hospital_code:
                     return _field_error('Vui lòng chọn nơi ĐK KCB ban đầu.')
                 if not Hospital.objects.filter(code=hospital_code, is_active=True,
@@ -241,19 +311,22 @@ class HospitalChangeView(InsuranceRegistrationView):
                                             'supplemented_at', 'row_version', 'updated_at'])
                     kind = 'RESUBMITTED' if resubmitted else 'STUDENT_UPDATED'
                 else:
-                    snapshot, images = registration_snapshot(reg)
+                    if reg:
+                        snapshot, images = registration_snapshot(reg)
+                    else:
+                        snapshot, images = card_snapshot(self._snapshot(student), card), {}
                     snapshot['hospital_code'] = hospital_code
                     row = HospitalChangeRequest.objects.create(
-                        student=student, registration=reg,
-                        full_name=reg.full_name or student.full_name or '',
-                        student_code=reg.student_code or student.current_student_code or '',
-                        social_insurance_code=reg.social_insurance_number or '',
-                        old_hospital_code=reg.hospital_code or '', hospital_code=hospital_code,
+                        student=student, registration=reg, card_id=card.pk,
+                        full_name=snapshot['full_name'] or student.full_name or '',
+                        student_code=snapshot['student_code'] or student.current_student_code or '',
+                        social_insurance_code=snapshot['social_insurance_number'],
+                        old_hospital_code=current or '', hospital_code=hospital_code,
                         intake_year=cfg.change_year, intake_period=cfg.change_period,
                         intake_snapshot=config_payload(cfg), snapshot=snapshot, images=images,
                         request_key=key, request_digest=digest)
                     kind = 'SUBMITTED'
-                    changes = {'hospital_code': {'before': reg.hospital_code, 'after': hospital_code}}
+                    changes = {'hospital_code': {'before': current, 'after': hospital_code}}
                     previous_rejection = None
                 HospitalChangeEvent.objects.create(change_request=row, event_type=kind, actor_id=student.pk,
                     source_app='Hub', request_key=key, payload={'request_digest': digest, 'changes': changes,

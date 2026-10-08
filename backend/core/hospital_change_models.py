@@ -32,9 +32,10 @@ class HospitalChangeRequest(models.Model):
 
     id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey('students.Student', on_delete=models.DO_NOTHING)
-    # Đơn đăng ký BHYT tại trường làm nguồn; mọi thông tin khác chép từ đơn này.
+    # Đơn đăng ký BHYT tại trường làm nguồn; mọi thông tin khác chép từ đơn này. Trống khi
+    # nguồn là thẻ diện ĐHQT còn hạn không có đơn (card_id = thẻ đó, thông tin từ hồ sơ SV).
     registration = models.ForeignKey('core.HealthInsuranceRegistration', on_delete=models.DO_NOTHING,
-                                     db_constraint=False, related_name='hospital_changes')
+                                     db_constraint=False, null=True, related_name='hospital_changes')
     card_id = models.BigIntegerField(null=True)
     full_name = models.CharField(max_length=255)
     student_code = models.CharField(max_length=64)

@@ -10,7 +10,9 @@ from rest_framework.test import APIClient
 from core.api.authentication import StudentPrincipal
 from core.hospital_change_models import HospitalChangeConfig, HospitalChangeRequest
 from core.models import HealthInsuranceRegistration
-from students.models import Hospital, Student, VnProvince, VnWard
+from students.models import (
+    HealthInsuranceCard, HealthInsuranceRegistrationType, Hospital, Student, VnProvince, VnWard,
+)
 
 
 class HospitalChangeTests(TestCase):
@@ -43,32 +45,107 @@ class HospitalChangeTests(TestCase):
             social_insurance_number='0123456789', permanent_province='79', permanent_ward='26734',
             permanent_street='1 Street', hospital_code='79001', note='Sai ngày sinh', cccd_image='insurance_private/a.jpg',
             payment_receipt_image='insurance_private/r.png')
+        # Thẻ Dashboard sinh ra khi Phát hành đơn (không ghi hạn).
+        self.reg_card = self.card(source_registration_id=self.reg.pk)
 
     def post(self, path=None, **data):
         data.setdefault('request_key', uuid4().hex)
         return self.client.post(path or self.url, data, format='multipart')
 
     def test_prefill_comes_from_latest_sent_registration(self):
-        HealthInsuranceRegistration.objects.create(student=self.student, registration_year=2030,
-            registration_period='Q2', status='iu_processing', hospital_code='79002', payment_receipt_image='x.png')
+        for status in ('iu_processing', 'waiting_bhxh'):
+            HealthInsuranceRegistration.objects.create(student=self.student, registration_year=2030,
+                registration_period='Q2', status=status, hospital_code='79002', payment_receipt_image='x.png')
         data = self.client.get(self.url).data
         self.assertEqual(data['source']['id'], self.reg.pk)
         self.assertEqual(data['prefill']['citizen_id'], '012345678901')
         self.assertEqual(data['config']['status'], 'open')
         self.assertEqual(len(data['images']), 2)
 
-    def test_without_sent_registration_is_conflict(self):
-        self.reg.status = 'iu_processing'
-        self.reg.save(update_fields=['status'])
+    def test_without_issued_registration_is_conflict(self):
+        # Đơn chưa Phát hành (kể cả đã gửi BHXH) nghĩa là thẻ chưa mua xong.
+        for status in ('iu_processing', 'waiting_bhxh', 'rejected'):
+            self.reg.status = status
+            self.reg.save(update_fields=['status'])
+            self.assertEqual(self.client.get(self.url).status_code, 409, status)
+            self.assertEqual(self.post(hospital_code='79002').status_code, 409, status)
+            self.assertFalse(self.client.get('/api/health-insurance/').data['hospital_change']['has_source'])
+
+    def card(self, code='DHQT', valid_until=None, **extra):
+        now = timezone.now()
+        kind, _ = HealthInsuranceRegistrationType.objects.get_or_create(
+            code=code, defaults={'name': code, 'created_at': now, 'updated_at': now})
+        values = dict(student=self.student, registration_type=kind, social_insurance_code='7777777777',
+                      hospital_code='79001', registration_year=now.year, created_at=now, updated_at=now,
+                      valid_until=valid_until)
+        return HealthInsuranceCard.objects.create(**{**values, **extra})
+
+    def test_valid_dhqt_card_without_registration_is_source(self):
+        self.reg.delete()
+        today = timezone.localdate()
+        card = self.card(valid_until=today, valid_from=today - timedelta(days=30))
+        self.assertTrue(self.client.get('/api/health-insurance/').data['hospital_change']['has_source'])
+        data = self.client.get(self.url).data
+        self.assertEqual((data['source']['id'], data['source']['card_id']), (None, card.pk))
+        self.assertEqual(data['prefill']['social_insurance_number'], '7777777777')
+        self.assertEqual(data['prefill']['full_name'], 'Test Student')
+        self.assertEqual(data['images'], [])
+        response = self.post(hospital_code='79002', social_insurance_number='1')
+        self.assertEqual(response.status_code, 201, response.data)
+        row = HospitalChangeRequest.objects.get()
+        self.assertEqual((row.registration_id, row.card_id), (None, card.pk))
+        self.assertEqual((row.old_hospital_code, row.hospital_code, row.social_insurance_code),
+                         ('79001', '79002', '7777777777'))
+        self.assertEqual(row.images, {})
+        self.assertEqual(self.client.get(self.url).data['id'], row.pk)
+
+    def test_card_not_eligible_when_expired_undated_or_other_type(self):
+        self.reg.delete()
+        today = timezone.localdate()
+        self.card(valid_until=today - timedelta(days=1))
+        self.card(valid_until=None, is_current=True)
+        self.card(code='DHQT_UT_SV', valid_until=today + timedelta(days=90))
+        self.card(code='KTX_DHQG', valid_until=today + timedelta(days=90))
+        self.assertFalse(self.client.get('/api/health-insurance/').data['hospital_change']['has_source'])
         self.assertEqual(self.client.get(self.url).status_code, 409)
         self.assertEqual(self.post(hospital_code='79002').status_code, 409)
+
+    def test_issued_registration_card_wins_over_other_valid_card(self):
+        self.card(valid_until=timezone.localdate() + timedelta(days=90))
+        source = self.client.get(self.url).data['source']
+        self.assertEqual((source['id'], source['card_id']), (self.reg.pk, self.reg_card.pk))
+        self.assertEqual(self.post(hospital_code='79002').status_code, 201)
+        row = HospitalChangeRequest.objects.get()
+        self.assertEqual((row.registration_id, row.card_id), (self.reg.pk, self.reg_card.pk))
+
+    def test_issued_registration_needs_school_type_card(self):
+        # Đơn Phát hành nhưng thẻ thuộc diện không mang nơi KCB → không có thẻ để đổi.
+        self.reg_card.registration_type = HealthInsuranceRegistrationType.objects.create(
+            code='DHQT_UT_SV', name='Ưu tiên', created_at=timezone.now(), updated_at=timezone.now())
+        self.reg_card.save(update_fields=['registration_type'])
+        self.assertEqual(self.client.get(self.url).status_code, 409)
+        self.assertEqual(self.post(hospital_code='79002').status_code, 409)
+
+    def test_valid_dn_sv_card_from_issued_registration_copies_registration(self):
+        self.reg_card.delete()
+        card = self.card(code='DHQT_DN_SV', valid_until=timezone.localdate() + timedelta(days=90),
+                         source_registration_id=self.reg.pk, hospital_code='79-001 Bệnh viện cũ')
+        data = self.client.get(self.url).data
+        self.assertEqual((data['source']['id'], data['source']['hospital_code']), (self.reg.pk, '79001'))
+        self.assertEqual(len(data['images']), 2)
+        # Mã thô "79-001 …" vẫn được nhận là nơi KCB hiện tại.
+        self.assertEqual(self.post(hospital_code='79001').status_code, 400)
+        self.assertEqual(self.post(hospital_code='79002').status_code, 201)
+        row = HospitalChangeRequest.objects.get()
+        self.assertEqual((row.registration_id, row.card_id, row.old_hospital_code), (self.reg.pk, card.pk, '79001'))
+        self.assertEqual(row.snapshot['citizen_id'], '012345678901')
 
     def test_submit_copies_registration_and_only_changes_hospital(self):
         response = self.post(hospital_code='79002', full_name='Hacker', citizen_id='999999999999')
         self.assertEqual(response.status_code, 201, response.data)
         row = HospitalChangeRequest.objects.get()
         self.assertEqual((row.status, row.old_hospital_code, row.hospital_code), ('iu_processing', '79001', '79002'))
-        self.assertEqual(row.registration_id, self.reg.pk)
+        self.assertEqual((row.registration_id, row.card_id), (self.reg.pk, self.reg_card.pk))
         self.assertEqual(row.full_name, 'Test Student')
         self.assertEqual(row.snapshot['citizen_id'], '012345678901')
         self.assertEqual(row.snapshot['note'], 'Sai ngày sinh')

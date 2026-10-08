@@ -191,6 +191,8 @@ class HealthInsuranceCard(models.Model):
     valid_from = models.DateField(null=True, blank=True)
     valid_until = models.DateField(null=True, blank=True)
     registration_year = models.IntegerField(null=True, blank=True)
+    # Đơn Hub đã sinh thẻ này (Dashboard ghi lúc Phát hành); thẻ nhập tay/import để trống.
+    source_registration_id = models.BigIntegerField(null=True, blank=True)
     # ⚠️ is_current = "thẻ đang dùng", KHÔNG phải "còn hiệu lực".
     # Hiệu lực tính riêng theo valid_until so với hôm nay.
     is_current = models.BooleanField(default=False)
