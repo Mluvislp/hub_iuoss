@@ -129,6 +129,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
 | `insurance_hospital_change_status_upgrade.sql` | đổi trạng thái yêu cầu đổi nơi KCB `pending`→`iu_processing`, `confirmed`→`issued` (3 giai đoạn như đơn đăng ký) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
 | `insurance_hospital_change_card_source_upgrade.sql` | cho `registration_id` của yêu cầu đổi nơi KCB được NULL — nguồn là thẻ diện ĐHQT còn hạn không có đơn (`card_id`) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
+| `insurance_doi_noi_kcb_production.sql` | **gộp toàn bộ SQL nhánh đổi nơi KCB** (3 bảng + link tra cứu bệnh viện + 2 bước đồng bộ bản cũ) để chạy một lần trên production — chạy lại được. |
 | `insurance_hospital_lookup_url_upgrade.sql` | cột `hospital_lookup_url` (link "tra cứu bệnh viện") trên 2 bảng cấu hình đợt, nạp sẵn link cũ — chạy lại được, không phụ thuộc thứ tự. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 | `insurance_hospital_change_upgrade.sql` | 3 bảng đổi nơi KCB ban đầu + 4 slot đợt (tắt sẵn) — chạy lại được. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 

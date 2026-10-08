@@ -266,11 +266,12 @@ VALUES
     ('Q4',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6));
 
 -- Mỗi yêu cầu chụp lại toàn bộ đơn đăng ký tại trường làm nguồn (snapshot + ảnh)
--- lúc gửi; sinh viên chỉ đổi được hospital_code.
+-- lúc gửi; sinh viên chỉ đổi được hospital_code. Không có đơn thì registration_id NULL,
+-- card_id = thẻ diện ĐHQT còn hạn làm nguồn (thông tin chép từ hồ sơ sinh viên).
 CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_requests (
     id BIGINT NOT NULL AUTO_INCREMENT,
     student_id BIGINT NOT NULL,
-    registration_id BIGINT NOT NULL,
+    registration_id BIGINT NULL,
     card_id BIGINT NULL,
     full_name VARCHAR(255) NOT NULL,
     student_code VARCHAR(64) NOT NULL,
