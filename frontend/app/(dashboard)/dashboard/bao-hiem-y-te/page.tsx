@@ -5,6 +5,7 @@ import { InsuranceStatus } from '@/components/insurance-status';
 import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
 import { InsuranceModal } from '@/components/insurance-modal';
+import { InsuranceTimeline, historyTimeline } from '@/components/insurance-timeline';
 import { RejectionNotice } from '@/components/rejection-notice';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
@@ -13,7 +14,7 @@ import { api, ApiError } from '@/lib/api';
 import { ui, accentIcon } from '@/lib/ui';
 import { cn, formatDate } from '@/lib/utils';
 import { HealthValidityBadge, daysLeft, validityState } from '@/components/health-insurance';
-import type { ExternalInsuranceDeclaration, HealthInsuranceCard, HealthInsuranceData } from '@/lib/types';
+import type { ExternalInsuranceDeclaration, HealthInsuranceCard, HealthInsuranceData, HospitalChangeRequestRow } from '@/lib/types';
 
 /** Ngưỡng nhắc gia hạn — dưới mức này thì hiện dòng lưu ý. */
 const EXPIRING_SOON_DAYS = 60;
@@ -96,6 +97,41 @@ function ExternalDeclarationDetail({ row }: { row: ExternalInsuranceDeclaration 
         <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={status} /></div>
         <RejectionNotice rejected={status === 'rejected'} eyebrow="Bản khai bị từ chối" note={detail.review_note} />
         <SubmittedInsuranceInfo data={detail} external />
+        <InsuranceTimeline items={historyTimeline(detail.history, 'external')} empty="Bản khai chưa có lịch sử chi tiết." />
+      </div> : !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 size={16} className="animate-spin" />Đang tải…</p>}
+    </InsuranceModal>}
+  </>;
+}
+
+function HospitalChangeDetail({ row, className }: { row: HospitalChangeRequestRow; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<import('@/lib/types').SubmittedInsurance | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    api.hospitalChange.detail(row.id).then(d => { if (active) setDetail(d); }).catch(e => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [open, row.id]);
+  const status = detail?.status || row.status;
+  const oldHospital = detail?.old_hospital?.name || detail?.old_hospital?.code || row.old_hospital_name || row.old_hospital_code || '—';
+  const newHospital = detail?.display?.hospital_code || row.hospital_name || row.hospital_code;
+  return <>
+    <button type="button" className={cn(ui.btnSecondary, className)} onClick={() => { setError(''); setOpen(true); }}>
+      <FileClock className="h-4 w-4" />Chi tiết
+    </button>
+    {open && <InsuranceModal eyebrow="Đổi nơi khám chữa bệnh ban đầu" title={'Yêu cầu #' + row.id} onClose={() => setOpen(false)}>
+      {error && <p role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">{error}</p>}
+      {detail ? <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={status} /></div>
+        <RejectionNotice rejected={status === 'rejected'} eyebrow="Yêu cầu bị từ chối" note={detail.review_note} />
+        <p className="rounded-lg border border-line bg-slate-50 px-4 py-3 text-sm">
+          <span className="text-muted">Nơi KCB ban đầu: </span>
+          <span className="text-slate-400 line-through">{oldHospital}</span>
+          {' → '}<span className="font-medium text-ink">{newHospital}</span>
+        </p>
+        <SubmittedInsuranceInfo data={detail} hospitalChange />
+        <InsuranceTimeline items={historyTimeline(detail.history, 'hospital-change')} empty="Yêu cầu chưa có lịch sử chi tiết." />
       </div> : !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 size={16} className="animate-spin" />Đang tải…</p>}
     </InsuranceModal>}
   </>;
@@ -424,9 +460,7 @@ export default function HealthInsurancePage() {
                   <span className="text-slate-400 line-through">{row.old_hospital_name || row.old_hospital_code || '—'}</span>
                   {' → '}<span className="font-medium text-ink">{row.hospital_name || row.hospital_code}</span>
                 </p>
-                <Link href={`/dashboard/bao-hiem-y-te/doi-noi-kcb?edit=${row.id}`} className={cn(ui.btnSecondary, 'w-full')}>
-                  <FileClock className="h-4 w-4" />Chi tiết
-                </Link>
+                <HospitalChangeDetail row={row} className="w-full" />
               </article>
             ))}
           </div>
@@ -450,9 +484,7 @@ export default function HealthInsurancePage() {
                     <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
                     <td className="px-5 py-3"><InsuranceStatus status={row.status} /></td>
                     <td className="px-5 py-3 text-right">
-                      <Link href={`/dashboard/bao-hiem-y-te/doi-noi-kcb?edit=${row.id}`} className={ui.btnSecondary}>
-                        <FileClock className="h-4 w-4" />Chi tiết
-                      </Link>
+                      <HospitalChangeDetail row={row} />
                     </td>
                   </tr>
                 ))}
