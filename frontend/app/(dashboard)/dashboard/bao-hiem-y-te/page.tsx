@@ -8,7 +8,7 @@ import { InsuranceModal } from '@/components/insurance-modal';
 import { RejectionNotice } from '@/components/rejection-notice';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
-import { AlertCircle, FileClock, History, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, FileClock, History, Hospital, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, accentIcon } from '@/lib/ui';
 import { cn, formatDate } from '@/lib/utils';
@@ -402,6 +402,66 @@ export default function HealthInsurancePage() {
         </section>
       )}
 
+      {!!data?.hospital_change?.requests.length && (
+        <section className={ui.card}>
+          <div className={ui.cardHeader}>
+            <h2 className={ui.sectionTitle}>
+              <History size={16} className={accentIcon.primary} />
+              Lịch sử yêu cầu đổi nơi khám chữa bệnh ban đầu
+            </h2>
+          </div>
+          <div className="divide-y divide-line2 md:hidden">
+            {data.hospital_change.requests.map(row => (
+              <article key={row.id} className="space-y-3 px-4 py-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">{PERIOD_LABELS[row.intake_period] ?? row.intake_period} năm {row.intake_year}</p>
+                    <p className="mt-1 text-xs text-muted">Gửi lúc {new Date(row.created_at).toLocaleString('vi-VN')}</p>
+                  </div>
+                  <InsuranceStatus status={row.status} />
+                </div>
+                <p className="text-xs text-slate-600">
+                  <span className="text-slate-400 line-through">{row.old_hospital_name || row.old_hospital_code || '—'}</span>
+                  {' → '}<span className="font-medium text-ink">{row.hospital_name || row.hospital_code}</span>
+                </p>
+                <Link href={`/dashboard/bao-hiem-y-te/doi-noi-kcb?edit=${row.id}`} className={cn(ui.btnSecondary, 'w-full')}>
+                  <FileClock className="h-4 w-4" />Chi tiết
+                </Link>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead><tr className={THEAD_ROW}>
+                <th className={TH}>Đợt</th>
+                <th className={TH}>Nơi KCB cũ → mới</th>
+                <th className={TH}>Ngày gửi</th>
+                <th className={TH}>Trạng thái</th>
+                <th className={cn(TH, 'text-right')}>Thao tác</th>
+              </tr></thead>
+              <tbody className="divide-y divide-line2">
+                {data.hospital_change.requests.map(row => (
+                  <tr key={row.id} className="hover:bg-[#f9fafb] transition-colors">
+                    <td className="px-5 py-3 font-medium text-[0.85rem] text-ink whitespace-nowrap">{PERIOD_LABELS[row.intake_period] ?? row.intake_period} năm {row.intake_year}</td>
+                    <td className="px-5 py-3 text-[0.82rem] text-slate-600 max-w-[320px]">
+                      <span className="text-slate-400 line-through">{row.old_hospital_name || row.old_hospital_code || '—'}</span>
+                      {' → '}<span className="font-medium text-ink">{row.hospital_name || row.hospital_code}</span>
+                    </td>
+                    <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
+                    <td className="px-5 py-3"><InsuranceStatus status={row.status} /></td>
+                    <td className="px-5 py-3 text-right">
+                      <Link href={`/dashboard/bao-hiem-y-te/doi-noi-kcb?edit=${row.id}`} className={ui.btnSecondary}>
+                        <FileClock className="h-4 w-4" />Chi tiết
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* ── Các cách tham gia BHYT ─────────────────────────── */}
       <section className={ui.card}>
         <div className={ui.cardHeader}>
@@ -415,6 +475,34 @@ export default function HealthInsurancePage() {
             </div>
             <Link href="/dashboard/bao-hiem-y-te/khai-noi-khac" className={cn(ui.btnOutline, "mt-3 shrink-0 sm:mt-0")}>Khai thông tin tại nơi khác</Link>
           </div>
+          {(() => {
+            const change = data?.hospital_change;
+            const open = !!change?.config && change.config.status === 'open';
+            const enabled = open && !!change?.has_source;
+            return (
+              <div className="rounded-lg border border-line bg-slate-50 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                <div>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                    <Hospital size={15} className="text-primary" />Đổi nơi khám chữa bệnh ban đầu
+                  </h3>
+                  <p className="mt-1 text-[0.82rem] text-muted">
+                    {!open
+                      ? 'Hiện chưa mở đợt nhận yêu cầu đổi nơi khám chữa bệnh ban đầu.'
+                      : !change?.has_source
+                        ? 'Chỉ áp dụng khi đã có đơn đăng ký BHYT tại trường được gửi BHXH hoặc đã phát hành.'
+                        : `${change.config!.name} · hạn cuối ${formatDate(change.config!.end_date)}. Thông tin lấy từ đơn đăng ký BHYT tại trường gần nhất.`}
+                  </p>
+                </div>
+                {enabled ? (
+                  <Link href="/dashboard/bao-hiem-y-te/doi-noi-kcb" className={cn(ui.btnOutline, 'mt-3 shrink-0 sm:mt-0')}>Gửi yêu cầu đổi nơi KCB</Link>
+                ) : (
+                  <button disabled className={cn(ui.btnOutline, 'mt-3 shrink-0 cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 sm:mt-0')}>
+                    {open ? 'Chưa đủ điều kiện' : 'Chưa mở'}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           <div className="border-t border-line2 pt-5">
             <h3 className="text-sm font-semibold text-ink">Đăng ký BHYT tại trường</h3>
             <p className="text-[0.85rem] text-muted mb-4">

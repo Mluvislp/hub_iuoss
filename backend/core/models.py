@@ -304,6 +304,8 @@ class HealthInsuranceRegistration(models.Model):
     
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="iu_processing")
     workflow_version = models.PositiveSmallIntegerField(default=2)
+    # Không bắt buộc: SV ghi lại thông tin BHYT đang sai (đổi CCCD, khai sinh, ngày sinh,
+    # tên…). Có nội dung thì Dashboard tô màu + nhãn "Có ghi chú".
     note = models.TextField(null=True, blank=True)
     supplement_pending = models.BooleanField(default=False)
     supplemented_at = models.DateTimeField(null=True, blank=True)
@@ -402,6 +404,8 @@ class HealthInsuranceConfig(models.Model):
     )
     description = models.TextField(blank=True, null=True)
     freshman_warning = models.TextField(blank=True, null=True)
+    # Link "tra cứu bệnh viện" trên form; staff sửa trên Dashboard, rỗng = ẩn.
+    hospital_lookup_url = models.CharField(max_length=500, blank=True, null=True)
     bank_name = models.CharField(max_length=255)
     # Mã BIN 6 số của Napas, dùng dựng VietQR. Bỏ trống thì frontend dò theo
     # `bank_name`; điền vào đây thì khỏi phải đoán.
@@ -423,3 +427,4 @@ class HealthInsuranceConfig(models.Model):
 
 from .insurance_history_models import InsuranceEvent, InsuranceAssessment, InsuranceEvidence  # noqa: E402,F401
 from .student_image_models import StudentImage  # noqa: E402,F401
+from .hospital_change_models import HospitalChangeConfig, HospitalChangeRequest  # noqa: E402,F401

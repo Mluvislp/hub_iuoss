@@ -1,5 +1,5 @@
 import InsuranceRegistrationForm from '@/components/insurance-registration-form';
 
 export default function Page() {
-  return <InsuranceRegistrationForm mode="external" />;
+  return <InsuranceRegistrationForm mode="hospital-change" />;
 }

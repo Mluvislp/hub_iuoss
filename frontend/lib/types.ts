@@ -82,6 +82,23 @@ export interface ExternalInsuranceDeclaration {
   reviewed_at: string | null;
 }
 
+/** Loại biểu mẫu dùng chung `InsuranceRegistrationForm`. */
+export type InsuranceFormMode = 'registration' | 'external' | 'hospital-change';
+
+export interface HospitalChangeRequestRow {
+  id: number;
+  old_hospital_code: string;
+  old_hospital_name: string | null;
+  hospital_code: string;
+  hospital_name: string | null;
+  intake_year: number;
+  intake_period: string;
+  status: 'iu_processing' | 'waiting_bhxh' | 'issued' | 'rejected';
+  review_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 export interface InsuranceRegistrationPrefill {
   full_name: string;
   student_code: string;
@@ -111,12 +128,16 @@ export interface HealthInsuranceData {
   history: HealthInsuranceCard[];
   registrations: HealthInsuranceRegistration[];
   external_declarations: ExternalInsuranceDeclaration[];
+  /** Đợt nhận yêu cầu đổi nơi KCB đang mở (nếu có) + các yêu cầu đã gửi. */
+  hospital_change?: { config: InsurancePeriodConfig | null; has_source: boolean; requests: HospitalChangeRequestRow[] };
   periods: InsurancePeriod[];
   is_eligible: boolean;
 }
 
 export interface InsurancePeriodConfig extends InsurancePeriod {
   description: string;
+  /** Link danh sách bệnh viện do staff cập nhật trên Dashboard; rỗng = ẩn dòng link. */
+  hospital_lookup_url?: string;
   insurance_fee: number;
   bank_name: string;
   bank_bin: string;
@@ -499,6 +520,10 @@ export interface SubmittedInsurance {
   created_at?:string; updated_at?:string; edited_at?:string|null; review_note?:string|null;
   history?:{event_type:string; created_at:string; source_app:string; payload:{changes?:Record<string,{before:unknown;after:unknown}>;images?:string[];previous_rejection?:string}}[];
   images?:{field:string; filename:string; url:string}[];
+  /** Yêu cầu đổi nơi KCB: nơi KCB trước khi đổi. */
+  old_hospital?:{code:string; name:string};
+  /** Yêu cầu đổi nơi KCB chưa gửi: đơn đăng ký tại trường làm nguồn. */
+  source?:{id:number; registration_year:number; registration_period:string; status:string; hospital_code:string; hospital_name:string};
 }
 export interface InsuranceDetail extends SubmittedInsurance {
   hospital_code: string;
