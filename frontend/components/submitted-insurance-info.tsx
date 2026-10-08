@@ -45,12 +45,6 @@ export function ChangeList({changes, images, submitted = false, className}:{
   </dl>;
 }
 
-const eventLabels: Record<string,string> = {
-  SUBMITTED:'Đã gửi bản khai', STUDENT_UPDATED:'Sinh viên chỉnh sửa',
-  RESUBMITTED:'Sinh viên gửi bổ sung', CONFIRMED:'Đã xác nhận', REJECTED:'Từ chối',
-  SUPPLEMENT_REVIEWED:'Đã kiểm tra bổ sung',
-};
-
 export function formatDateTime(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value);
@@ -92,9 +86,12 @@ export function PrivateImage({url, label, caption = true}:{url:string; label:str
   </figure>;
 }
 
-export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{data:SubmittedInsurance; external?:boolean; showEdit?:boolean}) {
+export function SubmittedInsuranceInfo({data, external=false, hospitalChange=false, showEdit=true}:{data:SubmittedInsurance; external?:boolean; hospitalChange?:boolean; showEdit?:boolean}) {
   const canEdit = data.can_edit ?? data.window?.can_edit;
   const canResubmit = data.can_resubmit ?? data.status === 'rejected';
+  // Khai nơi khác và đổi nơi KCB sửa/gửi lại trên trang form riêng của mình.
+  const formPath = '/dashboard/bao-hiem-y-te/' + (hospitalChange ? 'doi-noi-kcb' : external ? 'khai-noi-khac' : 'dang-ky');
+  const noun = hospitalChange ? 'yêu cầu' : external ? 'bản khai' : 'đơn';
   const displayValue = (key: string) => data.display?.[key] || data.prefill[key] || '—';
   return <section className={cn(ui.card, 'overflow-hidden')}>
     <div className={ui.cardHeader}>
@@ -116,10 +113,10 @@ export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{da
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-muted"><Clock3 size={15} />Hạn kết thúc: {formatDateTime(data.window?.end_date)}</p>
         {showEdit && <div className="flex flex-wrap gap-2">
-          {canEdit && <Link className={ui.btnSecondary} href={'/dashboard/bao-hiem-y-te/' + (external ? 'khai-noi-khac' : 'dang-ky') + '?edit=' + data.id}>
-            <Pencil size={14} />Chỉnh sửa {external ? 'bản khai' : 'đơn'}
+          {canEdit && <Link className={ui.btnSecondary} href={formPath + '?edit=' + data.id}>
+            <Pencil size={14} />Chỉnh sửa {noun}
           </Link>}
-          {external && canResubmit && <Link className={ui.btnSecondary} href={'/dashboard/bao-hiem-y-te/khai-noi-khac?edit=' + data.id + '&resubmit=1'}>
+          {(external || hospitalChange) && canResubmit && <Link className={ui.btnSecondary} href={formPath + '?edit=' + data.id + '&resubmit=1'}>
             Gửi lại sau từ chối
           </Link>}
         </div>}
@@ -135,17 +132,12 @@ export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{da
         <summary className="cursor-pointer font-medium text-ink">So sánh với hồ sơ tại lần lưu gần nhất</summary>
         <div className="mt-2 space-y-1 text-slate-600">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
       </details>}
-      {data.history?.map((event, index) => <details key={index} className="rounded-lg border border-line p-3 text-sm">
-        <summary className="cursor-pointer font-medium text-ink">{eventLabels[event.event_type] || event.event_type} · {formatDateTime(event.created_at)}</summary>
-        <div className="mt-2 space-y-1 text-slate-600">
-          {event.payload?.previous_rejection && <p>Phản hồi từ chối trước: {event.payload.previous_rejection}</p>}
-          <ChangeList changes={event.payload?.changes} images={event.payload?.images} submitted={event.event_type === 'SUBMITTED'} className="space-y-1" />
-        </div>
-      </details>)}
       {!!data.images?.length && <div>
         <h4 className="mb-3 text-sm font-semibold text-ink">Ảnh đã nộp</h4>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{data.images.map(i => <PrivateImage key={i.field} url={i.url} label={labels[i.field] || i.field}/>)}</div>
-        <p className="mt-2 text-xs text-muted">Các ảnh này được giữ nguyên. Chỉ chọn ảnh mới trong biểu mẫu khi muốn thay thế.</p>
+        <p className="mt-2 text-xs text-muted">{hospitalChange
+          ? 'Ảnh chép từ đơn đăng ký BHYT tại trường, không thay đổi được.'
+          : 'Các ảnh này được giữ nguyên. Chỉ chọn ảnh mới trong biểu mẫu khi muốn thay thế.'}</p>
       </div>}
     </div>
   </section>;
