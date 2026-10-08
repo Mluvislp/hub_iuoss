@@ -489,8 +489,8 @@ export default function HealthInsurancePage() {
                     {!open
                       ? 'Hiện chưa mở đợt nhận yêu cầu đổi nơi khám chữa bệnh ban đầu.'
                       : !change?.has_source
-                        ? 'Chỉ áp dụng khi đã có đơn đăng ký BHYT tại trường được gửi BHXH hoặc đã phát hành.'
-                        : `${change.config!.name} · hạn cuối ${formatDate(change.config!.end_date)}. Thông tin lấy từ đơn đăng ký BHYT tại trường gần nhất.`}
+                        ? 'Chỉ áp dụng khi đã có thẻ BHYT mua tại trường: đơn đăng ký tại trường đã Phát hành hoặc thẻ diện ĐHQT còn hạn.'
+                        : `${change.config!.name} · hạn cuối ${formatDate(change.config!.end_date)}. Thông tin lấy từ thẻ BHYT mua tại trường của bạn.`}
                   </p>
                 </div>
                 {enabled ? (

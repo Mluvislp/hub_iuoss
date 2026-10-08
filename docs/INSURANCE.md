@@ -44,8 +44,12 @@ Khai ngoài trường không có ô này; yêu cầu đổi nơi KCB chép
 nguyên ghi chú của đơn gốc vào snapshot và chỉ hiển thị.
 
 **Đổi nơi KCB ban đầu** (`core/api/hospital_change_views.py`): form đăng ký dùng chung ở
-chế độ `mode="hospital-change"` — mọi thông tin lấy từ đơn tại trường mới nhất đã
-`waiting_bhxh`/`issued`, khóa hết, chỉ mở chọn bệnh viện. POST chỉ nhận `hospital_code`;
+chế độ `mode="hospital-change"`. Chỉ đổi được thẻ đã mua thuộc diện trường
+(`DHQT`/`DHQT_DN_SV`); mỗi yêu cầu gắn một thẻ (`card_id`): thẻ phát hành từ đơn tại trường
+mới nhất ở `issued`, không có thì thẻ còn hạn (`valid_until` ≥ hôm nay). Thông tin lấy từ
+đơn đã sinh thẻ; thẻ không có đơn Phát hành thì lấy hồ sơ SV + mã BHXH/nơi KCB của thẻ,
+không ảnh, `registration_id` NULL. Đơn đang xử lý không đủ điều kiện. Dashboard Phát hành
+chỉ sửa nơi KCB trên thẻ, đơn giữ nguyên. Form khóa hết, chỉ mở chọn bệnh viện. POST chỉ nhận `hospital_code`;
 server tự chép phần còn lại. Đợt nhận yêu cầu là bảng riêng
 `hub_insurance_hospital_change_configs` (4 slot, staff quản lý trên Dashboard). Nghiệp vụ
 duyệt: `dashboard_iuoss/docs/HEALTH_INSURANCE.md` §3b.
@@ -124,6 +128,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `external_insurance_validity_fix.sql` | sửa thời hạn |
 | `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
 | `insurance_hospital_change_status_upgrade.sql` | đổi trạng thái yêu cầu đổi nơi KCB `pending`→`iu_processing`, `confirmed`→`issued` (3 giai đoạn như đơn đăng ký) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
+| `insurance_hospital_change_card_source_upgrade.sql` | cho `registration_id` của yêu cầu đổi nơi KCB được NULL — nguồn là thẻ diện ĐHQT còn hạn không có đơn (`card_id`) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
 | `insurance_hospital_lookup_url_upgrade.sql` | cột `hospital_lookup_url` (link "tra cứu bệnh viện") trên 2 bảng cấu hình đợt, nạp sẵn link cũ — chạy lại được, không phụ thuộc thứ tự. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 | `insurance_hospital_change_upgrade.sql` | 3 bảng đổi nơi KCB ban đầu + 4 slot đợt (tắt sẵn) — chạy lại được. **Chưa chạy trên prod/sandbox (07/10/2026).** |
 

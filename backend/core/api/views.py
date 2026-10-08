@@ -681,7 +681,7 @@ class HealthInsuranceView(APIView):
 
         } for row in external_rows]
         from core.hospital_change_models import HospitalChangeRequest
-        from .hospital_change_views import active_config as change_config, config_payload, source_registration
+        from .hospital_change_views import active_config as change_config, config_payload, has_change_source
         change_rows = list(HospitalChangeRequest.objects.filter(student_id=student_id)
                            .defer("snapshot", "images", "intake_snapshot").order_by("-created_at"))
         change_hospitals = dict(Hospital.objects.filter(
@@ -690,8 +690,8 @@ class HealthInsuranceView(APIView):
         open_change = change_config()
         hospital_change = {
             "config": config_payload(open_change) if open_change else None,
-            # Chỉ đơn tại trường đã gửi BHXH/phát hành mới đổi được nơi KCB ban đầu.
-            "has_source": source_registration(student) is not None,
+            # Chỉ thẻ đã mua tại trường (đơn Phát hành / thẻ ĐHQT còn hạn) mới đổi được nơi KCB.
+            "has_source": has_change_source(student),
             "requests": [{
                 "id": row.id,
                 "old_hospital_code": row.old_hospital_code,

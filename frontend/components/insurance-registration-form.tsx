@@ -146,7 +146,7 @@ const keptImages = {
 };
 const editSchema = schema.extend(keptImages);
 const externalEditSchema = withExternalRules(externalBase.extend(keptImages));
-// Đổi nơi KCB: mọi thông tin khác chép nguyên từ đơn tại trường và bị khóa, nên chỉ
+// Đổi nơi KCB: mọi thông tin khác chép nguyên từ nguồn (đơn tại trường/thẻ) và bị khóa, nên chỉ
 // kiểm tra bệnh viện mới — ô đang khóa không được phép chặn việc gửi.
 const hospitalChangeSchema = z.object({
   hospital_code: schema.shape.hospital_code,
@@ -379,7 +379,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
   const [hospitalProvince, setHospitalProvince] = useState("");
 
   const [config, setConfig] = useState<InsurancePeriodConfig | null>(null);
-  // Đổi nơi KCB chưa gửi: đơn tại trường làm nguồn (ảnh + nơi KCB hiện tại).
+  // Đổi nơi KCB chưa gửi: nguồn là đơn tại trường hoặc thẻ ĐHQT (ảnh + nơi KCB hiện tại).
   const [source, setSource] = useState<Pick<SubmittedInsurance, "source" | "images"> | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
 
@@ -817,7 +817,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
         </h1>
         {hospitalChange && !config?.description ? (
           <p className="mt-2 text-sm">
-            Thông tin được lấy nguyên từ đơn đăng ký BHYT tại trường gần nhất của bạn và không chỉnh sửa được.
+            Thông tin được lấy nguyên từ thẻ BHYT mua tại trường của bạn (đơn đăng ký đã phát hành, hoặc hồ sơ sinh viên khi không có đơn) và không chỉnh sửa được.
             Bấm <strong>Đổi nơi khám chữa bệnh ban đầu</strong> để chọn bệnh viện mới rồi gửi yêu cầu.
           </p>
         ) : external ? (
@@ -1428,7 +1428,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
 
               {hospitalChange ? (
                 <p className="text-xs text-muted">
-                  Ảnh lấy từ đơn đăng ký BHYT tại trường, không thay đổi được. Bấm vào ảnh để xem cỡ lớn.
+                  {imageSlots.length
+                    ? "Ảnh lấy từ đơn đăng ký BHYT tại trường, không thay đổi được. Bấm vào ảnh để xem cỡ lớn."
+                    : "Không có ảnh đính kèm: thông tin lấy từ thẻ BHYT tại trường và hồ sơ sinh viên."}
                 </p>
               ) : editingRecord && (
                 <p className="text-xs text-muted">

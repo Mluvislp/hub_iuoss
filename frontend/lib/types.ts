@@ -523,7 +523,8 @@ export interface SubmittedInsurance {
   /** Yêu cầu đổi nơi KCB: nơi KCB trước khi đổi. */
   old_hospital?:{code:string; name:string};
   /** Yêu cầu đổi nơi KCB chưa gửi: đơn đăng ký tại trường làm nguồn. */
-  source?:{id:number; registration_year:number; registration_period:string; status:string; hospital_code:string; hospital_name:string};
+  // id null = nguồn là thẻ diện ĐHQT còn hạn không có đơn (card_id).
+  source?:{id:number|null; card_id?:number; registration_year:number|null; registration_period:string; status:string; hospital_code:string; hospital_name:string};
 }
 export interface InsuranceDetail extends SubmittedInsurance {
   hospital_code: string;
