@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Download, FileText, ImageIcon, Loader2, Paperclip, X } from 'lucide-react';
+import { Download, File, FileSpreadsheet, FileText, ImageIcon, Loader2, Paperclip, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
@@ -125,9 +125,19 @@ export function FilePicker({
   );
 }
 
+/** PDF và ảnh xem được ngay trên trang; Word/Excel (chuyên viên gửi mẫu đơn) chỉ tải xuống. */
+function previewable(att: TicketAttachment): boolean {
+  return att.is_pdf || att.mime_type.startsWith('image/');
+}
+
+function isSpreadsheet(att: TicketAttachment): boolean {
+  return /spreadsheet|excel/.test(att.mime_type);
+}
+
 /**
  * File đã gửi: bấm để XEM NGAY TRÊN TRANG (ảnh hiện thẳng, PDF trong khung) —
  * không mở tab mới. File cần token nên tải qua fetch rồi dựng blob URL.
+ * File không xem được trong trình duyệt (Word/Excel) thì tải thẳng về máy.
  */
 export function AttachmentChip({ ticketId, att }: { ticketId: number; att: TicketAttachment }) {
   const [busy, setBusy] = useState(false);
@@ -141,7 +151,18 @@ export function AttachmentChip({ ticketId, att }: { ticketId: number; att: Ticke
     try {
       const blob = await api.tickets.attachment(ticketId, att.id);
       // Gán đúng kiểu để trình duyệt hiển thị PDF trong khung thay vì tải xuống.
-      setUrl(URL.createObjectURL(new Blob([blob], { type: att.mime_type })));
+      const objectUrl = URL.createObjectURL(new Blob([blob], { type: att.mime_type }));
+      if (!previewable(att)) {
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = att.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+        return;
+      }
+      setUrl(objectUrl);
     } catch {
       setError('Không tải được file.');
     } finally {
@@ -172,10 +193,11 @@ export function AttachmentChip({ ticketId, att }: { ticketId: number; att: Ticke
       <button
         type="button"
         onClick={open}
-        title={error ?? 'Xem file'}
+        title={error ?? (previewable(att) ? 'Xem file' : 'Tải xuống')}
         className={cn(
           'inline-flex max-w-[260px] items-center gap-2 rounded-lg border bg-white px-2.5 py-1.5',
-          'cursor-zoom-in text-left text-[0.8rem] text-ink transition-colors hover:border-primary-line',
+          previewable(att) ? 'cursor-zoom-in' : 'cursor-pointer',
+          'text-left text-[0.8rem] text-ink transition-colors hover:border-primary-line',
           error ? 'border-danger-line' : 'border-line',
         )}
       >
@@ -183,11 +205,16 @@ export function AttachmentChip({ ticketId, att }: { ticketId: number; att: Ticke
           <Loader2 size={14} className="shrink-0 animate-spin text-muted" />
         ) : att.is_pdf ? (
           <FileText size={14} className="shrink-0 text-danger-text" />
-        ) : (
+        ) : att.mime_type.startsWith('image/') ? (
           <ImageIcon size={14} className="shrink-0 text-primary" />
+        ) : isSpreadsheet(att) ? (
+          <FileSpreadsheet size={14} className="shrink-0 text-success-text" />
+        ) : (
+          <File size={14} className="shrink-0 text-primary" />
         )}
         <span className="truncate">{att.name}</span>
         <span className="shrink-0 text-[0.72rem] text-muted">{formatSize(att.size)}</span>
+        {!previewable(att) && !busy && <Download size={13} className="shrink-0 text-muted" />}
       </button>
 
       {url && (
