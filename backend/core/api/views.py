@@ -200,6 +200,19 @@ def _get_str(data, key) -> str:
     return ""
 
 
+def _get_codes(data):
+    """Danh sách mã năm học bảng điểm rèn luyện: `semester_codes` (mảng JSON) hoặc chuỗi cách
+    nhau bằng dấu phẩy; lùi về `semester_code` của client cũ. Phần tử lạ bị bỏ."""
+    raw = data.get("semester_codes")
+    if raw is None:
+        raw = data.get("semester_code")
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    if not isinstance(raw, (list, tuple)):
+        return []
+    return [v.strip() for v in raw if isinstance(v, str) and v.strip()][:20]
+
+
 # ── GET /api/health/ ─────────────────────────────────────────────────────────
 # Endpoint cho systemd / Nginx / Cloudflare / uptime monitor. Không cần auth.
 # Kiểm tra kết nối DB → trả 200 nếu khoẻ, 503 nếu DB lỗi.
@@ -1045,15 +1058,14 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         sid = request.user.student_id
         if not sid:
             return self._create(request, request_type)
-        semester_code, semester_label = None, None
+        semester_codes, labels = None, None
         if request_type == request_quota.CONDUCT_TYPE:
-            semester_code = _get_str(request.data, "semester_code")
+            semester_codes = _get_codes(request.data)
             student = self._resolve_student(request)
-            choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)} if student else {}
-            semester_label = choices.get(semester_code)
+            labels = {c["code"]: c["label"] for c in conduct_semester_choices(student)} if student else {}
         # Khoá theo SV: kiểm hạn mức + tạo yêu cầu là một bước, bấm gửi hai lần không lọt.
         with request_quota.student_lock(sid):
-            reason = request_quota.check(sid, request_type, semester_code, semester_label)
+            reason = request_quota.check(sid, request_type, semester_codes, labels)
             if reason:
                 return Response({"detail": reason, "code": "quota_exceeded"}, status=status.HTTP_409_CONFLICT)
             return self._create(request, request_type)
@@ -1316,10 +1328,13 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # Sửa yêu cầu "Chờ bổ sung": giữ nguyên năm học / học kỳ đã xin.
+        locked = ((self.editing.payload or {}).get("purpose") if self.editing is not None else None)
         try:
             payload, semester_label = build_conduct_payload(
                 student,
-                semester_code=_get_str(request.data, "semester_code"),
+                semester_codes=_get_codes(request.data),
+                locked_purpose=locked,
                 delivery=_get_str(request.data, "delivery"),
                 dob=_get_str(request.data, "dob"),
                 citizen_id=_get_str(request.data, "citizen_id"),

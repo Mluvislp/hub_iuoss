@@ -817,6 +817,7 @@ CONDUCT_DELIVERY_CHOICES = [
 
 
 def _semester_label(year, semester):
+    """Nhãn học kỳ lẻ — chỉ còn dùng để đọc yêu cầu cũ (trước 09/10/2026 SV chọn được HK lẻ)."""
     return f"Học kỳ {semester}, năm học {year}-{year + 1}"
 
 
@@ -824,11 +825,30 @@ def _year_label(year):
     return f"Cả năm học {year}-{year + 1}"
 
 
+def conduct_years_label(codes):
+    """["2024N", "2025N"] → "Cả năm học 2024-2025, 2025-2026" (cũ trước, mới sau).
+
+    Ghi vào cột `purpose` (VARCHAR 255) và `payload.purpose.label` — Dashboard hiện thẳng chuỗi này.
+    """
+    years = sorted(int(c[:4]) for c in codes)
+    return "Cả năm học " + ", ".join(f"{y}-{y + 1}" for y in years)
+
+
+def conduct_purpose_codes(purpose):
+    """Mã lựa chọn của một yêu cầu: `purpose.codes` (từ 09/10/2026, nhiều năm học) hoặc
+    `purpose.code` (yêu cầu cũ: một mã, hoặc nhiều mã nối bằng dấu phẩy)."""
+    purpose = purpose or {}
+    codes = purpose.get("codes")
+    if isinstance(codes, list):
+        return [str(c) for c in codes if c]
+    return [c.strip() for c in str(purpose.get("code") or "").split(",") if c.strip()]
+
+
 def conduct_overlapping_codes(code):
     """Các mã lựa chọn bị KHOÁ khi đã có yêu cầu `code` (kể cả chính nó) — dùng cho hạn mức.
 
     Một chiều (người dùng chốt 02/10/2026): đã xin CẢ NĂM học YYYY thì khoá luôn HK1,
-    HK2 của năm đó; đã xin MỘT học kỳ thì chỉ khoá đúng học kỳ đó — vẫn xin được cả năm.
+    HK2 của năm đó; đã xin MỘT học kỳ (yêu cầu cũ) thì chỉ khoá đúng học kỳ đó.
     """
     code = str(code or "")
     if len(code) != 5 or not code[:4].isdigit():
@@ -840,39 +860,29 @@ def conduct_overlapping_codes(code):
 
 
 def conduct_semester_choices(student, today=None):
-    """Các lựa chọn SV được xin bảng điểm rèn luyện, MỚI NHẤT trước.
+    """Các NĂM HỌC SV được xin bảng điểm rèn luyện, MỚI NHẤT trước. SV tích được nhiều năm.
 
-    Gồm từng học kỳ lẻ và, từ 01/10/2026, "Cả năm học" (mã `YYYYN`) cho năm học có
-    ĐỦ cả HK1 lẫn HK2 trong danh sách — đứng ngay trước HK2 của năm đó.
+    Từ 09/10/2026 (người dùng chốt) chỉ còn "Cả năm học" (mã `YYYYN`), bỏ học kỳ lẻ.
 
-    Chỉ học kỳ chính (HK1, HK2) ĐÃ KẾT THÚC — điểm rèn luyện chỉ có sau khi học
-    kỳ đóng. Mốc kết thúc theo `current_semester` (HK1 = T9–T1, HK2 = T2–T6):
-    đang HK1 thì học kỳ gần nhất là HK2 năm học trước; đang HK2 thì là HK1 năm
-    nay; đang hè thì là HK2 năm nay.
+    Một năm học được chọn khi HK2 của năm đó ĐÃ KẾT THÚC — điểm rèn luyện chỉ có sau khi
+    học kỳ đóng. Mốc kết thúc theo `current_semester` (HK1 = T9–T1, HK2 = T2–T6, hè = T7–T8):
+    đang HK1 hoặc HK2 thì năm học gần nhất là năm học trước; đang hè thì là năm học hiện tại.
 
-    Bắt đầu từ học kỳ nhập học (nhập học HK3 ⇒ bắt đầu từ HK1 năm học kế).
+    Năm học đầu tiên là năm SV đã học ít nhất HK2: nhập học HK1/HK2 năm YYYY ⇒ từ năm YYYY
+    (nhập học HK2 thì bảng điểm năm đầu chỉ có HK2); nhập học HK3 ⇒ từ năm học kế.
     Hồ sơ không có năm nhập học ⇒ lùi `CONDUCT_FALLBACK_YEARS` năm học.
     """
     cur_start, _ = current_academic_year(today)
-    sem_now = current_semester(today)
-    last = (cur_start - 1, 2) if sem_now == 1 else (cur_start, sem_now - 1 if sem_now == 2 else 2)
+    last = cur_start if current_semester(today) == 3 else cur_start - 1
 
     entry_year, _, _, entry_sem = admission_start(student)
     if entry_year:
-        first = (entry_year + 1, 1) if entry_sem == 3 else (entry_year, 2 if entry_sem == 2 else 1)
+        first = entry_year + 1 if entry_sem == 3 else entry_year
     else:
-        first = (last[0] - CONDUCT_FALLBACK_YEARS + 1, 1)
+        first = last - CONDUCT_FALLBACK_YEARS + 1
 
-    choices = []
-    year, sem = last
-    while (year, sem) >= first:
-        if sem == 2 and (year, 1) >= first:
-            choices.append({"code": f"{year}{CONDUCT_YEAR_SUFFIX}", "label": _year_label(year),
-                            "kind": "year"})
-        choices.append({"code": f"{year}{sem}", "label": _semester_label(year, sem),
-                        "kind": "semester"})
-        year, sem = (year, 1) if sem == 2 else (year - 1, 2)
-    return choices
+    return [{"code": f"{year}{CONDUCT_YEAR_SUFFIX}", "label": _year_label(year), "kind": "year"}
+            for year in range(last, first - 1, -1)]
 
 
 def resolve_conduct_delivery(code):
@@ -900,12 +910,33 @@ def build_conduct_prefill(student):
     }
 
 
-def build_conduct_payload(student, *, semester_code, delivery, dob, citizen_id,
-                          citizen_id_issue_date, province_code, ward_code, street):
-    choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)}
-    if semester_code not in choices:
-        raise ValueError("Vui lòng chọn học kỳ cấp bảng điểm rèn luyện hợp lệ.")
-    label = choices[semester_code]
+def _conduct_selection(student, semester_codes):
+    """Năm học SV tích → (danh sách mã cũ trước, nhãn). Mã phải nằm trong danh sách được chọn."""
+    allowed = {c["code"] for c in conduct_semester_choices(student)}
+    codes = sorted({str(c).strip() for c in (semester_codes or []) if str(c).strip()})
+    if not codes:
+        raise ValueError("Vui lòng chọn ít nhất một năm học cấp bảng điểm rèn luyện.")
+    if any(c not in allowed for c in codes):
+        raise ValueError("Năm học cấp bảng điểm rèn luyện không hợp lệ.")
+    return codes, conduct_years_label(codes)
+
+
+def build_conduct_payload(student, *, semester_codes, delivery, dob, citizen_id,
+                          citizen_id_issue_date, province_code, ward_code, street,
+                          locked_purpose=None):
+    """Bảng điểm rèn luyện — một yêu cầu gồm MỘT HOẶC NHIỀU năm học.
+
+    `purpose` = {code: "2024N,2025N", codes: ["2024N", "2025N"], label: "Cả năm học 2024-2025,
+    2025-2026"}: `code`/`label` vẫn là chuỗi để Dashboard và yêu cầu cũ đọc như trước.
+    `locked_purpose`: sửa yêu cầu "Chờ bổ sung" — giữ nguyên năm học/học kỳ đã xin (kể cả học
+    kỳ lẻ của yêu cầu cũ), không kiểm lại với danh sách hiện tại.
+    """
+    if locked_purpose:
+        purpose = dict(locked_purpose)
+        label = purpose.get("label") or ""
+    else:
+        codes, label = _conduct_selection(student, semester_codes)
+        purpose = {"code": ",".join(codes), "codes": codes, "label": label, "program_name": None}
     delivery_choice = resolve_conduct_delivery(delivery)
 
     dob_field = _editable_field(format_student_birth_date(student), dob)
@@ -916,7 +947,7 @@ def build_conduct_payload(student, *, semester_code, delivery, dob, citizen_id,
 
     payload = {
         "doc_type": "conduct_score",
-        "purpose": {"code": semester_code, "label": label, "program_name": None},
+        "purpose": purpose,
         "delivery": dict(delivery_choice),
         "snapshot": {**_conduct_snapshot(student), "semester": label,
                      "delivery": delivery_choice["label"]},

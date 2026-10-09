@@ -33,9 +33,12 @@ export default function ConductScoreRequestPage() {
   const [form, setForm] = useState<ConductScoreFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
-  const [semesterCode, setSemesterCode] = useState('');
+  // Năm học cấp bảng điểm — tích được nhiều năm (từ 09/10/2026; bỏ học kỳ lẻ).
+  const [selectedYears, setSelectedYears] = useState<string[]>([]);
+  // Sửa yêu cầu "Chờ bổ sung": năm học / học kỳ đã xin giữ nguyên — chỉ hiện nhãn.
+  const [lockedLabel, setLockedLabel] = useState('');
   const [delivery, setDelivery] = useState('');
-  // Học kỳ bảng điểm đã xin trong học kỳ hiện tại — làm mờ trong danh sách, không ẩn.
+  // Năm học bảng điểm đã xin trong học kỳ hiện tại — làm mờ trong danh sách, không ẩn.
   const quota = useRequestQuota();
   const usedSemesters = quota?.types.conduct_score?.blocked_semesters ?? {};
   const [values, setValues] = useState<Record<FieldKey, string>>(
@@ -75,7 +78,8 @@ export default function ConductScoreRequestPage() {
         setOpenFields((s) => ({ ...s, [k]: true }));
       }
     });
-    setSemesterCode(purposeOf(r).code);
+    const prevPurpose = ((r.payload ?? {}) as { purpose?: { label?: string } }).purpose;
+    setLockedLabel(prevPurpose?.label || r.purpose || purposeOf(r).code);
     const prevDelivery = ((r.payload ?? {}) as { delivery?: { code?: string } }).delivery?.code;
     if (prevDelivery) setDelivery(prevDelivery);
     const a = pendingAddress(r);
@@ -163,7 +167,7 @@ export default function ConductScoreRequestPage() {
     const pf = form.prefill;
 
     const errs: FErr = {};
-    if (!semesterCode) errs.semester = 'Vui lòng chọn học kỳ hoặc cả năm học.';
+    if (!isEdit && selectedYears.length === 0) errs.semester = 'Vui lòng chọn ít nhất một năm học.';
     if (!delivery) errs.delivery = 'Vui lòng chọn hình thức nhận.';
     const de = validateDob(values.dob); if (de) errs.dob = de;
     const ce = validateCccd(values.citizen_id, pf.citizen_id); if (ce) errs.citizen_id = ce;
@@ -185,7 +189,7 @@ export default function ConductScoreRequestPage() {
     setLoading(true);
     try {
       await submitOrUpdate(edit, 'conduct_score', api.requests.createConductScore, {
-        semester_code: semesterCode,
+        semester_codes: selectedYears,
         delivery,
         dob: values.dob.trim(),
         citizen_id: values.citizen_id.trim(),
@@ -269,7 +273,7 @@ export default function ConductScoreRequestPage() {
             Bảng điểm rèn luyện
           </h1>
           <p className="text-sm text-muted mt-1">
-            Thông tin lấy từ hồ sơ. Chọn học kỳ hoặc cả năm học và hình thức nhận, kiểm tra thông tin, yêu cầu chỉnh sửa nếu sai rồi gửi.
+            Thông tin lấy từ hồ sơ. Chọn một hoặc nhiều năm học và hình thức nhận, kiểm tra thông tin, yêu cầu chỉnh sửa nếu sai rồi gửi.
           </p>
         </div>
 
@@ -292,41 +296,58 @@ export default function ConductScoreRequestPage() {
             </div>
           </div>
 
-          {/* Học kỳ */}
-          <div className="sm:max-w-[360px]">
-            <label className={ui.fieldLabel}>Học kỳ / năm học cấp bảng điểm rèn luyện <span className="text-red-500">*</span></label>
-            {noSemester ? (
+          {/* Năm học — tích được nhiều năm */}
+          <div className="sm:max-w-[480px]">
+            <span className={ui.fieldLabel}>Năm học cấp bảng điểm rèn luyện <span className="text-red-500">*</span></span>
+            {isEdit ? (
+              <>
+                <LockedBox value={lockedLabel} />
+                <p className="mt-1 text-[0.75rem] text-muted">Năm học đã xin không đổi được khi cập nhật yêu cầu.</p>
+              </>
+            ) : noSemester ? (
               <p className="text-[0.85rem] text-muted">
-                Chưa có học kỳ nào kết thúc để cấp bảng điểm rèn luyện. Liên hệ Phòng CTSV nếu cần hỗ trợ.
+                Chưa có năm học nào kết thúc để cấp bảng điểm rèn luyện. Liên hệ Phòng CTSV nếu cần hỗ trợ.
               </p>
             ) : (
               <>
-                <select
-                  value={semesterCode}
-                  onChange={(e) => { setSemesterCode(e.target.value); setFieldErrors((f) => ({ ...f, semester: undefined })); }}
-                  disabled={isEdit}
-                  className={cn(ui.input, fieldErrors.semester && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
-                >
-                  <option value="">— Chọn học kỳ hoặc cả năm học —</option>
+                <p className="mb-2 text-[0.78rem] text-muted">Chọn một hoặc nhiều năm học. Năm học đang diễn ra chưa có bảng điểm.</p>
+                <div className="space-y-1.5">
                   {form.semester_choices.map((c) => {
-                    const used = !isEdit ? usedSemesters[c.code] : undefined;
-                    // Đã xin cả năm ⇒ học kỳ lẻ của năm đó bị khoá ⇒ nêu lựa chọn đã xin nếu khác.
-                    const usedLabel = used?.semester_label;
-                    const suffix = !used ? ''
-                      : usedLabel && usedLabel !== c.label ? ` — đã xin ${usedLabel.toLowerCase()}`
-                      : ' — đã xin trong học kỳ này';
+                    const used = usedSemesters[c.code];
+                    const checked = selectedYears.includes(c.code);
                     return (
-                      <option key={c.code} value={c.code} disabled={!!used}>
-                        {c.label}{suffix}
-                      </option>
+                      <label
+                        key={c.code}
+                        aria-disabled={!!used}
+                        className={cn(
+                          'flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm transition-colors',
+                          used
+                            ? 'cursor-not-allowed border-line bg-slate-50 text-slate-400'
+                            : checked
+                              ? 'cursor-pointer border-primary bg-primary-soft text-primary-text font-medium'
+                              : 'cursor-pointer border-line bg-white text-ink hover:border-slate-400',
+                          fieldErrors.semester && !checked && !used && 'border-danger-line',
+                        )}
+                      >
+                        <input
+                          type="checkbox" value={c.code} checked={checked} disabled={!!used}
+                          onChange={() => {
+                            setSelectedYears((s) => (s.includes(c.code) ? s.filter((x) => x !== c.code) : [...s, c.code]));
+                            setFieldErrors((f) => ({ ...f, semester: undefined }));
+                          }}
+                          className="accent-primary"
+                        />
+                        <span className="flex-1">{c.label}</span>
+                        {used && <span className="text-[0.75rem] font-normal">Đã xin trong học kỳ này</span>}
+                      </label>
                     );
                   })}
-                </select>
+                </div>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
-                {!isEdit && Object.keys(usedSemesters).length > 0 && quota && (
+                {Object.keys(usedSemesters).some((k) => form.semester_choices.some((c) => c.code === k)) && quota && (
                   <QuotaNotice
                     className="mt-2"
-                    reason={`Lựa chọn đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, đã xin cả năm học thì không xin lẻ từng học kỳ của năm học đó, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
+                    reason={`Năm học đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi năm học bảng điểm chỉ được xin 1 lần trong một học kỳ, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
                   />
                 )}
               </>

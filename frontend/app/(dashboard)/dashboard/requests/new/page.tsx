@@ -32,7 +32,7 @@ const TYPE_HINTS: Record<RequestType, string> = {
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
   bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
   english_form: 'Giấy xác nhận bằng tiếng Anh (du học, xin việc, visa…).',
-  conduct_score: 'Bảng điểm rèn luyện theo học kỳ hoặc cả năm học, bản mềm hoặc bản cứng.',
+  conduct_score: 'Bảng điểm rèn luyện theo năm học (chọn được nhiều năm), bản mềm hoặc bản cứng.',
   // Liệt kê theo OTHER_PURPOSE_CHOICES (backend/core/documents.py) — thêm/bớt mục đích thì xem lại câu này.
   other: 'Xác nhận cho vé Metro ưu đãi, xin visa, xin việc, thực tập, du học, thi Tiếng Anh đầu ra, giảm trừ gia cảnh, vay vốn theo nhu cầu, kết nạp Đảng…',
 };

@@ -13,6 +13,7 @@ from core.documents import (
     build_conduct_prefill,
     build_thuongbinh_payload,
     conduct_overlapping_codes,
+    conduct_purpose_codes,
     conduct_semester_choices,
 )
 from core import request_quota
@@ -25,71 +26,61 @@ def _student(term_code=None, entry_year=None):
     return SimpleNamespace(admission_term=term, academic_entry_year=entry_year)
 
 
-def _codes(student, today, kind="semester"):
-    """Mặc định chỉ học kỳ lẻ; kind=None ⇒ mọi lựa chọn (kể cả cả năm học)."""
-    return [c["code"] for c in conduct_semester_choices(student, today=today)
-            if kind is None or c["kind"] == kind]
+def _codes(student, today):
+    return [c["code"] for c in conduct_semester_choices(student, today=today)]
 
 
-class ConductSemesterChoicesTests(SimpleTestCase):
-    def test_during_hk1_latest_is_previous_hk2(self):
-        # 30/09/2026 đang HK1 2026-2027 ⇒ gần nhất là HK2 2025-2026.
-        self.assertEqual(_codes(_student("20241"), date(2026, 9, 30)),
-                         ["20252", "20251", "20242", "20241"])
+class ConductYearChoicesTests(SimpleTestCase):
+    """Từ 09/10/2026: chỉ còn "Cả năm học" (bỏ học kỳ lẻ), SV tích được nhiều năm."""
 
-    def test_january_still_counts_as_hk1(self):
-        self.assertEqual(_codes(_student("20251"), date(2027, 1, 15))[0], "20252")
+    def test_during_hk1_latest_is_previous_year(self):
+        # 09/10/2026 đang HK1 2026-2027 ⇒ năm học gần nhất đã xong là 2025-2026.
+        self.assertEqual(_codes(_student("20241"), date(2026, 10, 9)), ["2025N", "2024N"])
 
-    def test_during_hk2_latest_is_current_year_hk1(self):
-        self.assertEqual(_codes(_student("20241"), date(2026, 3, 1))[0], "20251")
+    def test_only_whole_years(self):
+        kinds = {c["kind"] for c in conduct_semester_choices(_student("20211"), today=date(2026, 10, 9))}
+        self.assertEqual(kinds, {"year"})
 
-    def test_summer_latest_is_current_year_hk2(self):
-        self.assertEqual(_codes(_student("20241"), date(2026, 7, 20))[0], "20252")
+    def test_january_still_previous_year(self):
+        self.assertEqual(_codes(_student("20241"), date(2027, 1, 15))[0], "2025N")
 
-    def test_starts_from_admission_hk2(self):
-        self.assertEqual(_codes(_student("20242"), date(2026, 9, 30)),
-                         ["20252", "20251", "20242"])
+    def test_during_hk2_current_year_not_finished(self):
+        self.assertEqual(_codes(_student("20241"), date(2026, 3, 1)), ["2024N"])
 
-    def test_admission_hk3_starts_next_year_hk1(self):
-        self.assertEqual(_codes(_student("20243"), date(2026, 9, 30))[-1], "20251")
+    def test_summer_current_year_finished(self):
+        self.assertEqual(_codes(_student("20241"), date(2026, 7, 20)), ["2025N", "2024N"])
 
-    def test_freshman_has_no_semester_yet(self):
-        self.assertEqual(_codes(_student("20261"), date(2026, 9, 30)), [])
+    def test_admission_hk2_keeps_first_year(self):
+        # Nhập học HK2 2024-2025 vẫn có bảng điểm năm đó (chỉ HK2).
+        self.assertEqual(_codes(_student("20242"), date(2026, 10, 9)), ["2025N", "2024N"])
 
-    def test_entry_year_only_starts_at_hk1(self):
-        self.assertEqual(_codes(_student(entry_year=2025), date(2026, 9, 30)), ["20252", "20251"])
+    def test_admission_hk3_starts_next_year(self):
+        self.assertEqual(_codes(_student("20243"), date(2026, 10, 9)), ["2025N"])
+
+    def test_freshman_has_no_year_yet(self):
+        self.assertEqual(_codes(_student("20261"), date(2026, 10, 9)), [])
+        self.assertEqual(_codes(_student("20251"), date(2026, 3, 1)), [])
+
+    def test_entry_year_only(self):
+        self.assertEqual(_codes(_student(entry_year=2025), date(2026, 10, 9)), ["2025N"])
 
     def test_no_admission_data_falls_back_four_years(self):
-        codes = _codes(_student(), date(2026, 9, 30))
-        self.assertEqual((codes[0], codes[-1], len(codes)), ("20252", "20221", 8))
+        self.assertEqual(_codes(_student(), date(2026, 10, 9)), ["2025N", "2024N", "2023N", "2022N"])
 
     def test_label(self):
-        first = conduct_semester_choices(_student("20251"), today=date(2026, 9, 30))[1]
-        self.assertEqual(first["label"], "Học kỳ 2, năm học 2025-2026")
-
-
-class ConductWholeYearTests(SimpleTestCase):
-    def test_year_option_sits_before_its_hk2(self):
-        self.assertEqual(_codes(_student("20241"), date(2026, 9, 30), kind=None),
-                         ["2025N", "20252", "20251", "2024N", "20242", "20241"])
-
-    def test_year_needs_both_semesters_finished(self):
-        # Đang HK2 2025-2026: HK2 chưa kết thúc ⇒ chưa có "cả năm 2025-2026".
-        self.assertEqual(_codes(_student("20241"), date(2026, 3, 1), kind=None),
-                         ["20251", "2024N", "20242", "20241"])
-
-    def test_year_needs_both_semesters_in_range(self):
-        # Nhập học HK2 2024-2025 ⇒ không có HK1 năm đó ⇒ không có "cả năm 2024-2025".
-        self.assertNotIn("2024N", _codes(_student("20242"), date(2026, 9, 30), kind="year"))
-
-    def test_year_label(self):
-        first = conduct_semester_choices(_student("20251"), today=date(2026, 9, 30))[0]
+        first = conduct_semester_choices(_student("20251"), today=date(2026, 10, 9))[0]
         self.assertEqual((first["code"], first["label"]), ("2025N", "Cả năm học 2025-2026"))
 
     def test_overlapping_codes(self):
         self.assertEqual(conduct_overlapping_codes("2025N"), {"2025N", "20251", "20252"})
         self.assertEqual(conduct_overlapping_codes("20251"), {"20251"})
         self.assertEqual(conduct_overlapping_codes(""), set())
+
+    def test_purpose_codes_old_and_new(self):
+        self.assertEqual(conduct_purpose_codes({"code": "20252"}), ["20252"])
+        self.assertEqual(conduct_purpose_codes({"code": "2024N,2025N"}), ["2024N", "2025N"])
+        self.assertEqual(conduct_purpose_codes({"code": "x", "codes": ["2023N"]}), ["2023N"])
+        self.assertEqual(conduct_purpose_codes(None), [])
 
 
 class ConductPayloadTests(TestCase):
@@ -109,7 +100,7 @@ class ConductPayloadTests(TestCase):
         )
 
     def _payload(self, **over):
-        data = dict(semester_code="20211", delivery="online", dob="01/05/2002", citizen_id="079202000001",
+        data = dict(semester_codes=["2021N"], delivery="online", dob="01/05/2002", citizen_id="079202000001",
                     citizen_id_issue_date="10/04/2021", province_code="79",
                     ward_code="26734", street="12 Đường số 1")
         data.update(over)
@@ -125,7 +116,7 @@ class ConductPayloadTests(TestCase):
     def test_unchanged_fields_need_no_review_except_new_address(self):
         payload, label = self._payload()
         ed = payload["editable"]
-        self.assertEqual(label, "Học kỳ 1, năm học 2021-2022")
+        self.assertEqual(label, "Cả năm học 2021-2022")
         self.assertFalse(ed["dob"]["changed"])
         self.assertFalse(ed["citizen_id"]["changed"])
         # Hồ sơ chưa có địa chỉ chuẩn hóa ⇒ địa chỉ luôn chờ duyệt.
@@ -143,7 +134,8 @@ class ConductPayloadTests(TestCase):
 
     def test_invalid_inputs_rejected(self):
         for over in ({"citizen_id": "12345"}, {"dob": "31/02/2002"},
-                     {"ward_code": ""}, {"semester_code": "20301"},
+                     {"ward_code": ""}, {"semester_codes": ["20301"]}, {"semester_codes": ["20211"]},
+                     {"semester_codes": []}, {"semester_codes": ["2021N", "2030N"]},
                      {"delivery": ""}, {"delivery": "fax"}):
             with self.subTest(over=over), self.assertRaises(ValueError):
                 self._payload(**over)
@@ -163,45 +155,56 @@ class ConductPayloadTests(TestCase):
         self.assertEqual(payload["delivery"], {"code": "paper", "label": "Bản cứng (giấy)"})
         self.assertEqual(payload["snapshot"]["delivery"], "Bản cứng (giấy)")
 
-    def test_whole_year_payload(self):
-        payload, label = self._payload(semester_code="2021N")
-        self.assertEqual(label, "Cả năm học 2021-2022")
-        self.assertEqual(payload["purpose"]["code"], "2021N")
+    def test_multi_year_payload(self):
+        payload, label = self._payload(semester_codes=["2023N", "2021N", "2023N"])
+        self.assertEqual(label, "Cả năm học 2021-2022, 2023-2024")
+        self.assertEqual(payload["purpose"]["codes"], ["2021N", "2023N"])
+        self.assertEqual(payload["purpose"]["code"], "2021N,2023N")
+        self.assertEqual(payload["snapshot"]["semester"], label)
+
+    def test_locked_purpose_keeps_old_semester_on_edit(self):
+        old = {"code": "20212", "label": "Học kỳ 2, năm học 2021-2022"}
+        payload, label = self._payload(semester_codes=[], locked_purpose=old)
+        self.assertEqual((payload["purpose"]["code"], label), ("20212", "Học kỳ 2, năm học 2021-2022"))
 
 
-class ConductQuotaOverlapTests(TestCase):
-    """Cả năm học khoá HK lẻ của năm đó; học kỳ lẻ KHÔNG khoá cả năm (chốt 02/10/2026)."""
+class ConductQuotaTests(TestCase):
+    """Mỗi năm học chiếm lượt riêng; yêu cầu nhiều năm chiếm lượt mọi năm trong đó."""
 
     @classmethod
     def setUpTestData(cls):
         cls.student = Student.objects.create(current_student_code="ITITIU20002", full_name="B")
 
-    def _request(self, code, label, status=ConfirmationRequest.STATUS_PENDING):
+    def _request(self, purpose, status=ConfirmationRequest.STATUS_PENDING):
         return ConfirmationRequest.objects.create(
             student_id=self.student.pk, ldap_uid="ITITIU20002", request_type="conduct_score",
-            purpose=label, status=status,
-            payload={"purpose": {"code": code, "label": label}},
+            purpose=purpose.get("label", ""), status=status, payload={"purpose": purpose},
         )
 
-    def test_year_blocks_its_semesters(self):
-        self._request("2025N", "Cả năm học 2025-2026")
-        msg = request_quota.check(self.student.pk, "conduct_score", "20251",
-                                  "Học kỳ 1, năm học 2025-2026")
-        self.assertIn("cả năm học 2025-2026", msg)
-        self.assertIn("không xin lẻ từng học kỳ", msg)
-        self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "20241", "x"))
+    def _check(self, *codes):
+        return request_quota.check(self.student.pk, "conduct_score", list(codes),
+                                   {c: f"Cả năm học {c[:4]}-{int(c[:4]) + 1}" for c in codes})
 
-    def test_semester_does_not_block_year(self):
-        # Chốt 02/10/2026: đã xin một học kỳ thì vẫn xin được cả năm học đó.
-        self._request("20252", "Học kỳ 2, năm học 2025-2026")
-        self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "2025N",
-                                              "Cả năm học 2025-2026"))
-        self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "20251", "x"))
-        self.assertIsNotNone(request_quota.check(self.student.pk, "conduct_score", "20252", "x"))
+    def test_multi_year_request_blocks_each_year(self):
+        self._request({"code": "2023N,2024N", "codes": ["2023N", "2024N"],
+                       "label": "Cả năm học 2023-2024, 2024-2025"})
+        msg = self._check("2022N", "2024N")
+        self.assertIn("năm học 2024-2025", msg)
+        self.assertNotIn("2022-2023", msg)
+        self.assertIsNone(self._check("2022N", "2025N"))
         blocked = request_quota.availability(self.student.pk, ["conduct_score"])[
             "types"]["conduct_score"]["blocked_semesters"]
-        self.assertEqual(set(blocked), {"20252"})
+        self.assertTrue({"2023N", "2024N"} <= set(blocked))
 
-    def test_rejected_frees_overlap(self):
-        self._request("2025N", "Cả năm học 2025-2026", status=ConfirmationRequest.STATUS_REJECTED)
-        self.assertIsNone(request_quota.check(self.student.pk, "conduct_score", "20251", "x"))
+    def test_old_semester_request_does_not_block_year(self):
+        self._request({"code": "20252", "label": "Học kỳ 2, năm học 2025-2026"})
+        self.assertIsNone(self._check("2025N"))
+
+    def test_old_whole_year_request_still_blocks(self):
+        self._request({"code": "2025N", "label": "Cả năm học 2025-2026"})
+        self.assertIsNotNone(self._check("2025N"))
+
+    def test_rejected_frees_year(self):
+        self._request({"code": "2025N", "codes": ["2025N"], "label": "Cả năm học 2025-2026"},
+                      status=ConfirmationRequest.STATUS_REJECTED)
+        self.assertIsNone(self._check("2025N"))
