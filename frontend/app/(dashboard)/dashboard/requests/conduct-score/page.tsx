@@ -272,9 +272,6 @@ export default function ConductScoreRequestPage() {
             <FileText size={17} className="text-primary" />
             Bảng điểm rèn luyện
           </h1>
-          <p className="text-sm text-muted mt-1">
-            Thông tin lấy từ hồ sơ. Chọn một hoặc nhiều năm học và hình thức nhận, kiểm tra thông tin, yêu cầu chỉnh sửa nếu sai rồi gửi.
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
