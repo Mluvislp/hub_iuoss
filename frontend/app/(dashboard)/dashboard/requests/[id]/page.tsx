@@ -50,6 +50,8 @@ const EVENT_LABELS: Record<string, string> = {
   done: 'Hoàn thành',
   returned: 'Đã trả giấy',
   processing: 'Chuyển sang đang xử lý',
+  // Lượt ẢO: ghi chú SV nhập lúc gửi yêu cầu, hiện đầu khung trao đổi (không phải dòng DB).
+  request_note: 'Ghi chú khi gửi yêu cầu',
 };
 
 function fieldValue(info: unknown): string {
@@ -177,6 +179,20 @@ export default function RequestDetailPage() {
   const snapshot = (payload.snapshot ?? {}) as Record<string, unknown>;
   const editable = (payload.editable ?? {}) as Record<string, unknown>;
   const studentChoices = (payload.student_choices ?? {}) as Record<string, string>;
+
+  // Ghi chú SV nhập lúc gửi yêu cầu = lượt ĐẦU TIÊN của khung trao đổi (09/10/2026). Chỉ hiển thị,
+  // không phải dòng trao đổi thật — Dashboard dựng y hệt (document_request_detail.html).
+  const noteText = (data.note ?? '').trim();
+  const noteComment: RequestComment | null = noteText ? {
+    id: -1,
+    author_role: 'student',
+    author_name: data.comments.find((c) => c.author_role === 'student')?.author_name
+      || ((data.payload ?? {}) as { snapshot?: { student_name?: string } }).snapshot?.student_name
+      || 'Sinh viên',
+    body: noteText,
+    event: 'request_note',
+    created_at: data.created_at,
+  } : null;
 
   return (
     <div className="space-y-5">
@@ -307,7 +323,8 @@ export default function RequestDetailPage() {
         </div>
 
         <div className="max-h-[520px] space-y-2.5 overflow-y-auto px-5 py-4">
-          {data.comments.length === 0 ? (
+          {noteComment && <Bubble c={noteComment} />}
+          {data.comments.length === 0 && !noteComment ? (
             <p className="py-6 text-center text-sm text-muted">
               Chưa có trao đổi.
             </p>
