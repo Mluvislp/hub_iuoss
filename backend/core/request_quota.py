@@ -3,10 +3,10 @@
 Luật (người dùng chốt 01/10/2026):
   - Mỗi loại giấy chỉ xin được MỘT lần trong học kỳ hiện tại.
   - Yêu cầu bị TỪ CHỐI không tính lượt ⇒ xin lại được.
-  - Bảng điểm rèn luyện (`conduct_score`) tính riêng theo TỪNG HỌC KỲ CỦA BẢNG ĐIỂM:
-    trong một học kỳ, mỗi học kỳ bảng điểm xin được 1 lần. "Cả năm học" (mã `YYYYN`):
-    đã xin cả năm thì không xin lẻ HK1, HK2 của năm đó nữa; đã xin một học kỳ thì VẪN
-    xin được cả năm (một chiều, chốt 02/10/2026 — `documents.conduct_overlapping_codes`).
+  - Bảng điểm rèn luyện (`conduct_score`) tính riêng theo TỪNG NĂM HỌC CỦA BẢNG ĐIỂM:
+    trong một học kỳ, mỗi năm học bảng điểm xin được 1 lần. Từ 09/10/2026 một yêu cầu gồm
+    một hoặc nhiều năm học (`documents.conduct_purpose_codes`) — mỗi năm trong đó đều chiếm
+    lượt. Yêu cầu cũ chọn học kỳ lẻ chỉ khoá đúng học kỳ đó (`conduct_overlapping_codes`).
   - Chuyên viên bấm "Mở lại lượt xin" trên Dashboard ⇒ yêu cầu đó được đánh dấu
     `payload.quota_exempt` và KHÔNG tính lượt nữa ⇒ SV xin thêm được đúng một lần.
 
@@ -26,7 +26,7 @@ from django.utils import timezone
 
 from students.timeline import current_academic_year, current_semester
 
-from .documents import conduct_overlapping_codes
+from .documents import conduct_overlapping_codes, conduct_purpose_codes
 from .models import ConfirmationRequest
 
 CONTACT_EMAIL = "oss@hcmiu.edu.vn"
@@ -94,10 +94,10 @@ def availability(student_id, request_types, today=None):
         if t == CONDUCT_TYPE:
             sems = {}
             for r in mine:
-                code = ((r.payload or {}).get("purpose") or {}).get("code")
-                # Đã xin cả năm ⇒ khoá luôn học kỳ lẻ của năm đó (một chiều).
-                for c in sorted(conduct_overlapping_codes(code)):
-                    sems.setdefault(c, _blocking_info(r, term))
+                # Mỗi năm học trong yêu cầu đều chiếm lượt; cả năm khoá luôn học kỳ lẻ của năm đó.
+                for code in conduct_purpose_codes((r.payload or {}).get("purpose")):
+                    for c in sorted(conduct_overlapping_codes(code)):
+                        sems.setdefault(c, _blocking_info(r, term))
             out[t] = {"blocked": False, "reason": "", "blocking": None, "blocked_semesters": sems}
             continue
         if mine:
@@ -120,14 +120,31 @@ def block_message(request_type, info, semester_label=None):
             f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.{overlap}")
 
 
-def check(student_id, request_type, semester_code=None, semester_label=None):
-    """Chuỗi lý do bị chặn, hoặc None nếu được tạo."""
+def conduct_block_message(hits):
+    """hits = [(nhãn năm học đang xin, info yêu cầu chiếm lượt)] — liệt kê mọi năm bị trùng."""
+    years = ", ".join(label.replace("Cả năm học ", "") for label, _ in hits)
+    refs = "; ".join(dict.fromkeys(f"mã yêu cầu {i['code']}, {i['status_label'].lower()}" for _, i in hits))
+    term = hits[0][1]["term"].lower()
+    return (f"Bảng điểm rèn luyện năm học {years} đã được xin trong {term} ({refs}). Mỗi năm học "
+            f"chỉ được xin 1 lần trong một học kỳ; được xin lại khi yêu cầu trước bị từ chối. Bỏ chọn "
+            f"năm học đã xin để gửi các năm còn lại. Trường hợp cần xin cấp thêm, đề nghị liên hệ "
+            f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.")
+
+
+def check(student_id, request_type, semester_codes=None, labels=None):
+    """Chuỗi lý do bị chặn, hoặc None nếu được tạo.
+
+    Bảng điểm rèn luyện: `semester_codes` là danh sách năm học đang xin (`labels` = {mã: nhãn});
+    trùng bất kỳ năm nào ⇒ chặn cả yêu cầu và nêu đủ các năm trùng.
+    """
     if not student_id:
         return None
     data = availability(student_id, [request_type])["types"][request_type]
     if request_type == CONDUCT_TYPE:
-        info = data["blocked_semesters"].get(str(semester_code or ""))
-        return block_message(request_type, info, semester_label or "") if info else None
+        blocked = data["blocked_semesters"]
+        labels = labels or {}
+        hits = [(labels.get(c, c), blocked[c]) for c in (semester_codes or []) if c in blocked]
+        return conduct_block_message(hits) if hits else None
     return data["reason"] if data["blocked"] else None
 
 

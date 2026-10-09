@@ -323,7 +323,8 @@ export interface ConductScorePrefill {
   street: string;
 }
 
-/** Mã `YYYYS` = một học kỳ, `YYYYN` = cả năm học (kind 'year'). */
+/** Mã `YYYYN` = cả năm học (kind 'year'). Từ 09/10/2026 chỉ còn năm học, SV tích được nhiều năm;
+ *  `YYYYS` (học kỳ lẻ) chỉ còn ở yêu cầu cũ. */
 export interface ConductSemesterChoice extends PurposeChoice {
   kind: 'semester' | 'year';
 }
@@ -715,7 +716,7 @@ export interface QuotaTypeState {
   blocked: boolean;
   reason: string;
   blocking: QuotaBlocking | null;
-  /** Chỉ conduct_score: học kỳ bảng điểm đã xin trong học kỳ hiện tại. */
+  /** Chỉ conduct_score: năm học (học kỳ) bảng điểm đã xin trong học kỳ hiện tại. */
   blocked_semesters?: Record<string, QuotaBlocking>;
 }
 

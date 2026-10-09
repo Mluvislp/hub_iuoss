@@ -290,7 +290,8 @@ export const api = {
       return request('/requests/conduct-score/form/');
     },
     createConductScore(data: {
-      semester_code: string;
+      /** Một hoặc nhiều năm học (mã `YYYYN`). */
+      semester_codes: string[];
       delivery: string;
       dob: string;
       citizen_id: string;

@@ -65,7 +65,7 @@ def apply_student_edit(req, request, fields):
         if req.request_type == "conduct_score":
             old_sem = (old.get("purpose") or {}).get("code")
             if old_sem and (new.get("purpose") or {}).get("code") != old_sem:
-                raise ParseError("Không đổi được học kỳ của yêu cầu bảng điểm rèn luyện.")
+                raise ParseError("Không đổi được năm học (học kỳ) của yêu cầu bảng điểm rèn luyện.")
         req.payload = _merge_payload(old, new)
 
     req.purpose = fields["purpose"]
