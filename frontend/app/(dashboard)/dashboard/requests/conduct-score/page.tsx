@@ -352,8 +352,7 @@ export default function ConductScoreRequestPage() {
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
                 {selectedYears.length > 0 && (
                   <p className="mt-1.5 text-[0.75rem] text-muted">
-                    Điểm hiển thị theo dữ liệu Phòng CTSV đang lưu; điểm cả năm học là trung bình các học kỳ có điểm.
-                    Điểm chính thức theo bảng điểm được cấp.
+                    Điểm từng học kỳ theo dữ liệu Phòng CTSV đang lưu. Điểm chính thức theo bảng điểm được cấp.
                   </p>
                 )}
                 {Object.keys(usedSemesters).some((k) => form.semester_choices.some((c) => c.code === k)) && quota && (
@@ -554,7 +553,8 @@ export default function ConductScoreRequestPage() {
 }
 
 
-// Điểm rèn luyện của một năm học, hiện ngay dưới năm học SV vừa tích.
+// Điểm rèn luyện HK1/HK2 của một năm học, hiện ngay dưới năm học SV vừa tích.
+// Không hiện điểm cả năm: con số tự tính có thể lệch bảng điểm chính thức (chốt 10/10/2026).
 function ConductYearScores({ score }: { score?: ConductYearScore }) {
   if (!score || score.semester_count === 0) {
     return (
@@ -563,23 +563,17 @@ function ConductYearScores({ score }: { score?: ConductYearScore }) {
       </p>
     );
   }
-  const cells = [
-    ...score.semesters.map((s) => ({ label: `Học kỳ ${s.semester}`, value: s.score, rank: s.rank })),
-    { label: 'Cả năm học', value: score.average, rank: score.average_rank },
-  ];
   return (
-    <div className="mx-3.5 mb-3 grid grid-cols-3 divide-x divide-line2 rounded-md border border-primary-line bg-white font-normal">
-      {cells.map((cell, i) => (
-        <div key={cell.label} className="px-2 py-2 text-center">
-          <div className="text-[0.72rem] text-muted">{cell.label}</div>
-          {cell.value === null || cell.value === undefined ? (
+    <div className="mx-3.5 mb-3 grid grid-cols-2 divide-x divide-line2 rounded-md border border-primary-line bg-white font-normal">
+      {score.semesters.map((s) => (
+        <div key={s.semester} className="px-2 py-2 text-center">
+          <div className="text-[0.72rem] text-muted">Học kỳ {s.semester}</div>
+          {s.score === null ? (
             <div className="mt-0.5 text-[0.8rem] italic text-slate-400">Chưa có điểm</div>
           ) : (
             <>
-              <div className={cn('text-[1.05rem] font-semibold leading-tight', i === cells.length - 1 ? 'text-primary-text' : 'text-ink')}>
-                {cell.value}
-              </div>
-              <div className="text-[0.72rem] text-muted">{cell.rank}</div>
+              <div className="text-[1.05rem] font-semibold leading-tight text-ink">{s.score}</div>
+              <div className="text-[0.72rem] text-muted">{s.rank}</div>
             </>
           )}
         </div>

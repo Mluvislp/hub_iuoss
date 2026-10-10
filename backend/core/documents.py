@@ -7,7 +7,6 @@ Contract payload dùng chung với Dashboard (nơi sinh giấy). Hiện có "oth
 import re
 import unicodedata
 from datetime import date, datetime
-from decimal import ROUND_HALF_UP, Decimal
 
 from core import address_service, cccd_rules
 from students.models import Department, StudentIdentityDocument, StudentAddress, VnProvince, VnWard
@@ -893,35 +892,14 @@ CONDUCT_RANK_LABELS = {
     "AVERAGE": "Trung bình",
     "WEAK": "Yếu",
 }
-CONDUCT_RANK_THRESHOLDS = [(90, "EXCELLENT"), (80, "GOOD"), (65, "FAIR"), (50, "AVERAGE")]
-
-
-def conduct_year_average(scores):
-    """Trung bình các học kỳ CÓ điểm, làm tròn 1 chữ số kiểu Excel (nửa lên) — đúng cách mẫu
-    in bảng điểm rèn luyện tính. Bản gốc ở Dashboard `students/conduct_scores.py`, sửa cả hai."""
-    values = [Decimal(s) for s in scores if s is not None]
-    if not values:
-        return None
-    return (sum(values) / len(values)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
-
-
-def conduct_rank_for_score(score):
-    for threshold, code in CONDUCT_RANK_THRESHOLDS:
-        if score >= threshold:
-            return code
-    return "WEAK"
-
-
-def _format_conduct_score(value):
-    """Decimal('87.5') → '87,5'; Decimal('88.0') → '88'."""
-    return str(int(value)) if value == value.to_integral() else str(value).replace(".", ",")
 
 
 def conduct_scores_by_year(student, choices):
-    """Điểm rèn luyện của các năm học trong `choices` (mã `YYYYN`) → {mã: {...}}.
+    """Điểm rèn luyện HK1/HK2 của các năm học trong `choices` (mã `YYYYN`) → {mã: {...}}.
 
-    Mỗi năm: điểm HK1/HK2 (None nếu chưa có), trung bình năm học + xếp loại (chỉ khi có
-    ít nhất một học kỳ). Xếp loại TỪNG học kỳ lấy nguyên theo dữ liệu Phòng CTSV nhập.
+    Chỉ trả điểm + xếp loại TỪNG học kỳ đúng như Phòng CTSV nhập. KHÔNG tự tính điểm
+    hay xếp loại cả năm (người dùng chốt 10/10/2026: con số tự tính có thể lệch bảng
+    điểm chính thức). Học kỳ chưa có điểm ⇒ `score` None.
     """
     from students.models import StudentConductScore
 
@@ -944,11 +922,8 @@ def conduct_scores_by_year(student, choices):
                 "score": s.final_score if s else None,
                 "rank": CONDUCT_RANK_LABELS.get(s.conduct_rank, "") if s else "",
             })
-        avg = conduct_year_average(x["score"] for x in semesters)
         result[f"{year}{CONDUCT_YEAR_SUFFIX}"] = {
             "semesters": semesters,
-            "average": _format_conduct_score(avg) if avg is not None else None,
-            "average_rank": CONDUCT_RANK_LABELS[conduct_rank_for_score(avg)] if avg is not None else "",
             "semester_count": sum(1 for x in semesters if x["score"] is not None),
         }
     return result
