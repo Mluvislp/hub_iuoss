@@ -350,11 +350,6 @@ export default function ConductScoreRequestPage() {
                   })}
                 </div>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
-                {selectedYears.length > 0 && (
-                  <p className="mt-1.5 text-[0.75rem] text-muted">
-                    Điểm từng học kỳ theo dữ liệu Phòng CTSV đang lưu. Điểm chính thức theo bảng điểm được cấp.
-                  </p>
-                )}
                 {Object.keys(usedSemesters).some((k) => form.semester_choices.some((c) => c.code === k)) && quota && (
                   <QuotaNotice
                     className="mt-2"
