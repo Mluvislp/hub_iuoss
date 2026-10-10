@@ -210,27 +210,6 @@ class ConductQuotaTests(TestCase):
         self.assertIsNone(self._check("2025N"))
 
 
-class ConductScoreMathTests(SimpleTestCase):
-    """Trung bình năm học + xếp loại — đúng cách mẫu in bảng điểm tính (sheet `In`)."""
-
-    def test_average_rounds_half_up_to_one_decimal(self):
-        from decimal import Decimal
-        from core.documents import conduct_year_average
-        self.assertEqual(conduct_year_average([85, 90]), Decimal("87.5"))
-        self.assertEqual(conduct_year_average([88, 88]), Decimal("88.0"))
-        self.assertEqual(conduct_year_average([100, None]), Decimal("100.0"))
-        self.assertEqual(conduct_year_average([-2, 3]), Decimal("0.5"))
-        self.assertIsNone(conduct_year_average([None, None]))
-
-    def test_rank_thresholds(self):
-        from decimal import Decimal
-        from core.documents import conduct_rank_for_score
-        cases = {"90": "EXCELLENT", "89.5": "GOOD", "80": "GOOD", "79.5": "FAIR", "65": "FAIR",
-                 "64.5": "AVERAGE", "50": "AVERAGE", "49.5": "WEAK", "-2": "WEAK"}
-        for score, rank in cases.items():
-            self.assertEqual(conduct_rank_for_score(Decimal(score)), rank, score)
-
-
 class ConductScoresByYearTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -253,10 +232,13 @@ class ConductScoresByYearTests(TestCase):
         full = data["2023N"]
         self.assertEqual([s["score"] for s in full["semesters"]], [85, 90])
         self.assertEqual([s["rank"] for s in full["semesters"]], ["Tốt", "Xuất sắc"])
-        self.assertEqual((full["average"], full["average_rank"], full["semester_count"]), ("87,5", "Tốt", 2))
+        self.assertEqual(full["semester_count"], 2)
+        # Không tự tính điểm / xếp loại cả năm (người dùng chốt 10/10/2026).
+        self.assertNotIn("average", full)
         # HK2 chưa có (dòng HK2 của SV khác không được lẫn vào), HK hè không tính.
         part = data["2024N"]
         self.assertEqual([s["score"] for s in part["semesters"]], [64, None])
-        self.assertEqual((part["average"], part["average_rank"], part["semester_count"]), ("64", "Trung bình", 1))
+        self.assertEqual(part["semester_count"], 1)
         empty = data["2025N"]
-        self.assertEqual((empty["average"], empty["average_rank"], empty["semester_count"]), (None, "", 0))
+        self.assertEqual([s["score"] for s in empty["semesters"]], [None, None])
+        self.assertEqual(empty["semester_count"], 0)

@@ -329,12 +329,10 @@ export interface ConductSemesterChoice extends PurposeChoice {
   kind: 'semester' | 'year';
 }
 
-/** Điểm rèn luyện một năm học (Phòng CTSV import ở Dashboard). `score` null = học kỳ chưa có điểm.
- *  `average` đã định dạng sẵn ("87,5"), null khi cả năm chưa có điểm nào. */
+/** Điểm rèn luyện HK1/HK2 của một năm học, đúng như Phòng CTSV nhập — KHÔNG có điểm cả năm
+ *  tự tính. `score` null = học kỳ chưa có điểm. */
 export interface ConductYearScore {
   semesters: { semester: number; score: number | null; rank: string }[];
-  average: string | null;
-  average_rank: string;
   semester_count: number;
 }
 
