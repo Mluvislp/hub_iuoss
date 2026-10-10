@@ -329,8 +329,19 @@ export interface ConductSemesterChoice extends PurposeChoice {
   kind: 'semester' | 'year';
 }
 
+/** Điểm rèn luyện một năm học (Phòng CTSV import ở Dashboard). `score` null = học kỳ chưa có điểm.
+ *  `average` đã định dạng sẵn ("87,5"), null khi cả năm chưa có điểm nào. */
+export interface ConductYearScore {
+  semesters: { semester: number; score: number | null; rank: string }[];
+  average: string | null;
+  average_rank: string;
+  semester_count: number;
+}
+
 export interface ConductScoreFormData {
   semester_choices: ConductSemesterChoice[];
+  /** Theo mã năm học `YYYYN`. */
+  conduct_scores?: Record<string, ConductYearScore>;
   /** Hình thức nhận: online = bản mềm, paper = bản cứng. */
   delivery_choices: PurposeChoice[];
   prefill: ConductScorePrefill;
