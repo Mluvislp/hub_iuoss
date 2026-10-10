@@ -1054,19 +1054,16 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
-        """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py)."""
+        """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py),
+        trừ bảng điểm rèn luyện (không giới hạn)."""
         request_type = _get_str(request.data, "request_type")
         sid = request.user.student_id
         if not sid:
             return self._create(request, request_type)
-        semester_codes, labels = None, None
-        if request_type == request_quota.CONDUCT_TYPE:
-            semester_codes = _get_codes(request.data)
-            student = self._resolve_student(request)
-            labels = {c["code"]: c["label"] for c in conduct_semester_choices(student)} if student else {}
         # Khoá theo SV: kiểm hạn mức + tạo yêu cầu là một bước, bấm gửi hai lần không lọt.
+        # Bảng điểm rèn luyện không giới hạn số lần (request_quota.UNLIMITED_TYPES).
         with request_quota.student_lock(sid):
-            reason = request_quota.check(sid, request_type, semester_codes, labels)
+            reason = request_quota.check(sid, request_type)
             if reason:
                 return Response({"detail": reason, "code": "quota_exceeded"}, status=status.HTTP_409_CONFLICT)
             return self._create(request, request_type)

@@ -17,7 +17,6 @@ import {
   isValidDob, isValidIssueDate,
 } from '@/lib/form-validators';
 import { PermanentAddressCccdNote, STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
-import { QuotaGuard, QuotaNotice, useRequestQuota } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf, pendingAddress } from '@/components/request-edit';
 
 // Bảng điểm rèn luyện: Phòng CTSV xuất từ hệ thống khác. Ngày sinh / CCCD + ngày cấp /
@@ -38,9 +37,6 @@ export default function ConductScoreRequestPage() {
   // Sửa yêu cầu "Chờ bổ sung": năm học / học kỳ đã xin giữ nguyên — chỉ hiện nhãn.
   const [lockedLabel, setLockedLabel] = useState('');
   const [delivery, setDelivery] = useState('');
-  // Năm học bảng điểm đã xin trong học kỳ hiện tại — làm mờ trong danh sách, không ẩn.
-  const quota = useRequestQuota();
-  const usedSemesters = quota?.types.conduct_score?.blocked_semesters ?? {};
   const [values, setValues] = useState<Record<FieldKey, string>>(
     { dob: '', citizen_id: '', citizen_id_issue_date: '' });
   const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>(
@@ -275,7 +271,6 @@ export default function ConductScoreRequestPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
-          <QuotaGuard type="conduct_score" bypass={isEdit}>
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -310,31 +305,21 @@ export default function ConductScoreRequestPage() {
                 <p className="mb-2 text-[0.78rem] text-muted">Chọn một hoặc nhiều năm học. Năm học đang diễn ra chưa có bảng điểm.</p>
                 <div className="space-y-1.5">
                   {form.semester_choices.map((c) => {
-                    const used = usedSemesters[c.code];
                     const checked = selectedYears.includes(c.code);
                     return (
                       <div
                         key={c.code}
                         className={cn(
                           'rounded-lg border text-sm transition-colors',
-                          used
-                            ? 'border-line bg-slate-50 text-slate-400'
-                            : checked
-                              ? 'border-primary bg-primary-soft text-primary-text'
-                              : 'border-line bg-white text-ink hover:border-slate-400',
-                          fieldErrors.semester && !checked && !used && 'border-danger-line',
+                          checked
+                            ? 'border-primary bg-primary-soft text-primary-text'
+                            : 'border-line bg-white text-ink hover:border-slate-400',
+                          fieldErrors.semester && !checked && 'border-danger-line',
                         )}
                       >
-                        <label
-                          aria-disabled={!!used}
-                          className={cn(
-                            'flex items-center gap-2.5 px-3.5 py-2.5',
-                            used ? 'cursor-not-allowed' : 'cursor-pointer',
-                            checked && 'font-medium',
-                          )}
-                        >
+                        <label className={cn('flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5', checked && 'font-medium')}>
                           <input
-                            type="checkbox" value={c.code} checked={checked} disabled={!!used}
+                            type="checkbox" value={c.code} checked={checked}
                             onChange={() => {
                               setSelectedYears((s) => (s.includes(c.code) ? s.filter((x) => x !== c.code) : [...s, c.code]));
                               setFieldErrors((f) => ({ ...f, semester: undefined }));
@@ -342,7 +327,6 @@ export default function ConductScoreRequestPage() {
                             className="accent-primary"
                           />
                           <span className="flex-1">{c.label}</span>
-                          {used && <span className="text-[0.75rem] font-normal">Đã xin trong học kỳ này</span>}
                         </label>
                         {checked && <ConductYearScores score={form.conduct_scores?.[c.code]} />}
                       </div>
@@ -350,12 +334,6 @@ export default function ConductScoreRequestPage() {
                   })}
                 </div>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
-                {Object.keys(usedSemesters).some((k) => form.semester_choices.some((c) => c.code === k)) && quota && (
-                  <QuotaNotice
-                    className="mt-2"
-                    reason={`Năm học đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi năm học bảng điểm chỉ được xin 1 lần trong một học kỳ, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
-                  />
-                )}
               </>
             )}
           </div>
@@ -533,7 +511,6 @@ export default function ConductScoreRequestPage() {
               </button>
             </ConsentGate>
           </div>
-        </QuotaGuard>
         </form>
       </div>
 

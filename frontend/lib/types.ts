@@ -725,8 +725,6 @@ export interface QuotaTypeState {
   blocked: boolean;
   reason: string;
   blocking: QuotaBlocking | null;
-  /** Chỉ conduct_score: năm học (học kỳ) bảng điểm đã xin trong học kỳ hiện tại. */
-  blocked_semesters?: Record<string, QuotaBlocking>;
 }
 
 export interface RequestAvailability {
