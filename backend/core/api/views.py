@@ -48,6 +48,7 @@ from core.documents import (
     build_conduct_payload,
     build_conduct_prefill,
     conduct_semester_choices,
+    conduct_scores_by_year,
     CONDUCT_DELIVERY_CHOICES,
 )
 from core import offcampus
@@ -1628,10 +1629,13 @@ class ConductScoreRequestFormView(DocumentRequestsRequiredMixin, APIView):
                 {"detail": "Không tìm thấy hồ sơ sinh viên."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        choices = conduct_semester_choices(student)
         return Response({
-            "semester_choices": conduct_semester_choices(student),
+            "semester_choices": choices,
             "delivery_choices": CONDUCT_DELIVERY_CHOICES,
             "prefill": build_conduct_prefill(student),
+            # Điểm rèn luyện từng năm học để SV xem trước khi xin (Phòng CTSV import ở Dashboard).
+            "conduct_scores": conduct_scores_by_year(student, choices),
         })
 
 

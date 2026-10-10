@@ -103,6 +103,30 @@ class Student(models.Model):
         return f"{self.current_student_code} - {self.full_name}"
 
 
+class StudentConductScore(models.Model):
+    """Điểm rèn luyện theo học kỳ — Dashboard sở hữu (import từ file của Phòng CTSV), Hub CHỈ ĐỌC.
+
+    `final_score` = điểm CVHT chốt (điểm in trên bảng điểm); `conduct_rank` lấy nguyên từ
+    file (EXCELLENT/GOOD/FAIR/AVERAGE/WEAK). Chỉ khai báo các cột Hub dùng.
+    """
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING, db_column="student_id", related_name="conduct_scores",
+    )
+    term = models.ForeignKey(
+        AcademicTerm, on_delete=models.DO_NOTHING, db_column="term_id", related_name="+",
+    )
+    final_score = models.SmallIntegerField()
+    conduct_rank = models.CharField(max_length=10)
+
+    class Meta:
+        managed = False
+        db_table = "student_conduct_scores"
+
+    def __str__(self):
+        return f"{self.student_id} @ {self.term_id}: {self.final_score}"
+
+
 class StudentCodeHistory(models.Model):
     """Lịch sử mã số sinh viên — Dashboard sở hữu, Hub CHỈ ĐỌC.
 

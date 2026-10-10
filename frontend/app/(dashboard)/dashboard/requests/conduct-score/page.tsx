@@ -6,7 +6,7 @@ import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } 
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
-import type { ConductScoreFormData, Province, Ward } from '@/lib/types';
+import type { ConductScoreFormData, ConductYearScore, Province, Ward } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
 import {
@@ -313,34 +313,49 @@ export default function ConductScoreRequestPage() {
                     const used = usedSemesters[c.code];
                     const checked = selectedYears.includes(c.code);
                     return (
-                      <label
+                      <div
                         key={c.code}
-                        aria-disabled={!!used}
                         className={cn(
-                          'flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm transition-colors',
+                          'rounded-lg border text-sm transition-colors',
                           used
-                            ? 'cursor-not-allowed border-line bg-slate-50 text-slate-400'
+                            ? 'border-line bg-slate-50 text-slate-400'
                             : checked
-                              ? 'cursor-pointer border-primary bg-primary-soft text-primary-text font-medium'
-                              : 'cursor-pointer border-line bg-white text-ink hover:border-slate-400',
+                              ? 'border-primary bg-primary-soft text-primary-text'
+                              : 'border-line bg-white text-ink hover:border-slate-400',
                           fieldErrors.semester && !checked && !used && 'border-danger-line',
                         )}
                       >
-                        <input
-                          type="checkbox" value={c.code} checked={checked} disabled={!!used}
-                          onChange={() => {
-                            setSelectedYears((s) => (s.includes(c.code) ? s.filter((x) => x !== c.code) : [...s, c.code]));
-                            setFieldErrors((f) => ({ ...f, semester: undefined }));
-                          }}
-                          className="accent-primary"
-                        />
-                        <span className="flex-1">{c.label}</span>
-                        {used && <span className="text-[0.75rem] font-normal">Đã xin trong học kỳ này</span>}
-                      </label>
+                        <label
+                          aria-disabled={!!used}
+                          className={cn(
+                            'flex items-center gap-2.5 px-3.5 py-2.5',
+                            used ? 'cursor-not-allowed' : 'cursor-pointer',
+                            checked && 'font-medium',
+                          )}
+                        >
+                          <input
+                            type="checkbox" value={c.code} checked={checked} disabled={!!used}
+                            onChange={() => {
+                              setSelectedYears((s) => (s.includes(c.code) ? s.filter((x) => x !== c.code) : [...s, c.code]));
+                              setFieldErrors((f) => ({ ...f, semester: undefined }));
+                            }}
+                            className="accent-primary"
+                          />
+                          <span className="flex-1">{c.label}</span>
+                          {used && <span className="text-[0.75rem] font-normal">Đã xin trong học kỳ này</span>}
+                        </label>
+                        {checked && <ConductYearScores score={form.conduct_scores?.[c.code]} />}
+                      </div>
                     );
                   })}
                 </div>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
+                {selectedYears.length > 0 && (
+                  <p className="mt-1.5 text-[0.75rem] text-muted">
+                    Điểm hiển thị theo dữ liệu Phòng CTSV đang lưu; điểm cả năm học là trung bình các học kỳ có điểm.
+                    Điểm chính thức theo bảng điểm được cấp.
+                  </p>
+                )}
                 {Object.keys(usedSemesters).some((k) => form.semester_choices.some((c) => c.code === k)) && quota && (
                   <QuotaNotice
                     className="mt-2"
@@ -534,6 +549,41 @@ export default function ConductScoreRequestPage() {
           Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.
         </p>
       </div>
+    </div>
+  );
+}
+
+
+// Điểm rèn luyện của một năm học, hiện ngay dưới năm học SV vừa tích.
+function ConductYearScores({ score }: { score?: ConductYearScore }) {
+  if (!score || score.semester_count === 0) {
+    return (
+      <p className="mx-3.5 mb-3 rounded-md border border-line bg-white px-3 py-2 text-[0.78rem] font-normal text-muted">
+        Chưa có điểm rèn luyện của năm học này trong hệ thống. Phòng CTSV kiểm tra khi xử lý yêu cầu.
+      </p>
+    );
+  }
+  const cells = [
+    ...score.semesters.map((s) => ({ label: `Học kỳ ${s.semester}`, value: s.score, rank: s.rank })),
+    { label: 'Cả năm học', value: score.average, rank: score.average_rank },
+  ];
+  return (
+    <div className="mx-3.5 mb-3 grid grid-cols-3 divide-x divide-line2 rounded-md border border-primary-line bg-white font-normal">
+      {cells.map((cell, i) => (
+        <div key={cell.label} className="px-2 py-2 text-center">
+          <div className="text-[0.72rem] text-muted">{cell.label}</div>
+          {cell.value === null || cell.value === undefined ? (
+            <div className="mt-0.5 text-[0.8rem] italic text-slate-400">Chưa có điểm</div>
+          ) : (
+            <>
+              <div className={cn('text-[1.05rem] font-semibold leading-tight', i === cells.length - 1 ? 'text-primary-text' : 'text-ink')}>
+                {cell.value}
+              </div>
+              <div className="text-[0.72rem] text-muted">{cell.rank}</div>
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
