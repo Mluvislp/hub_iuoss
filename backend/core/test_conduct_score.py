@@ -12,7 +12,6 @@ from core.documents import (
     build_conduct_payload,
     build_conduct_prefill,
     build_thuongbinh_payload,
-    conduct_overlapping_codes,
     conduct_purpose_codes,
     conduct_semester_choices,
 )
@@ -70,11 +69,6 @@ class ConductYearChoicesTests(SimpleTestCase):
     def test_label(self):
         first = conduct_semester_choices(_student("20251"), today=date(2026, 10, 9))[0]
         self.assertEqual((first["code"], first["label"]), ("2025N", "Cả năm học 2025-2026"))
-
-    def test_overlapping_codes(self):
-        self.assertEqual(conduct_overlapping_codes("2025N"), {"2025N", "20251", "20252"})
-        self.assertEqual(conduct_overlapping_codes("20251"), {"20251"})
-        self.assertEqual(conduct_overlapping_codes(""), set())
 
     def test_purpose_codes_old_and_new(self):
         self.assertEqual(conduct_purpose_codes({"code": "20252"}), ["20252"])
@@ -169,45 +163,28 @@ class ConductPayloadTests(TestCase):
 
 
 class ConductQuotaTests(TestCase):
-    """Mỗi năm học chiếm lượt riêng; yêu cầu nhiều năm chiếm lượt mọi năm trong đó."""
+    """Bảng điểm rèn luyện KHÔNG giới hạn số lần xin (người dùng chốt 10/10/2026)."""
 
     @classmethod
     def setUpTestData(cls):
         cls.student = Student.objects.create(current_student_code="ITITIU20002", full_name="B")
 
-    def _request(self, purpose, status=ConfirmationRequest.STATUS_PENDING):
+    def _request(self, request_type, purpose, status=ConfirmationRequest.STATUS_PENDING):
         return ConfirmationRequest.objects.create(
-            student_id=self.student.pk, ldap_uid="ITITIU20002", request_type="conduct_score",
+            student_id=self.student.pk, ldap_uid="ITITIU20002", request_type=request_type,
             purpose=purpose.get("label", ""), status=status, payload={"purpose": purpose},
         )
 
-    def _check(self, *codes):
-        return request_quota.check(self.student.pk, "conduct_score", list(codes),
-                                   {c: f"Cả năm học {c[:4]}-{int(c[:4]) + 1}" for c in codes})
+    def test_same_year_can_be_requested_again(self):
+        for _ in range(3):
+            self._request("conduct_score", {"code": "2025N", "codes": ["2025N"], "label": "Cả năm học 2025-2026"})
+        self.assertIsNone(request_quota.check(self.student.pk, "conduct_score"))
+        info = request_quota.availability(self.student.pk, ["conduct_score"])["types"]["conduct_score"]
+        self.assertEqual(info, {"blocked": False, "reason": "", "blocking": None})
 
-    def test_multi_year_request_blocks_each_year(self):
-        self._request({"code": "2023N,2024N", "codes": ["2023N", "2024N"],
-                       "label": "Cả năm học 2023-2024, 2024-2025"})
-        msg = self._check("2022N", "2024N")
-        self.assertIn("năm học 2024-2025", msg)
-        self.assertNotIn("2022-2023", msg)
-        self.assertIsNone(self._check("2022N", "2025N"))
-        blocked = request_quota.availability(self.student.pk, ["conduct_score"])[
-            "types"]["conduct_score"]["blocked_semesters"]
-        self.assertTrue({"2023N", "2024N"} <= set(blocked))
-
-    def test_old_semester_request_does_not_block_year(self):
-        self._request({"code": "20252", "label": "Học kỳ 2, năm học 2025-2026"})
-        self.assertIsNone(self._check("2025N"))
-
-    def test_old_whole_year_request_still_blocks(self):
-        self._request({"code": "2025N", "label": "Cả năm học 2025-2026"})
-        self.assertIsNotNone(self._check("2025N"))
-
-    def test_rejected_frees_year(self):
-        self._request({"code": "2025N", "codes": ["2025N"], "label": "Cả năm học 2025-2026"},
-                      status=ConfirmationRequest.STATUS_REJECTED)
-        self.assertIsNone(self._check("2025N"))
+    def test_other_types_still_limited(self):
+        self._request("other", {"code": "visa", "label": "Bổ sung hồ sơ xin visa"})
+        self.assertIsNotNone(request_quota.check(self.student.pk, "other"))
 
 
 class ConductScoresByYearTests(TestCase):

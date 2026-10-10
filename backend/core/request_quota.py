@@ -3,10 +3,9 @@
 Luật (người dùng chốt 01/10/2026):
   - Mỗi loại giấy chỉ xin được MỘT lần trong học kỳ hiện tại.
   - Yêu cầu bị TỪ CHỐI không tính lượt ⇒ xin lại được.
-  - Bảng điểm rèn luyện (`conduct_score`) tính riêng theo TỪNG NĂM HỌC CỦA BẢNG ĐIỂM:
-    trong một học kỳ, mỗi năm học bảng điểm xin được 1 lần. Từ 09/10/2026 một yêu cầu gồm
-    một hoặc nhiều năm học (`documents.conduct_purpose_codes`) — mỗi năm trong đó đều chiếm
-    lượt. Yêu cầu cũ chọn học kỳ lẻ chỉ khoá đúng học kỳ đó (`conduct_overlapping_codes`).
+  - Bảng điểm rèn luyện (`conduct_score`) KHÔNG có hạn mức (người dùng chốt 10/10/2026 — bỏ
+    hẳn luật 1 lần / năm học / học kỳ có từ 01/10). SV xin bao nhiêu lần cũng được; Dashboard
+    hiện số lần đã cấp cho SV ở trang chi tiết yêu cầu (`documents/conduct_sheet.student_history`).
   - Chuyên viên bấm "Mở lại lượt xin" trên Dashboard ⇒ yêu cầu đó được đánh dấu
     `payload.quota_exempt` và KHÔNG tính lượt nữa ⇒ SV xin thêm được đúng một lần.
 
@@ -26,11 +25,12 @@ from django.utils import timezone
 
 from students.timeline import current_academic_year, current_semester
 
-from .documents import conduct_overlapping_codes, conduct_purpose_codes
 from .models import ConfirmationRequest
 
 CONTACT_EMAIL = "oss@hcmiu.edu.vn"
 CONDUCT_TYPE = "conduct_score"
+# Loại giấy không giới hạn số lần xin.
+UNLIMITED_TYPES = {CONDUCT_TYPE}
 # Trạng thái KHÔNG tính lượt.
 FREE_STATUSES = {ConfirmationRequest.STATUS_REJECTED}
 
@@ -83,22 +83,16 @@ def _blocking_info(req, term):
 def availability(student_id, request_types, today=None):
     """Trạng thái từng loại giấy cho học kỳ hiện tại — dùng cho trang chọn loại + form.
 
-    {type: {"blocked": bool, "reason": str, "blocking": {...} | None,
-            "blocked_semesters": {code: {...}}  # chỉ conduct_score}}
+    {type: {"blocked": bool, "reason": str, "blocking": {...} | None}}
+    Loại trong `UNLIMITED_TYPES` luôn `blocked=False`.
     """
     term = current_term(today)
     counted = _counted(student_id, term) if student_id else []
     out = {}
     for t in request_types:
         mine = [r for r in counted if r.request_type == t]
-        if t == CONDUCT_TYPE:
-            sems = {}
-            for r in mine:
-                # Mỗi năm học trong yêu cầu đều chiếm lượt; cả năm khoá luôn học kỳ lẻ của năm đó.
-                for code in conduct_purpose_codes((r.payload or {}).get("purpose")):
-                    for c in sorted(conduct_overlapping_codes(code)):
-                        sems.setdefault(c, _blocking_info(r, term))
-            out[t] = {"blocked": False, "reason": "", "blocking": None, "blocked_semesters": sems}
+        if t in UNLIMITED_TYPES:
+            out[t] = {"blocked": False, "reason": "", "blocking": None}
             continue
         if mine:
             info = _blocking_info(mine[0], term)
@@ -108,43 +102,18 @@ def availability(student_id, request_types, today=None):
     return {"term": {"key": term["key"], "label": term["label"]}, "contact_email": CONTACT_EMAIL, "types": out}
 
 
-def block_message(request_type, info, semester_label=None):
-    # Bảng điểm RL: nêu lựa chọn ĐÃ xin — có thể khác lựa chọn đang xin (cả năm ↔ học kỳ lẻ).
-    used = info.get("semester_label") or semester_label
-    what = f"Bảng điểm rèn luyện {used.lower()}" if used else "Loại giấy này"
-    overlap = (" Đã xin cả năm học thì không xin lẻ từng học kỳ của năm học đó."
-               if semester_label and used and used != semester_label else "")
-    return (f"{what} đã được xin trong {info['term'].lower()} (mã yêu cầu {info['code']}, "
+def block_message(request_type, info):
+    return (f"Loại giấy này đã được xin trong {info['term'].lower()} (mã yêu cầu {info['code']}, "
             f"{info['status_label'].lower()}). Mỗi loại giấy chỉ được xin 1 lần trong một học kỳ; "
             f"được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ "
-            f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.{overlap}")
-
-
-def conduct_block_message(hits):
-    """hits = [(nhãn năm học đang xin, info yêu cầu chiếm lượt)] — liệt kê mọi năm bị trùng."""
-    years = ", ".join(label.replace("Cả năm học ", "") for label, _ in hits)
-    refs = "; ".join(dict.fromkeys(f"mã yêu cầu {i['code']}, {i['status_label'].lower()}" for _, i in hits))
-    term = hits[0][1]["term"].lower()
-    return (f"Bảng điểm rèn luyện năm học {years} đã được xin trong {term} ({refs}). Mỗi năm học "
-            f"chỉ được xin 1 lần trong một học kỳ; được xin lại khi yêu cầu trước bị từ chối. Bỏ chọn "
-            f"năm học đã xin để gửi các năm còn lại. Trường hợp cần xin cấp thêm, đề nghị liên hệ "
             f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.")
 
 
-def check(student_id, request_type, semester_codes=None, labels=None):
-    """Chuỗi lý do bị chặn, hoặc None nếu được tạo.
-
-    Bảng điểm rèn luyện: `semester_codes` là danh sách năm học đang xin (`labels` = {mã: nhãn});
-    trùng bất kỳ năm nào ⇒ chặn cả yêu cầu và nêu đủ các năm trùng.
-    """
-    if not student_id:
+def check(student_id, request_type):
+    """Chuỗi lý do bị chặn, hoặc None nếu được tạo."""
+    if not student_id or request_type in UNLIMITED_TYPES:
         return None
     data = availability(student_id, [request_type])["types"][request_type]
-    if request_type == CONDUCT_TYPE:
-        blocked = data["blocked_semesters"]
-        labels = labels or {}
-        hits = [(labels.get(c, c), blocked[c]) for c in (semester_codes or []) if c in blocked]
-        return conduct_block_message(hits) if hits else None
     return data["reason"] if data["blocked"] else None
 
 

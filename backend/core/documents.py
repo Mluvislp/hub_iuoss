@@ -844,21 +844,6 @@ def conduct_purpose_codes(purpose):
     return [c.strip() for c in str(purpose.get("code") or "").split(",") if c.strip()]
 
 
-def conduct_overlapping_codes(code):
-    """Các mã lựa chọn bị KHOÁ khi đã có yêu cầu `code` (kể cả chính nó) — dùng cho hạn mức.
-
-    Một chiều (người dùng chốt 02/10/2026): đã xin CẢ NĂM học YYYY thì khoá luôn HK1,
-    HK2 của năm đó; đã xin MỘT học kỳ (yêu cầu cũ) thì chỉ khoá đúng học kỳ đó.
-    """
-    code = str(code or "")
-    if len(code) != 5 or not code[:4].isdigit():
-        return {code} if code else set()
-    year, part = code[:4], code[4]
-    if part == CONDUCT_YEAR_SUFFIX:
-        return {code, year + "1", year + "2"}
-    return {code}
-
-
 def conduct_semester_choices(student, today=None):
     """Các NĂM HỌC SV được xin bảng điểm rèn luyện, MỚI NHẤT trước. SV tích được nhiều năm.
 
