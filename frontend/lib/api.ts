@@ -424,6 +424,24 @@ export const api = {
       return requestMultipart('/health-insurance/external/', body);
     },
   },
+  diploma: {
+    state(): Promise<import('./types').DiplomaState> {
+      return request('/diploma/');
+    },
+    submit(body: FormData): Promise<import('./types').DiplomaState> {
+      if (!body.has('request_key')) body.set('request_key', crypto.randomUUID());
+      return requestMultipart('/diploma/', body);
+    },
+    /** Ảnh CCCD / PDF cần token → tải qua fetch rồi mở bằng blob URL. */
+    async file(path: string): Promise<Blob> {
+      if (!/^\/api\/(?:diploma\/files\/(?:cccd_front|diploma_pdf)\/(?:\?v=\d+)?|student-images\/\d+\/file\/)$/.test(path)) {
+        throw new Error('Đường dẫn file không hợp lệ.');
+      }
+      const res = await fetch(`${API_BASE}${path.slice(4)}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
+    },
+  },
   hospitalChange: {
     detail(id: number): Promise<import('./types').SubmittedInsurance> { return request('/health-insurance/hospital-change/' + id + '/'); },
     update(id: number, body: FormData): Promise<{ id: number; status: string }> { return requestMultipart('/health-insurance/hospital-change/' + id + '/', body); },
