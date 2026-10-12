@@ -1,18 +1,23 @@
 """Nộp bằng tốt nghiệp THPT — nghiệp vụ phía Hub. Tài liệu: dashboard_iuoss/docs/DIPLOMA.md.
 
 Quy trình 4 bước:
-  1. SV khai online (form này) + ảnh CCCD mặt trước (lấy từ kho `student_images`) + bản scan PDF.
+  1. SV khai thông tin văn bằng + bản scan PDF trên Hub (form này).
   2. Chuyên viên duyệt từng hồ sơ trên Dashboard (đúng → Đã duyệt; sai → Cần sửa lại kèm lý do).
   3. Hồ sơ đã duyệt vào hàng chờ; chuyên viên bấm gửi một thư hẹn (BCC) cho cả lô.
   4. SV mang bằng gốc tới, đọc MSSV (hoặc đưa mã QR trên trang này), chuyên viên xác nhận đã nhận.
 
-Mỗi SV MỘT hồ sơ (bằng THPT chỉ có một). Đợt (`diploma_rounds`) chỉ quyết định lúc nào
-nhận hồ sơ MỚI; hồ sơ bị trả về vẫn sửa được sau hạn chót (SV không có lỗi khi chuyên viên
-duyệt muộn), giống ngoại lệ của khám sức khỏe.
+Thông tin cá nhân (họ tên, MSSV, email trường, SĐT, CCCD, ảnh CCCD) KHÔNG lưu vào hồ sơ và SV
+KHÔNG sửa được — đọc thẳng từ dữ liệu có sẵn, chỉ để xem. Ngoại lệ duy nhất: kho ảnh chưa có
+ảnh CCCD mặt trước thì SV tải lên (lưu vào kho `student_images`, không sửa ảnh đã có).
 
-Họ tên, MSSV, email trường lấy nguyên từ hồ sơ và không sửa được; SĐT, CCCD là số SV khai —
-khác hồ sơ thì ghi vào `profile_diff` cho chuyên viên đối chiếu, KHÔNG tự ghi đè hồ sơ
-(`students/` là read-only với Hub).
+Trang Hub có bốn chế độ (`build_state()['mode']`):
+  - `imported`  : hồ sơ do chuyên viên import từ hệ thống — chỉ hiện thông tin văn bằng.
+  - `submitted` : đã nộp trên Hub — hiện đơn đã nộp; chỉ sửa được khi bị trả về.
+  - `form`      : chưa có hồ sơ, đang có đợt mở cho KHÓA của SV — hiện form.
+  - `blocked`   : chưa có hồ sơ, không có đợt mở cho khóa của SV — hiện lý do.
+
+Mỗi SV MỘT hồ sơ (bằng THPT chỉ có một). Đợt mở cho một hoặc nhiều khóa (`intake_years`,
+so với `students.academic_entry_year`). Hồ sơ bị trả về vẫn gửi lại được sau hạn chót.
 """
 import hashlib
 import re
@@ -27,7 +32,7 @@ from django.utils import timezone
 from students.models import Student, StudentContactPoint, StudentIdentityDocument
 
 from . import student_images
-from .diploma_models import DiplomaEvent, DiplomaRound, DiplomaSubmission
+from .diploma_models import DiplomaEvent, DiplomaRound, DiplomaSubmission as S
 from .insurance_contract import WorkflowError, fingerprint, request_key, safe_path
 from .insurance_files import inspect_upload
 
@@ -36,17 +41,15 @@ MAX_PDF_BYTES = 10 * 1024 * 1024
 STORAGE_PREFIX = 'insurance_private/diplomas'   # prefix đã bị chặn URL thô ở Django + Nginx
 CCCD_KIND = 'cccd_front'
 
-# Cam kết cuối form — lưu đúng câu SV đồng ý vào payload sự kiện. Đổi câu chữ thì tăng phiên bản.
-CONSENT_VERSION = '2026-10-12'
-CONSENT_TEXT = ('Tôi cam kết thông tin đã khai và bản scan đã tải lên đúng với bằng tốt nghiệp THPT bản gốc; '
-                'sẽ mang bản gốc tới Phòng Công tác Sinh viên khi nhận được thư hẹn.')
+# Cam kết cuối form — lưu phiên bản + thời điểm vào payload sự kiện. Đổi câu chữ thì tăng phiên bản.
+CONSENT_VERSION = '2026-10-13'
+CONSENT_TEXT = ('Tôi cam kết thông tin văn bằng đã khai và bản scan đã tải lên đúng với bằng tốt nghiệp THPT '
+                'bản gốc; sẽ mang bản gốc tới Phòng Công tác Sinh viên khi nhận được thư hẹn.')
 
 # Người dùng thường gõ khoảng trắng / chữ thường; số hiệu văn bằng giữ chữ, số, '/', '-', '.'.
 DIPLOMA_NUMBER_RE = re.compile(r'^[A-Z0-9][A-Z0-9/.\-]{3,31}$')
-PHONE_RE = re.compile(r'^(0|\+84)\d{9,10}$')
 YEAR_RE = re.compile(r'(19[5-9]\d|20\d\d)')
-
-EDITABLE_STATUSES = (DiplomaSubmission.STATUS_PENDING, DiplomaSubmission.STATUS_RETURNED)
+FIELDS = ('diploma_number', 'issued_by', 'issued_on', 'exam_session')
 
 
 class DiplomaError(ValueError):
@@ -69,30 +72,38 @@ def round_state(round_, now=None):
     return 'open'
 
 
-def display_round(now=None):
-    """Đợt đang mở; không có thì đợt sắp mở gần nhất; không nữa thì đợt vừa đóng."""
+def intake_years(round_):
+    return {int(y) for y in (round_.intake_years or []) if str(y).isdigit()}
+
+
+def rounds_for(student):
+    """Các đợt mở cho khóa của SV (lọc trong Python — số đợt nhỏ, JSON khó index)."""
+    year = student.academic_entry_year
+    if not year:
+        return []
+    return [r for r in DiplomaRound.objects.order_by('opens_at') if year in intake_years(r)]
+
+
+def display_round(student, now=None):
+    """Đợt của khóa SV: đang mở; không có thì sắp mở gần nhất; không nữa thì vừa đóng."""
     now = now or timezone.now()
-    rounds = DiplomaRound.objects.all()
-    return (rounds.filter(opens_at__lte=now, closes_at__gte=now).order_by('-opens_at').first()
-            or rounds.filter(opens_at__gt=now).order_by('opens_at').first()
-            or rounds.filter(closes_at__lt=now).order_by('-closes_at').first())
+    rounds = rounds_for(student)
+    return (next((r for r in rounds if round_state(r, now) == 'open'), None)
+            or next((r for r in rounds if round_state(r, now) == 'upcoming'), None)
+            or next((r for r in reversed(rounds) if round_state(r, now) == 'closed'), None))
 
 
 def _lines(text):
     """Mỗi dòng một ý; dòng mở đầu '+' là gạch đầu dòng — cùng quy ước gói khám sức khỏe."""
-    out = []
-    for raw in (text or '').splitlines():
-        line = raw.strip()
-        if line:
-            out.append({'bullet': line.startswith('+'), 'text': line.lstrip('+').strip()})
-    return out
+    return [{'bullet': line.startswith('+'), 'text': line.lstrip('+').strip()}
+            for line in (raw.strip() for raw in (text or '').splitlines()) if line]
 
 
 def serialize_round(round_):
     if round_ is None:
         return None
     return {
-        'id': round_.pk, 'title': round_.title,
+        'id': round_.pk, 'title': round_.title, 'intake_years': sorted(intake_years(round_)),
         'opens_at': round_.opens_at.isoformat(), 'closes_at': round_.closes_at.isoformat(),
         'state': round_state(round_),
         'description_lines': _lines(round_.description),
@@ -100,10 +111,20 @@ def serialize_round(round_):
     }
 
 
-# ── Hồ sơ gốc ────────────────────────────────────────────────────────────────
+def _blocked_message(student, round_):
+    if not student.academic_entry_year:
+        return 'Hồ sơ của bạn chưa có thông tin khóa, chưa xác định được đợt nộp. Vui lòng liên hệ Phòng CTSV.'
+    if round_ is None:
+        return f'Hiện chưa có đợt nộp bằng tốt nghiệp THPT dành cho khóa {student.academic_entry_year}.'
+    if round_state(round_) == 'upcoming':
+        return f'{round_.title} mở nhận hồ sơ từ {timezone.localtime(round_.opens_at):%H:%M %d/%m/%Y}.'
+    return f'{round_.title} đã kết thúc lúc {timezone.localtime(round_.closes_at):%H:%M %d/%m/%Y}.'
+
+
+# ── Hồ sơ gốc (chỉ đọc) ─────────────────────────────────────────────────────
 
 def profile(student):
-    """Thông tin điền sẵn — cùng cách chọn dòng với form BHYT (`_snapshot`)."""
+    """Thông tin cá nhân hiển thị — cùng cách chọn dòng với form BHYT (`_snapshot`)."""
     contacts = {}
     for kind, value in (StudentContactPoint.objects
                         .filter(student_id=student.pk, is_current=True,
@@ -117,6 +138,7 @@ def profile(student):
     return {
         'full_name': student.full_name or '',
         'student_code': student.current_student_code or '',
+        'intake_year': student.academic_entry_year,
         'university_email': contacts.get(StudentContactPoint.TYPE_UNIVERSITY_EMAIL, '').lower(),
         'phone_number': contacts.get(StudentContactPoint.TYPE_MOBILE_PHONE, ''),
         'citizen_id': (cccd.document_number or '') if cccd else '',
@@ -129,67 +151,46 @@ def current_cccd_image(student):
 
 # ── Trạng thái cho frontend ─────────────────────────────────────────────────
 
-def _file_url(submission, field):
-    return f'/api/diploma/files/{field}/?v={submission.row_version}'
-
-
 def serialize_submission(sub):
     if sub is None:
         return None
+    imported = sub.source == S.SOURCE_IMPORT
     return {
-        'id': sub.pk, 'status': sub.status, 'status_label': sub.status_label,
-        'row_version': sub.row_version, 'round_id': sub.round_id,
-        'student_code': sub.student_code, 'full_name': sub.full_name,
-        'university_email': sub.university_email, 'phone_number': sub.phone_number,
-        'citizen_id': sub.citizen_id, 'diploma_number': sub.diploma_number,
-        'issued_by': sub.issued_by, 'issued_on': sub.issued_on.isoformat(),
-        'exam_session': sub.exam_session,
-        'cccd_front_url': _file_url(sub, 'cccd_front'),
-        'diploma_pdf_url': _file_url(sub, 'diploma_pdf'),
+        'id': sub.pk, 'source': sub.source, 'status': sub.status, 'status_label': sub.status_label,
+        'row_version': sub.row_version,
+        'diploma_number': sub.diploma_number, 'issued_by': sub.issued_by,
+        'issued_on': sub.issued_on.isoformat(), 'exam_session': sub.exam_session,
+        'cccd_front_url': None if imported or not sub.cccd_image_id
+        else f'/api/diploma/files/cccd_front/?v={sub.row_version}',
+        'diploma_pdf_url': f'/api/diploma/files/diploma_pdf/?v={sub.row_version}' if sub.diploma_pdf else None,
         'diploma_pdf_name': (sub.diploma_pdf or {}).get('original_filename') or 'bang-tot-nghiep.pdf',
         'review_note': sub.review_note or '',
-        'reviewed_at': sub.reviewed_at.isoformat() if sub.reviewed_at else None,
         'notified_at': sub.notified_at.isoformat() if sub.notified_at else None,
         'received_at': sub.received_at.isoformat() if sub.received_at else None,
         'created_at': sub.created_at.isoformat(), 'updated_at': sub.updated_at.isoformat(),
-        'submit_count': sub.submit_count,
     }
-
-
-def _can_edit(sub, round_):
-    """Đang chờ duyệt: sửa khi đợt của hồ sơ còn mở. Bị trả về: sửa lúc nào cũng được."""
-    if sub is None:
-        return False
-    if sub.status == DiplomaSubmission.STATUS_RETURNED:
-        return True
-    return sub.status == DiplomaSubmission.STATUS_PENDING and round_state(sub.round) == 'open'
 
 
 def build_state(student):
-    sub = DiplomaSubmission.objects.select_related('round').filter(student=student).first()
-    round_ = sub.round if sub else display_round()
+    sub = S.objects.select_related('round').filter(student=student).first()
+    if sub is not None:
+        mode = 'imported' if sub.source == S.SOURCE_IMPORT else 'submitted'
+        round_ = sub.round
+    else:
+        round_ = display_round(student)
+        mode = 'form' if round_ is not None and round_state(round_) == 'open' else 'blocked'
     image = current_cccd_image(student)
     return {
+        'mode': mode,
         'round': serialize_round(round_),
         'submission': serialize_submission(sub),
         'profile': profile(student),
-        'cccd_image': student_images.image_payload(image) if image else None,
-        'can_submit': sub is None and round_ is not None and round_state(round_) == 'open',
-        'can_edit': _can_edit(sub, round_),
+        # Ảnh đang dùng trong kho — chỉ cần khi chưa nộp; đã nộp thì xem ảnh gắn với hồ sơ.
+        'cccd_image': student_images.image_payload(image) if image and sub is None else None,
+        'can_edit': mode == 'submitted' and sub.status == S.STATUS_RETURNED,
         'consent_text': CONSENT_TEXT,
-        'closed_message': '' if sub else _closed_message(round_),
+        'blocked_message': _blocked_message(student, round_) if mode == 'blocked' else '',
     }
-
-
-def _closed_message(round_):
-    if round_ is None:
-        return 'Hiện chưa có đợt nhận hồ sơ bằng tốt nghiệp THPT.'
-    state = round_state(round_)
-    if state == 'upcoming':
-        return f'{round_.title} mở nhận hồ sơ từ {timezone.localtime(round_.opens_at):%H:%M %d/%m/%Y}.'
-    if state == 'closed':
-        return f'{round_.title} đã kết thúc lúc {timezone.localtime(round_.closes_at):%H:%M %d/%m/%Y}.'
-    return ''
 
 
 # ── Kiểm dữ liệu ─────────────────────────────────────────────────────────────
@@ -200,20 +201,15 @@ def exam_year(text):
 
 
 def clean(data):
-    """Chuẩn hóa + kiểm các ô SV nhập. Trả (giá trị, lỗi theo ô)."""
+    """Chuẩn hóa + kiểm 4 ô văn bằng. Trả (giá trị, lỗi theo ô). Dashboard import dùng chung luật này
+    (bản sao ở `diplomas/services.clean_diploma`) — sửa luật thì sửa cả hai."""
     get = lambda key: str(data.get(key) or '').strip()  # noqa: E731
     errors = {}
     values = {
-        'phone_number': re.sub(r'[\s.\-]', '', get('phone_number')),
-        'citizen_id': re.sub(r'\s', '', get('citizen_id')),
         'diploma_number': re.sub(r'\s', '', get('diploma_number')).upper(),
         'issued_by': re.sub(r'\s+', ' ', get('issued_by')),
         'exam_session': re.sub(r'\s+', ' ', get('exam_session')),
     }
-    if not PHONE_RE.fullmatch(values['phone_number']):
-        errors['phone_number'] = 'Số điện thoại không hợp lệ.'
-    if not re.fullmatch(r'\d{12}', values['citizen_id']):
-        errors['citizen_id'] = 'Số CCCD gồm 12 chữ số.'
     if not DIPLOMA_NUMBER_RE.fullmatch(values['diploma_number']):
         errors['diploma_number'] = 'Số hiệu văn bằng gồm 4–32 ký tự chữ, số, "/", "-" (ghi đúng như trên bằng).'
     if not 3 <= len(values['issued_by']) <= 255:
@@ -256,8 +252,7 @@ def _write_pdf(student, data, digest, original_name, written):
         written.append(target)
         stream.write(data)
     name = Path((original_name or '').replace('\\', '/')).name[:255] or 'bang-tot-nghiep.pdf'
-    return {'storage_key': key, 'mime_type': PDF_MIME, 'size': len(data), 'sha256': digest,
-            'original_filename': name}
+    return {'storage_key': key, 'size': len(data), 'sha256': digest, 'original_filename': name}
 
 
 def _cleanup(paths):
@@ -268,10 +263,10 @@ def _cleanup(paths):
             pass
 
 
-# ── Nộp / sửa ────────────────────────────────────────────────────────────────
+# ── Nộp / gửi lại ────────────────────────────────────────────────────────────
 
 def submit(student, data, files):
-    """Tạo hồ sơ mới, hoặc sửa hồ sơ đang chờ duyệt / gửi lại hồ sơ bị trả về.
+    """Nộp hồ sơ mới, hoặc gửi lại hồ sơ bị trả về. Không nhận bất kỳ ô thông tin cá nhân nào.
 
     Đọc và kiểm file TRƯỚC transaction; ghi file trong transaction đã khóa dòng SV, lỗi ở
     bất kỳ bước nào thì xóa sạch file vừa ghi. Idempotent theo `request_key`.
@@ -301,77 +296,62 @@ def submit(student, data, files):
     written = []
     try:
         with transaction.atomic():
-            Student.objects.select_for_update().filter(pk=student.pk).first()
+            student = Student.objects.select_for_update().get(pk=student.pk)
             # of=('self',): không khóa luôn dòng đợt (MySQL khóa cả bảng JOIN) — mọi SV sẽ xếp hàng trên một dòng.
-            sub = (DiplomaSubmission.objects.select_for_update(of=('self',)).select_related('round')
-                   .filter(student=student).first())
+            sub = S.objects.select_for_update(of=('self',)).select_related('round').filter(student=student).first()
             if sub:
                 replay = sub.events.filter(request_key=key).first()
                 if replay:
                     if (replay.payload or {}).get('request_digest') != digest:
                         raise DiplomaError('Yêu cầu này đã được dùng cho nội dung khác. Hãy tải lại trang.', code='conflict')
                     return sub
+                if sub.source == S.SOURCE_IMPORT:
+                    raise DiplomaError('Thông tin văn bằng của bạn đã được nhập từ hệ thống, không cần nộp.', code='closed')
+                if sub.status != S.STATUS_RETURNED:
+                    raise DiplomaError('Bạn đã nộp hồ sơ. Chỉ sửa được khi Phòng CTSV trả hồ sơ về.', code='closed')
                 if str(sub.row_version) != str(data.get('row_version') or ''):
                     raise DiplomaError('Hồ sơ đã thay đổi ở nơi khác. Hãy tải lại trang.', code='conflict')
-                if not _can_edit(sub, sub.round):
-                    raise DiplomaError('Hồ sơ đã được duyệt hoặc đợt đã đóng, không thể chỉnh sửa.', code='closed')
-                round_ = sub.round
             else:
-                round_ = display_round()
+                round_ = display_round(student)
                 if round_ is None or round_state(round_) != 'open':
-                    raise DiplomaError(_closed_message(round_) or 'Hiện không nhận hồ sơ.', code='closed')
+                    raise DiplomaError(_blocked_message(student, round_), code='closed')
                 if not pdf:
                     raise DiplomaError('Vui lòng tải lên bản scan bằng tốt nghiệp (PDF).',
                                        errors={'diploma_pdf': 'Vui lòng tải lên bản scan (PDF).'})
 
-            # Ảnh CCCD: ảnh mới → kho student_images (nguồn diploma); không thì dùng ảnh đang có.
-            image = (student_images.save_image(student, CCCD_KIND, student_images.SELF, cccd,
-                                               original_filename=cccd_upload.name,
-                                               source=student_images.SOURCE_DIPLOMA, written=written)
-                     if cccd else current_cccd_image(student))
-            if image is None and not sub:
-                raise DiplomaError('Vui lòng tải lên ảnh CCCD mặt trước.',
+            # Ảnh CCCD chỉ ĐỌC từ kho; SV chỉ tải lên khi kho chưa có — không thay ảnh đã có.
+            image = current_cccd_image(student)
+            if cccd and image is None:
+                image = student_images.save_image(student, CCCD_KIND, student_images.SELF, cccd,
+                                                  original_filename=cccd_upload.name,
+                                                  source=student_images.SOURCE_DIPLOMA, written=written)
+            if image is None:
+                raise DiplomaError('Hồ sơ chưa có ảnh CCCD mặt trước, vui lòng tải lên.',
                                    errors={'cccd_front': 'Vui lòng tải lên ảnh CCCD mặt trước.'})
-            cccd_snapshot = ({'storage_key': image.storage_key, 'mime_type': image.mime_type, 'image_id': image.pk}
-                             if image and (cccd or not sub) else None)
             pdf_snapshot = _write_pdf(student, pdf[0], pdf[1], pdf_upload.name, written) if pdf else None
-
-            base = profile(student)
-            diff = {field: {'profile': base[field], 'declared': values[field]}
-                    for field in ('phone_number', 'citizen_id') if base[field] and base[field] != values[field]}
-            fields = dict(values, full_name=base['full_name'] or student.full_name or '',
-                          student_code=base['student_code'], university_email=base['university_email'],
-                          profile_diff=diff or None)
             now = timezone.now()
             if sub is None:
-                sub = DiplomaSubmission.objects.create(
-                    round=round_, student=student, cccd_front=cccd_snapshot, diploma_pdf=pdf_snapshot, **fields)
+                sub = S.objects.create(student=student, round=round_, source=S.SOURCE_HUB, cccd_image=image,
+                                       diploma_pdf=pdf_snapshot, **values)
                 kind, changes = 'SUBMITTED', {}
             else:
-                changes = {}
-                for name, value in values.items():
-                    before = getattr(sub, name)
-                    if str(before) != str(value):
-                        changes[name] = {'before': str(before), 'after': str(value)}
-                if cccd_snapshot and cccd_snapshot['storage_key'] != (sub.cccd_front or {}).get('storage_key'):
+                changes = {name: {'before': str(getattr(sub, name)), 'after': str(value)}
+                           for name, value in values.items() if str(getattr(sub, name)) != str(value)}
+                if image.pk != sub.cccd_image_id:
                     changes['cccd_front'] = {'before': '', 'after': 'Ảnh mới'}
-                    sub.cccd_front = cccd_snapshot
                 if pdf_snapshot and pdf_snapshot['sha256'] != (sub.diploma_pdf or {}).get('sha256'):
                     changes['diploma_pdf'] = {'before': '', 'after': pdf_snapshot['original_filename']}
                     sub.diploma_pdf = pdf_snapshot
-                resubmitted = sub.status == DiplomaSubmission.STATUS_RETURNED
-                if not changes and not resubmitted:
-                    raise DiplomaError('Bạn chưa thay đổi thông tin nào.')
-                for name, value in fields.items():
+                for name, value in values.items():
                     setattr(sub, name, value)
-                if resubmitted:
-                    sub.status = DiplomaSubmission.STATUS_PENDING
-                    sub.submit_count += 1
-                    sub.supplement_pending = True
-                    sub.supplemented_at = now
+                sub.cccd_image = image
+                sub.status = S.STATUS_PENDING
+                sub.submit_count += 1
+                sub.supplement_pending = True
+                sub.supplemented_at = now
                 sub.row_version += 1
                 sub.save()
-                kind = 'RESUBMITTED' if resubmitted else 'STUDENT_UPDATED'
+                kind = 'RESUBMITTED'
             DiplomaEvent.objects.create(
                 submission=sub, event_type=kind, actor_id=student.pk, source_app='Hub', request_key=key,
                 payload={'request_digest': digest, 'changes': changes,
@@ -384,9 +364,12 @@ def submit(student, data, files):
 
 def file_path(student, field):
     """(Path, mime) của ảnh CCCD / PDF trong hồ sơ của CHÍNH SV, hoặc (None, None)."""
-    sub = DiplomaSubmission.objects.filter(student=student).first()
-    if sub is None or field not in ('cccd_front', 'diploma_pdf'):
+    sub = S.objects.select_related('cccd_image').filter(student=student).first()
+    if sub is None:
         return None, None
-    data = getattr(sub, field) or {}
-    path = safe_path(settings.MEDIA_ROOT, data.get('storage_key'))
-    return (path, data.get('mime_type')) if path else (None, None)
+    if field == 'cccd_front':
+        return student_images.image_path(sub.cccd_image) if sub.cccd_image_id else (None, None)
+    if field == 'diploma_pdf' and sub.diploma_pdf:
+        path = safe_path(settings.MEDIA_ROOT, sub.diploma_pdf.get('storage_key'))
+        return (path, PDF_MIME) if path else (None, None)
+    return None, None

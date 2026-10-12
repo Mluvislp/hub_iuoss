@@ -782,6 +782,8 @@ export interface DiplomaLine { bullet: boolean; text: string }
 export interface DiplomaRound {
   id: number;
   title: string;
+  /** Các khóa (năm nhập học) được nộp trong đợt. */
+  intake_years: number[];
   opens_at: string;
   closes_at: string;
   state: 'open' | 'upcoming' | 'closed';
@@ -790,52 +792,50 @@ export interface DiplomaRound {
   original_note_lines: DiplomaLine[];
 }
 
-/** Một cột trạng thái, đi một chiều: pending → approved → notified → received; pending ⇄ returned. */
-export type DiplomaStatus = 'pending' | 'returned' | 'approved' | 'notified' | 'received';
+/** pending → approved → notified → received; pending ⇄ returned. `imported` = nhập từ hệ thống. */
+export type DiplomaStatus = 'pending' | 'returned' | 'approved' | 'notified' | 'received' | 'imported';
 
+/** Chỉ thông tin văn bằng — thông tin cá nhân không lưu trong hồ sơ, đọc ở `profile`. */
 export interface DiplomaSubmission {
   id: number;
+  source: 'hub' | 'import';
   status: DiplomaStatus;
   status_label: string;
   row_version: number;
-  round_id: number;
-  student_code: string;
-  full_name: string;
-  university_email: string;
-  phone_number: string;
-  citizen_id: string;
   diploma_number: string;
   issued_by: string;
   issued_on: string;
   exam_session: string;
-  cccd_front_url: string;
-  diploma_pdf_url: string;
+  cccd_front_url: string | null;
+  diploma_pdf_url: string | null;
   diploma_pdf_name: string;
   review_note: string;
-  reviewed_at: string | null;
   notified_at: string | null;
   received_at: string | null;
   created_at: string;
   updated_at: string;
-  submit_count: number;
 }
 
+/** Hồ sơ sinh viên — chỉ để xem, sinh viên không sửa được. */
 export interface DiplomaProfile {
   full_name: string;
   student_code: string;
+  intake_year: number | null;
   university_email: string;
   phone_number: string;
   citizen_id: string;
 }
 
 export interface DiplomaState {
+  /** imported: chỉ hiện văn bằng · submitted: hiện đơn đã nộp · form: được nộp · blocked: không có đợt cho khóa. */
+  mode: 'imported' | 'submitted' | 'form' | 'blocked';
   round: DiplomaRound | null;
   submission: DiplomaSubmission | null;
   profile: DiplomaProfile;
-  /** Ảnh CCCD mặt trước đang dùng trong kho ảnh của SV (nộp từ BHYT…), null nếu chưa có. */
+  /** Ảnh CCCD mặt trước đang có trong kho ảnh (chỉ khi chưa nộp); null = SV phải tải lên. */
   cccd_image: { id: number; url: string; label: string } | null;
-  can_submit: boolean;
+  /** Đơn bị trả về → được sửa và gửi lại. */
   can_edit: boolean;
   consent_text: string;
-  closed_message: string;
+  blocked_message: string;
 }

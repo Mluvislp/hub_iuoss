@@ -531,10 +531,14 @@ CREATE TABLE `student_images` (
   CONSTRAINT `chk_si_size` CHECK (`file_size_bytes` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ── Nộp bằng tốt nghiệp THPT (12/10/2026) — nguồn: dashboard_iuoss/docs/sql/20261012_diploma_submissions.sql
+-- ── Nộp bằng tốt nghiệp THPT (12–13/10/2026) — nguồn: dashboard_iuoss/docs/sql/20261012_diploma_submissions.sql
+-- Đợt nhận hồ sơ online, mở cho MỘT hoặc NHIỀU khóa (`students.academic_entry_year`).
+-- Hub chỉ nhận hồ sơ MỚI khi opens_at <= now <= closes_at và khóa của SV nằm trong intake_years.
+-- Dashboard chặn hai đợt trùng thời gian CÓ CHUNG khóa.
 CREATE TABLE IF NOT EXISTS `diploma_rounds` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `intake_years` json NOT NULL COMMENT 'Các khóa được nộp, VD [2026] hoặc [2022,2023,2024,2025]',
   `opens_at` datetime(6) NOT NULL,
   `closes_at` datetime(6) NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci NULL COMMENT 'Hướng dẫn trên Hub; mỗi dòng một ý, dòng mở đầu bằng "+" là gạch đầu dòng',
@@ -560,27 +564,25 @@ CREATE TABLE IF NOT EXISTS `diploma_notice_batches` (
   UNIQUE KEY `uq_dnb_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Mỗi sinh viên MỘT hồ sơ (bằng THPT chỉ có một), round_id = đợt lúc nộp.
--- Trạng thái một cột, đi một chiều:
---   pending (Chờ duyệt online) → approved (Đã duyệt, chờ gửi thư) → notified (Đã hẹn nộp bản gốc)
---   → received (Đã nhận bằng gốc). approved cũng nhận thẳng được (SV tới trước khi có thư).
---   pending → returned (Cần sửa lại, có lý do) → pending khi SV gửi lại.
+-- Mỗi sinh viên MỘT hồ sơ. KHÔNG chép thông tin hồ sơ (MSSV, họ tên, email, SĐT, CCCD):
+-- hai app đọc thẳng từ students / student_contact_points / student_identity_documents.
+-- Ảnh CCCD trỏ vào student_images (dòng bất biến — thay ảnh là thêm dòng mới) nên vẫn giữ
+-- đúng tấm ảnh chuyên viên đã duyệt.
+--   source='hub'    : SV nộp trên Hub, round_id = đợt lúc nộp, có PDF.
+--   source='import' : chuyên viên import Excel, status='imported', không có đợt / PDF / ảnh.
+-- Trạng thái (source='hub'):
+--   pending → approved → notified → received;  approved → received;  pending ⇄ returned.
 CREATE TABLE IF NOT EXISTS `diploma_submissions` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `round_id` bigint NOT NULL,
   `student_id` bigint NOT NULL,
-  `student_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `full_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `university_email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `phone_number` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `citizen_id` varchar(12) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `round_id` bigint NULL,
+  `source` varchar(8) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'hub',
   `diploma_number` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Số hiệu văn bằng',
   `issued_by` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Nơi cấp — chữ tự do, giữ tên tỉnh cũ',
   `issued_on` date NOT NULL,
   `exam_session` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Khóa thi, ghi như trên bằng (năm hoặc ngày)',
-  `cccd_front` json NOT NULL COMMENT '{storage_key, mime_type, image_id} — chụp lại ảnh lúc nộp',
-  `diploma_pdf` json NOT NULL COMMENT '{storage_key, mime_type, size, sha256, original_filename}',
-  `profile_diff` json DEFAULT NULL COMMENT 'SĐT/CCCD khai khác hồ sơ: {field: {profile, declared}}',
+  `cccd_image_id` bigint NULL COMMENT 'Ảnh CCCD mặt trước lúc nộp (student_images.id)',
+  `diploma_pdf` json NULL COMMENT '{storage_key, size, sha256, original_filename}',
   `status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `review_note` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `reviewed_by_id` int DEFAULT NULL,
@@ -599,11 +601,11 @@ CREATE TABLE IF NOT EXISTS `diploma_submissions` (
   UNIQUE KEY `uq_ds_student` (`student_id`),
   KEY `idx_ds_status` (`status`, `updated_at`),
   KEY `idx_ds_round` (`round_id`, `status`),
-  KEY `idx_ds_student_code` (`student_code`),
   KEY `idx_ds_diploma_number` (`diploma_number`),
   KEY `idx_ds_batch` (`notice_batch_id`),
   CONSTRAINT `fk_ds_round` FOREIGN KEY (`round_id`) REFERENCES `diploma_rounds` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `fk_ds_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`),
+  CONSTRAINT `fk_ds_cccd_image` FOREIGN KEY (`cccd_image_id`) REFERENCES `student_images` (`id`),
   CONSTRAINT `fk_ds_batch` FOREIGN KEY (`notice_batch_id`) REFERENCES `diploma_notice_batches` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

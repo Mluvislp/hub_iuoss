@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import QRCode from 'react-qr-code';
 import {
-  AlertCircle, CalendarClock, Check, CheckCircle2, ChevronRight, FileText, GraduationCap,
-  Award, Info, Loader2, Lock, MapPin, Pencil, Plus, Upload, User,
+  AlertCircle, Award, CalendarClock, Check, CheckCircle2, ChevronRight, Database, FileText, GraduationCap,
+  Info, Loader2, Lock, MapPin, Pencil, Plus, Upload, User,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import { RejectionNotice } from '@/components/rejection-notice';
-import type { DiplomaLine, DiplomaState, DiplomaStatus } from '@/lib/types';
+import type { DiplomaLine, DiplomaState, DiplomaStatus, DiplomaSubmission } from '@/lib/types';
 
 const MAX_IMAGE = 5 * 1024 * 1024;
 const MAX_PDF = 10 * 1024 * 1024;
@@ -31,13 +31,14 @@ const STATUS_BADGE: Record<DiplomaStatus, string> = {
   approved: badge.info,
   notified: badge.info,
   received: badge.success,
+  imported: badge.neutral,
 };
 
-type Field = 'phone_number' | 'citizen_id' | 'diploma_number' | 'issued_by' | 'issued_on' | 'exam_session';
+type Field = 'diploma_number' | 'issued_by' | 'issued_on' | 'exam_session';
 type Values = Record<Field, string>;
 type Errors = Partial<Record<Field | 'cccd_front' | 'diploma_pdf' | 'confirm', string>>;
 
-const EMPTY: Values = { phone_number: '', citizen_id: '', diploma_number: '', issued_by: '', issued_on: '', exam_session: '' };
+const EMPTY: Values = { diploma_number: '', issued_by: '', issued_on: '', exam_session: '' };
 
 function fmtDateTime(iso?: string | null) {
   if (!iso) return '—';
@@ -46,11 +47,14 @@ function fmtDateTime(iso?: string | null) {
     + d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function fmtDate(iso: string) {
+  const [y, m, d] = iso.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
 /** Kiểm giống `core/diploma.clean` để báo lỗi ngay trên ô; server vẫn kiểm lại. */
 function validate(v: Values): Errors {
   const e: Errors = {};
-  if (!/^(0|\+84)\d{9,10}$/.test(v.phone_number.replace(/[\s.-]/g, ''))) e.phone_number = 'Số điện thoại không hợp lệ.';
-  if (!/^\d{12}$/.test(v.citizen_id.replace(/\s/g, ''))) e.citizen_id = 'Số CCCD gồm 12 chữ số.';
   if (!/^[A-Z0-9][A-Z0-9/.-]{3,31}$/.test(v.diploma_number.replace(/\s/g, '').toUpperCase())) {
     e.diploma_number = 'Số hiệu văn bằng gồm 4–32 ký tự chữ, số, "/", "-" (ghi đúng như trên bằng).';
   }
@@ -103,6 +107,19 @@ function FieldError({ message }: { message?: string }) {
   return <p data-field-error className="mt-1 text-xs text-danger-text">{message}</p>;
 }
 
+function InfoRows({ rows }: { rows: [string, string | number | null | undefined][] }) {
+  return (
+    <dl className="px-4 sm:px-5">
+      {rows.map(([label, value]) => (
+        <div key={label} className={ui.dtRow}>
+          <dt className={ui.dtLabel}>{label}</dt>
+          <dd className={cn(ui.dtValue, !value && 'font-normal text-muted')}>{value || 'Chưa có trong hồ sơ'}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** Bốn bước của quy trình; bước hiện tại tô đậm, bước bị trả về tô đỏ. */
 function Steps({ status }: { status: DiplomaStatus | null }) {
   const steps = ['Nộp hồ sơ online', 'Phòng CTSV duyệt', 'Nhận thư hẹn', 'Nộp bằng gốc'];
@@ -133,6 +150,22 @@ function Steps({ status }: { status: DiplomaStatus | null }) {
   );
 }
 
+/** Thông tin văn bằng đã có — chỉ xem. */
+function DiplomaInfo({ sub }: { sub: DiplomaSubmission }) {
+  return (
+    <section className={ui.card}>
+      <div className={ui.cardHeader}>
+        <h2 className={ui.sectionTitle}><Award size={16} className="text-primary" /> Thông tin bằng tốt nghiệp THPT</h2>
+      </div>
+      <InfoRows rows={[['Số hiệu văn bằng', sub.diploma_number], ['Nơi cấp', sub.issued_by],
+        ['Ngày cấp', fmtDate(sub.issued_on)], ['Khóa thi', sub.exam_session]]} />
+      {sub.diploma_pdf_url && (
+        <div className="border-t border-line2 px-4 py-3 sm:px-5"><PdfLink url={sub.diploma_pdf_url} /></div>
+      )}
+    </section>
+  );
+}
+
 export default function DiplomaPage() {
   const [state, setState] = useState<DiplomaState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,8 +176,6 @@ export default function DiplomaPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [editing, setEditing] = useState(false);
-  // SĐT/CCCD đã có trong hồ sơ thì khóa, bấm "Sửa" mới mở — cùng cách form BHYT.
-  const [contactEditable, setContactEditable] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
@@ -154,16 +185,13 @@ export default function DiplomaPage() {
   const apply = useCallback((s: DiplomaState) => {
     const sub = s.submission;
     setState(s);
-    setValues(sub ? {
-      phone_number: sub.phone_number, citizen_id: sub.citizen_id, diploma_number: sub.diploma_number,
-      issued_by: sub.issued_by, issued_on: sub.issued_on, exam_session: sub.exam_session,
-    } : { ...EMPTY, phone_number: s.profile.phone_number, citizen_id: s.profile.citizen_id });
+    setValues(sub ? { diploma_number: sub.diploma_number, issued_by: sub.issued_by,
+      issued_on: sub.issued_on, exam_session: sub.exam_session } : EMPTY);
     setCccdFile(null);
     setPdfFile(null);
     setConfirm(false);
     setErrors({});
     setEditing(false);
-    setContactEditable(false);
   }, []);
 
   useEffect(() => {
@@ -174,6 +202,7 @@ export default function DiplomaPage() {
   }, [apply]);
 
   const sub = state?.submission ?? null;
+  // Đã nộp: ảnh gắn với hồ sơ. Chưa nộp: ảnh đang có trong kho ảnh của SV.
   const cccdUrl = sub ? sub.cccd_front_url : state?.cccd_image?.url;
   const cccdPreview = usePrivateFile(cccdFile ? null : cccdUrl);
   const [localCccd, setLocalCccd] = useState('');
@@ -195,18 +224,16 @@ export default function DiplomaPage() {
     );
   }
 
-  const round = state.round;
-  const formOpen = sub ? editing : state.can_submit;
-  const profile = state.profile;
-  const contactLocked = (field: 'phone_number' | 'citizen_id') =>
-    !formOpen || (!sub && !!profile[field] && !contactEditable);
+  const { mode, round, profile } = state;
+  const formOpen = mode === 'form' || (mode === 'submitted' && editing);
+  // Chỉ được tải ảnh CCCD khi kho ảnh chưa có — không thay ảnh đã có.
+  const canUploadCccd = mode === 'form' && !state.cccd_image;
 
   const set = (field: Field) => (e: React.ChangeEvent<HTMLInputElement>) => {
     requestKey.current = null;
     setValues((v) => ({ ...v, [field]: e.target.value }));
     setErrors((er) => ({ ...er, [field]: undefined }));
   };
-
   const pickCccd = (file?: File) => {
     requestKey.current = null;
     if (!file) return;
@@ -229,7 +256,6 @@ export default function DiplomaPage() {
     setErrors((er) => ({ ...er, diploma_pdf: undefined }));
     setPdfFile(file);
   };
-
   const scrollToError = () => setTimeout(() => {
     formRef.current?.querySelector('[data-field-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 50);
@@ -239,7 +265,7 @@ export default function DiplomaPage() {
     setFormError('');
     setNotice('');
     const found = validate(values);
-    if (!sub && !cccdFile && !state.cccd_image) found.cccd_front = 'Vui lòng tải lên ảnh CCCD mặt trước.';
+    if (canUploadCccd && !cccdFile) found.cccd_front = 'Vui lòng tải lên ảnh CCCD mặt trước.';
     if (!sub && !pdfFile) found.diploma_pdf = 'Vui lòng tải lên bản scan bằng tốt nghiệp (PDF).';
     if (!confirm) found.confirm = 'Vui lòng tích ô cam kết.';
     setErrors(found);
@@ -253,14 +279,13 @@ export default function DiplomaPage() {
     if (sub) fd.append('row_version', String(sub.row_version));
     requestKey.current ??= crypto.randomUUID();
     fd.set('request_key', requestKey.current);
-    const resubmit = sub?.status === 'returned';
     setSaving(true);
     try {
       const fresh = await api.diploma.submit(fd);
       requestKey.current = null;
       apply(fresh);
-      setNotice(!sub ? 'Đã nộp hồ sơ. Phòng CTSV sẽ kiểm tra và báo kết quả qua email trường.'
-        : resubmit ? 'Đã gửi lại hồ sơ. Phòng CTSV sẽ kiểm tra lại.' : 'Đã lưu thay đổi.');
+      setNotice(sub ? 'Đã gửi lại hồ sơ. Phòng CTSV sẽ kiểm tra lại.'
+        : 'Đã nộp hồ sơ. Phòng CTSV sẽ kiểm tra và báo kết quả qua email trường.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       if (err instanceof ApiError && err.data.errors && typeof err.data.errors === 'object') {
@@ -273,8 +298,7 @@ export default function DiplomaPage() {
     }
   };
 
-  const inputCls = (locked: boolean, error?: string) => cn(ui.input, locked && 'bg-slate-50 text-slate-500',
-    error && 'border-red-500 bg-red-50/30 focus:border-red-500 focus:ring-red-500');
+  const inputCls = (error?: string) => cn(ui.input, error && 'border-red-500 bg-red-50/30 focus:border-red-500 focus:ring-red-500');
   const cccdSrc = localCccd || cccdPreview.src;
 
   return (
@@ -288,22 +312,21 @@ export default function DiplomaPage() {
       <div className="rounded-lg border border-primary-line bg-primary-soft p-4 text-primary-text sm:p-5">
         <h1 className="flex items-start gap-2 text-base font-bold sm:text-lg">
           <GraduationCap size={20} className="mt-0.5 shrink-0" />
-          <span>Nộp bằng tốt nghiệp THPT{round ? ` — ${round.title}` : ''}</span>
+          <span>Nộp bằng tốt nghiệp THPT{round && mode !== 'imported' ? ` — ${round.title}` : ''}</span>
         </h1>
-        {round?.description_lines.length ? <div className="mt-3"><Lines lines={round.description_lines} /></div> : (
+        {mode !== 'imported' && (round?.description_lines.length ? <div className="mt-3"><Lines lines={round.description_lines} /></div> : (
           <p className="mt-2 text-sm">
             Khai thông tin văn bằng và tải bản scan PDF. Sau khi Phòng CTSV duyệt, bạn sẽ nhận email hẹn
             mang <strong>bằng gốc</strong> tới nộp.
           </p>
-        )}
-        {round && !sub && (
-          <p className="mt-3 flex items-center gap-1.5 text-xs">
+        ))}
+        {round && mode === 'form' && (
+          <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
             <CalendarClock size={14} /> Nhận hồ sơ: {fmtDateTime(round.opens_at)} – {fmtDateTime(round.closes_at)}
+            <span>· Dành cho khóa {round.intake_years.join(', ')}</span>
           </p>
         )}
       </div>
-
-      <Steps status={sub?.status ?? null} />
 
       {notice && (
         <div role="status" className="flex items-start gap-2.5 rounded-lg border border-success-line bg-success-soft px-4 py-3 text-sm text-success-text">
@@ -311,13 +334,27 @@ export default function DiplomaPage() {
         </div>
       )}
 
-      {!sub && !state.can_submit && (
-        <p className="flex items-center gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm text-muted">
-          <Lock size={15} className="shrink-0" /> {state.closed_message || 'Hiện không nhận hồ sơ.'}
+      {/* Hồ sơ import từ hệ thống: chỉ hiện thông tin văn bằng. */}
+      {mode === 'imported' && sub && (
+        <>
+          <div className="flex items-start gap-2.5 rounded-lg border border-line bg-white px-4 py-3 text-sm text-slate-700">
+            <Database size={16} className="mt-0.5 shrink-0 text-primary" />
+            Thông tin văn bằng của bạn đã được Phòng CTSV nhập từ hệ thống. Bạn không cần nộp hồ sơ online.
+            Nếu thông tin sai, vui lòng liên hệ Phòng CTSV.
+          </div>
+          <DiplomaInfo sub={sub} />
+        </>
+      )}
+
+      {mode === 'blocked' && (
+        <p className="flex items-start gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm text-muted">
+          <Lock size={15} className="mt-0.5 shrink-0" /> {state.blocked_message}
         </p>
       )}
 
-      {sub && (
+      {(mode === 'form' || mode === 'submitted') && <Steps status={sub?.status ?? null} />}
+
+      {mode === 'submitted' && sub && (
         <section className={ui.card}>
           <div className={cn(ui.cardHeader, 'flex-wrap')}>
             <h2 className={ui.sectionTitle}><FileText size={16} className="text-primary" /> Hồ sơ đã nộp</h2>
@@ -326,7 +363,7 @@ export default function DiplomaPage() {
           <div className="space-y-4 p-4 sm:p-5">
             <p className="text-xs text-muted">Nộp lúc {fmtDateTime(sub.created_at)} · Cập nhật lúc {fmtDateTime(sub.updated_at)}</p>
             {sub.status === 'pending' && (
-              <p className="text-sm text-slate-700">Phòng CTSV đang kiểm tra hồ sơ online. Kết quả sẽ gửi qua email trường <strong>{sub.university_email || 'của bạn'}</strong>.</p>
+              <p className="text-sm text-slate-700">Phòng CTSV đang kiểm tra hồ sơ online. Kết quả sẽ gửi qua email trường <strong>{profile.university_email || 'của bạn'}</strong>.</p>
             )}
             {sub.status === 'returned' && (
               <RejectionNotice eyebrow="Hồ sơ cần sửa lại" title="Vui lòng sửa theo phản hồi rồi gửi lại" note={sub.review_note} />
@@ -344,8 +381,8 @@ export default function DiplomaPage() {
                   <p className="text-sm">Khi tới nơi, đọc <strong>MSSV</strong> hoặc đưa mã QR bên cạnh để cán bộ tìm hồ sơ. Nhớ mang theo CCCD.</p>
                 </div>
                 <div className="flex flex-col items-center gap-1.5 justify-self-center rounded-lg bg-white p-3">
-                  <QRCode value={sub.student_code} size={112} />
-                  <span className="font-mono text-sm font-semibold tracking-wide text-ink">{sub.student_code}</span>
+                  <QRCode value={profile.student_code} size={112} />
+                  <span className="font-mono text-sm font-semibold tracking-wide text-ink">{profile.student_code}</span>
                 </div>
               </div>
             )}
@@ -357,12 +394,57 @@ export default function DiplomaPage() {
             )}
             {state.can_edit && !editing && (
               <button type="button" onClick={() => { setNotice(''); setEditing(true); }} className={ui.btnPrimary}>
-                <Pencil size={15} /> {sub.status === 'returned' ? 'Sửa và gửi lại hồ sơ' : 'Chỉnh sửa hồ sơ'}
+                <Pencil size={15} /> Sửa và gửi lại hồ sơ
               </button>
             )}
           </div>
         </section>
       )}
+
+      {/* Thông tin cá nhân: đọc từ hồ sơ, chỉ để xem. */}
+      {(mode === 'form' || mode === 'submitted') && (
+        <section className={ui.card}>
+          <div className={ui.cardHeader}>
+            <h2 className={ui.sectionTitle}><User size={16} className="text-primary" /> Thông tin sinh viên</h2>
+            <span className="inline-flex items-center gap-1 text-xs text-muted"><Lock size={12} /> Lấy từ hồ sơ</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-[1fr_16rem]">
+            <InfoRows rows={[['Họ và tên', profile.full_name], ['Mã số sinh viên', profile.student_code],
+              ['Khóa', profile.intake_year], ['Email trường', profile.university_email],
+              ['Số điện thoại', profile.phone_number], ['Số CCCD', profile.citizen_id]]} />
+            <div className="px-4 pb-4 sm:py-3 sm:pl-0 sm:pr-5">
+              <p className="mb-1.5 text-[0.8rem] font-medium text-muted">Ảnh CCCD mặt trước</p>
+              {cccdSrc ? (
+                <a href={cccdSrc} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-slate-50">
+                  <img src={cccdSrc} alt="CCCD mặt trước" className="h-36 w-full object-contain" />
+                </a>
+              ) : canUploadCccd ? (
+                <label className={cn('relative flex h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed text-center text-xs hover:bg-slate-50',
+                  errors.cccd_front ? 'border-red-500 bg-red-50' : 'border-slate-300')}>
+                  <input type="file" accept="image/*" disabled={saving} onChange={(e) => pickCccd(e.target.files?.[0])} className="absolute inset-0 cursor-pointer opacity-0" />
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-500"><Plus size={18} /></span>
+                  <span className="font-medium text-slate-700">Hồ sơ chưa có ảnh — tải lên</span>
+                  <span className="text-slate-500">JPG, PNG, HEIC · tối đa 5 MB</span>
+                </label>
+              ) : (
+                <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-line bg-slate-50 px-3 text-center text-xs text-muted">
+                  {cccdPreview.error || (cccdUrl ? 'Đang tải ảnh…' : 'Không có ảnh')}
+                </div>
+              )}
+              {cccdFile && canUploadCccd && (
+                <button type="button" onClick={() => setCccdFile(null)} className="mt-1.5 text-xs text-primary hover:underline">Chọn ảnh khác</button>
+              )}
+              <FieldError message={errors.cccd_front} />
+            </div>
+          </div>
+          <p className="flex items-start gap-2 border-t border-line2 px-4 py-2.5 text-xs text-muted sm:px-5">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            Thông tin lấy từ hồ sơ sinh viên và không chỉnh sửa tại đây. Nếu sai, vui lòng liên hệ Phòng CTSV.
+          </p>
+        </section>
+      )}
+
+      {mode === 'submitted' && sub && !editing && <DiplomaInfo sub={sub} />}
 
       {formError && (
         <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">
@@ -370,72 +452,9 @@ export default function DiplomaPage() {
         </div>
       )}
 
-      {(sub || state.can_submit) && (
+      {formOpen && (
         <form ref={formRef} onSubmit={onSubmit} noValidate className="space-y-5 sm:space-y-6">
-          <fieldset disabled={saving || !formOpen} className={cn('min-w-0 space-y-5 sm:space-y-6', saving && 'opacity-60')}>
-            <section className={ui.card}>
-              <div className={ui.cardHeader}>
-                <h2 className={ui.sectionTitle}><User size={16} className="text-primary" /> Thông tin sinh viên</h2>
-                {formOpen && !sub && (profile.phone_number || profile.citizen_id) && (
-                  <span role="button" tabIndex={0} onClick={() => {
-                    if (contactEditable) setValues((v) => ({ ...v, phone_number: profile.phone_number, citizen_id: profile.citizen_id }));
-                    setContactEditable(!contactEditable);
-                  }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setContactEditable(!contactEditable); } }}
-                  className="inline-flex cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary hover:underline">
-                    <Pencil size={12} /> {contactEditable ? 'Hủy sửa' : 'Sửa SĐT / CCCD'}
-                  </span>
-                )}
-              </div>
-              <div className="grid gap-4 p-4 sm:grid-cols-2 sm:gap-5 sm:p-5">
-                {([['Họ và tên', sub?.full_name ?? profile.full_name], ['Mã số sinh viên', sub?.student_code ?? profile.student_code],
-                  ['Email trường', sub?.university_email ?? profile.university_email]] as const).map(([label, value]) => (
-                  <div key={label} className="min-w-0">
-                    <label className={ui.fieldLabel}>{label}</label>
-                    <input value={value || 'Chưa có trong hồ sơ'} readOnly disabled className={inputCls(true)} />
-                  </div>
-                ))}
-                <div className="min-w-0">
-                  <label htmlFor="phone_number" className={ui.fieldLabel}>Số điện thoại *</label>
-                  <input id="phone_number" inputMode="tel" value={values.phone_number} onChange={set('phone_number')}
-                    disabled={contactLocked('phone_number')} className={inputCls(contactLocked('phone_number'), errors.phone_number)} />
-                  <FieldError message={errors.phone_number} />
-                </div>
-                <div className="min-w-0">
-                  <label htmlFor="citizen_id" className={ui.fieldLabel}>Số CCCD *</label>
-                  <input id="citizen_id" inputMode="numeric" maxLength={12} value={values.citizen_id} onChange={set('citizen_id')}
-                    disabled={contactLocked('citizen_id')} className={inputCls(contactLocked('citizen_id'), errors.citizen_id)} />
-                  <FieldError message={errors.citizen_id} />
-                </div>
-                <div className="min-w-0 sm:col-span-2">
-                  <label className={ui.fieldLabel}>Ảnh CCCD mặt trước *
-                    {!sub && state.cccd_image && !cccdFile && <span className="ml-1.5 text-xs font-normal text-muted">(lấy từ ảnh bạn đã nộp trước đây)</span>}
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,18rem)_1fr] sm:items-start">
-                    {cccdSrc ? (
-                      <a href={cccdSrc} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-slate-50">
-                        <img src={cccdSrc} alt="CCCD mặt trước" className="h-40 w-full object-contain" />
-                      </a>
-                    ) : (
-                      <label className={cn('relative flex h-40 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-center text-sm',
-                        errors.cccd_front ? 'border-red-500 bg-red-50' : 'border-slate-300', formOpen ? 'cursor-pointer hover:bg-slate-50' : 'bg-slate-50')}>
-                        {formOpen && <input type="file" accept="image/*" onChange={(e) => pickCccd(e.target.files?.[0])} className="absolute inset-0 cursor-pointer opacity-0" />}
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-500"><Plus size={20} /></span>
-                        <span className="font-medium text-slate-700">{cccdPreview.error || 'Tải lên mặt trước CCCD'}</span>
-                        <span className="text-xs text-slate-500">JPG, PNG, HEIC · tối đa 5 MB</span>
-                      </label>
-                    )}
-                    {cccdSrc && formOpen && (
-                      <label className={cn(ui.btnOutline, 'relative h-9 cursor-pointer self-start overflow-hidden px-3 text-xs')}>
-                        <input type="file" accept="image/*" onChange={(e) => pickCccd(e.target.files?.[0])} className="absolute inset-0 cursor-pointer opacity-0" />
-                        <Upload size={14} /> {cccdFile ? cccdFile.name : 'Thay ảnh khác'}
-                      </label>
-                    )}
-                  </div>
-                  <FieldError message={errors.cccd_front} />
-                </div>
-              </div>
-            </section>
-
+          <fieldset disabled={saving} className={cn('min-w-0 space-y-5 sm:space-y-6', saving && 'opacity-60')}>
             <section className={ui.card}>
               <div className={ui.cardHeader}>
                 <h2 className={ui.sectionTitle}><Award size={16} className="text-primary" /> Thông tin bằng tốt nghiệp THPT</h2>
@@ -444,26 +463,25 @@ export default function DiplomaPage() {
                 <div className="min-w-0">
                   <label htmlFor="diploma_number" className={ui.fieldLabel}>Số hiệu văn bằng *</label>
                   <input id="diploma_number" value={values.diploma_number} onChange={set('diploma_number')} autoComplete="off"
-                    placeholder="Ghi đúng như trên bằng" className={inputCls(!formOpen, errors.diploma_number)} />
+                    placeholder="Ghi đúng như trên bằng" className={inputCls(errors.diploma_number)} />
                   <FieldError message={errors.diploma_number} />
                 </div>
                 <div className="min-w-0">
                   <label htmlFor="exam_session" className={ui.fieldLabel}>Khóa thi *</label>
                   <input id="exam_session" value={values.exam_session} onChange={set('exam_session')} maxLength={32}
-                    placeholder="VD: 2025 hoặc 26/06/2025" className={inputCls(!formOpen, errors.exam_session)} />
+                    placeholder="VD: 2025 hoặc 26/06/2025" className={inputCls(errors.exam_session)} />
                   <FieldError message={errors.exam_session} />
                 </div>
                 <div className="min-w-0">
                   <label htmlFor="issued_by" className={ui.fieldLabel}>Nơi cấp *</label>
                   <input id="issued_by" list="diploma-issuers" value={values.issued_by} onChange={set('issued_by')} maxLength={255}
-                    placeholder="VD: Sở Giáo dục và Đào tạo TP. Hồ Chí Minh" className={inputCls(!formOpen, errors.issued_by)} />
+                    placeholder="VD: Sở Giáo dục và Đào tạo TP. Hồ Chí Minh" className={inputCls(errors.issued_by)} />
                   <datalist id="diploma-issuers">{ISSUER_HINTS.map((h) => <option key={h} value={h} />)}</datalist>
                   <FieldError message={errors.issued_by} />
                 </div>
                 <div className="min-w-0">
                   <label htmlFor="issued_on" className={ui.fieldLabel}>Ngày cấp *</label>
-                  <input id="issued_on" type="date" value={values.issued_on} onChange={set('issued_on')}
-                    className={inputCls(!formOpen, errors.issued_on)} />
+                  <input id="issued_on" type="date" value={values.issued_on} onChange={set('issued_on')} className={inputCls(errors.issued_on)} />
                   <FieldError message={errors.issued_on} />
                 </div>
                 <div className="min-w-0 sm:col-span-2">
@@ -472,19 +490,15 @@ export default function DiplomaPage() {
                     errors.diploma_pdf ? 'border-red-500 bg-red-50' : 'border-slate-300')}>
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-500"><FileText size={20} /></span>
                     <div className="min-w-0 flex-1 text-sm">
-                      <p className="truncate font-medium text-slate-700">
-                        {pdfFile ? pdfFile.name : sub ? sub.diploma_pdf_name : 'Chưa chọn file'}
-                      </p>
-                      <p className="text-xs text-slate-500">Chỉ nhận PDF · tối đa 10 MB · scan rõ cả mặt có số hiệu văn bằng</p>
+                      <p className="truncate font-medium text-slate-700">{pdfFile ? pdfFile.name : sub ? sub.diploma_pdf_name : 'Chưa chọn file'}</p>
+                      <p className="text-xs text-slate-500">Chỉ nhận PDF · tối đa 10 MB · scan rõ mặt có số hiệu văn bằng{sub ? ' · bỏ trống để giữ file cũ' : ''}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {sub && !pdfFile && <PdfLink url={sub.diploma_pdf_url} />}
-                      {formOpen && (
-                        <label className={cn(ui.btnOutline, 'relative h-9 cursor-pointer overflow-hidden px-3 text-xs')}>
-                          <input type="file" accept="application/pdf,.pdf" onChange={(e) => pickPdf(e.target.files?.[0])} className="absolute inset-0 cursor-pointer opacity-0" />
-                          <Upload size={14} /> {sub || pdfFile ? 'Chọn file khác' : 'Chọn file PDF'}
-                        </label>
-                      )}
+                      {sub?.diploma_pdf_url && !pdfFile && <PdfLink url={sub.diploma_pdf_url} />}
+                      <label className={cn(ui.btnOutline, 'relative h-9 cursor-pointer overflow-hidden px-3 text-xs')}>
+                        <input type="file" accept="application/pdf,.pdf" onChange={(e) => pickPdf(e.target.files?.[0])} className="absolute inset-0 cursor-pointer opacity-0" />
+                        <Upload size={14} /> {sub || pdfFile ? 'Chọn file khác' : 'Chọn file PDF'}
+                      </label>
                     </div>
                   </div>
                   <FieldError message={errors.diploma_pdf} />
@@ -492,63 +506,50 @@ export default function DiplomaPage() {
               </div>
             </section>
 
-            {formOpen && (
-              <section className={cn(ui.card, 'space-y-4 p-4 sm:p-5')}>
-                <label className={cn('flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm',
-                  errors.confirm ? 'border-red-500 bg-red-50' : 'border-line')}>
-                  <input type="checkbox" checked={confirm} onChange={(e) => { setConfirm(e.target.checked); setErrors((er) => ({ ...er, confirm: undefined })); }}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
-                  <span>{state.consent_text}</span>
-                </label>
-                <FieldError message={errors.confirm} />
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  {sub && (
-                    <button type="button" onClick={() => apply(state)} className={ui.btnGhost}>Hủy</button>
-                  )}
-                  <button type="submit" className={ui.btnPrimary}>
-                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                    {!sub ? 'Nộp hồ sơ' : sub.status === 'returned' ? 'Gửi lại hồ sơ' : 'Lưu thay đổi'}
-                  </button>
-                </div>
-              </section>
-            )}
+            <section className={cn(ui.card, 'space-y-4 p-4 sm:p-5')}>
+              <label className={cn('flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm',
+                errors.confirm ? 'border-red-500 bg-red-50' : 'border-line')}>
+                <input type="checkbox" checked={confirm} onChange={(e) => { setConfirm(e.target.checked); setErrors((er) => ({ ...er, confirm: undefined })); }}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary" />
+                <span>{state.consent_text}</span>
+              </label>
+              <FieldError message={errors.confirm} />
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                {sub && <button type="button" onClick={() => apply(state)} className={ui.btnGhost}>Hủy</button>}
+                <button type="submit" className={ui.btnPrimary}>
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  {sub ? 'Gửi lại hồ sơ' : 'Nộp hồ sơ'}
+                </button>
+              </div>
+            </section>
           </fieldset>
-          {formOpen && !sub && (
-            <p className="flex items-start gap-2 text-xs text-muted">
-              <Info size={14} className="mt-0.5 shrink-0" />
-              Họ tên, MSSV và email lấy từ hồ sơ sinh viên. Nếu sai, vui lòng liên hệ Phòng CTSV.
-            </p>
-          )}
         </form>
       )}
     </div>
   );
 }
 
-/** Span role="button" thay vì <button>: nằm trong <fieldset disabled> lúc chỉ xem mà vẫn phải bấm được. */
 function PdfLink({ url }: { url: string }) {
   const [busy, setBusy] = useState(false);
   const open = async () => {
     if (busy) return;
     setBusy(true);
-      // Mở tab trước khi await để trình duyệt không chặn popup.
-      const tab = window.open('', '_blank');
-      try {
-        const blob = await api.diploma.file(url);
-        const objectUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-        if (tab) tab.location.href = objectUrl; else window.location.href = objectUrl;
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-      } catch {
-        tab?.close();
-      } finally {
-        setBusy(false);
-      }
+    // Mở tab trước khi await để trình duyệt không chặn popup.
+    const tab = window.open('', '_blank');
+    try {
+      const blob = await api.diploma.file(url);
+      const objectUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      if (tab) tab.location.href = objectUrl; else window.location.href = objectUrl;
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {
+      tab?.close();
+    } finally {
+      setBusy(false);
+    }
   };
   return (
-    <span role="button" tabIndex={0} aria-disabled={busy} onClick={open}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void open(); } }}
-      className={cn(ui.btnSecondary, 'h-9 cursor-pointer text-xs', busy && 'opacity-60')}>
-      <FileText size={14} /> Xem bản đã nộp
-    </span>
+    <button type="button" disabled={busy} onClick={open} className={cn(ui.btnSecondary, 'h-9 text-xs')}>
+      <FileText size={14} /> Xem bản scan đã nộp
+    </button>
   );
 }

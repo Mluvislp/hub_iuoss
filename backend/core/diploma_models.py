@@ -7,10 +7,11 @@ from django.db import models
 
 
 class DiplomaRound(models.Model):
-    """Đợt nhận hồ sơ online. Hub mở/khóa form mới hoàn toàn theo `opens_at`/`closes_at`."""
+    """Đợt nhận hồ sơ online cho một hoặc nhiều khóa (`intake_years` ⊂ `students.academic_entry_year`)."""
 
     id = models.BigAutoField(primary_key=True)
     title = models.CharField(max_length=255)
+    intake_years = models.JSONField(default=list)
     opens_at = models.DateTimeField()
     closes_at = models.DateTimeField()
     description = models.TextField(null=True, blank=True)
@@ -31,6 +32,9 @@ class DiplomaSubmission(models.Model):
     STATUS_APPROVED = 'approved'
     STATUS_NOTIFIED = 'notified'
     STATUS_RECEIVED = 'received'
+    STATUS_IMPORTED = 'imported'
+    SOURCE_HUB = 'hub'
+    SOURCE_IMPORT = 'import'
     # Cùng nhãn Dashboard (diplomas/models.py) — sinh viên và chuyên viên đọc cùng một câu.
     STATUS_LABELS = {
         STATUS_PENDING: 'Chờ duyệt hồ sơ online',
@@ -38,24 +42,23 @@ class DiplomaSubmission(models.Model):
         STATUS_APPROVED: 'Đã duyệt online, chờ thư hẹn',
         STATUS_NOTIFIED: 'Đã hẹn nộp bản gốc',
         STATUS_RECEIVED: 'Đã nhận bằng gốc',
+        STATUS_IMPORTED: 'Import từ hệ thống',
     }
 
     id = models.BigAutoField(primary_key=True)
-    round = models.ForeignKey(DiplomaRound, on_delete=models.PROTECT, related_name='submissions')
+    # Không chép MSSV / họ tên / email / SĐT / CCCD — đọc thẳng từ hồ sơ SV.
     student = models.OneToOneField('students.Student', on_delete=models.DO_NOTHING,
                                    related_name='diploma_submission')
-    student_code = models.CharField(max_length=64)
-    full_name = models.CharField(max_length=255)
-    university_email = models.CharField(max_length=255, default='')
-    phone_number = models.CharField(max_length=20)
-    citizen_id = models.CharField(max_length=12)
+    round = models.ForeignKey(DiplomaRound, on_delete=models.PROTECT, null=True, related_name='submissions')
+    source = models.CharField(max_length=8, default=SOURCE_HUB)
     diploma_number = models.CharField(max_length=32)
     issued_by = models.CharField(max_length=255)
     issued_on = models.DateField()
     exam_session = models.CharField(max_length=32)
-    cccd_front = models.JSONField()
-    diploma_pdf = models.JSONField()
-    profile_diff = models.JSONField(null=True, blank=True)
+    # Dòng student_images bất biến (thay ảnh = thêm dòng) nên id giữ đúng ảnh lúc nộp.
+    cccd_image = models.ForeignKey('core.StudentImage', on_delete=models.DO_NOTHING, null=True,
+                                   db_constraint=False, related_name='+')
+    diploma_pdf = models.JSONField(null=True)
     status = models.CharField(max_length=16, default=STATUS_PENDING)
     review_note = models.CharField(max_length=1000, null=True, blank=True)
     reviewed_by_id = models.IntegerField(null=True, blank=True)
