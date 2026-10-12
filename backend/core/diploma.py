@@ -302,7 +302,9 @@ def submit(student, data, files):
     try:
         with transaction.atomic():
             Student.objects.select_for_update().filter(pk=student.pk).first()
-            sub = DiplomaSubmission.objects.select_for_update().select_related('round').filter(student=student).first()
+            # of=('self',): không khóa luôn dòng đợt (MySQL khóa cả bảng JOIN) — mọi SV sẽ xếp hàng trên một dòng.
+            sub = (DiplomaSubmission.objects.select_for_update(of=('self',)).select_related('round')
+                   .filter(student=student).first())
             if sub:
                 replay = sub.events.filter(request_key=key).first()
                 if replay:
