@@ -1055,7 +1055,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
 
     def post(self, request):
         """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py),
-        trừ bảng điểm rèn luyện (không giới hạn)."""
+        trừ bảng điểm rèn luyện (không giới hạn); GXN "Khác" + tiếng Anh tính theo mục đích."""
         request_type = _get_str(request.data, "request_type")
         sid = request.user.student_id
         if not sid:
@@ -1063,7 +1063,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         # Khoá theo SV: kiểm hạn mức + tạo yêu cầu là một bước, bấm gửi hai lần không lọt.
         # Bảng điểm rèn luyện không giới hạn số lần (request_quota.UNLIMITED_TYPES).
         with request_quota.student_lock(sid):
-            reason = request_quota.check(sid, request_type)
+            reason = request_quota.check(sid, request_type, _get_str(request.data, "purpose_code"))
             if reason:
                 return Response({"detail": reason, "code": "quota_exceeded"}, status=status.HTTP_409_CONFLICT)
             return self._create(request, request_type)

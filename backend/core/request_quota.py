@@ -1,4 +1,4 @@
-"""Hạn mức xin giấy tờ: mỗi loại giấy 1 lần / 1 học kỳ.
+"""Hạn mức xin giấy tờ: mỗi loại giấy 1 lần / 1 học kỳ (GXN "Khác" + GXN tiếng Anh: theo MỤC ĐÍCH).
 
 Luật (người dùng chốt 01/10/2026):
   - Mỗi loại giấy chỉ xin được MỘT lần trong học kỳ hiện tại.
@@ -6,6 +6,10 @@ Luật (người dùng chốt 01/10/2026):
   - Bảng điểm rèn luyện (`conduct_score`) KHÔNG có hạn mức (người dùng chốt 10/10/2026 — bỏ
     hẳn luật 1 lần / năm học / học kỳ có từ 01/10). SV xin bao nhiêu lần cũng được; Dashboard
     hiện số lần đã cấp cho SV ở trang chi tiết yêu cầu (`documents/conduct_sheet.student_history`).
+  - GXN "Lý do khác" (`other`) và GXN tiếng Anh (`english_form`) tính lượt theo MỤC ĐÍCH
+    (`payload.purpose.code`), không chung cả loại (người dùng chốt 12/10/2026): cùng học kỳ SV
+    vẫn xin được mục đích khác. Mục "tham gia [Tên chương trình]" là MỘT mục đích (mã `program`)
+    dù tên chương trình khác nhau — tên gõ tự do, so chữ thì đổi một ký tự là lách được.
   - Chuyên viên bấm "Mở lại lượt xin" trên Dashboard ⇒ yêu cầu đó được đánh dấu
     `payload.quota_exempt` và KHÔNG tính lượt nữa ⇒ SV xin thêm được đúng một lần.
 
@@ -25,12 +29,15 @@ from django.utils import timezone
 
 from students.timeline import current_academic_year, current_semester
 
+from .documents import ENGLISH_PURPOSE_MAP, OTHER_PURPOSE_MAP
 from .models import ConfirmationRequest
 
 CONTACT_EMAIL = "oss@hcmiu.edu.vn"
 CONDUCT_TYPE = "conduct_score"
 # Loại giấy không giới hạn số lần xin.
 UNLIMITED_TYPES = {CONDUCT_TYPE}
+# Loại giấy tính lượt theo mục đích (`payload.purpose.code`) → nhãn mục đích gốc (chưa ghép tên chương trình).
+PURPOSE_SCOPED_TYPES = {"other": OTHER_PURPOSE_MAP, "english_form": ENGLISH_PURPOSE_MAP}
 # Trạng thái KHÔNG tính lượt.
 FREE_STATUSES = {ConfirmationRequest.STATUS_REJECTED}
 
@@ -67,6 +74,10 @@ def _counted(student_id, term):
     return [r for r in rows if not is_exempt(r)]
 
 
+def purpose_code(req):
+    return ((req.payload or {}).get("purpose") or {}).get("code") or ""
+
+
 def _blocking_info(req, term):
     purpose = (req.payload or {}).get("purpose") or {}
     return {
@@ -84,7 +95,9 @@ def availability(student_id, request_types, today=None):
     """Trạng thái từng loại giấy cho học kỳ hiện tại — dùng cho trang chọn loại + form.
 
     {type: {"blocked": bool, "reason": str, "blocking": {...} | None}}
-    Loại trong `UNLIMITED_TYPES` luôn `blocked=False`.
+    Loại trong `UNLIMITED_TYPES` luôn `blocked=False`. Loại trong `PURPOSE_SCOPED_TYPES` không
+    chặn cả loại (`blocked=False`) mà kèm `purposes: {code: {blocked, reason, blocking}}` — chỉ
+    liệt kê mục đích đã hết lượt.
     """
     term = current_term(today)
     counted = _counted(student_id, term) if student_id else []
@@ -93,6 +106,16 @@ def availability(student_id, request_types, today=None):
         mine = [r for r in counted if r.request_type == t]
         if t in UNLIMITED_TYPES:
             out[t] = {"blocked": False, "reason": "", "blocking": None}
+            continue
+        if t in PURPOSE_SCOPED_TYPES:
+            purposes = {}
+            for r in mine:
+                code = purpose_code(r)
+                if code and code not in purposes:
+                    info = _blocking_info(r, term)
+                    purposes[code] = {"blocked": True, "reason": purpose_block_message(t, code, info),
+                                      "blocking": info}
+            out[t] = {"blocked": False, "reason": "", "blocking": None, "purposes": purposes}
             continue
         if mine:
             info = _blocking_info(mine[0], term)
@@ -109,11 +132,23 @@ def block_message(request_type, info):
             f"Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.")
 
 
-def check(student_id, request_type):
-    """Chuỗi lý do bị chặn, hoặc None nếu được tạo."""
+def purpose_block_message(request_type, code, info):
+    label = PURPOSE_SCOPED_TYPES[request_type].get(code, code).replace(" [Tên chương trình]", " chương trình")
+    return (f"Mục đích “{label}” đã được xin trong {info['term'].lower()} (mã yêu cầu {info['code']}, "
+            f"{info['status_label'].lower()}). Mỗi mục đích chỉ được xin 1 lần trong một học kỳ; "
+            f"có thể chọn mục đích khác, hoặc xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin "
+            f"cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email {CONTACT_EMAIL}.")
+
+
+def check(student_id, request_type, purpose=""):
+    """Chuỗi lý do bị chặn, hoặc None nếu được tạo. `purpose` = mã mục đích SV chọn (chỉ dùng
+    cho loại trong `PURPOSE_SCOPED_TYPES`)."""
     if not student_id or request_type in UNLIMITED_TYPES:
         return None
     data = availability(student_id, [request_type])["types"][request_type]
+    if request_type in PURPOSE_SCOPED_TYPES:
+        hit = data["purposes"].get(purpose or "")
+        return hit["reason"] if hit else None
     return data["reason"] if data["blocked"] else None
 
 

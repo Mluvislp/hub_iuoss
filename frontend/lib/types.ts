@@ -725,6 +725,8 @@ export interface QuotaTypeState {
   blocked: boolean;
   reason: string;
   blocking: QuotaBlocking | null;
+  /** GXN "Khác" + tiếng Anh: lượt tính theo mục đích — chỉ liệt kê mục đích đã hết lượt. */
+  purposes?: Record<string, QuotaTypeState>;
 }
 
 export interface RequestAvailability {
