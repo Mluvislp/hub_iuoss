@@ -183,8 +183,25 @@ class ConductQuotaTests(TestCase):
         self.assertEqual(info, {"blocked": False, "reason": "", "blocking": None})
 
     def test_other_types_still_limited(self):
-        self._request("other", {"code": "visa", "label": "Bổ sung hồ sơ xin visa"})
-        self.assertIsNotNone(request_quota.check(self.student.pk, "other"))
+        self._request("deferment", {"code": "x", "label": "Hoãn nghĩa vụ"})
+        self.assertIsNotNone(request_quota.check(self.student.pk, "deferment"))
+
+    def test_other_and_english_limited_per_purpose(self):
+        # Từ 12/10/2026: GXN "Khác" + tiếng Anh tính lượt theo mục đích, không chặn cả loại.
+        self._request("other", {"code": "visa", "label": "Bổ sung hồ sơ xin visa cho sinh viên"})
+        self._request("english_form", {"code": "program", "label": "Apply for X", "program_name": "X"})
+        self.assertIsNotNone(request_quota.check(self.student.pk, "other", "visa"))
+        self.assertIsNone(request_quota.check(self.student.pk, "other", "job"))
+        self.assertIsNotNone(request_quota.check(self.student.pk, "english_form", "program"))
+        self.assertIsNone(request_quota.check(self.student.pk, "english_form", "visa"))
+        types = request_quota.availability(self.student.pk, ["other", "english_form"])["types"]
+        self.assertFalse(types["other"]["blocked"])
+        self.assertEqual(set(types["other"]["purposes"]), {"visa"})
+        self.assertIn("chương trình", types["english_form"]["purposes"]["program"]["reason"])
+
+    def test_rejected_purpose_can_be_requested_again(self):
+        self._request("other", {"code": "visa", "label": "v"}, status=ConfirmationRequest.STATUS_REJECTED)
+        self.assertIsNone(request_quota.check(self.student.pk, "other", "visa"))
 
 
 class ConductScoresByYearTests(TestCase):

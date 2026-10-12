@@ -11,7 +11,7 @@ import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/
 import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
 import { validateDob, validateCccd, isValidDob, isValidCccd } from '@/lib/form-validators';
-import { QuotaGuard } from '@/components/request-quota';
+import { QuotaGuard, QuotaNotice, usePurposeLocks } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf } from '@/components/request-edit';
 
 
@@ -78,6 +78,9 @@ export default function OtherRequestPage() {
   }, []);
 
   const isProgram = form ? purposeCode === form.program_purpose_code : false;
+  // Lượt xin tính theo mục đích (backend core/request_quota.py) — mục đích đã xin trong học kỳ bị làm mờ.
+  const purposeLocks = usePurposeLocks('other', isEdit);
+  const purposeLock = purposeLocks[purposeCode];
   const cccdMustRenew = form ? !isValidCccd(form.prefill.citizen_id) : false;
 
   function setValue(key: FieldKey, v: string) {
@@ -251,8 +254,13 @@ export default function OtherRequestPage() {
               className={cn(ui.input, 'appearance-none bg-white')}
             >
               <option value="">— Chọn mục đích —</option>
-              {form.purpose_choices.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+              {form.purpose_choices.map((c) => (
+                <option key={c.code} value={c.code} disabled={!!purposeLocks[c.code]}>
+                  {c.label}{purposeLocks[c.code] ? ' (đã xin trong học kỳ này)' : ''}
+                </option>
+              ))}
             </select>
+            {purposeLock && <QuotaNotice reason={purposeLock.reason} className="mt-2.5" />}
 
             {isProgram && (
               <div className="mt-2.5">
@@ -284,7 +292,7 @@ export default function OtherRequestPage() {
               <ArrowLeft size={15} /> Quay lại
             </Link>
             <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading || (isEdit && !edit.request)} className={ui.btnPrimary}>
+              <button type="submit" disabled={loading || (isEdit && !edit.request) || !!purposeLock} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>

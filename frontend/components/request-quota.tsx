@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { Ban } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import type { RequestAvailability } from '@/lib/types';
+import type { QuotaTypeState, RequestAvailability } from '@/lib/types';
 
 export function useRequestQuota(): RequestAvailability | null {
   const [data, setData] = useState<RequestAvailability | null>(null);
@@ -28,6 +28,16 @@ export function useRequestQuota(): RequestAvailability | null {
     };
   }, []);
   return data;
+}
+
+/**
+ * GXN "Khác" + tiếng Anh tính lượt theo MỤC ĐÍCH (không chặn cả loại): trả các mục đích đã hết
+ * lượt trong học kỳ ⇒ form làm mờ đúng mục đích đó. Đang sửa yêu cầu cũ (`bypass`) ⇒ không chặn.
+ */
+export function usePurposeLocks(type: string, bypass = false): Record<string, QuotaTypeState> {
+  const quota = useRequestQuota();
+  if (bypass) return {};
+  return quota?.types[type]?.purposes ?? {};
 }
 
 /** Khối thông báo lý do hết lượt (dùng ở trang chọn loại + đầu mỗi form). */
