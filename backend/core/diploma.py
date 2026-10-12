@@ -202,7 +202,7 @@ def exam_year(text):
 
 def clean(data):
     """Chuẩn hóa + kiểm 4 ô văn bằng. Trả (giá trị, lỗi theo ô). Dashboard import dùng chung luật này
-    (bản sao ở `diplomas/services.clean_diploma`) — sửa luật thì sửa cả hai."""
+    (bản sao ở dashboard_iuoss `diplomas/importer.clean_diploma`) — sửa luật thì sửa cả hai."""
     get = lambda key: str(data.get(key) or '').strip()  # noqa: E731
     errors = {}
     values = {
