@@ -530,3 +530,95 @@ CREATE TABLE `student_images` (
   CONSTRAINT `chk_si_subject` CHECK (`subject` IN ('SELF','FATHER','MOTHER','GUARDIAN')),
   CONSTRAINT `chk_si_size` CHECK (`file_size_bytes` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Nộp bằng tốt nghiệp THPT (12/10/2026) — nguồn: dashboard_iuoss/docs/sql/20261012_diploma_submissions.sql
+CREATE TABLE IF NOT EXISTS `diploma_rounds` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `opens_at` datetime(6) NOT NULL,
+  `closes_at` datetime(6) NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci NULL COMMENT 'Hướng dẫn trên Hub; mỗi dòng một ý, dòng mở đầu bằng "+" là gạch đầu dòng',
+  `original_note` text COLLATE utf8mb4_unicode_ci NULL COMMENT 'Thời gian, địa điểm nộp bản gốc — chèn vào thư hẹn và trang Hub',
+  `created_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_dr_window` (`opens_at`, `closes_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Một lần bấm "Gửi thư hẹn nộp bản gốc" = một lô, mã TNyyMMdd-NN in ở tiêu đề thư.
+-- Thư To oss@ + BCC sinh viên, chia nhiều thư khi lô lớn (email_ids giữ id các thư).
+CREATE TABLE IF NOT EXISTS `diploma_notice_batches` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `code` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `recipient_count` int NOT NULL DEFAULT '0',
+  `email_ids` json DEFAULT NULL,
+  `original_note` text COLLATE utf8mb4_unicode_ci NULL COMMENT 'Nội dung hẹn đã gửi (chụp lại lúc gửi)',
+  `created_by_id` int DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_dnb_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Mỗi sinh viên MỘT hồ sơ (bằng THPT chỉ có một), round_id = đợt lúc nộp.
+-- Trạng thái một cột, đi một chiều:
+--   pending (Chờ duyệt online) → approved (Đã duyệt, chờ gửi thư) → notified (Đã hẹn nộp bản gốc)
+--   → received (Đã nhận bằng gốc). approved cũng nhận thẳng được (SV tới trước khi có thư).
+--   pending → returned (Cần sửa lại, có lý do) → pending khi SV gửi lại.
+CREATE TABLE IF NOT EXISTS `diploma_submissions` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `round_id` bigint NOT NULL,
+  `student_id` bigint NOT NULL,
+  `student_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `full_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `university_email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `phone_number` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `citizen_id` varchar(12) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `diploma_number` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Số hiệu văn bằng',
+  `issued_by` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Nơi cấp — chữ tự do, giữ tên tỉnh cũ',
+  `issued_on` date NOT NULL,
+  `exam_session` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Khóa thi, ghi như trên bằng (năm hoặc ngày)',
+  `cccd_front` json NOT NULL COMMENT '{storage_key, mime_type, image_id} — chụp lại ảnh lúc nộp',
+  `diploma_pdf` json NOT NULL COMMENT '{storage_key, mime_type, size, sha256, original_filename}',
+  `profile_diff` json DEFAULT NULL COMMENT 'SĐT/CCCD khai khác hồ sơ: {field: {profile, declared}}',
+  `status` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `review_note` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reviewed_by_id` int DEFAULT NULL,
+  `reviewed_at` datetime(6) DEFAULT NULL,
+  `supplement_pending` tinyint(1) NOT NULL DEFAULT '0',
+  `supplemented_at` datetime(6) DEFAULT NULL,
+  `submit_count` smallint unsigned NOT NULL DEFAULT '1',
+  `notice_batch_id` bigint DEFAULT NULL,
+  `notified_at` datetime(6) DEFAULT NULL,
+  `received_at` datetime(6) DEFAULT NULL,
+  `received_by_id` int DEFAULT NULL,
+  `row_version` int unsigned NOT NULL DEFAULT '0',
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ds_student` (`student_id`),
+  KEY `idx_ds_status` (`status`, `updated_at`),
+  KEY `idx_ds_round` (`round_id`, `status`),
+  KEY `idx_ds_student_code` (`student_code`),
+  KEY `idx_ds_diploma_number` (`diploma_number`),
+  KEY `idx_ds_batch` (`notice_batch_id`),
+  CONSTRAINT `fk_ds_round` FOREIGN KEY (`round_id`) REFERENCES `diploma_rounds` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_ds_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`),
+  CONSTRAINT `fk_ds_batch` FOREIGN KEY (`notice_batch_id`) REFERENCES `diploma_notice_batches` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Timeline append-only. request_key chống gửi trùng từ Hub (bấm hai lần, mạng chập chờn).
+CREATE TABLE IF NOT EXISTS `diploma_submission_events` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `submission_id` bigint NOT NULL,
+  `event_type` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_id` bigint DEFAULT NULL,
+  `source_app` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `request_key` varchar(96) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `payload` json DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_dse_key` (`submission_id`, `request_key`),
+  KEY `idx_dse_submission` (`submission_id`, `id`),
+  CONSTRAINT `fk_dse_submission` FOREIGN KEY (`submission_id`) REFERENCES `diploma_submissions` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
