@@ -14,6 +14,7 @@ import {
 } from '@/components/editable-field';
 import { validateDob, isValidDob } from '@/lib/form-validators';
 import { PermanentAddressCccdNote, STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
+import { useDocumentPreview } from '@/components/request-preview';
 import { QuotaGuard } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, pendingAddress } from '@/components/request-edit';
 
@@ -48,6 +49,7 @@ export default function DefermentRequestPage() {
 
   // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
   const edit = useEditRequest('deferment');
+  const preview = useDocumentPreview('deferment');
   const isEdit = edit.id !== null;
   const editApplied = useRef(false);
   useEffect(() => {
@@ -139,8 +141,10 @@ export default function DefermentRequestPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Nút "Xem trước giấy" đi chung phần kiểm tra này, chưa cần tích cam đoan.
+    const previewing = preview.consume();
     if (!form) return;
-    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    if (!confirmed && !previewing) { setError(CONSENT_REQUIRED_MSG); return; }
     const pf = form.prefill;
 
     const errs: FErr = {};
@@ -153,15 +157,17 @@ export default function DefermentRequestPage() {
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
+    const data = {
+      dob: values.dob.trim(),
+      province_code: provinceCode,
+      ward_code: wardCode,
+      street: street.trim(),
+      note: note.trim() || undefined,
+    };
+    if (previewing) { preview.show(data); return; }
     setLoading(true);
     try {
-      await submitOrUpdate(edit, 'deferment', api.requests.createDeferment, {
-        dob: values.dob.trim(),
-        province_code: provinceCode,
-        ward_code: wardCode,
-        street: street.trim(),
-        note: note.trim() || undefined,
-      });
+      await submitOrUpdate(edit, 'deferment', api.requests.createDeferment, data);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
@@ -360,6 +366,8 @@ export default function DefermentRequestPage() {
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
+            {preview.button}
+            {preview.modal}
             <ConsentGate checked={confirmed}>
               <button type="submit" disabled={loading || (isEdit && !edit.request)} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}

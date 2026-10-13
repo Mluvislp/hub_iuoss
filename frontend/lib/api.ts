@@ -182,6 +182,13 @@ export const api = {
     availability(): Promise<import('./types').RequestAvailability> {
       return request('/requests/availability/');
     },
+    /** Xem trước giấy (core/document_preview.py): GET = bật hay chưa; POST = ảnh JPEG base64 có dấu chìm. */
+    previewStatus(): Promise<{ enabled: boolean; types: string[] }> {
+      return request('/requests/preview/');
+    },
+    preview(data: { request_type: string } & Record<string, unknown>): Promise<{ pages: string[] }> {
+      return request('/requests/preview/', { method: 'POST', body: JSON.stringify(data) });
+    },
     detail(id: number): Promise<ConfirmationRequestDetail> {
       return request(`/requests/${id}/`);
     },

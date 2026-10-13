@@ -27,7 +27,7 @@ from core.models import (
     ConfirmationRequestComment,
     ExternalInsuranceDeclaration,
 )
-from core import request_quota, request_edit, student_images
+from core import document_preview, request_quota, request_edit, student_images
 from core.documents import (
     BANKLOAN_FEE_EXEMPTION_CHOICES,
     BANKLOAN_ORPHAN_CHOICES,
@@ -1367,6 +1367,60 @@ def _visible_comments():
     prefetch nên đếm và hiển thị không thể lệch nhau.
     """
     return Prefetch("comments", queryset=ConfirmationRequestComment.visible_qs())
+
+
+class _PreviewCaptured(Exception):
+    """Dừng đường tạo yêu cầu đúng ở bước ghi DB — mang theo các cột lẽ ra được lưu."""
+
+    def __init__(self, fields):
+        super().__init__("preview")
+        self.fields = fields
+
+
+class RequestPreviewView(RequestsView):
+    """POST /api/requests/preview/ — xem trước giấy với thông tin SV vừa nhập, KHÔNG tạo yêu cầu.
+
+    Đi chung TOÀN BỘ đường kiểm tra + dựng payload của `RequestsView` (cùng body như lúc gửi),
+    chỉ chặn ở `_persist` ⇒ bản xem trước luôn khớp đúng yêu cầu sẽ gửi. Bỏ qua hạn mức (không
+    tốn lượt). Ảnh do Dashboard dựng, đã đóng dấu chìm — core/document_preview.py.
+    """
+
+    def get_throttles(self):
+        if self.request.method != "POST":
+            return []
+        self.throttle_scope = "preview_request"
+        return super(RequestsView, self).get_throttles()
+
+    def get(self, request):
+        return Response({"enabled": document_preview.enabled(),
+                         "types": sorted(document_preview.PREVIEW_TYPES)})
+
+    def _persist(self, request, **fields):
+        raise _PreviewCaptured(fields)
+
+    def post(self, request):
+        request_type = _get_str(request.data, "request_type")
+        if request_type not in document_preview.PREVIEW_TYPES:
+            return Response({"detail": "Loại giấy này chưa hỗ trợ xem trước."}, status=status.HTTP_400_BAD_REQUEST)
+        if not document_preview.enabled():
+            return Response({"detail": "Tính năng xem trước chưa được bật."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        try:
+            resp = self._create(request, request_type)
+        except _PreviewCaptured as cap:
+            fields = cap.fields
+        else:
+            return resp   # lỗi kiểm tra dữ liệu (400) — trả y như lúc gửi thật
+        student = self._resolve_student(request)
+        viewer = (student.current_student_code if student else "") or request.user.ldap_uid or ""
+        try:
+            pages = document_preview.render(fields["request_type"], fields.get("student_id"),
+                                            fields.get("payload") or {}, viewer)
+        except document_preview.PreviewUnavailable as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        logger.info("DOCUMENT_PREVIEW | uid=%-20s | type=%s | pages=%d", request.user.ldap_uid, request_type, len(pages))
+        resp = Response({"pages": pages})
+        resp["Cache-Control"] = "no-store"
+        return resp
 
 
 class _OwnRequestMixin(DocumentRequestsRequiredMixin):
