@@ -76,16 +76,38 @@ export function useDocumentPreview(requestType: string) {
     setPages([]);
   }, []);
 
+  // Nổi hơn nút phụ thường (viền + nền xanh nhạt, chữ đậm) để SV để ý — vẫn nhường nút Gửi (nền xanh đặc).
   const button = enabled ? (
-    <button type="submit" onClick={arm} disabled={loading} className={cn(ui.btnOutline, ui.formFooterBtn)}>
+    <button
+      type="submit"
+      onClick={arm}
+      disabled={loading}
+      className={cn(
+        'inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-primary bg-primary-soft px-4',
+        'text-sm font-semibold text-primary-text transition-colors hover:bg-primary hover:text-white',
+        'disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        ui.formFooterBtn,
+      )}
+    >
       {loading ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
       Xem trước giấy
     </button>
   ) : null;
 
+  // Nhắc ngắn đặt ngay trên thanh nút cuối form.
+  const note = enabled ? (
+    <p className="flex items-start gap-2 border-l-2 border-primary bg-primary-soft/60 px-3 py-2 text-[0.82rem] leading-relaxed text-ink">
+      <Eye size={15} className="mt-0.5 shrink-0 text-primary" />
+      <span>
+        Nên bấm <strong className="font-semibold">Xem trước giấy</strong> để kiểm tra đúng loại giấy cần xin
+        và thông tin sẽ in trước khi gửi yêu cầu.
+      </span>
+    </p>
+  ) : null;
+
   const modal = open ? <PreviewModal loading={loading} pages={pages} error={error} onClose={close} /> : null;
 
-  return { enabled, consume, show, button, modal };
+  return { enabled, consume, show, button, note, modal };
 }
 
 function PreviewModal({ loading, pages, error, onClose }: {
