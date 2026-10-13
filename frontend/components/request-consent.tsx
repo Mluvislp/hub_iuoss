@@ -49,9 +49,13 @@ export function RequestConsent({
  * phải truyền `disabled` vào từng nút ở 5 form. Độ mờ lấy từ `disabled:` của
  * chính nút (`ui.btnPrimary`), fieldset không tự làm mờ để khỏi mờ chồng hai lần.
  */
-export function ConsentGate({ checked, children }: { checked: boolean; children: React.ReactNode }) {
+export function ConsentGate({ checked, className, children }: {
+  checked: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <fieldset disabled={!checked} className="inline-flex">
+    <fieldset disabled={!checked} className={className ? `inline-flex ${className}` : 'inline-flex'}>
       {children}
     </fieldset>
   );

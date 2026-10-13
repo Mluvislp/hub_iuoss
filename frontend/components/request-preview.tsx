@@ -77,7 +77,7 @@ export function useDocumentPreview(requestType: string) {
   }, []);
 
   const button = enabled ? (
-    <button type="submit" onClick={arm} disabled={loading} className={ui.btnGhost}>
+    <button type="submit" onClick={arm} disabled={loading} className={cn(ui.btnOutline, ui.formFooterBtn)}>
       {loading ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
       Xem trước giấy
     </button>
