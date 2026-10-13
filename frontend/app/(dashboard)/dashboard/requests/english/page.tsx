@@ -11,6 +11,7 @@ import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/
 import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
 import { validateDob, isValidDob } from '@/lib/form-validators';
+import { useDocumentPreview } from '@/components/request-preview';
 import { QuotaGuard, QuotaNotice, usePurposeLocks } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf } from '@/components/request-edit';
 
@@ -38,6 +39,7 @@ export default function EnglishRequestPage() {
 
   // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
   const edit = useEditRequest('english_form');
+  const preview = useDocumentPreview('english_form');
   const isEdit = edit.id !== null;
   const editApplied = useRef(false);
   useEffect(() => {
@@ -88,7 +90,9 @@ export default function EnglishRequestPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    // Nút "Xem trước giấy" đi chung phần kiểm tra này, chưa cần tích cam đoan.
+    const previewing = preview.consume();
+    if (!confirmed && !previewing) { setError(CONSENT_REQUIRED_MSG); return; }
     if (!form) return;
     const pf = form.prefill;
     const errs: FErr = {};
@@ -98,14 +102,16 @@ export default function EnglishRequestPage() {
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
+    const data = {
+      dob: values.dob.trim(),
+      purpose_code: purposeCode,
+      program_name: isProgram ? programName.trim() : undefined,
+      note: note.trim() || undefined,
+    };
+    if (previewing) { preview.show(data); return; }
     setLoading(true);
     try {
-      await submitOrUpdate(edit, 'english_form', api.requests.createEnglish, {
-        dob: values.dob.trim(),
-        purpose_code: purposeCode,
-        program_name: isProgram ? programName.trim() : undefined,
-        note: note.trim() || undefined,
-      });
+      await submitOrUpdate(edit, 'english_form', api.requests.createEnglish, data);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
@@ -258,6 +264,8 @@ export default function EnglishRequestPage() {
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
+            {preview.button}
+            {preview.modal}
             <ConsentGate checked={confirmed}>
               <button type="submit" disabled={loading || (isEdit && !edit.request) || !!purposeLock} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}

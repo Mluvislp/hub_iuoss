@@ -37,6 +37,7 @@ urlpatterns = [
     path("health-insurance/registrations/", views.InsuranceRegistrationView.as_view(), name="api_health_insurance_registrations"),
     path("requests/",             views.RequestsView.as_view(),          name="api_requests"),
     path("requests/availability/", views.RequestAvailabilityView.as_view(), name="api_request_availability"),
+    path("requests/preview/",     views.RequestPreviewView.as_view(),    name="api_request_preview"),
     path("requests/<int:pk>/",          views.RequestDetailView.as_view(),   name="api_request_detail"),
     path("requests/<int:pk>/comments/", views.RequestCommentsView.as_view(), name="api_request_comments"),
     path("requests/<int:pk>/soft-copy/", views.RequestSoftCopyView.as_view(), name="api_request_soft_copy"),

@@ -11,6 +11,7 @@ import { ui } from '@/lib/ui';
 import type { ThuongBinhFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
+import { useDocumentPreview } from '@/components/request-preview';
 import { QuotaGuard } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue } from '@/components/request-edit';
 
@@ -35,6 +36,7 @@ export default function ThuongBinhRequestPage() {
 
   // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
   const edit = useEditRequest('thuong_binh');
+  const preview = useDocumentPreview('thuong_binh');
   const isEdit = edit.id !== null;
   const editApplied = useRef(false);
   useEffect(() => {
@@ -81,7 +83,9 @@ export default function ThuongBinhRequestPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    // Nút "Xem trước giấy" đi chung phần kiểm tra này, chưa cần tích cam đoan.
+    const previewing = preview.consume();
+    if (!confirmed && !previewing) { setError(CONSENT_REQUIRED_MSG); return; }
     if (!form) return;
     const pf = form.prefill;
     const errs: FErr = {};
@@ -96,13 +100,15 @@ export default function ThuongBinhRequestPage() {
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
+    const data = {
+      citizen_id: values.citizen_id.trim(),
+      citizen_id_issue_date: values.citizen_id_issue_date.trim(),
+      note: note.trim() || undefined,
+    };
+    if (previewing) { preview.show(data); return; }
     setLoading(true);
     try {
-      await submitOrUpdate(edit, 'thuong_binh', api.requests.createThuongBinh, {
-        citizen_id: values.citizen_id.trim(),
-        citizen_id_issue_date: values.citizen_id_issue_date.trim(),
-        note: note.trim() || undefined,
-      });
+      await submitOrUpdate(edit, 'thuong_binh', api.requests.createThuongBinh, data);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
@@ -242,6 +248,8 @@ export default function ThuongBinhRequestPage() {
             <Link href="/dashboard/requests/new" className={ui.btnGhost}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
+            {preview.button}
+            {preview.modal}
             <ConsentGate checked={confirmed}>
               <button type="submit" disabled={loading || (isEdit && !edit.request)} className={ui.btnPrimary}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
