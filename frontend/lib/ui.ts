@@ -38,6 +38,13 @@ export const ui = {
     'inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg ' +
     'border border-line bg-white text-sm font-medium text-ink hover:bg-slate-50 transition-colors',
 
+  // Thanh nút cuối form yêu cầu: điện thoại xếp dọc full-width (nút chính trên cùng — thứ tự DOM
+  // là Quay lại · Xem trước · Gửi nên dùng flex-col-reverse), từ sm trở lên một hàng canh phải.
+  formFooter:
+    'flex flex-col-reverse gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5 ' +
+    'sm:flex-row sm:items-center sm:justify-end',
+  formFooterBtn: 'w-full whitespace-nowrap sm:w-auto',
+
   // Definition list row (thông tin hành chính)
   dtRow: 'flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0',
   dtLabel: 'text-sm text-muted',
