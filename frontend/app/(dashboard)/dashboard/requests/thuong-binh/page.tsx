@@ -244,6 +244,8 @@ export default function ThuongBinhRequestPage() {
           />
 
           {/* Footer */}
+          {preview.note}
+
           <div className={ui.formFooter}>
             <Link href="/dashboard/requests/new" className={cn(ui.btnGhost, ui.formFooterBtn)}>
               <ArrowLeft size={15} /> Quay lại
