@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Clock3, FileImage, History, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
-import { accentIcon, badge, ui } from '@/lib/ui';
+import { accentIcon, badge, ui, notice, noticeIcon } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { SubmittedInsurance } from '@/lib/types';
 
@@ -105,8 +105,8 @@ export function SubmittedInsuranceInfo({data, external=false, hospitalChange=fal
     </div>
 
     <div className="space-y-5 p-5">
-      {data.edited_at && <div className="flex items-start gap-2.5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-text">
-        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+      {data.edited_at && <div className={cn(notice.base, notice.warning)}>
+        <AlertTriangle className={noticeIcon.warning} />
         <span>Sinh viên đã chỉnh sửa vào lúc {formatDateTime(data.edited_at)}, không thể chỉnh sửa thêm</span>
       </div>}
 

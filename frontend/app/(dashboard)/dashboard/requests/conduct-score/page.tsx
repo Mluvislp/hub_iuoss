@@ -262,10 +262,10 @@ export default function ConductScoreRequestPage() {
 
       <EditRequestBanner edit={edit} />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+            <FileText size={17} className="text-slate-500" />
             Bảng điểm rèn luyện
           </h1>
         </div>

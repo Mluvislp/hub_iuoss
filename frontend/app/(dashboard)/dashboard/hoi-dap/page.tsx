@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, Loader2, MessageSquare, MessagesSquare, Plus } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, badge } from '@/lib/ui';
+import { ui, badge, notice, noticeIcon } from '@/lib/ui';
 import { cn, formatDateTime } from '@/lib/utils';
 import { TICKET_STATUS_STYLES, type TicketStatus, type TicketSummary } from '@/lib/types';
 
@@ -75,9 +75,9 @@ export default function TicketListPage() {
       </div>
 
       {unread > 0 && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-primary-line bg-primary-soft px-4 py-3">
-          <MessageSquare size={16} className="mt-0.5 shrink-0 text-primary-text" />
-          <p className="text-sm text-primary-text">
+        <div className={cn(notice.base, notice.info)}>
+          <MessageSquare className={noticeIcon.info} />
+          <p>
             <strong>{unread}</strong> ticket có phản hồi mới từ Phòng Công tác Sinh viên.
           </p>
         </div>

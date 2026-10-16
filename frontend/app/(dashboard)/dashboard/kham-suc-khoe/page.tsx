@@ -81,7 +81,7 @@ function PackageInfo({ state }: { state: HealthCheckState }) {
       </div>
       {r.schedule_note && (
         <div className="px-4 py-3 flex items-start gap-2">
-          <CalendarClock size={15} className="text-primary mt-0.5 flex-shrink-0" />
+          <CalendarClock size={15} className="text-slate-500 mt-0.5 flex-shrink-0" />
           <div>
             <div className="text-[0.75rem] font-medium text-muted mb-0.5">Thời gian và địa điểm dự kiến</div>
             <div className="text-ink">{r.schedule_note}</div>
@@ -167,7 +167,7 @@ export default function HealthCheckPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <HeartPulse size={17} className="text-primary" /> {round.title}
+            <HeartPulse size={17} className="text-slate-500" /> {round.title}
           </h1>
           <p className="text-sm text-muted mt-1">
             Năm học {round.academic_year} · Thời hạn khai báo {fmtDateTime(round.opens_at)} – {fmtDateTime(round.closes_at)}
@@ -231,7 +231,7 @@ export default function HealthCheckPage() {
             {response.choice === 'register' ? 'Đã ghi nhận đăng ký khám sức khỏe.' : 'Đã ghi nhận kết quả khám và minh chứng.'}
           </div>
         )}
-        <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+        <div className={ui.card}>
           {header}
           <div className="px-6 py-5 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -324,7 +324,7 @@ export default function HealthCheckPage() {
     return (
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
-        <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+        <div className={ui.card}>
           {header}
           <div className="px-6 py-6 text-sm text-muted">
             {round.state === 'upcoming'
@@ -376,7 +376,7 @@ export default function HealthCheckPage() {
     <div className="max-w-[860px] space-y-4">
       <Breadcrumb />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         {header}
         <div className="px-6 py-5">
           <p className="text-[0.9rem] font-semibold text-ink mb-3">
@@ -441,9 +441,9 @@ export default function HealthCheckPage() {
 
               {!eligible ? (
                 <div className="px-6 py-5">
-                  <div role="alert" className="flex items-start gap-3 rounded-lg border border-warning-line border-l-4 border-l-warning-text bg-warning-soft px-4 py-3.5">
-                    <AlertTriangle size={20} className="text-warning-text flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-warning-text">
+                  <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
+                    <AlertTriangle size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-ink">
                       <div className="font-semibold">Phần đăng ký khám chưa mở</div>
                       <p className="mt-1">
                         Chỉ sinh viên có địa chỉ <b>thường trú</b> hoặc <b>tạm trú</b> tại Thành phố

@@ -146,7 +146,7 @@ export default function NewTicketPage() {
               const picked = (topics ?? []).find((t) => t.id === topicId);
               if (!picked || picked.children.length === 0) return null;
               return (
-                <div className="mt-4 rounded-lg border border-primary-line bg-[#f8fbff] px-4 py-3">
+                <div className="mt-4 rounded-lg border border-line2 bg-[#f8fafc] px-4 py-3">
                   <p className="mb-2 text-[0.82rem] font-medium text-ink">
                     Nội dung cụ thể — {picked.name}
                   </p>

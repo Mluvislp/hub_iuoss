@@ -167,10 +167,10 @@ export default function ThuongBinhRequestPage() {
 
       <EditRequestBanner edit={edit} />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+            <FileText size={17} className="text-slate-500" />
             Giấy xác nhận sinh viên — Ưu đãi giáo dục (thương binh)
           </h1>
           <p className="text-sm text-muted mt-1">Thông tin lấy từ hồ sơ sinh viên. Kiểm tra, yêu cầu chỉnh sửa CCCD nếu sai rồi gửi yêu cầu.</p>

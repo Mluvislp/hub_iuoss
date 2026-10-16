@@ -18,15 +18,15 @@ export function InsuranceTimeline<T extends TimelineEntry>({ items, empty, rende
   items: T[]; empty: string; renderExtra?: (item: T) => ReactNode;
 }) {
   return <section className="rounded-lg border border-line bg-white p-4 sm:p-6">
-    <div className="mb-5 flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 text-primary" /><div><h3 className="font-semibold text-ink">Lịch sử xử lý và bổ sung</h3><p className="text-sm text-muted">Các hoạt động được sắp xếp theo thời gian</p></div></div>
+    <div className="mb-5 flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 text-slate-500" /><div><h3 className="font-semibold text-ink">Lịch sử xử lý và bổ sung</h3><p className="text-sm text-muted">Các hoạt động được sắp xếp theo thời gian</p></div></div>
     {!items.length && <p className="rounded-lg bg-slate-50 p-4 text-sm text-muted">{empty}</p>}
-    <div className="relative ml-2 border-l-2 border-primary-line pl-6 sm:ml-3 sm:pl-8">
+    <div className="relative ml-2 border-l border-line pl-6 sm:ml-3 sm:pl-8">
     {items.map((e, index) => <article className="relative pb-6 last:pb-0" key={e.key}>
-      <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-4 border-white bg-primary shadow-sm sm:-left-[39px]" />
+      <span className="absolute -left-[30.5px] top-[18px] h-2.5 w-2.5 rounded-full border-2 border-white bg-slate-400 ring-1 ring-line sm:-left-[38.5px]" />
       <div className="rounded-lg border border-line bg-white p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold text-ink">{e.label}</p><p className="mt-1 text-xs text-slate-500">Bước {index + 1} · {actorName(e.source_app)}</p></div><time className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{new Date(e.created_at).toLocaleString('vi-VN')}</time></div>
+        <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold text-ink">{e.label}</p><p className="mt-1 text-xs text-slate-500">Bước {index + 1} · {actorName(e.source_app)}</p></div><time className="text-xs text-muted">{new Date(e.created_at).toLocaleString('vi-VN')}</time></div>
         {e.from_status && e.to_status && e.from_status !== e.to_status && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><InsuranceStatus status={e.from_status} /><ArrowRight className="h-4 w-4 text-slate-400" /><InsuranceStatus status={e.to_status} /></div>}
-        {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-text">{e.reason_label && <p className="font-semibold">{e.reason_label}</p>}{e.reason_text && <p className={e.reason_label ? 'mt-1' : ''}>{e.reason_text}</p>}</div>}
+        {(e.reason_label || e.reason_text) && <div className="mt-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-3 py-2 text-sm text-ink">{e.reason_label && <p className="font-semibold">{e.reason_label}</p>}{e.reason_text && <p className={e.reason_label ? 'mt-1' : ''}>{e.reason_text}</p>}</div>}
         {e.payload.previous_rejection && <p className="mt-3 text-sm text-danger-text">Phản hồi từ chối trước: {e.payload.previous_rejection}</p>}
         <ChangeList changes={e.payload.changes} images={e.payload.images} submitted={e.event_type === 'SUBMITTED'} className="mt-3 space-y-1 rounded-lg bg-slate-50 p-3 text-sm" />
         {renderExtra?.(e)}

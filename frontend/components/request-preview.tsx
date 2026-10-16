@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eye, Loader2, ShieldAlert, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui } from '@/lib/ui';
+import { ui, notice, noticeIcon } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 
 export function useDocumentPreview(requestType: string) {
@@ -149,8 +149,8 @@ function PreviewModal({ loading, pages, error, onClose }: {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
-          <div className="mb-3 flex items-start gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2.5 text-[0.82rem] text-warning-text">
-            <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+          <div className={cn(notice.base, notice.warning, 'mb-3 px-3 py-2.5 text-[0.82rem]')}>
+            <ShieldAlert className={noticeIcon.warning} />
             <p>
               Bản xem trước chỉ để kiểm tra thông tin trước khi gửi, có dấu chìm và không có giá trị sử dụng.
               Giấy chính thức do Phòng Công tác Sinh viên cấp sau khi xử lý yêu cầu.
@@ -162,7 +162,7 @@ function PreviewModal({ loading, pages, error, onClose }: {
             </div>
           )}
           {!loading && error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">{error}</p>
+            <p className={cn(notice.base, notice.error)}>{error}</p>
           )}
           <div className="select-none space-y-4" onDragStart={block} onCopy={block}>
             {pages.map((b64, i) => (

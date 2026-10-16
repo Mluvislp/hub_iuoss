@@ -12,7 +12,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, MessageSquareWarning } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
+import { notice, noticeIcon } from '@/lib/ui';
 import type { ConfirmationRequestDetail, RequestType } from '@/lib/types';
 
 /** Trang form của từng loại giấy sửa được. Loại cũ (chỉ mục đích tự do) không có. */
@@ -99,8 +100,8 @@ export function EditRequestBanner({ edit }: { edit: EditState }) {
   if (edit.id === null) return null;
   if (edit.error) {
     return (
-      <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
-        <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+      <div className={cn(notice.base, notice.error)}>
+        <AlertCircle className={noticeIcon.error} />
         <span>
           {edit.error}{' '}
           <Link href={`/dashboard/requests/${edit.id}`} className="font-medium underline">Xem yêu cầu</Link>
@@ -111,9 +112,9 @@ export function EditRequestBanner({ edit }: { edit: EditState }) {
   if (!edit.request) return null;
   const ask = [...edit.request.comments].reverse().find((c) => c.author_role === 'staff');
   return (
-    <div className="rounded-lg border border-warning-line bg-warning-soft px-4 py-3">
-      <div className="flex items-center gap-2 text-[0.84rem] font-semibold text-warning-text">
-        <MessageSquareWarning size={15} className="shrink-0" />
+    <div className="rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3">
+      <div className="flex items-center gap-2 text-[0.84rem] font-semibold text-ink">
+        <MessageSquareWarning size={15} className="shrink-0 text-[#d97706]" />
         Bổ sung thông tin theo yêu cầu của Phòng CTSV
       </div>
       {ask && (

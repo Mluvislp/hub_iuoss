@@ -61,14 +61,42 @@ export const badge = {
   neutral: 'bg-slate-50 text-slate-600 border-slate-200',
 };
 
-/** Icon màu accent theo section. */
+/**
+ * Icon cạnh tiêu đề section — MỘT màu trung tính cho mọi section (16/10/2026). Trước đây mỗi
+ * section một màu (xanh/lục/vàng) làm trang loang lổ; màu chỉ còn ở badge trạng thái & nút.
+ * Giữ các khoá cũ để không phải sửa chỗ gọi.
+ */
 export const accentIcon = {
-  primary: 'text-primary',
-  success: 'text-success-text',
-  warning: 'text-warning-text',
-  danger: 'text-danger-text',
-  neutral: 'text-slate-400',
+  primary: 'text-slate-500',
+  success: 'text-slate-500',
+  warning: 'text-slate-500',
+  danger: 'text-slate-500',
+  neutral: 'text-slate-500',
 };
+
+/**
+ * Hộp thông báo / ghi chú trong trang. Nền TRẮNG, viền xám, màu ngữ nghĩa chỉ ở vạch trái 3px
+ * và icon — không tô nền pastel. Lỗi chặn thao tác (form không gửi được) vẫn dùng `notice.error`.
+ *   <div className={cn(notice.base, notice.warning)}><AlertCircle className={noticeIcon.warning} />…</div>
+ */
+export const notice = {
+  base: 'flex items-start gap-2.5 rounded-lg border border-line bg-white px-4 py-3 text-sm text-ink border-l-[3px]',
+  info: 'border-l-primary',
+  warning: 'border-l-[#d97706]',
+  success: 'border-l-[#059669]',
+  neutral: 'border-l-slate-300',
+  error: 'border-danger-line border-l-danger-text bg-danger-soft text-danger-text',
+};
+export const noticeIcon = {
+  info: 'mt-0.5 h-4 w-4 shrink-0 text-primary',
+  warning: 'mt-0.5 h-4 w-4 shrink-0 text-[#d97706]',
+  success: 'mt-0.5 h-4 w-4 shrink-0 text-[#059669]',
+  neutral: 'mt-0.5 h-4 w-4 shrink-0 text-slate-400',
+  error: 'mt-0.5 h-4 w-4 shrink-0 text-danger-text',
+};
+
+/** Ô số liệu / khối phụ trong card: nền xám rất nhạt, không tô màu ngữ nghĩa. */
+export const subtle = 'rounded-lg border border-line2 bg-[#f8fafc]';
 
 // Backward-compat alias
 export const statusChip = badge.base;
