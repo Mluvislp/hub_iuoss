@@ -215,7 +215,7 @@ export default function RequestDetailPage() {
           Yêu cầu giấy tờ
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1 className="text-xl font-semibold tracking-tight text-ink">
+          <h1 className="text-xl font-semibold text-ink">
             {REQUEST_TYPE_LABELS[data.request_type]}
           </h1>
           <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status])}>
@@ -393,11 +393,11 @@ export default function RequestDetailPage() {
             </div>
             <div className={ui.dtRow}>
               <dt className={ui.dtLabel}>Ngày gửi</dt>
-              <dd className={cn(ui.dtValue, 'tabular-nums')}>{formatDateTime(data.created_at)}</dd>
+              <dd className={ui.dtValue}>{formatDateTime(data.created_at)}</dd>
             </div>
             <div className={ui.dtRow}>
               <dt className={ui.dtLabel}>Cập nhật</dt>
-              <dd className={cn(ui.dtValue, 'tabular-nums')}>{formatDate(data.updated_at)}</dd>
+              <dd className={ui.dtValue}>{formatDate(data.updated_at)}</dd>
             </div>
           </dl>
         </section>
@@ -408,7 +408,7 @@ export default function RequestDetailPage() {
               <Ticket size={14} className="text-slate-500" />
               Mã hồ sơ Portal
             </p>
-            <p className="mt-1.5 font-mono text-xl font-semibold tracking-wide text-ink">{data.portal_code}</p>
+            <p className="mt-1.5 font-mono text-2xl font-bold tracking-wide text-ink">{data.portal_code}</p>
             <p className="mt-1.5 text-[0.8rem] leading-relaxed text-muted">
               Xuất trình mã này khi đến nhận giấy tại Phòng Công tác Sinh viên (O1.105).
             </p>

@@ -164,15 +164,15 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className={subtle + ' p-3.5'}>
                     <span className="text-xs font-medium text-muted">Số tiền phải đóng</span>
-                    <p className="mt-1 text-lg font-semibold text-ink">{money(data.payment.required_amount_vnd)}</p>
+                    <p className="mt-1 text-lg font-bold text-ink">{money(data.payment.required_amount_vnd)}</p>
                   </div>
                   <div className={subtle + ' p-3.5'}>
                     <span className="text-xs font-medium text-muted">Số tiền đã xác nhận</span>
-                    <p className="mt-1 text-lg font-semibold text-ink">{money(data.payment.confirmed_paid_total_vnd)}</p>
+                    <p className="mt-1 text-lg font-bold text-ink">{money(data.payment.confirmed_paid_total_vnd)}</p>
                   </div>
                   <div className={subtle + ' p-3.5'}>
                     <span className="text-xs font-medium text-muted">Số tiền còn thiếu</span>
-                    <p className={'mt-1 text-lg font-semibold ' + (data.payment.missing_amount_vnd > 0 ? 'text-danger-text' : 'text-ink')}>{money(data.payment.missing_amount_vnd)}</p>
+                    <p className={'mt-1 text-lg font-bold ' + (data.payment.missing_amount_vnd > 0 ? 'text-danger-text' : 'text-ink')}>{money(data.payment.missing_amount_vnd)}</p>
                   </div>
                 </div>
 

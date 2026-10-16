@@ -170,7 +170,7 @@ export default function RequestHistoryPage() {
                     <p className="mt-1 line-clamp-1 text-[0.85rem] text-slate-600" title={req.purpose}>
                       {req.purpose}
                     </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-muted tabular-nums">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-muted">
                       <RequestCode code={req.code} />
                       <span>Gửi {formatDateTime(req.created_at)}</span>
                       {req.portal_code && (
