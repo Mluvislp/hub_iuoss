@@ -95,38 +95,19 @@ function LoginForm() {
     <div className="min-h-screen flex">
 
       {/* ── Left panel: Branding ── */}
+      {/* Nền xanh thương hiệu đặc, không quầng sáng / lưới chấm (bỏ 16/10/2026 — trông "AI template"). */}
       <div className="hidden lg:flex lg:w-[42%] relative flex-col justify-between p-10 overflow-hidden
-                      bg-[#0a0f1e]">
-
-        {/* Gradient glow blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full
-                          bg-blue-600/20 blur-[100px]" />
-          <div className="absolute top-1/2 -right-20 w-80 h-80 rounded-full
-                          bg-indigo-500/15 blur-[90px]" />
-          <div className="absolute -bottom-20 left-1/3 w-72 h-72 rounded-full
-                          bg-blue-800/20 blur-[80px]" />
-        </div>
-
-        {/* Dot-grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+                      bg-[#0f2a5c] border-r border-[#0b2149]">
 
         {/* Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center
-                            shadow-lg shadow-blue-600/40">
+            <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center">
               <GraduationCap size={20} className="text-white" />
             </div>
             <div>
               <div className="text-white font-bold text-lg tracking-tight">IUOSS Hub</div>
-              <div className="text-slate-400 text-xs">hub.iuoss.com</div>
+              <div className="text-blue-200/80 text-xs">hub.iuoss.com</div>
             </div>
           </div>
         </div>
@@ -134,11 +115,13 @@ function LoginForm() {
         {/* Main copy */}
         <div className="relative z-10 space-y-6">
           <div>
-            <h1 className="text-white text-3xl font-bold leading-tight tracking-tight">
-              Cổng thông tin Sinh viên<br />
-              <span className="text-blue-400">IUOSS HUB</span>
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-blue-200/80">
+              Trường Đại học Quốc tế — ĐHQG-HCM
+            </p>
+            <h1 className="mt-3 text-white text-[1.75rem] font-semibold leading-tight tracking-tight">
+              Cổng thông tin Sinh viên
             </h1>
-            <p className="mt-3 text-slate-400 text-sm leading-relaxed">
+            <p className="mt-3 max-w-sm text-blue-100/80 text-sm leading-relaxed">
               Tra cứu hồ sơ, theo dõi yêu cầu và quản lý thông tin học vụ của Sinh viên
               Trường Đại học Quốc tế, ĐHQG-HCM.
             </p>
@@ -168,7 +151,7 @@ function LoginForm() {
 
         {/* Footer */}
         <div className="relative z-10">
-          <p className="text-slate-600 text-xs">
+          <p className="text-blue-200/60 text-xs">
             © {new Date().getFullYear()} Phòng Công tác Sinh viên — HCMIU
           </p>
         </div>
@@ -180,7 +163,7 @@ function LoginForm() {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#0f2a5c] flex items-center justify-center">
               <GraduationCap size={16} className="text-white" />
             </div>
             <span className="font-bold text-slate-900">IUOSS Hub</span>
