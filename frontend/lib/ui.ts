@@ -47,14 +47,15 @@ export const ui = {
 
   // Definition list row (thông tin hành chính) — kiểu "summary list" của GOV.UK: nhãn và giá trị
   // cùng căn TRÁI theo hai cột cố định tỉ lệ, đọc dọc một mạch; không đẩy giá trị dạt mép phải.
-  dtRow: 'grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2.5 border-b border-line2 last:border-0',
+  // Điện thoại: nhãn nhỏ phía trên giá trị (đỡ ép chữ vào nửa cột hẹp); từ sm: hai cột.
+  dtRow: 'grid gap-0.5 py-2.5 border-b border-line2 last:border-0 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-4',
   dtLabel: 'text-sm text-muted',
   dtValue: 'text-sm font-medium text-ink break-words',
 };
 
 /** Badge trạng thái/section — viền hệ thống, tint nhẹ theo ngữ nghĩa. */
 export const badge = {
-  base: 'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium',
+  base: 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium',
   success: 'bg-success-soft text-success-text border-success-line',
   warning: 'bg-warning-soft text-warning-text border-warning-line',
   danger: 'bg-danger-soft text-danger-text border-danger-line',

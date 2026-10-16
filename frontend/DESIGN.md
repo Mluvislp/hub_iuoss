@@ -46,6 +46,13 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
 - **Số liệu:** bảng dùng `tabular-nums` (globals.css); h1/h2 `letter-spacing: -0.01em`.
 - **Trang đăng nhập:** panel thương hiệu xanh đặc `#0f2a5c`, không quầng sáng/lưới chấm.
 
+## Mobile (rà 16/10/2026 ở 320 / 375 / 768px)
+- `tailwind.config.ts` PHẢI quét `lib/**` — token className nằm ở `lib/ui.ts`; thiếu là class không được sinh CSS.
+- Ô lưới chứa chữ dài: thêm `min-w-0` cho item (nếu không chữ kéo giãn cột → tràn ngang).
+- Badge `whitespace-nowrap` (đã có trong `badge.base`). Bảng nhiều cột → trên điện thoại đổi sang danh sách dòng (`sm:hidden` / `hidden sm:block`) hoặc ẩn cột phụ.
+- Vùng chạm tối thiểu ~32px: nút icon nhỏ dùng padding + margin âm (`-m-2.5 p-2.5`) để không làm to bố cục.
+- Nút hỗ trợ nổi chiếm góc dưới phải: `main` có `pb-24` trên điện thoại; thanh dính đáy chừa `pr-16`.
+
 ## Tuyệt đối tránh
 Gradient đậm · glassmorphism (`backdrop-blur`) · shadow dày · icon nền pastel nhiều màu · nhiều card metric kiểu SaaS · sidebar navy đậm full · emoji trong UI chính · copywriting kiểu marketing · phủ màu diện rộng · bo góc quá mức.
 

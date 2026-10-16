@@ -79,7 +79,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="lg:pl-[260px] flex flex-col min-h-screen">
         <Topbar title={title} session={session} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1">
-          <div className="max-w-content px-5 sm:px-8 py-6 sm:py-8">
+          {/* pb-24 trên điện thoại: nút hỗ trợ nổi (48px, góc dưới phải) không che nội dung cuối trang. */}
+          <div className="max-w-content px-4 sm:px-8 pt-5 pb-24 sm:py-8">
             {/* Chưa biết cờ → chờ, tránh chớp nội dung rồi đổi sang trang chờ. */}
             {!sessionReady || outsideBhyt || (!ready && routeFeature) ? (
               <div className="flex items-center justify-center h-64 text-muted">
