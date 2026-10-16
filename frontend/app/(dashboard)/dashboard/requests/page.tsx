@@ -123,7 +123,7 @@ export default function RequestHistoryPage() {
                   type="button"
                   onClick={() => setFilter(key)}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors',
+                    'inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[0.8rem] font-medium transition-colors sm:h-8',
                     filter === key
                       ? 'border-primary bg-primary-soft text-primary-text'
                       : 'border-line bg-white text-slate-600 hover:bg-slate-50',

@@ -240,7 +240,26 @@ export default function DashboardPage() {
         }
       >
         {confirmation_requests?.length ? (
-          <div className="overflow-x-auto">
+          <>
+          {/* Điện thoại: danh sách dòng (bảng 6 cột bị cắt cột "Xem" ở khổ 375px). */}
+          <ul className="divide-y divide-line2 sm:hidden">
+            {confirmation_requests.map((req) => (
+              <li key={req.id}>
+                <Link href={`/dashboard/requests/${req.id}`} className="flex items-start gap-3 px-4 py-3.5 active:bg-[#f9fafb]">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-ink text-sm">{TYPE_LABELS[req.request_type]}</span>
+                      <span className={cn(badge.base, STATUS_STYLES[req.status])}>{STATUS_LABELS[req.status]}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-1 text-[0.82rem] text-slate-600">{req.purpose}</p>
+                    <p className="mt-0.5 text-[0.75rem] text-muted tabular-nums">{formatDateTime(req.created_at)}</p>
+                  </div>
+                  <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
@@ -295,6 +314,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          </>
         ) : (
           <div className="py-10 text-center">
             <p className="text-sm text-muted">Chưa có yêu cầu nào.</p>

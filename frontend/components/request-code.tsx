@@ -33,7 +33,8 @@ export function RequestCode({ code, size = 'sm' }: { code: string; size?: 'sm' |
         type="button"
         onClick={copy}
         aria-label={copied ? `Đã chép mã ${code}` : `Chép mã ${code}`}
-        className="text-slate-400 hover:text-primary"
+        // Vùng chạm ~30px (padding + margin âm) mà ô mã không to ra — icon chỉ 13px.
+        className="-m-2.5 p-2.5 text-slate-400 hover:text-primary"
       >
         {copied ? <Check size={size === 'lg' ? 15 : 13} className="text-success-text" /> : <Copy size={size === 'lg' ? 15 : 13} />}
       </button>

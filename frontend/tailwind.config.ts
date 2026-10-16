@@ -5,6 +5,9 @@ const config: Config = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    // Token className (ui.*, badge.*, notice.*) và REQUEST_STATUS_STYLES nằm ở lib/ — thiếu dòng này
+    // thì class chỉ khai trong lib/ không được sinh CSS (vd. lưới 2 cột của ui.dtRow).
+    './lib/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
