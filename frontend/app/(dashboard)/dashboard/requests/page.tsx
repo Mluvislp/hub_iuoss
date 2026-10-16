@@ -125,7 +125,7 @@ export default function RequestHistoryPage() {
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors',
                     filter === key
-                      ? 'border-primary bg-primary text-white'
+                      ? 'border-primary bg-primary-soft text-primary-text'
                       : 'border-line bg-white text-slate-600 hover:bg-slate-50',
                   )}
                 >
@@ -133,7 +133,7 @@ export default function RequestHistoryPage() {
                   <span
                     className={cn(
                       'rounded-full px-1.5 text-[0.7rem]',
-                      filter === key ? 'bg-white/20' : 'bg-slate-100 text-slate-500',
+                      filter === key ? 'bg-white text-primary-text' : 'bg-slate-100 text-slate-500',
                     )}
                   >
                     {n}
@@ -143,15 +143,13 @@ export default function RequestHistoryPage() {
             })}
           </div>
 
-          <div className="space-y-2.5">
+          {/* Một danh sách liền có vạch ngăn (resource list) thay cho chồng card rời. */}
+          <div className={cn(ui.card, 'divide-y divide-line2 overflow-hidden')}>
             {visible.map((req) => (
               <Link
                 key={req.id}
                 href={`/dashboard/requests/${req.id}`}
-                className={cn(
-                  ui.card,
-                  'block px-5 py-4 transition-colors hover:border-primary-line hover:bg-slate-50/60',
-                )}
+                className="block px-5 py-4 transition-colors hover:bg-[#f9fafb]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -172,16 +170,16 @@ export default function RequestHistoryPage() {
                     <p className="mt-1 line-clamp-1 text-[0.85rem] text-slate-600" title={req.purpose}>
                       {req.purpose}
                     </p>
-                    <p className="mt-1 text-[0.78rem] text-muted">
-                      <RequestCode code={req.code} /> <span className="ml-1">Gửi {formatDateTime(req.created_at)}</span>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-muted tabular-nums">
+                      <RequestCode code={req.code} />
+                      <span>Gửi {formatDateTime(req.created_at)}</span>
+                      {req.portal_code && (
+                        <span className="inline-flex items-center gap-1">
+                          <Ticket size={13} className="text-slate-400" />
+                          Portal <span className="font-mono font-semibold text-ink">{req.portal_code}</span>
+                        </span>
+                      )}
                     </p>
-                    {req.portal_code && (
-                      <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-primary-line bg-primary-soft px-2 py-1 text-[0.78rem] text-primary-text">
-                        <Ticket size={13} />
-                        Mã hồ sơ portal:{' '}
-                        <span className="font-mono font-semibold">{req.portal_code}</span>
-                      </p>
-                    )}
                   </div>
                   <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
                 </div>

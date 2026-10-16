@@ -127,7 +127,7 @@ export default function TicketListPage() {
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[0.8rem] font-medium transition-colors',
                     filter === key
-                      ? 'border-primary bg-primary text-white'
+                      ? 'border-primary bg-primary-soft text-primary-text'
                       : 'border-line bg-white text-slate-600 hover:bg-slate-50',
                   )}
                 >
@@ -135,7 +135,7 @@ export default function TicketListPage() {
                   <span
                     className={cn(
                       'rounded-full px-1.5 text-[0.7rem]',
-                      filter === key ? 'bg-white/20' : 'bg-slate-100 text-slate-500',
+                      filter === key ? 'bg-white text-primary-text' : 'bg-slate-100 text-slate-500',
                     )}
                   >
                     {n}

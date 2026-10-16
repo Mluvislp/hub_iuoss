@@ -37,6 +37,15 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
 - **Ô hỗ trợ nổi** (`components/support-widget.tsx`, mount ở `app/layout.tsx` nên có trên mọi trang kể cả login): nút tròn 48px `bg-primary` góc dưới-phải, `z-30` (thấp hơn overlay z-40 / sidebar z-50 để không đè menu mobile). Bấm mới mở, KHÔNG tự bật/không nhắc lại. Panel mở lên trên, rộng `min(330px, 100vw-2.5rem)`, đóng bằng X / Esc / bấm ra ngoài. Giá trị liên hệ là link thật (`tel:`, `mailto:`, `zalo.me`) kèm nút chép — trên desktop `tel:` vô dụng nên phải chép được.
 - **Trang chờ / tính năng chưa mở** (`components/coming-soon.tsx`): card căn giữa `max-w-[560px]`, ô icon 56px `bg-primary-soft` + `border-primary-line`, tên tính năng, badge `badge.info` "Đang phát triển", một câu giải thích, divider `border-line2`, nút `btnSecondary` quay lại. Không minh hoạ lớn, không đồng hồ đếm ngược, không hứa mốc thời gian cụ thể. Ở sidebar, mục chưa mở chỉ mang **một chấm 6px** `bg-warning-line` + `title` — đánh dấu cái bất thường, không dán nhãn dài lên mọi mục.
 
+## Học từ các design system lớn (đợt 16/10/2026)
+- **Summary list (GOV.UK):** nhãn và giá trị căn TRÁI theo 2 cột tỉ lệ 2:3 (`ui.dtRow`), không đẩy giá trị sang phải.
+- **Trang chi tiết 2/3 + 1/3 (Shopify Polaris):** nội dung chính trái, cột "Tóm tắt" ~320px phải (mã, trạng thái, ngày, mã Portal, file). Điện thoại: cột tóm tắt lên trước. Mẫu: `requests/[id]`.
+- **Đầu trang chi tiết:** link quay lại dạng chữ nhỏ màu muted (không phải nút viền), tiêu đề + badge trạng thái cùng hàng, dòng phụ thời gian.
+- **Resource list (Polaris/GitHub):** danh sách bản ghi = MỘT card có `divide-y`, không chồng card rời.
+- **Bộ lọc:** pill đang chọn = `bg-primary-soft text-primary-text border-primary`, không tô đặc xanh.
+- **Số liệu:** bảng dùng `tabular-nums` (globals.css); h1/h2 `letter-spacing: -0.01em`.
+- **Trang đăng nhập:** panel thương hiệu xanh đặc `#0f2a5c`, không quầng sáng/lưới chấm.
+
 ## Tuyệt đối tránh
 Gradient đậm · glassmorphism (`backdrop-blur`) · shadow dày · icon nền pastel nhiều màu · nhiều card metric kiểu SaaS · sidebar navy đậm full · emoji trong UI chính · copywriting kiểu marketing · phủ màu diện rộng · bo góc quá mức.
 

@@ -45,10 +45,11 @@ export const ui = {
     'sm:flex-row sm:items-center sm:justify-end',
   formFooterBtn: 'w-full whitespace-nowrap sm:w-auto',
 
-  // Definition list row (thông tin hành chính)
-  dtRow: 'flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0',
+  // Definition list row (thông tin hành chính) — kiểu "summary list" của GOV.UK: nhãn và giá trị
+  // cùng căn TRÁI theo hai cột cố định tỉ lệ, đọc dọc một mạch; không đẩy giá trị dạt mép phải.
+  dtRow: 'grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 py-2.5 border-b border-line2 last:border-0',
   dtLabel: 'text-sm text-muted',
-  dtValue: 'text-sm font-medium text-ink text-right',
+  dtValue: 'text-sm font-medium text-ink break-words',
 };
 
 /** Badge trạng thái/section — viền hệ thống, tint nhẹ theo ngữ nghĩa. */
