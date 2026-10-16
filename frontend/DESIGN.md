@@ -43,7 +43,7 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
 - **Đầu trang chi tiết:** link quay lại dạng chữ nhỏ màu muted (không phải nút viền), tiêu đề + badge trạng thái cùng hàng, dòng phụ thời gian.
 - **Resource list (Polaris/GitHub):** danh sách bản ghi = MỘT card có `divide-y`, không chồng card rời.
 - **Bộ lọc:** pill đang chọn = `bg-primary-soft text-primary-text border-primary`, không tô đặc xanh.
-- **Số liệu:** bảng dùng `tabular-nums` (globals.css); h1/h2 `letter-spacing: -0.01em`.
+- **Chữ:** giữ nguyên Inter mặc định — KHÔNG ép letter-spacing h1/h2, KHÔNG tabular-nums toàn cục, không hạ font-bold xuống semibold (người dùng chê "font xấu" 16/10/2026, đã hoàn lại).
 - **Trang đăng nhập:** panel thương hiệu xanh đặc `#0f2a5c`, không quầng sáng/lưới chấm.
 
 ## Mobile (rà 16/10/2026 ở 320 / 375 / 768px)

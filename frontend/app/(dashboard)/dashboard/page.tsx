@@ -101,7 +101,7 @@ export default function DashboardPage() {
       <section>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-xl font-semibold text-ink">
+            <h1 className="text-[1.35rem] font-semibold text-ink">
               Xin chào, {session?.full_name ?? '—'}
             </h1>
             <p className="text-sm text-muted mt-1">
@@ -252,7 +252,7 @@ export default function DashboardPage() {
                       <span className={cn(badge.base, STATUS_STYLES[req.status])}>{STATUS_LABELS[req.status]}</span>
                     </div>
                     <p className="mt-1 line-clamp-1 text-[0.82rem] text-slate-600">{req.purpose}</p>
-                    <p className="mt-0.5 text-[0.75rem] text-muted tabular-nums">{formatDateTime(req.created_at)}</p>
+                    <p className="mt-0.5 text-[0.75rem] text-muted">{formatDateTime(req.created_at)}</p>
                   </div>
                   <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
                 </Link>

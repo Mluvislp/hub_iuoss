@@ -812,7 +812,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
 
       {/* Tiêu đề + mô tả của đợt. Đơn đã nộp dùng mô tả HIỆN HÀNH của chính đợt đó. */}
       <div className={cn(ui.card, "p-4 text-ink sm:p-5")}>
-        <h1 className="flex items-start gap-2 text-base font-semibold sm:text-lg">
+        <h1 className="flex items-start gap-2 text-base font-bold sm:text-lg">
           <ShieldPlus size={20} className="mt-0.5 shrink-0 text-slate-500" /> <span>{title}</span>
         </h1>
         {hospitalChange && !config?.description ? (
