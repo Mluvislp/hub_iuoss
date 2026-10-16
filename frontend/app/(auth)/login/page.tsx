@@ -115,13 +115,11 @@ function LoginForm() {
         {/* Main copy */}
         <div className="relative z-10 space-y-6">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-blue-200/80">
-              Trường Đại học Quốc tế — ĐHQG-HCM
-            </p>
-            <h1 className="mt-3 text-white text-[1.75rem] font-semibold leading-tight tracking-tight">
-              Cổng thông tin Sinh viên
+            <h1 className="text-white text-3xl font-bold leading-tight tracking-tight">
+              Cổng thông tin Sinh viên<br />
+              <span className="text-blue-300">IUOSS HUB</span>
             </h1>
-            <p className="mt-3 max-w-sm text-blue-100/80 text-sm leading-relaxed">
+            <p className="mt-3 text-blue-100/80 text-sm leading-relaxed">
               Tra cứu hồ sơ, theo dõi yêu cầu và quản lý thông tin học vụ của Sinh viên
               Trường Đại học Quốc tế, ĐHQG-HCM.
             </p>
