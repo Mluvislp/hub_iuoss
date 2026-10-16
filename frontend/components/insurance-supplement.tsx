@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, Building2, Check, CheckSquare, Copy, CreditC
 import QRCode from 'react-qr-code';
 import SearchableSelect from '@/components/searchable-select';
 import { InsuranceStatus } from '@/components/insurance-status';
-import { ui } from '@/lib/ui';
+import { ui, notice, noticeIcon, subtle } from '@/lib/ui';
 import { SubmittedInsuranceInfo } from '@/components/submitted-insurance-info';
 import { InsuranceTimeline } from '@/components/insurance-timeline';
 import { InsuranceModal } from '@/components/insurance-modal';
@@ -134,8 +134,8 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
           <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={data.status} /></div>
           {rejected && <RejectionNotice eyebrow="Đơn bị từ chối" title={data.reason_label || 'Đơn bị từ chối'} note={data.reason_text}>
               {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' || paymentReason ?
-                !editing && <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-primary-text">{paymentReason ? 'Bổ sung minh chứng chuyển khoản để cán bộ xem xét lại đơn.' : 'Chọn lại bệnh viện khám chữa bệnh để gửi lại đơn.'}</p>
+                !editing && <div className="flex flex-col gap-2 rounded-lg border border-line bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-ink">{paymentReason ? 'Bổ sung minh chứng chuyển khoản để cán bộ xem xét lại đơn.' : 'Chọn lại bệnh viện khám chữa bệnh để gửi lại đơn.'}</p>
                   <button type="button" className={ui.btnPrimary + " w-full shrink-0 sm:w-auto"} onClick={() => setEditing(true)}>
                     {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
                 </div>
@@ -162,21 +162,21 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
             </> : <>
               {data.payment ? <>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg border border-line bg-slate-50 p-3.5">
+                  <div className={subtle + ' p-3.5'}>
                     <span className="text-xs font-medium text-muted">Số tiền phải đóng</span>
-                    <p className="mt-1 text-lg font-bold text-ink">{money(data.payment.required_amount_vnd)}</p>
+                    <p className="mt-1 text-lg font-semibold text-ink">{money(data.payment.required_amount_vnd)}</p>
                   </div>
-                  <div className="rounded-lg border border-success-line bg-success-soft p-3.5">
-                    <span className="text-xs font-medium text-success-text">Số tiền đã xác nhận</span>
-                    <p className="mt-1 text-lg font-bold text-success-text">{money(data.payment.confirmed_paid_total_vnd)}</p>
+                  <div className={subtle + ' p-3.5'}>
+                    <span className="text-xs font-medium text-muted">Số tiền đã xác nhận</span>
+                    <p className="mt-1 text-lg font-semibold text-ink">{money(data.payment.confirmed_paid_total_vnd)}</p>
                   </div>
-                  <div className="rounded-lg border border-warning-line bg-warning-soft p-3.5">
-                    <span className="text-xs font-medium text-warning-text">Số tiền còn thiếu</span>
-                    <p className="mt-1 text-lg font-bold text-warning-text">{money(data.payment.missing_amount_vnd)}</p>
+                  <div className={subtle + ' p-3.5'}>
+                    <span className="text-xs font-medium text-muted">Số tiền còn thiếu</span>
+                    <p className={'mt-1 text-lg font-semibold ' + (data.payment.missing_amount_vnd > 0 ? 'text-danger-text' : 'text-ink')}>{money(data.payment.missing_amount_vnd)}</p>
                   </div>
                 </div>
 
-                {data.payment.missing_amount_vnd === 0 ? <p className="rounded-lg border border-success-line bg-success-soft p-3 text-sm font-medium text-success-text">Bạn không cần chuyển thêm tiền.</p> :
+                {data.payment.missing_amount_vnd === 0 ? <p className={notice.base + ' ' + notice.success}><CheckSquare className={noticeIcon.success} />Bạn không cần chuyển thêm tiền.</p> :
                   data.payment.bank_account_number ? <div className="flex flex-col items-start gap-6 rounded-lg border border-line bg-slate-50 p-4 md:flex-row">
                     <div className="mx-auto shrink-0 text-center md:mx-0">
                       {paymentQr ? <>
@@ -197,8 +197,8 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                       </ul>
                       <p className="mt-3 text-xs text-muted">Mã QR đã gồm sẵn số tài khoản, số tiền còn thiếu và nội dung. Giữ nguyên nội dung chuyển khoản để Phòng KHTC đối chiếu được hóa đơn.</p>
                     </div>
-                  </div> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
-              </> : <p className="rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning-text">Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
+                  </div> : <p className={notice.base + ' ' + notice.warning}><AlertTriangle className={noticeIcon.warning} />Thiếu thông tin tài khoản tại thời điểm đăng ký. Liên hệ Phòng CTSV để xác minh trước khi chuyển tiền.</p>}
+              </> : <p className={notice.base + ' ' + notice.warning}><AlertTriangle className={noticeIcon.warning} />Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
 
               <div>
                 <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
@@ -207,7 +207,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                     setFiles(e.target.files?.[0] ? [e.target.files[0]] : []); pending.current = null;
                   }} />
                   <div className="flex min-w-0 flex-col items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 transition-transform group-hover:scale-110">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-slate-500">
                       {files.length ? <CheckSquare size={20} /> : <Plus size={20} />}
                     </div>
                     <span className="max-w-full break-all text-sm font-medium text-slate-700">{files.length ? 'Đã chọn 1 ảnh' : 'Tải lên minh chứng chuyển khoản'}</span>
@@ -229,7 +229,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
           <SubmittedInsuranceInfo data={data} />
           <InsuranceTimeline items={data.timeline.map(e => ({ ...e, key: e.id }))} empty="Đơn cũ chưa có lịch sử chi tiết."
             renderExtra={e => <>
-              {e.assessment && <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-2.5"><span className="block text-xs text-slate-500">Phí phải đóng</span><b>{money(e.assessment.required_amount_vnd)}</b></div><div className="rounded-lg bg-success-soft p-2.5"><span className="block text-xs text-success-text">Đã xác nhận</span><b>{money(e.assessment.confirmed_paid_total_vnd)}</b></div><div className="rounded-lg bg-warning-soft p-2.5"><span className="block text-xs text-warning-text">Còn thiếu</span><b>{money(e.assessment.missing_amount_vnd)}</b></div></div>}
+              {e.assessment && <dl className="mt-3 grid divide-y divide-line2 rounded-lg border border-line2 text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0"><div className="px-3 py-2.5"><dt className="text-xs text-muted">Phí phải đóng</dt><dd className="mt-0.5 font-semibold text-ink">{money(e.assessment.required_amount_vnd)}</dd></div><div className="px-3 py-2.5"><dt className="text-xs text-muted">Đã xác nhận</dt><dd className="mt-0.5 font-semibold text-ink">{money(e.assessment.confirmed_paid_total_vnd)}</dd></div><div className="px-3 py-2.5"><dt className="text-xs text-muted">Còn thiếu</dt><dd className={'mt-0.5 font-semibold ' + (e.assessment.missing_amount_vnd > 0 ? 'text-danger-text' : 'text-ink')}>{money(e.assessment.missing_amount_vnd)}</dd></div></dl>}
               {e.payload.before && e.payload.after && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm"><div className="mb-2 flex items-center gap-2 font-semibold text-slate-700"><Building2 className="h-4 w-4" />Thay đổi nơi khám chữa bệnh</div><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><div><span className="text-xs text-slate-500">Từ</span><p>{e.payload.before.hospital_name || '—'}</p><p className="text-xs text-slate-500">{e.payload.before.province_name}</p></div><ArrowRight className="hidden h-4 w-4 self-center text-slate-400 sm:block" /><div><span className="text-xs text-slate-500">Sang</span><p className="font-medium text-primary-text">{e.payload.after.hospital_name || '—'}</p><p className="text-xs text-slate-500">{e.payload.after.province_name}</p></div></div></div>}
               {!!e.evidences.length && <div className="mt-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Minh chứng thanh toán bổ sung</p><div className="flex flex-wrap gap-2">{e.evidences.map(p => <EvidenceImage key={p.id} evidence={p} />)}</div></div>}
             </>} />

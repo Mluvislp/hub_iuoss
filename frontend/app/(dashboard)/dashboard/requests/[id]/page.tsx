@@ -15,7 +15,7 @@ import {
   AlertCircle, ArrowLeft, Download, FileText, Lock, Loader2, MessageSquare, PencilLine, Send, Ticket,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, badge, accentIcon } from '@/lib/ui';
+import { ui, badge, accentIcon, notice, noticeIcon } from '@/lib/ui';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import { editHref } from '@/components/request-edit';
 import {
@@ -54,6 +54,16 @@ const EVENT_LABELS: Record<string, string> = {
   request_note: 'Ghi chú khi gửi yêu cầu',
 };
 
+/** Màu nhãn sự kiện theo đúng nghĩa (trước đây mọi nhãn đều vàng, kể cả "Hoàn thành"). */
+const EVENT_STYLES: Record<string, string> = {
+  awaiting_info: badge.warning,
+  rejected: badge.danger,
+  done: badge.success,
+  returned: badge.success,
+  processing: badge.info,
+  request_note: badge.neutral,
+};
+
 function fieldValue(info: unknown): string {
   if (info === null || info === undefined) return '';
   if (typeof info === 'string') return info;
@@ -76,16 +86,16 @@ function Bubble({ c }: { c: RequestComment }) {
       <div
         className={cn(
           'max-w-[85%] rounded-lg border px-3.5 py-2.5',
-          mine ? 'border-primary-line bg-primary-soft' : 'border-line bg-white',
+          mine ? 'border-line bg-[#f8fafc]' : 'border-line bg-white',
         )}
       >
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span className="text-[0.78rem] font-semibold text-ink">{c.author_name}</span>
-          <span className={cn(badge.base, mine ? badge.info : badge.neutral, 'py-0')}>
+          <span className={cn(badge.base, badge.neutral, 'py-0')}>
             {mine ? 'Sinh viên' : 'Phòng CTSV'}
           </span>
           {c.event && EVENT_LABELS[c.event] && (
-            <span className={cn(badge.base, badge.warning, 'py-0')}>{EVENT_LABELS[c.event]}</span>
+            <span className={cn(badge.base, EVENT_STYLES[c.event] ?? badge.neutral, 'py-0')}>{EVENT_LABELS[c.event]}</span>
           )}
           <span className="ml-auto text-[0.72rem] text-muted">{formatDateTime(c.created_at)}</span>
         </div>
@@ -158,9 +168,9 @@ export default function RequestDetailPage() {
           <ArrowLeft size={15} />
           Danh sách yêu cầu
         </Link>
-        <div className="flex items-start gap-2.5 rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
-          <AlertCircle size={16} className="mt-0.5 shrink-0 text-danger-text" />
-          <p className="text-sm text-danger-text">{error}</p>
+        <div className={cn(notice.base, notice.error)}>
+          <AlertCircle className={noticeIcon.error} />
+          <p>{error}</p>
         </div>
       </div>
     );
@@ -196,48 +206,29 @@ export default function RequestDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/dashboard/requests" className={ui.btnSecondary}>
-        <ArrowLeft size={15} />
-        Danh sách yêu cầu
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-ink">
+      <div>
+        <Link
+          href="/dashboard/requests"
+          className="inline-flex items-center gap-1.5 text-[0.82rem] font-medium text-muted hover:text-ink"
+        >
+          <ArrowLeft size={14} />
+          Yêu cầu giấy tờ
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h1 className="text-xl font-semibold tracking-tight text-ink">
             {REQUEST_TYPE_LABELS[data.request_type]}
           </h1>
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-            <span className="text-[0.75rem] font-medium uppercase tracking-wide">Mã yêu cầu</span>
-            <RequestCode code={data.code} size="lg" />
-            <span>· Gửi {formatDateTime(data.created_at)}</span>
-          </p>
+          <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status])}>
+            {REQUEST_STATUS_LABELS[data.status]}
+          </span>
         </div>
-        <span className={cn(badge.base, REQUEST_STATUS_STYLES[data.status], 'text-[0.82rem]')}>
-          {REQUEST_STATUS_LABELS[data.status]}
-        </span>
+        <p className="mt-1 text-sm text-muted">Gửi lúc {formatDateTime(data.created_at)}</p>
       </div>
 
-      {data.portal_code && (
-        <section className="rounded-lg border border-primary-line bg-primary-soft px-5 py-4">
-          <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-primary-text">
-            <Ticket size={14} />
-            MÃ HỒ SƠ PORTAL
-          </p>
-          <p className="mt-1.5 font-mono text-2xl font-bold tracking-wide text-primary-text">
-            {data.portal_code}
-          </p>
-          <p className="mt-1.5 text-[0.82rem] text-primary-text/80">
-            Xuất trình mã này khi đến nhận giấy tại Phòng Công tác Sinh viên (O1.105).
-          </p>
-        </section>
-      )}
-
-      {data.soft_copy && <SoftCopyCard id={data.id} code={data.code} file={data.soft_copy} />}
-
       {data.student_can_edit && editHref(data) && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-line bg-warning-soft px-5 py-4">
+        <section className={cn(notice.base, notice.warning, 'flex-wrap items-center justify-between gap-3 px-5 py-4')}>
           <div className="min-w-0">
-            <p className="text-[0.88rem] font-semibold text-warning-text">Phòng CTSV yêu cầu bổ sung thông tin</p>
+            <p className="text-[0.88rem] font-semibold text-ink">Phòng CTSV yêu cầu bổ sung thông tin</p>
             <p className="mt-0.5 text-[0.82rem] text-ink">
               Sửa lại thông tin trên form theo nội dung trao đổi bên dưới, hoặc trả lời bằng tin nhắn.
             </p>
@@ -249,6 +240,10 @@ export default function RequestDetailPage() {
         </section>
       )}
 
+      {/* Bố cục trang chi tiết 2/3 + 1/3 (kiểu Polaris): nội dung chính bên trái, tóm tắt bên phải.
+          Điện thoại: cột tóm tắt lên TRƯỚC vì mã Portal / bản mềm là thứ SV cần nhất. */}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-5">
       <section className={ui.card}>
         <div className={ui.cardHeader}>
           <h2 className={ui.sectionTitle}>Thông tin đã gửi</h2>
@@ -380,9 +375,49 @@ export default function RequestDetailPage() {
         </div>
       </section>
 
-      <p className="text-[0.78rem] text-muted">
-        Cập nhật lần cuối: {formatDate(data.updated_at)}
-      </p>
+      </div>
+
+      <aside className="order-first space-y-5 lg:order-none">
+        <section className={ui.card}>
+          <div className={ui.cardHeader}>
+            <h2 className={ui.sectionTitle}>Tóm tắt</h2>
+          </div>
+          <dl className="px-5 py-1">
+            <div className={ui.dtRow}>
+              <dt className={ui.dtLabel}>Mã yêu cầu</dt>
+              <dd className={ui.dtValue}><RequestCode code={data.code} /></dd>
+            </div>
+            <div className={ui.dtRow}>
+              <dt className={ui.dtLabel}>Trạng thái</dt>
+              <dd className={ui.dtValue}>{REQUEST_STATUS_LABELS[data.status]}</dd>
+            </div>
+            <div className={ui.dtRow}>
+              <dt className={ui.dtLabel}>Ngày gửi</dt>
+              <dd className={cn(ui.dtValue, 'tabular-nums')}>{formatDateTime(data.created_at)}</dd>
+            </div>
+            <div className={ui.dtRow}>
+              <dt className={ui.dtLabel}>Cập nhật</dt>
+              <dd className={cn(ui.dtValue, 'tabular-nums')}>{formatDate(data.updated_at)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        {data.portal_code && (
+          <section className={cn(ui.card, 'px-5 py-4')}>
+            <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-muted">
+              <Ticket size={14} className="text-slate-500" />
+              Mã hồ sơ Portal
+            </p>
+            <p className="mt-1.5 font-mono text-xl font-semibold tracking-wide text-ink">{data.portal_code}</p>
+            <p className="mt-1.5 text-[0.8rem] leading-relaxed text-muted">
+              Xuất trình mã này khi đến nhận giấy tại Phòng Công tác Sinh viên (O1.105).
+            </p>
+          </section>
+        )}
+
+        {data.soft_copy && <SoftCopyCard id={data.id} code={data.code} file={data.soft_copy} />}
+      </aside>
+      </div>
     </div>
   );
 }
@@ -417,14 +452,18 @@ function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { fi
 
   const size = file.size >= 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
   return (
-    <section className="rounded-lg border border-success-line bg-success-soft px-5 py-4">
-      <p className="flex items-center gap-1.5 text-[0.8rem] font-medium text-success-text">
-        <FileText size={14} />
-        BẢN MỀM (PDF)
-      </p>
-      <p className="mt-1.5 text-[0.88rem] text-ink break-all">{file.filename} · {size}</p>
-      {file.sent_at && <p className="mt-0.5 text-[0.78rem] text-muted">Gửi lúc {file.sent_at}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
+    <section className={cn(ui.card, 'flex flex-wrap items-center justify-between gap-3 px-5 py-4')}>
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-line bg-[#f8fafc]">
+          <FileText size={16} className="text-slate-500" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[0.8rem] font-medium text-muted">Bản mềm (PDF)</p>
+          <p className="mt-0.5 text-[0.88rem] font-medium text-ink break-all">{file.filename}</p>
+          <p className="mt-0.5 text-[0.78rem] text-muted">{size}{file.sent_at && <> · Gửi lúc {file.sent_at}</>}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => open(false)} disabled={busy} className={ui.btnSecondary}>
           {busy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />} Xem
         </button>
@@ -432,7 +471,7 @@ function SoftCopyCard({ id, code, file }: { id: number; code: string; file: { fi
           <Download size={15} /> Tải về
         </button>
       </div>
-      {error && <p className="mt-2 text-[0.8rem] text-danger-text">{error}</p>}
+      {error && <p className="w-full text-[0.8rem] text-danger-text">{error}</p>}
     </section>
   );
 }

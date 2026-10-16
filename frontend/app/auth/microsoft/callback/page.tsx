@@ -63,7 +63,7 @@ function CallbackHandler() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
       <div className="w-full max-w-[420px] text-center">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <GraduationCap size={16} className="text-white" />
           </div>
           <span className="font-bold text-slate-900">IUOSS Hub</span>
@@ -72,8 +72,8 @@ function CallbackHandler() {
         {error ? (
           <>
             <div
-              className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50
-                         border border-red-200 text-red-700 text-sm text-left"
+              className="flex items-start gap-2.5 p-3.5 rounded-lg bg-danger-soft
+                         border border-danger-line text-danger-text text-sm text-left"
             >
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
               <span>{error}</span>

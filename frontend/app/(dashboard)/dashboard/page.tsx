@@ -10,7 +10,7 @@ import { api, ApiError } from '@/lib/api';
 import { getSession } from '@/lib/auth';
 import { useFeatures } from '@/lib/features';
 import { formatDate, formatDateTime, cn } from '@/lib/utils';
-import { ui, badge, accentIcon } from '@/lib/ui';
+import { ui, badge, accentIcon, notice, noticeIcon } from '@/lib/ui';
 import { CivicActivitiesTable } from '@/components/civic-activities';
 import { HealthValidityBadge } from '@/components/health-insurance';
 import type { DashboardData, StudentSession } from '@/lib/types';
@@ -59,6 +59,15 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function ProfileItem({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 sm:px-5 sm:first:pl-0">
+      <dt className={ui.label}>{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-ink">{children}</dd>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [session, setSession] = useState<StudentSession | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
@@ -89,10 +98,10 @@ export default function DashboardPage() {
     <div className="space-y-6">
 
       {/* ── Hero / greeting ───────────────────────────────── */}
-      <section className="rounded-lg border border-primary-line bg-[#f5f9ff] px-5 sm:px-6 py-5">
+      <section>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-[1.35rem] font-semibold text-ink">
+            <h1 className="text-xl font-semibold text-ink">
               Xin chào, {session?.full_name ?? '—'}
             </h1>
             <p className="text-sm text-muted mt-1">
@@ -109,15 +118,15 @@ export default function DashboardPage() {
       </section>
 
       {error && (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
-          <AlertCircle size={16} className="flex-shrink-0" />
+        <div className={cn(notice.base, notice.warning)}>
+          <AlertCircle className={noticeIcon.warning} />
           {error}
         </div>
       )}
 
       {!student && !error && (
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
-          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+        <div className={cn(notice.base, notice.warning)}>
+          <AlertCircle className={noticeIcon.warning} />
           <span>
             Tài khoản <strong>{session?.ldap_uid}</strong> chưa được liên kết với hồ sơ sinh viên.
             Vui lòng liên hệ Phòng CTSV để được hỗ trợ.
@@ -128,30 +137,20 @@ export default function DashboardPage() {
       {/* ── Hồ sơ sinh viên ───────────────────────────────── */}
       {student && (
         <Panel title="Hồ sơ sinh viên" icon={UserRound} accent="primary">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
-              <div className={ui.label}>Mã số sinh viên</div>
-              <div className="mt-1 text-sm font-semibold text-ink font-mono">{student.current_student_code}</div>
-            </div>
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
-              <div className={ui.label}>Khoa</div>
-              <div className="mt-1 text-sm font-medium text-ink">
-                {student.current_department?.name_vi ?? student.current_department?.code ?? '—'}
-              </div>
-            </div>
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
-              <div className={ui.label}>Bậc đào tạo</div>
-              <div className="mt-1 text-sm font-medium text-ink">{student.current_degree_level?.name ?? '—'}</div>
-            </div>
-            <div className="rounded-lg border border-line2 bg-[#f8fafc] px-3.5 py-3">
-              <div className={ui.label}>Trạng thái</div>
-              <div className="mt-1.5">
-                <span className={cn(badge.base, isActive ? badge.success : badge.neutral)}>
-                  {student.current_status?.name_vi ?? '—'}
-                </span>
-              </div>
-            </div>
-          </div>
+          <dl className="grid grid-cols-2 gap-y-4 sm:grid-cols-4 sm:divide-x sm:divide-line2">
+            <ProfileItem label="Mã số sinh viên">
+              <span className="font-mono font-semibold">{student.current_student_code}</span>
+            </ProfileItem>
+            <ProfileItem label="Khoa">
+              {student.current_department?.name_vi ?? student.current_department?.code ?? '—'}
+            </ProfileItem>
+            <ProfileItem label="Bậc đào tạo">{student.current_degree_level?.name ?? '—'}</ProfileItem>
+            <ProfileItem label="Trạng thái">
+              <span className={cn(badge.base, isActive ? badge.success : badge.neutral)}>
+                {student.current_status?.name_vi ?? '—'}
+              </span>
+            </ProfileItem>
+          </dl>
         </Panel>
       )}
 
@@ -241,7 +240,26 @@ export default function DashboardPage() {
         }
       >
         {confirmation_requests?.length ? (
-          <div className="overflow-x-auto">
+          <>
+          {/* Điện thoại: danh sách dòng (bảng 6 cột bị cắt cột "Xem" ở khổ 375px). */}
+          <ul className="divide-y divide-line2 sm:hidden">
+            {confirmation_requests.map((req) => (
+              <li key={req.id}>
+                <Link href={`/dashboard/requests/${req.id}`} className="flex items-start gap-3 px-4 py-3.5 active:bg-[#f9fafb]">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-ink text-sm">{TYPE_LABELS[req.request_type]}</span>
+                      <span className={cn(badge.base, STATUS_STYLES[req.status])}>{STATUS_LABELS[req.status]}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-1 text-[0.82rem] text-slate-600">{req.purpose}</p>
+                    <p className="mt-0.5 text-[0.75rem] text-muted tabular-nums">{formatDateTime(req.created_at)}</p>
+                  </div>
+                  <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
@@ -296,6 +314,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
+          </>
         ) : (
           <div className="py-10 text-center">
             <p className="text-sm text-muted">Chưa có yêu cầu nào.</p>

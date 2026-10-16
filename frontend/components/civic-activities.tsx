@@ -27,7 +27,7 @@ export function CivicActivitiesTable({ items }: { items: CivicActivity[] }) {
             <th className="text-left font-medium px-5 py-2.5">Hoạt động</th>
             <th className="text-center font-medium px-3 py-2.5">Lần</th>
             <th className="text-left font-medium px-3 py-2.5">Kết quả</th>
-            <th className="text-left font-medium px-5 py-2.5">Ngày hoàn thành</th>
+            <th className="hidden sm:table-cell text-left font-medium px-5 py-2.5 whitespace-nowrap">Ngày hoàn thành</th>
           </tr>
         </thead>
         <tbody>
@@ -39,7 +39,7 @@ export function CivicActivitiesTable({ items }: { items: CivicActivity[] }) {
               <td className="px-5 py-3 font-medium text-ink">{act.activity_code}</td>
               <td className="px-3 py-3 text-center text-muted">{act.attempt_no}</td>
               <td className="px-3 py-3"><CivicResult value={act.result_value} /></td>
-              <td className="px-5 py-3 text-muted text-[0.82rem]">{formatDate(act.completed_at)}</td>
+              <td className="hidden sm:table-cell px-5 py-3 text-muted text-[0.82rem]">{formatDate(act.completed_at)}</td>
             </tr>
           ))}
         </tbody>

@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
 import { AlertCircle, FileClock, History, Hospital, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, accentIcon } from '@/lib/ui';
+import { ui, accentIcon, notice, noticeIcon, subtle } from '@/lib/ui';
 import { cn, formatDate } from '@/lib/utils';
 import { HealthValidityBadge, daysLeft, validityState } from '@/components/health-insurance';
 import type { ExternalInsuranceDeclaration, HealthInsuranceCard, HealthInsuranceData, HospitalChangeRequestRow } from '@/lib/types';
@@ -167,8 +167,8 @@ export default function HealthInsurancePage() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
-          <AlertCircle size={16} className="flex-shrink-0" />
+        <div className={cn(notice.base, notice.warning)}>
+          <AlertCircle className={noticeIcon.warning} />
           {error}
         </div>
       )}
@@ -191,7 +191,7 @@ export default function HealthInsurancePage() {
         {current ? (
           <div className="px-5 py-5">
             {/* Mã thẻ là thứ SV cần nhất khi đi khám → cho nổi lên trên cùng. */}
-            <div className="rounded-lg border border-primary-line bg-[#f5f9ff] px-5 py-4">
+            <div className={cn(subtle, 'px-5 py-4')}>
               <div className={ui.label}>Mã thẻ BHYT</div>
               <div className="mt-1.5 font-mono text-[1.25rem] font-semibold text-ink tracking-wide break-all">
                 {current.medical_insurance_code || <Empty />}
@@ -500,7 +500,7 @@ export default function HealthInsurancePage() {
           <h2 className={ui.sectionTitle}>Tham gia Bảo hiểm Y tế</h2>
         </div>
         <div className="p-5 space-y-6">
-          <div className="rounded-lg border border-primary-line bg-primary-soft p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <div className="rounded-lg border border-line bg-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div>
               <h3 className="text-sm font-semibold text-ink">Đã tham gia BHYT tại nơi khác?</h3>
               <p className="mt-1 text-[0.82rem] text-muted">Khai thông tin thẻ để nhà trường kiểm tra và xác nhận.</p>
@@ -512,10 +512,10 @@ export default function HealthInsurancePage() {
             const open = !!change?.config && change.config.status === 'open';
             const enabled = open && !!change?.has_source;
             return (
-              <div className="rounded-lg border border-line bg-slate-50 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+              <div className="rounded-lg border border-line bg-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
                 <div>
                   <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    <Hospital size={15} className="text-primary" />Đổi nơi khám chữa bệnh ban đầu
+                    <Hospital size={15} className="text-slate-500" />Đổi nơi khám chữa bệnh ban đầu
                   </h3>
                   <p className="mt-1 text-[0.82rem] text-muted">
                     {!open
@@ -555,7 +555,7 @@ export default function HealthInsurancePage() {
               const blockedByEarlierRegistration = !!blockingRegistration;
               const blocked = !data?.is_eligible || blockedByEarlierRegistration;
               return (
-                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-slate-50 flex flex-col justify-between">
+                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-white flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-[0.78rem] text-muted mt-1">
@@ -572,7 +572,12 @@ export default function HealthInsurancePage() {
                     )}
                   </div>
                   <div className="mt-4">
-                    {isOpen ? (
+                    {isOpen && blocked ? (
+                      // Nút xanh mờ 50% trông như lỗi hiển thị → dùng đúng kiểu nút vô hiệu như "Chưa mở".
+                      <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed"}>
+                        {!data?.is_eligible ? 'Không đủ điều kiện' : 'Đã đăng ký đợt trước'}
+                      </button>
+                    ) : isOpen ? (
                       <Link
                         href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
                         className={cn(ui.btnPrimary, "w-full text-center")}
