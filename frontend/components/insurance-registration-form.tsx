@@ -71,7 +71,7 @@ const ACCEPTED_IMAGE_TYPES = [
  * Tailwind xóa kiểu danh sách/liên kết nên phải khai lại ở đây.
  */
 const DESCRIPTION_CLS =
-  "text-sm leading-6 [&_a]:font-medium [&_a]:underline [&_h2]:font-semibold [&_h3]:font-semibold " +
+  "text-sm leading-6 [&_a]:font-medium [&_a]:text-primary-text [&_a]:underline [&_h2]:font-semibold [&_h3]:font-semibold " +
   "[&_h4]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5";
 
 const fileSchema = z
@@ -779,10 +779,10 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
       : `Khai thông tin - Mua BHYT năm ${year ?? ""}${config?.name ? ` - ${config.name}` : ""}`;
   const windowInfo = submitted?.window ?? (config ? { start_date: config.start_date, end_date: config.end_date, can_edit: config.status === 'open' } : null);
   const imageSlots = ([
-    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-blue-50 text-blue-500" },
-    { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-sky-50 text-sky-500" },
-    { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-emerald-50 text-emerald-500" },
-    { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-indigo-50 text-indigo-500" },
+    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-slate-100 text-slate-500" },
+    { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-slate-100 text-slate-500" },
+    { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-slate-100 text-slate-500" },
+    { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-slate-100 text-slate-500" },
   ] as const).filter((slot) => hospitalChange
     // Ảnh chép từ đơn tại trường: chỉ hiện ảnh đơn đó thực sự có.
     ? !!submittedImages[slot.name]
@@ -811,9 +811,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
       </nav>
 
       {/* Tiêu đề + mô tả của đợt. Đơn đã nộp dùng mô tả HIỆN HÀNH của chính đợt đó. */}
-      <div className="rounded-lg border border-primary-line bg-primary-soft p-4 text-primary-text sm:p-5">
-        <h1 className="flex items-start gap-2 text-base font-bold sm:text-lg">
-          <ShieldPlus size={20} className="mt-0.5 shrink-0" /> <span>{title}</span>
+      <div className={cn(ui.card, "p-4 text-ink sm:p-5")}>
+        <h1 className="flex items-start gap-2 text-base font-semibold sm:text-lg">
+          <ShieldPlus size={20} className="mt-0.5 shrink-0 text-slate-500" /> <span>{title}</span>
         </h1>
         {hospitalChange && !config?.description ? (
           <p className="mt-2 text-sm">
@@ -867,7 +867,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
           <div className={cn(ui.cardHeader, "px-4 sm:px-5")}>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h2 className={ui.sectionTitle}>
-                <History size={16} className="text-primary" />
+                <History size={16} className="text-slate-500" />
                 {hospitalChange ? "Yêu cầu đã gửi" : external ? "Bản khai đã gửi" : "Đơn đã gửi"}
               </h2>
               {submitted.status && <InsuranceStatus status={submitted.status} />}
@@ -940,7 +940,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
         <fieldset disabled={saving || !formEnabled} className={cn("min-w-0 space-y-5 sm:space-y-6", saving && "opacity-60")}>
           {external && (
             <section className={ui.card}>
-              <div className={ui.cardHeader}><h2 className={ui.sectionTitle}><FileText size={16} className="text-primary" /> Thông tin thẻ tham gia ngoài nhà trường</h2></div>
+              <div className={ui.cardHeader}><h2 className={ui.sectionTitle}><FileText size={16} className="text-slate-500" /> Thông tin thẻ tham gia ngoài nhà trường</h2></div>
               <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
                 {([
                   ['medical_insurance_code', 'Mã thẻ BHYT', 'text'],
@@ -960,7 +960,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
           <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
-                <User size={16} className="text-primary" /> Thông tin cá nhân
+                <User size={16} className="text-slate-500" /> Thông tin cá nhân
               </h2>
               {prefill && !editingRecord && !hospitalChange && (
                 <EditLink
@@ -1084,9 +1084,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   />
                   <FieldError message={errors.social_insurance_number?.message} />
                   {!editLocked && !hospitalChange && (
-                    <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                    <div className="mt-2 rounded-lg border border-line2 bg-[#f8fafc] px-3 py-2.5 text-xs leading-5 text-ink">
                       <p className="flex items-center gap-1.5 font-semibold">
-                        <Info size={14} className="shrink-0" /> Cách lấy số sổ BHXH
+                        <Info size={14} className="shrink-0 text-slate-500" /> Cách lấy số sổ BHXH
                       </p>
                       <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-slate-700">
                         <li>
@@ -1182,9 +1182,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   />
                   <FieldError message={errors.note?.message} />
                   {!noteLocked && (
-                    <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                    <div className="mt-2 rounded-lg border border-line2 bg-[#f8fafc] px-3 py-2.5 text-xs leading-5 text-ink">
                       <p className="flex items-center gap-1.5 font-semibold">
-                        <Info size={14} className="shrink-0" /> Khi nào cần ghi chú
+                        <Info size={14} className="shrink-0 text-slate-500" /> Khi nào cần ghi chú
                       </p>
                       <p className="mt-1 text-slate-700">
                         Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
@@ -1201,7 +1201,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
           <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
-                <ShieldPlus size={16} className="text-primary" /> Nơi đăng ký khám chữa bệnh ban đầu
+                <ShieldPlus size={16} className="text-slate-500" /> Nơi đăng ký khám chữa bệnh ban đầu
               </h2>
               {/* Nút duy nhất mở khóa form đổi nơi KCB (span, không bị fieldset khóa). */}
               {hospitalChange && canSubmit && (
@@ -1336,7 +1336,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
           <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
-                <CreditCard size={16} className="text-primary" /> {external || hospitalChange ? "Hồ sơ đính kèm" : "Thanh toán & Hồ sơ"}
+                <CreditCard size={16} className="text-slate-500" /> {external || hospitalChange ? "Hồ sơ đính kèm" : "Thanh toán & Hồ sơ"}
               </h2>
             </div>
             <div className="space-y-5 p-4 sm:space-y-6 sm:p-5">

@@ -22,7 +22,7 @@ export function EvidenceGuide({ hcmc, year }: { hcmc: boolean; year: string }) {
   const link = 'inline-flex items-center gap-1 font-medium text-primary-text hover:underline';
   const box = (active: boolean) => cn(
     'rounded-lg border px-4 py-3 text-[0.84rem] text-ink',
-    active ? 'border-primary-line border-l-4 border-l-primary bg-primary-soft' : 'border-line bg-slate-50',
+    active ? 'border-line border-l-[3px] border-l-primary bg-white' : 'border-line bg-[#f8fafc]',
   );
   return (
     <div className="space-y-2.5">

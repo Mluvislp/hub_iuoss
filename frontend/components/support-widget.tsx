@@ -127,7 +127,7 @@ export default function SupportWidget() {
         >
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line bg-[#f8fafc]">
             <h2 className="flex items-center gap-2 text-[0.9rem] font-semibold text-ink">
-              <Headset size={15} className="text-primary" />
+              <Headset size={15} className="text-slate-500" />
               Hỗ trợ kỹ thuật
             </h2>
             <button

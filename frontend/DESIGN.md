@@ -10,7 +10,8 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
 - **Radius 8px** (`rounded-lg`) cho card/input/button. Không bo 16–20px đại trà.
 - **Một màu hành động** = primary blue. Không dùng 2 màu CTA khác nhau.
 - **Hierarchy bằng typography/spacing + accent nhỏ**, không bằng nhiều màu/shadow.
-- **1 icon nhỏ (16px) tối đa cho mỗi title section.** Không icon nền pastel nhiều màu.
+- **1 icon nhỏ (16px) tối đa cho mỗi title section, màu trung tính `text-slate-500`** (`accentIcon.*` giờ đều trỏ về màu này). Không icon nền pastel nhiều màu, không mỗi section một màu.
+- **Không tô nền màu cho khối nội dung** (16/10/2026). Hộp thông báo/ghi chú = nền trắng + viền xám + vạch trái 3px theo ngữ nghĩa (`notice.*` + `noticeIcon.*`). Ô số liệu/khối phụ = `subtle` (xám rất nhạt). Nền đỏ nhạt chỉ còn cho lỗi chặn thao tác (`notice.error`) và khối "bị từ chối".
 
 ## Design tokens (nguồn: code, KHÔNG hardcode màu rời rạc)
 - **`tailwind.config.ts`** — color system:
@@ -18,20 +19,21 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
   - `success` emerald · `warning` amber · `danger` red — mỗi cái có `soft`/`line`/`text`
   - neutral: `ink #111827`, `muted #64748b`, `line #e5e7eb`, `line2 #eef1f5`, `canvas #f6f8fb`, `sidebar #f8fafc`
   - `shadow-card`, `max-w-content` (1120px)
-- **`lib/ui.ts`** — className tái sử dụng: `ui.card`, `ui.cardHeader`, `ui.sectionTitle`, `ui.input`, `ui.textarea`, `ui.btnPrimary`, `ui.btnSecondary`, `ui.btnGhost`, `ui.btnOutline`, `ui.dtRow/dtLabel/dtValue`; `badge.{base,success,warning,danger,info,neutral}`; `accentIcon.{primary,success,warning,danger,neutral}`.
+- **`lib/ui.ts`** — className tái sử dụng: `ui.card`, `ui.cardHeader`, `ui.sectionTitle`, `ui.input`, `ui.textarea`, `ui.btnPrimary`, `ui.btnSecondary`, `ui.btnGhost`, `ui.btnOutline`, `ui.dtRow/dtLabel/dtValue`; `badge.{base,success,warning,danger,info,neutral}`; `accentIcon.*` (icon tiêu đề, trung tính); `notice.{base,info,warning,success,neutral,error}` + `noticeIcon.*`; `subtle`.
 - **`lib/types.ts`** — `REQUEST_STATUS_STYLES` map trạng thái → token semantic.
 
 > Thêm UI mới: dùng token có sẵn. Cần biến thể mới thì thêm vào `lib/ui.ts` / `tailwind.config.ts`, đừng rải class/màu ad-hoc.
 
 ## Khuôn mẫu component
-- **Card**: `ui.card` + header `ui.cardHeader` (title `ui.sectionTitle` kèm 1 icon accent `accentIcon[...]`). Section quan trọng có thể thêm `border-t-2 border-t-primary` (như card form).
+- **Card**: `ui.card` + header `ui.cardHeader` (title `ui.sectionTitle` kèm 1 icon `accentIcon[...]`). KHÔNG thêm dải màu trên đỉnh card (`border-t-primary` đã bỏ 16/10/2026).
 - **Badge trạng thái**: `cn(badge.base, badge.<variant>)`. pending=warning, processing=info, done=success, rejected=danger, "Đang học"=success.
 - **Button**: chính = `ui.btnPrimary` (blue, h-40, radius 8); phụ = `ui.btnSecondary` (viền, chữ blue) / `ui.btnGhost` (text). Action phụ trong bảng dùng `btnSecondary` (có viền), không để text trần.
 - **Bảng**: header `bg-[#f8fafc]` + `text-muted` label thường (không uppercase tracking-widest); row `border-b border-line2` + `hover:bg-[#f9fafb]`; mục đích dài `line-clamp-2` + `title`.
 - **Definition list** (thông tin hành chính): `ui.dtRow`; giá trị trống → `italic text-slate-400` "Chưa cập nhật" / "—".
-- **Hero/greeting**: panel tint `bg-[#f5f9ff]` + `border-primary-line`, tiêu đề + subtitle + CTA primary bên phải. Không emoji, không gradient đậm.
+- **Hero/greeting**: tiêu đề trang đặt thẳng trên nền canvas (không khung tô màu), subtitle + CTA primary bên phải — giống đầu trang danh sách. Không emoji, không gradient.
+- **Nhãn sự kiện trong trao đổi**: màu theo nghĩa (hoàn thành/đã trả = success, từ chối = danger, cần bổ sung = warning, đang xử lý = info, ghi chú = neutral). Bong bóng của SV nền `#f8fafc`, của Phòng CTSV nền trắng.
 - **Sidebar**: nền `bg-sidebar` (#f8fafc), dải accent `h-1 bg-primary` trên đỉnh, brand IU. Active = `bg-primary-soft text-primary-text` + `border-l-[3px] border-primary`. Không sidebar navy full.
-- **Form**: card viền (+ accent trên), header chữ + mô tả, breadcrumb nhỏ, option = tile (`border`, active `border-primary bg-primary-soft ring-primary-line`), `*` bắt buộc tinh tế, counter dưới input, footer căn phải, alert note `border-l-2 border-primary`.
+- **Form**: card viền, header chữ + mô tả, breadcrumb nhỏ, option = tile (`border`, active `border-primary bg-primary-soft ring-primary-line`), `*` bắt buộc tinh tế, counter dưới input, footer căn phải, alert note `border-l-2 border-primary`.
 - **Ô hỗ trợ nổi** (`components/support-widget.tsx`, mount ở `app/layout.tsx` nên có trên mọi trang kể cả login): nút tròn 48px `bg-primary` góc dưới-phải, `z-30` (thấp hơn overlay z-40 / sidebar z-50 để không đè menu mobile). Bấm mới mở, KHÔNG tự bật/không nhắc lại. Panel mở lên trên, rộng `min(330px, 100vw-2.5rem)`, đóng bằng X / Esc / bấm ra ngoài. Giá trị liên hệ là link thật (`tel:`, `mailto:`, `zalo.me`) kèm nút chép — trên desktop `tel:` vô dụng nên phải chép được.
 - **Trang chờ / tính năng chưa mở** (`components/coming-soon.tsx`): card căn giữa `max-w-[560px]`, ô icon 56px `bg-primary-soft` + `border-primary-line`, tên tính năng, badge `badge.info` "Đang phát triển", một câu giải thích, divider `border-line2`, nút `btnSecondary` quay lại. Không minh hoạ lớn, không đồng hồ đếm ngược, không hứa mốc thời gian cụ thể. Ở sidebar, mục chưa mở chỉ mang **một chấm 6px** `bg-warning-line` + `title` — đánh dấu cái bất thường, không dán nhãn dài lên mọi mục.
 

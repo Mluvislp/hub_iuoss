@@ -32,9 +32,9 @@ export default function CccdForm({ onSaved }: { onSaved: (next: HealthCheckState
   }
 
   return (
-    <div className="rounded-lg border border-warning-line border-l-4 border-l-warning-text bg-warning-soft px-4 py-3.5 space-y-3">
-      <div className="flex items-start gap-2.5 text-sm text-warning-text">
-        <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
+    <div className="rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5 space-y-3">
+      <div className="flex items-start gap-2.5 text-sm text-ink">
+        <AlertTriangle size={18} className="flex-shrink-0 mt-0.5 text-[#d97706]" />
         <div>
           <div className="font-semibold">Hồ sơ chưa có số CCCD</div>
           <p className="mt-0.5">Khai báo khám sức khỏe bắt buộc có số CCCD. Bổ sung để tiếp tục.</p>

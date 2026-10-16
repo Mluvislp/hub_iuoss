@@ -14,7 +14,7 @@ import {
   AlertCircle, ChevronRight, FileText, Loader2, MessageSquare, Plus, Ticket,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, badge, accentIcon } from '@/lib/ui';
+import { ui, badge, accentIcon, notice, noticeIcon } from '@/lib/ui';
 import { cn, formatDateTime } from '@/lib/utils';
 import {
   REQUEST_TYPE_LABELS,
@@ -72,9 +72,9 @@ export default function RequestHistoryPage() {
       </div>
 
       {needsAction > 0 && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
-          <AlertCircle size={16} className="mt-0.5 shrink-0 text-violet-700" />
-          <p className="text-sm text-violet-900">
+        <div className={cn(notice.base, notice.warning)}>
+          <AlertCircle className={noticeIcon.warning} />
+          <p>
             <strong>{needsAction}</strong> yêu cầu cần bổ sung thông tin. Phản hồi trong phần
             trao đổi của yêu cầu để được xử lý tiếp.
           </p>

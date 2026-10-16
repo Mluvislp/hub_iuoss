@@ -468,9 +468,9 @@ export default function PersonalInfoPage() {
         </div>
       )}
 
-      <section className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <section className={ui.card}>
         <div className={ui.cardHeader}>
-          <h1 className={ui.sectionTitle}><UserRound size={17} className="text-primary" /> Thông tin cá nhân</h1>
+          <h1 className={ui.sectionTitle}><UserRound size={17} className="text-slate-500" /> Thông tin cá nhân</h1>
         </div>
         <div className="px-5 py-4 grid sm:grid-cols-2 gap-3">
           <ReadonlyField label="Họ tên" value={r.full_name} />
