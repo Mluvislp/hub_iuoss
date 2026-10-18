@@ -36,6 +36,7 @@ FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_P
 FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
 FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
 FEATURE_PERSONAL_INFO = env_bool("FEATURE_PERSONAL_INFO", default=not IS_PRODUCTION)
+FEATURE_DIPLOMA = env_bool("FEATURE_DIPLOMA", default=not IS_PRODUCTION)
 
 # Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
 # Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.

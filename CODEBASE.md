@@ -54,6 +54,7 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
+  core/diploma.py · diploma_models.py · api/diploma_views.py   ← nộp bằng tốt nghiệp THPT (PDF + CCCD từ kho ảnh)
   core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách
   core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
@@ -104,6 +105,7 @@ frontend/
 | `/dashboard/bao-hiem-y-te/doi-noi-kcb` | yêu cầu đổi nơi KCB ban đầu (form đăng ký, khóa trừ bệnh viện) |
 | `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
+| `/dashboard/bang-tot-nghiep` | nộp bằng tốt nghiệp THPT online, xem trạng thái + mã QR khi được hẹn nộp bản gốc |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
@@ -120,6 +122,7 @@ frontend/
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
 `tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` +
 `<id>/attachments/<id>/` · `student-images/` (GET) + `<id>/file/` ·
+`diploma/` + `diploma/files/<field>/` ·
 `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
@@ -130,6 +133,7 @@ frontend/
 |---|---|
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
+| Nộp bằng tốt nghiệp THPT | `dashboard_iuoss/docs/DIPLOMA.md` |
 | Hỏi đáp (ticket), realtime | `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |
@@ -179,7 +183,7 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_SUPPORT_TICKETS · FEATURE_DIPLOMA   # mặc định TẮT ở production
 DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```

@@ -444,6 +444,7 @@ export interface FeatureFlags {
   health_check: boolean;
   support_tickets: boolean;
   personal_info: boolean;
+  diploma: boolean;
 }
 
 /**
@@ -772,4 +773,69 @@ export interface PersonalInfoData {
   groups: PersonalInfoGroup[];
   bank_suggestions: string[];
   sent?: number;
+}
+
+// ── Nộp bằng tốt nghiệp THPT — backend `core/diploma.py` ──────────────────────
+
+export interface DiplomaLine { bullet: boolean; text: string }
+
+export interface DiplomaRound {
+  id: number;
+  title: string;
+  /** Các khóa (năm nhập học) được nộp trong đợt. */
+  intake_years: number[];
+  opens_at: string;
+  closes_at: string;
+  state: 'open' | 'upcoming' | 'closed';
+  description_lines: DiplomaLine[];
+  /** Thời gian, địa điểm nộp bản gốc. */
+  original_note_lines: DiplomaLine[];
+}
+
+/** pending → approved → notified → received; pending ⇄ returned. `imported` = nhập từ hệ thống. */
+export type DiplomaStatus = 'pending' | 'returned' | 'approved' | 'notified' | 'received' | 'imported';
+
+/** Chỉ thông tin văn bằng — thông tin cá nhân không lưu trong hồ sơ, đọc ở `profile`. */
+export interface DiplomaSubmission {
+  id: number;
+  source: 'hub' | 'import';
+  status: DiplomaStatus;
+  status_label: string;
+  row_version: number;
+  diploma_number: string;
+  issued_by: string;
+  issued_on: string;
+  exam_session: string;
+  cccd_front_url: string | null;
+  diploma_pdf_url: string | null;
+  diploma_pdf_name: string;
+  review_note: string;
+  notified_at: string | null;
+  received_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Hồ sơ sinh viên — chỉ để xem, sinh viên không sửa được. */
+export interface DiplomaProfile {
+  full_name: string;
+  student_code: string;
+  intake_year: number | null;
+  university_email: string;
+  phone_number: string;
+  citizen_id: string;
+}
+
+export interface DiplomaState {
+  /** imported: chỉ hiện văn bằng · submitted: hiện đơn đã nộp · form: được nộp · blocked: không có đợt cho khóa. */
+  mode: 'imported' | 'submitted' | 'form' | 'blocked';
+  round: DiplomaRound | null;
+  submission: DiplomaSubmission | null;
+  profile: DiplomaProfile;
+  /** Ảnh CCCD mặt trước đang có trong kho ảnh (chỉ khi chưa nộp); null = SV phải tải lên. */
+  cccd_image: { id: number; url: string; label: string } | null;
+  /** Đơn bị trả về → được sửa và gửi lại. */
+  can_edit: boolean;
+  consent_text: string;
+  blocked_message: string;
 }

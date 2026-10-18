@@ -1,5 +1,5 @@
 from django.urls import path
-from . import health_check_views, ticket_views, views
+from . import diploma_views, health_check_views, ticket_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
@@ -64,6 +64,10 @@ urlpatterns = [
          name="api_health_check_register"),
     path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
          name="api_health_check_citizen_id"),
+
+    # Nộp bằng tốt nghiệp THPT — core/diploma.py
+    path("diploma/", diploma_views.DiplomaView.as_view(), name="api_diploma"),
+    path("diploma/files/<str:field>/", diploma_views.DiplomaFileView.as_view(), name="api_diploma_file"),
 
     # Hỏi đáp (ticket) — core/tickets.py
     path("tickets/",                 ticket_views.TicketsView.as_view(),       name="api_tickets"),
