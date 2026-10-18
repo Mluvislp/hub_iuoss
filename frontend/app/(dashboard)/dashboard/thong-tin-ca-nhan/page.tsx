@@ -94,11 +94,12 @@ function DateInput({ value, onChange }: { value: string; onChange: (v: string) =
 /** Một dòng giá trị đang khóa. */
 function LockedRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    // min-w-0: ô lưới không bị chữ dài (vd. "Nơi cấp" CCCD) kéo giãn → tràn ngang trên điện thoại.
+    <div className="min-w-0">
       <div className={ui.label}>{label}</div>
-      <div className="mt-1 flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
+      <div className="mt-1 flex min-w-0 items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
         <Lock size={13} className="text-slate-400 flex-shrink-0" />
-        <span className={cn('truncate', !value && 'text-slate-400 italic')}>{value || 'Chưa có thông tin'}</span>
+        <span className={cn('truncate', !value && 'text-slate-400 italic')} title={value || undefined}>{value || 'Chưa có thông tin'}</span>
       </div>
     </div>
   );
@@ -468,9 +469,9 @@ export default function PersonalInfoPage() {
         </div>
       )}
 
-      <section className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <section className={ui.card}>
         <div className={ui.cardHeader}>
-          <h1 className={ui.sectionTitle}><UserRound size={17} className="text-primary" /> Thông tin cá nhân</h1>
+          <h1 className={ui.sectionTitle}><UserRound size={17} className="text-slate-500" /> Thông tin cá nhân</h1>
         </div>
         <div className="px-5 py-4 grid sm:grid-cols-2 gap-3">
           <ReadonlyField label="Họ tên" value={r.full_name} />
@@ -503,8 +504,9 @@ export default function PersonalInfoPage() {
         </Section>
       ))}
 
-      <div className="sticky bottom-0 -mx-1 px-1 py-3 bg-gradient-to-t from-canvas via-canvas to-transparent">
-        <div className={cn(ui.card, 'px-5 py-3 flex flex-wrap items-center justify-between gap-3')}>
+      {/* Thanh gửi dính đáy. Điện thoại: chừa 4rem bên phải cho nút hỗ trợ nổi để không che nút Gửi. */}
+      <div className="sticky bottom-0 z-20 -mx-1 px-1 pt-2 pb-3 pr-16 sm:pr-1 bg-canvas">
+        <div className={cn(ui.card, 'px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-3')}>
           <div className="text-sm">
             {formError
               ? <span className="text-danger-text">{formError}</span>

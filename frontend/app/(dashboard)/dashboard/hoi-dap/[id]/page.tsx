@@ -433,8 +433,8 @@ export default function TicketDetailPage() {
         {/* ── Dòng trao đổi ── */}
         <div className="min-w-0 space-y-3">
           {notice !== null && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary-line bg-primary-soft px-4 py-2.5">
-              <p className="text-[0.85rem] font-medium text-primary-text">{OFFICE} đã gửi phản hồi mới.</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line border-l-[3px] border-l-primary bg-white px-4 py-2.5">
+              <p className="text-[0.85rem] font-medium text-ink">{OFFICE} đã gửi phản hồi mới.</p>
               <button
                 type="button"
                 className="text-[0.82rem] font-semibold text-primary-text underline"
@@ -498,7 +498,7 @@ export default function TicketDetailPage() {
             <section className={ui.card}>
               <div className={ui.cardHeader}>
                 <h2 className={ui.sectionTitle}>
-                  <Reply size={16} className="text-primary" />
+                  <Reply size={16} className="text-slate-500" />
                   {waitingOffice ? 'Bổ sung thông tin' : 'Phản hồi'} — Ticket #{data.id}
                 </h2>
               </div>
@@ -559,8 +559,8 @@ export default function TicketDetailPage() {
 
           {/* Xác nhận đóng — một bước tại chỗ để tránh bấm nhầm (không dùng hộp thoại trình duyệt). */}
           {data.can_reply && confirmClose && (
-            <div className="rounded-lg border border-warning-line bg-warning-soft px-5 py-4">
-              <p className="text-[0.88rem] font-semibold text-warning-text">Đóng ticket #{data.id}?</p>
+            <div className="rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-5 py-4">
+              <p className="text-[0.88rem] font-semibold text-ink">Đóng ticket #{data.id}?</p>
               <p className="mt-1 text-[0.84rem] text-slate-700">
                 Xác nhận nội dung đã được giải đáp. Ticket đã đóng không tiếp nhận thêm trao đổi;
                 vấn đề phát sinh sau đó đề nghị đặt câu hỏi mới.

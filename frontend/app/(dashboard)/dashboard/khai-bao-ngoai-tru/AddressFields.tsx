@@ -127,7 +127,7 @@ export default function AddressFields({
       </div>
 
       {hint && (
-        <div className="flex gap-2 px-3 py-2 rounded-lg bg-warning-soft border border-warning-line text-[0.78rem] text-warning-text">
+        <div className="flex gap-2 px-3 py-2 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white text-[0.78rem] text-ink">
           {hint}
         </div>
       )}

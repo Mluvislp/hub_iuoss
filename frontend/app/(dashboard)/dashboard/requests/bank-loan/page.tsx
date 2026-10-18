@@ -14,6 +14,7 @@ import { ui } from '@/lib/ui';
 import type { BankLoanFormData } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
+import { useDocumentPreview } from '@/components/request-preview';
 import { QuotaGuard } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue } from '@/components/request-edit';
 
@@ -45,6 +46,7 @@ export default function BankLoanRequestPage() {
 
   // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
   const edit = useEditRequest('bank_loan');
+  const preview = useDocumentPreview('bank_loan');
   const isEdit = edit.id !== null;
   const editApplied = useRef(false);
   useEffect(() => {
@@ -101,7 +103,9 @@ export default function BankLoanRequestPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!confirmed) { setError(CONSENT_REQUIRED_MSG); return; }
+    // Nút "Xem trước giấy" đi chung phần kiểm tra này, chưa cần tích cam đoan.
+    const previewing = preview.consume();
+    if (!confirmed && !previewing) { setError(CONSENT_REQUIRED_MSG); return; }
     if (!form) return;
     const pf = form.prefill;
     const errs: FErr = {};
@@ -120,17 +124,19 @@ export default function BankLoanRequestPage() {
     setFieldErrors(errs);
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
+    const data = {
+      dob: values.dob.trim(),
+      citizen_id: values.citizen_id.trim(),
+      citizen_id_issue_date: values.citizen_id_issue_date.trim(),
+      class_code: values.class_code.trim(),
+      fee_exemption: feeExemption,
+      orphan,
+      note: note.trim() || undefined,
+    };
+    if (previewing) { preview.show(data); return; }
     setLoading(true);
     try {
-      await submitOrUpdate(edit, 'bank_loan', api.requests.createBankLoan, {
-        dob: values.dob.trim(),
-        citizen_id: values.citizen_id.trim(),
-        citizen_id_issue_date: values.citizen_id_issue_date.trim(),
-        class_code: values.class_code.trim(),
-        fee_exemption: feeExemption,
-        orphan,
-        note: note.trim() || undefined,
-      });
+      await submitOrUpdate(edit, 'bank_loan', api.requests.createBankLoan, data);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
@@ -198,10 +204,10 @@ export default function BankLoanRequestPage() {
 
       <EditRequestBanner edit={edit} />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+            <FileText size={17} className="text-slate-500" />
             Giấy xác nhận sinh viên — Vay vốn ngân hàng
           </h1>
           <p className="text-sm text-muted mt-1">Thông tin lấy từ hồ sơ. Kiểm tra, yêu cầu chỉnh sửa mã lớp / CCCD nếu sai rồi gửi.</p>
@@ -325,12 +331,16 @@ export default function BankLoanRequestPage() {
           />
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
-            <Link href="/dashboard/requests/new" className={ui.btnGhost}>
+          {preview.note}
+
+          <div className={ui.formFooter}>
+            <Link href="/dashboard/requests/new" className={cn(ui.btnGhost, ui.formFooterBtn)}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading || (isEdit && !edit.request)} className={ui.btnPrimary}>
+            {preview.button}
+            {preview.modal}
+            <ConsentGate checked={confirmed} className={ui.formFooterBtn}>
+              <button type="submit" disabled={loading || (isEdit && !edit.request)} className={cn(ui.btnPrimary, ui.formFooterBtn)}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>

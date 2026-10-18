@@ -85,7 +85,7 @@ export default function OffCampusDeclarationPage() {
           <span className="text-ink font-medium">Khai báo ngoại trú</span>
         </nav>
 
-        <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+        <div className={ui.card}>
           <div className="px-6 py-5 border-b border-line">
             <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
               <ShieldCheck size={17} className="text-success-text" />
@@ -197,10 +197,10 @@ export default function OffCampusDeclarationPage() {
         <span className="text-ink font-medium">Khai báo ngoại trú</span>
       </nav>
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <Home size={17} className="text-primary" />
+            <Home size={17} className="text-slate-500" />
             Khai báo thông tin ngoại trú
           </h1>
         </div>

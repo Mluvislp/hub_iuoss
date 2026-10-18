@@ -42,6 +42,12 @@ FEATURE_DIPLOMA = env_bool("FEATURE_DIPLOMA", default=not IS_PRODUCTION)
 # Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.
 DASHBOARD_PUBLIC_URL = os.getenv("DASHBOARD_PUBLIC_URL", "https://dashboard.iuoss.com").strip().rstrip("/")
 
+# Bản xem trước giấy tờ (core/document_preview.py): Hub backend gọi THẲNG Dashboard qua cổng nội bộ
+# (vd http://127.0.0.1:8003 ở sandbox) — ngoại lệ duy nhất của luật "hai app không gọi API nhau",
+# vì mẫu .docx + luật dựng giấy chỉ có ở Dashboard. Thiếu một trong hai biến ⇒ tính năng tắt.
+DASHBOARD_INTERNAL_URL = os.getenv("DASHBOARD_INTERNAL_URL", "").strip().rstrip("/")
+DOCUMENT_PREVIEW_TOKEN = os.getenv("DOCUMENT_PREVIEW_TOKEN", "").strip()
+
 # Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
 FRONTEND_ORIGINS = env_list(
     "FRONTEND_ORIGINS",
@@ -203,6 +209,8 @@ REST_FRAMEWORK = {
         # Nới rộng để tránh chặn nhầm khi nhiều SV dùng chung IP (NAT ký túc xá/wifi trường)
         "login": os.getenv("THROTTLE_LOGIN", "30/min"),
         "create_request": os.getenv("THROTTLE_CREATE_REQUEST", "60/hour"),
+        # Xem trước giấy: mỗi lượt chạy LibreOffice trên server ⇒ chặt theo người dùng.
+        "preview_request": os.getenv("THROTTLE_PREVIEW_REQUEST", "20/hour"),
         # Ticket hỏi đáp: tạo mới chặt, nhắn trong ticket nới hơn (đang trò chuyện).
         "ticket_create": os.getenv("THROTTLE_TICKET_CREATE", "10/hour"),
         "ticket_message": os.getenv("THROTTLE_TICKET_MESSAGE", "120/hour"),

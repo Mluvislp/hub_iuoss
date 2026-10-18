@@ -11,6 +11,7 @@ import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/
 import { RequestNoteField } from '@/components/request-note';
 import { ReadonlyField, EditableField } from '@/components/editable-field';
 import { validateDob, validateCccd, isValidDob, isValidCccd } from '@/lib/form-validators';
+import { useDocumentPreview } from '@/components/request-preview';
 import { QuotaGuard, QuotaNotice, usePurposeLocks } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf } from '@/components/request-edit';
 
@@ -41,6 +42,7 @@ export default function OtherRequestPage() {
 
   // Sửa yêu cầu "Chờ bổ sung" (?edit=<id>) — điền lại ô từ yêu cầu cũ một lần khi cả hai đã nạp.
   const edit = useEditRequest('other');
+  const preview = useDocumentPreview('other');
   const isEdit = edit.id !== null;
   const editApplied = useRef(false);
   useEffect(() => {
@@ -100,10 +102,12 @@ export default function OtherRequestPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Nút "Xem trước giấy" đi chung phần kiểm tra này, chưa cần tích cam đoan.
+    const previewing = preview.consume();
     if (!form) return;
     const pf = form.prefill;
 
-    if (!confirmed) {
+    if (!confirmed && !previewing) {
       setError(CONSENT_REQUIRED_MSG);
       return;
     }
@@ -117,15 +121,17 @@ export default function OtherRequestPage() {
     if (!purposeCode) { setError('Vui lòng chọn mục đích làm giấy.'); return; }
     if (Object.keys(errs).length) { setError('Vui lòng kiểm tra lại các trường được đánh dấu.'); return; }
     setError('');
+    const data = {
+      purpose_code: purposeCode,
+      program_name: isProgram ? programName.trim() : undefined,
+      dob: values.dob.trim(),
+      citizen_id: values.citizen_id.trim(),
+      note: note.trim() || undefined,
+    };
+    if (previewing) { preview.show(data); return; }
     setLoading(true);
     try {
-      await submitOrUpdate(edit, 'other', api.requests.createOther, {
-        purpose_code: purposeCode,
-        program_name: isProgram ? programName.trim() : undefined,
-        dob: values.dob.trim(),
-        citizen_id: values.citizen_id.trim(),
-        note: note.trim() || undefined,
-      });
+      await submitOrUpdate(edit, 'other', api.requests.createOther, data);
       setSuccess(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gửi yêu cầu thất bại. Vui lòng thử lại.');
@@ -137,7 +143,7 @@ export default function OtherRequestPage() {
   if (loadError) {
     return (
       <div className="max-w-[760px]">
-        <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
           <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
           {loadError}
         </div>
@@ -152,8 +158,8 @@ export default function OtherRequestPage() {
     return (
       <div className="max-w-[760px]">
         <div className={cn(ui.card, 'p-8 text-center')}>
-          <div className="w-11 h-11 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
-            <Check size={22} className="text-green-700" />
+          <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
+            <Check size={22} className="text-success-text" />
           </div>
           <h2 className="text-lg font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
@@ -180,10 +186,10 @@ export default function OtherRequestPage() {
 
       <EditRequestBanner edit={edit} />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+            <FileText size={17} className="text-slate-500" />
             Giấy xác nhận sinh viên (lý do khác)
           </h1>
           <p className="text-sm text-muted mt-1">Thông tin dưới đây lấy từ hồ sơ sinh viên. Kiểm tra, chỉnh sửa nếu cần rồi chọn mục đích.</p>
@@ -192,7 +198,7 @@ export default function OtherRequestPage() {
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
           <QuotaGuard type="other" bypass={isEdit}>
           {error && (
-            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
             </div>
           )}
@@ -287,12 +293,16 @@ export default function OtherRequestPage() {
           />
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
-            <Link href="/dashboard/requests/new" className={ui.btnGhost}>
+          {preview.note}
+
+          <div className={ui.formFooter}>
+            <Link href="/dashboard/requests/new" className={cn(ui.btnGhost, ui.formFooterBtn)}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading || (isEdit && !edit.request) || !!purposeLock} className={ui.btnPrimary}>
+            {preview.button}
+            {preview.modal}
+            <ConsentGate checked={confirmed} className={ui.formFooterBtn}>
+              <button type="submit" disabled={loading || (isEdit && !edit.request) || !!purposeLock} className={cn(ui.btnPrimary, ui.formFooterBtn)}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>

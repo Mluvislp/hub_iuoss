@@ -8,7 +8,9 @@ gửi yêu cầu giấy tờ. Production: `hub.iuoss.com`.
 
 **Monorepo:** `backend/` (Django 5.2 + DRF, Gunicorn `:8002`) + `frontend/` (Next.js 14
 App Router + Tailwind, PM2 `:3000`). MySQL 8.4 **dùng chung với `dashboard_iuoss`** —
-hai app **không gọi API của nhau**, mọi thứ trao đổi qua DB.
+hai app **không gọi API của nhau**, mọi thứ trao đổi qua DB — ngoại lệ duy nhất: xem trước giấy tờ
+(`core/document_preview.py` gọi Dashboard `/documents/internal/preview/`; chi tiết ở dashboard
+`docs/DOCUMENT_REQUESTS.md` mục "Xem trước giấy").
 
 | Repo | Domain | Người dùng |
 |---|---|---|

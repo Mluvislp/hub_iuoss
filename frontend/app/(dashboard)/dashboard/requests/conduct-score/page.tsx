@@ -262,10 +262,10 @@ export default function ConductScoreRequestPage() {
 
       <EditRequestBanner edit={edit} />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+            <FileText size={17} className="text-slate-500" />
             Bảng điểm rèn luyện
           </h1>
         </div>
@@ -500,12 +500,12 @@ export default function ConductScoreRequestPage() {
           />
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
-            <Link href="/dashboard/requests/new" className={ui.btnGhost}>
+          <div className={ui.formFooter}>
+            <Link href="/dashboard/requests/new" className={cn(ui.btnGhost, ui.formFooterBtn)}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading || noSemester || (isEdit && !edit.request)} className={ui.btnPrimary}>
+            <ConsentGate checked={confirmed} className={ui.formFooterBtn}>
+              <button type="submit" disabled={loading || noSemester || (isEdit && !edit.request)} className={cn(ui.btnPrimary, ui.formFooterBtn)}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>
