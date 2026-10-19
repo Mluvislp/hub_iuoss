@@ -42,5 +42,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icons/).*)'],
+  // Ảnh tĩnh trong public/ (icons/, img/) phải qua được khi chưa đăng nhập —
+  // trang /login dùng ảnh bìa ở public/img/.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icons/|img/).*)'],
 };
