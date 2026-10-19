@@ -239,6 +239,9 @@ def build_address_proposed(province_code, ward_code, street):
 
 
 def _strip_accents(s):
+    # "Đ/đ" là chữ riêng, NFD KHÔNG tách ra d + dấu ⇒ phải đổi tay (trước 19/10/2026 tên
+    # trên giấy tiếng Anh ra "Tran Đuc Thanh").
+    s = (s or "").replace("Đ", "D").replace("đ", "d")
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
 
