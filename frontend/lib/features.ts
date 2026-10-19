@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { ClipboardList, FileText, GraduationCap, HeartPulse, MessagesSquare, UserRound } from 'lucide-react';
+import { ClipboardList, FileText, FileUp, GraduationCap, HeartPulse, MessagesSquare, UserRound } from 'lucide-react';
 import { api } from './api';
 import type { FeatureFlags } from './types';
 
@@ -57,6 +57,11 @@ export const FEATURE_META: Record<FeatureKey, FeatureMeta> = {
     href: '/dashboard/bang-tot-nghiep',
     icon: GraduationCap,
   },
+  direct_submissions: {
+    label: 'Nạp giấy tờ trực tiếp',
+    href: '/dashboard/nap-giay-to',
+    icon: FileUp,
+  },
 };
 
 /** Tiền tố URL → tính năng chi phối nó. Khớp theo tiền tố nên bao cả route con. */
@@ -67,6 +72,7 @@ const FEATURE_ROUTES: { prefix: string; feature: FeatureKey }[] = [
   { prefix: '/dashboard/hoi-dap', feature: 'support_tickets' },
   { prefix: '/dashboard/thong-tin-ca-nhan', feature: 'personal_info' },
   { prefix: '/dashboard/bang-tot-nghiep', feature: 'diploma' },
+  { prefix: '/dashboard/nap-giay-to', feature: 'direct_submissions' },
 ];
 
 /** Tính năng chi phối route này (null nếu route không bị cờ nào chi phối). */
@@ -81,6 +87,7 @@ const ALL_OFF: FeatureFlags = {
   support_tickets: false,
   personal_info: false,
   diploma: false,
+  direct_submissions: false,
 };
 
 const CACHE_KEY = 'hub_features';
@@ -93,6 +100,7 @@ function normalize(raw: Partial<FeatureFlags>): FeatureFlags {
     support_tickets: raw.support_tickets === true,
     personal_info: raw.personal_info === true,
     diploma: raw.diploma === true,
+    direct_submissions: raw.direct_submissions === true,
   };
 }
 

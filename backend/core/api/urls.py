@@ -1,5 +1,5 @@
 from django.urls import path
-from . import diploma_views, health_check_views, ticket_views, views
+from . import diploma_views, health_check_views, submission_views, ticket_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
@@ -47,6 +47,15 @@ urlpatterns = [
     path("requests/bank-loan/form/",   views.BankLoanRequestFormView.as_view(),    name="api_bankloan_request_form"),
     path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
     path("requests/conduct-score/form/", views.ConductScoreRequestFormView.as_view(), name="api_conduct_request_form"),
+
+    # Nạp giấy tờ trực tiếp — core/direct_submissions.py
+    path("submissions/",            submission_views.SubmissionsView.as_view(),       name="api_submissions"),
+    path("submissions/form/",       submission_views.SubmissionFormView.as_view(),    name="api_submission_form"),
+    path("submissions/<int:pk>/",   submission_views.SubmissionDetailView.as_view(),  name="api_submission_detail"),
+    path("submissions/<int:pk>/comments/", submission_views.SubmissionCommentsView.as_view(),
+         name="api_submission_comments"),
+    path("submissions/<int:pk>/files/<int:file_id>/", submission_views.SubmissionFileView.as_view(),
+         name="api_submission_file"),
 
     # Khai báo thông tin ngoại trú
     path("personal-info/", PersonalInfoView.as_view(), name="api_personal_info"),

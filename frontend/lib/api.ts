@@ -86,7 +86,7 @@ async function request<T>(
 async function requestMultipart<T>(
   path: string,
   formData: FormData,
-  opts: RequestOptions = {},
+  opts: RequestOptions & { method?: 'POST' | 'PUT' } = {},
 ): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
@@ -94,7 +94,7 @@ async function requestMultipart<T>(
   };
 
   const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
+    method: opts.method ?? 'POST',
     headers,
     body: formData,
   });
@@ -312,6 +312,41 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'conduct_score', ...data }),
       });
+    },
+  },
+
+  /** Nạp giấy tờ trực tiếp — backend core/api/submission_views.py. */
+  submissions: {
+    list(): Promise<import('./types').SubmissionSummary[]> {
+      return request('/submissions/');
+    },
+    form(): Promise<import('./types').SubmissionFormData> {
+      return request('/submissions/form/');
+    },
+    detail(id: number): Promise<import('./types').SubmissionDetail> {
+      return request(`/submissions/${id}/`);
+    },
+    /** FormData: các ô form + `files` (nhiều lần) + `consent=1`. */
+    create(body: FormData): Promise<{ id: number; code: string }> {
+      return requestMultipart('/submissions/', body);
+    },
+    /** Sửa lúc "Chờ bổ sung": như create + `remove_file_ids` (nhiều lần). */
+    update(id: number, body: FormData): Promise<import('./types').SubmissionDetail> {
+      return requestMultipart(`/submissions/${id}/`, body, { method: 'PUT' });
+    },
+    addComment(id: number, body: string): Promise<{
+      comment: RequestComment; status: RequestStatus; status_label: string;
+      student_can_comment: boolean; student_can_edit: boolean;
+    }> {
+      return request(`/submissions/${id}/comments/`, { method: 'POST', body: JSON.stringify({ body }) });
+    },
+    /** File đã nạp — cần token nên tải qua fetch rồi dựng blob URL. */
+    async file(id: number, fileId: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/submissions/${id}/files/${fileId}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
     },
   },
 

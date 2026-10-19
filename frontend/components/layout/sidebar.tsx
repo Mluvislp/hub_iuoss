@@ -65,6 +65,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         label: 'Tạo yêu cầu mới',
         feature: 'document_requests',
       },
+      featureItem('direct_submissions'),
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
       featureItem('health_check'),
       featureItem('diploma'),
