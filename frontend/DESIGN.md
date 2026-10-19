@@ -44,7 +44,7 @@ mature, institutional. Có điểm nhấn thương hiệu (xanh) và thân thi�
 - **Resource list (Polaris/GitHub):** danh sách bản ghi = MỘT card có `divide-y`, không chồng card rời.
 - **Bộ lọc:** pill đang chọn = `bg-primary-soft text-primary-text border-primary`, không tô đặc xanh.
 - **Chữ:** giữ nguyên Inter mặc định — KHÔNG ép letter-spacing h1/h2, KHÔNG tabular-nums toàn cục, không hạ font-bold xuống semibold (người dùng chê "font xấu" 16/10/2026, đã hoàn lại).
-- **Trang đăng nhập:** panel thương hiệu xanh đặc `#0f2a5c`, không quầng sáng/lưới chấm.
+- **Trang đăng nhập:** panel thương hiệu = ảnh bìa trường (`public/img/login-cover.*`, 19/10/2026) phủ navy `#0f2a5c` làm scrim (đậm ở đỉnh và đáy, nhạt giữa); điện thoại có dải ảnh h-36 thay logo. Không quầng sáng/lưới chấm. Cùng ảnh với trang đăng nhập Dashboard.
 
 ## Mobile (rà 16/10/2026 ở 320 / 375 / 768px)
 - `tailwind.config.ts` PHẢI quét `lib/**` — token className nằm ở `lib/ui.ts`; thiếu là class không được sinh CSS.
