@@ -7,12 +7,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AlertCircle, ChevronRight, FileUp, Loader2, MessageSquare, Paperclip, Plus, Ticket } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { ui, badge, notice, noticeIcon } from '@/lib/ui';
 import { cn, formatDateTime } from '@/lib/utils';
 import { REQUEST_STATUS_LABELS, REQUEST_STATUS_STYLES, type RequestStatus, type SubmissionSummary } from '@/lib/types';
 import { RequestCode } from '@/components/request-code';
+import { SubmissionWarningModal } from '@/components/submission-warning';
 
 const FILTERS: { key: 'all' | RequestStatus; label: string }[] = [
   { key: 'all', label: 'Tất cả' },
@@ -28,6 +30,9 @@ export default function SubmissionListPage() {
   const [rows, setRows] = useState<SubmissionSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | RequestStatus>('all');
+  // Nút "Nạp giấy tờ" mở popup cảnh báo đúng chức năng trước (components/submission-warning.tsx).
+  const [warning, setWarning] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     api.submissions.list()
@@ -45,6 +50,12 @@ export default function SubmissionListPage() {
 
   return (
     <div className="space-y-5">
+      {warning && (
+        <SubmissionWarningModal
+          onClose={() => setWarning(false)}
+          onContinue={() => router.push('/dashboard/nap-giay-to/new')}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-ink">Nạp giấy tờ trực tiếp</h1>
@@ -52,10 +63,10 @@ export default function SubmissionListPage() {
             Nạp ảnh chụp / bản scan giấy tờ cần Phòng Công tác Sinh viên xét, theo dõi xử lý và nhận lại giấy.
           </p>
         </div>
-        <Link href="/dashboard/nap-giay-to/new" className={ui.btnPrimary}>
+        <button type="button" onClick={() => setWarning(true)} className={ui.btnPrimary}>
           <Plus size={15} />
           Nạp giấy tờ
-        </Link>
+        </button>
       </div>
 
       {needsAction > 0 && (
@@ -89,9 +100,9 @@ export default function SubmissionListPage() {
             </span>
             <p className="text-sm font-medium text-ink">Chưa nạp giấy tờ nào</p>
             <p className="mt-1 text-[0.82rem] text-muted">Giấy tờ cần Phòng CTSV xét, ký hoặc đóng dấu — nạp ảnh chụp / bản scan tại đây.</p>
-            <Link href="/dashboard/nap-giay-to/new" className={cn(ui.btnPrimary, 'mt-4')}>
+            <button type="button" onClick={() => setWarning(true)} className={cn(ui.btnPrimary, 'mt-4')}>
               <Plus size={15} /> Nạp giấy tờ
-            </Link>
+            </button>
           </div>
         </section>
       )}
