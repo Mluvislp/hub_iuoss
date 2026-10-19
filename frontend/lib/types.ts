@@ -444,6 +444,7 @@ export interface FeatureFlags {
   health_check: boolean;
   support_tickets: boolean;
   personal_info: boolean;
+  direct_submissions: boolean;
 }
 
 /**
@@ -772,4 +773,75 @@ export interface PersonalInfoData {
   groups: PersonalInfoGroup[];
   bank_suggestions: string[];
   sent?: number;
+}
+
+// ── Nạp giấy tờ trực tiếp (backend core/direct_submissions.py) ─────────────────
+
+export interface SubmissionPrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  major: string;
+  class_code: string;
+  cur_status_group: string;
+  cur_status_vi: string;
+  dob: string;
+  phone: string;
+  email: string;
+  cccd_valid: boolean;
+  citizen_id: string;
+  citizen_id_issue_date: string;
+}
+
+export interface SubmissionLimits {
+  max_files: number;
+  image_max_bytes: number;
+  pdf_max_bytes: number;
+  total_max_bytes: number;
+  document_name_max: number;
+  note_max: number;
+  copies_max: number;
+}
+
+export interface SubmissionFormData {
+  prefill: SubmissionPrefill;
+  limits: SubmissionLimits;
+}
+
+export interface SubmissionSummary {
+  id: number;
+  code: string;
+  document_name: string;
+  copies: number;
+  status: RequestStatus;
+  status_label: string;
+  return_code: string | null;
+  created_at: string;
+  updated_at: string;
+  file_count: number;
+  comment_count: number;
+}
+
+export interface SubmissionFile {
+  id: number;
+  name: string;
+  size: number;
+  mime_type: string;
+  is_pdf: boolean;
+  created_at: string;
+}
+
+export interface SubmissionDetail extends SubmissionSummary {
+  contact_phone: string | null;
+  note: string | null;
+  consented_at: string;
+  payload: {
+    snapshot?: Partial<SubmissionPrefill>;
+    editable?: Record<string, { original: string; proposed: string; changed: boolean; review: string | null }>;
+  };
+  files: SubmissionFile[];
+  comments: RequestComment[];
+  student_can_comment: boolean;
+  student_can_edit: boolean;
+  returned_at: string | null;
 }
