@@ -7,6 +7,7 @@ SV trả lời một câu hỏi mỗi năm học:
       1. Khai báo thông tin cá nhân — CHÍNH LÀ form khai báo ngoại trú
          (`offcampus.submit`), nên nộp xong là cũng tính là đã khai ngoại trú.
       2. Đồng ý tham gia khám — chỉ mở khi thường trú HOẶC tạm trú ở TP.HCM.
+         Đợt có cấu hình ca khám thì SV chọn thêm MỘT ngày + ca (bắt buộc).
 
 Cả hai phần đi trong MỘT transaction: điều kiện TP.HCM được tính lại ở server từ
 địa chỉ vừa ghi xuống, không tin cờ client gửi. Không đủ điều kiện thì rollback
@@ -28,6 +29,7 @@ from students.models import ProfileChangeRequest, Student
 
 from . import address_service as addr
 from . import health_check_result as result_spec
+from . import health_check_slots as slots
 from . import offcampus
 from . import profile_changes as pc
 from .health_check_models import HealthCheckResponse as Response_
@@ -137,6 +139,52 @@ def serialize_round(round_):
     }
 
 
+def slot_options(round_, now=None):
+    """Lựa chọn ngày + ca cho form đăng ký; None khi đợt không chia ca.
+
+    Ca đã tới giờ bắt đầu hoặc đã đủ chỗ thì `available=False` (vẫn hiện để SV
+    thấy lịch đầy đủ). `remaining` là None khi đợt không giới hạn chỗ.
+    """
+    cfg = slots.config(round_)
+    if cfg is None:
+        return None
+    used = slots.taken(Response_.objects.filter(round=round_, choice=Response_.CHOICE_REGISTER)
+                       .values_list("evidence", flat=True))
+    now = now or timezone.now()
+    days = []
+    for day in cfg["dates"]:
+        shifts = []
+        for slot in slots.iter_slots({**cfg, "dates": [day]}):
+            remaining = None if cfg["capacity"] is None else max(0, cfg["capacity"] - used[slot["key"]])
+            started = slots.has_started(slot, now)
+            shifts.append({**slots.snapshot(slot), "remaining": remaining,
+                           "available": not started and remaining != 0,
+                           "reason": "Đã qua giờ đăng ký" if started else "Đã đủ chỗ" if remaining == 0 else ""})
+        days.append({"date": day, "label": slots.date_label(day), "shifts": shifts})
+    return {"capacity": cfg["capacity"], "days": days}
+
+
+def _pick_slot(round_, key):
+    """Kiểm ca SV chọn lúc nộp — gọi SAU khi đã khóa dòng đợt, nên đếm chỗ là chính xác."""
+    cfg = slots.config(round_)
+    if cfg is None:
+        return None
+    slot = slots.find(cfg, key)
+    if slot is None:
+        raise HealthCheckError("Vui lòng chọn ngày và ca khám.",
+                               errors={"exam_slot": "Chưa chọn ca khám."}, code="exam_slot")
+    if slots.has_started(slot):
+        raise HealthCheckError("Ca khám đã chọn đã qua giờ đăng ký. Vui lòng chọn ca khác.",
+                               errors={"exam_slot": "Ca đã qua giờ đăng ký."}, code="exam_slot")
+    if cfg["capacity"] is not None:
+        used = slots.taken(Response_.objects.filter(round=round_, choice=Response_.CHOICE_REGISTER)
+                           .values_list("evidence", flat=True))
+        if used[slot["key"]] >= cfg["capacity"]:
+            raise HealthCheckError("Ca khám đã chọn vừa đủ chỗ. Vui lòng chọn ca khác.",
+                                   errors={"exam_slot": "Ca đã đủ chỗ."}, code="exam_slot")
+    return slots.snapshot(slot)
+
+
 # ── Điều kiện TP.HCM ────────────────────────────────────────────────────────
 
 def residence_snapshot(student):
@@ -202,6 +250,8 @@ def _serialize_response(resp):
         "data_consent_at": ((resp.evidence or {}).get("data_consent") or {}).get("at")
         if isinstance(resp.evidence, dict) else None,
         "residence": resp.residence or None,
+        "exam_slot": slots.chosen(resp.evidence),
+        "exam_slot_label": slots.describe(slots.chosen(resp.evidence)),
     }
 
 
@@ -234,6 +284,8 @@ def build_state(student):
         # Điều kiện theo địa chỉ ĐÃ LƯU — dùng khi form ngoại trú đang khóa.
         # Form còn mở thì frontend tự tính theo ô đang nhập, server tính lại lúc nộp.
         "residence": residence_snapshot(student),
+        # Ngày + ca khám tại trường (nhánh "Chưa khám"); None khi đợt không chia ca.
+        "exam_slots": slot_options(round_) if round_ and resp is None and state == "open" else None,
     }
 
 
@@ -393,7 +445,8 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
 
 
 def register(student, data):
-    """Nhánh "Chưa khám": khai báo (nếu form ngoại trú đang mở) + đăng ký khám."""
+    """Nhánh "Chưa khám": khai báo (nếu form ngoại trú đang mở) + đăng ký khám
+    (+ ngày và ca khám nếu đợt có chia ca)."""
     if data.get("consent") is not True:
         raise HealthCheckError(
             "Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.",
@@ -408,6 +461,9 @@ def register(student, data):
                 raise HealthCheckError(_closed_message(round_), code="closed")
             if Response_.objects.filter(round=round_, student_id=student.pk).exists():
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
+            # Khóa dòng đợt: các lượt đăng ký xếp hàng nhau, đếm chỗ trong ca không bị lọt.
+            round_ = HealthCheckRound.objects.select_for_update().get(pk=round_.pk)
+            exam_slot = _pick_slot(round_, (data.get("exam_slot") or "").strip())
 
             locked, _ = offcampus.lock_state(student)
             declared_now = False
@@ -436,7 +492,8 @@ def register(student, data):
                 round=round_, student_id=student.pk,
                 choice=Response_.CHOICE_REGISTER, status=Response_.STATUS_REGISTERED,
                 residence=residence, consent_at=now, submit_count=1, submitted_at=now,
-                evidence={"data_consent": _data_consent(Response_.CHOICE_REGISTER)},
+                evidence={"data_consent": _data_consent(Response_.CHOICE_REGISTER),
+                          **({"exam_slot": exam_slot} if exam_slot else {})},
             )
     except IntegrityError as exc:
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc

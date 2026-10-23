@@ -19,6 +19,7 @@ import { EvidenceThumbs } from './Evidence';
 import ExaminedWizard from './ExaminedWizard';
 import CccdForm from './CccdForm';
 import ConsentBox from './ConsentBox';
+import SlotPicker from './SlotPicker';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -127,6 +128,8 @@ export default function HealthCheckPage() {
   const [choice, setChoice] = useState<'examined' | 'register' | null>(null);
   const [consent, setConsent] = useState(false);
   const [dataConsent, setDataConsent] = useState(false);
+  const [examSlot, setExamSlot] = useState('');
+  const [slotError, setSlotError] = useState('');
   const [error, setError] = useState('');
   const [resubmitting, setResubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -274,6 +277,12 @@ export default function HealthCheckPage() {
                   </div>
                 </>
               )}
+              {response.exam_slot && (
+                <div className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Ngày và ca khám</span>
+                  <span className={ui.dtValue}>{response.exam_slot_label}</span>
+                </div>
+              )}
               {response.data_consent_at && (
                 <div className={ui.dtRow}>
                   <span className={ui.dtLabel}>Cam kết, đồng ý cung cấp thông tin</span>
@@ -339,7 +348,7 @@ export default function HealthCheckPage() {
   // ── Đợt đang mở, chưa trả lời ──
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
-    setError(''); draft.setFieldErrors({});
+    setError(''); setSlotError(''); draft.setFieldErrors({});
     if (declarationLocked && state?.cccd_missing) {
       setError('Bổ sung số CCCD ở phần 1 trước khi gửi đăng ký.');
       return;
@@ -353,6 +362,11 @@ export default function HealthCheckPage() {
       }
     }
     if (!eligible) { setError('Phần đăng ký khám chưa được mở.'); return; }
+    if (state?.exam_slots && !examSlot) {
+      setSlotError('Chưa chọn ca khám.');
+      setError('Vui lòng chọn ngày và ca khám.');
+      return;
+    }
     if (!consent) { setError('Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.'); return; }
     if (!dataConsent) { setError('Vui lòng tích xác nhận cam kết và đồng ý cung cấp thông tin.'); return; }
     setSaving(true);
@@ -361,12 +375,19 @@ export default function HealthCheckPage() {
         declaration: declarationLocked ? undefined : draft.payload({ requireCccd: true }),
         consent: true,
         data_consent: true,
+        exam_slot: state?.exam_slots ? examSlot : undefined,
       }));
       setJustSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       if (err instanceof ApiError && err.data?.errors) {
         draft.setFieldErrors(err.data.errors as Record<string, string>);
+        const slotMsg = (err.data.errors as Record<string, string>).exam_slot;
+        if (slotMsg) {
+          // Ca vừa đầy / vừa qua giờ: tải lại lịch để SV thấy tình trạng mới rồi chọn ca khác.
+          setSlotError(slotMsg); setExamSlot('');
+          api.healthCheck.state().then(setState).catch(() => {});
+        }
       }
       setError(err instanceof ApiError ? err.message : 'Không gửi được đăng ký.');
     } finally { setSaving(false); }
@@ -473,6 +494,10 @@ export default function HealthCheckPage() {
                         : 'Tạm trú tại Thành phố Hồ Chí Minh'}
                   </div>
                   <PackageInfo state={state} />
+                  {state.exam_slots && (
+                    <SlotPicker options={state.exam_slots} value={examSlot} error={slotError}
+                                onChange={(key) => { setExamSlot(key); setSlotError(''); }} />
+                  )}
                   <label className={cn(
                     'flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
                     consent ? 'border-primary bg-primary-soft' : 'border-line hover:bg-slate-50',
@@ -490,7 +515,7 @@ export default function HealthCheckPage() {
 
               <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-line2">
                 <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>
-                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent} className={ui.btnPrimary}>
+                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent || (!!state.exam_slots && !examSlot)} className={ui.btnPrimary}>
                   {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
                           : <><ClipboardCheck size={15} /> Gửi đăng ký khám</>}
                 </button>
