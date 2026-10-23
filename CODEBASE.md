@@ -54,6 +54,7 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
+  core/health_check_slots.py ← ngày + ca khám tại trường — bản song sinh GIỐNG HỆT dashboard healthcheck/slots.py
   core/diploma.py · diploma_models.py · api/diploma_views.py   ← nộp bằng tốt nghiệp THPT (PDF + CCCD từ kho ảnh)
   core/direct_submissions.py · submission_models.py · submission_code.py ← nạp giấy tờ trực tiếp (mã NG-…)
   core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách

@@ -418,7 +418,7 @@ export const api = {
     submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
       return requestMultipart('/health-check/evidence/', body);
     },
-    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean }):
+    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
     },

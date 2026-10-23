@@ -101,7 +101,7 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
-    """POST JSON {declaration?, consent} — nhánh "Chưa khám"."""
+    """POST JSON {declaration?, consent, data_consent, exam_slot?} — nhánh "Chưa khám"."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [JSONParser]
