@@ -670,6 +670,8 @@ export interface HealthCheckState {
   cccd_missing: boolean;
   /** Câu cam kết + đồng ý cung cấp thông tin ở cuối form, theo từng lựa chọn. */
   data_consent_text: { examined: string; register: string };
+  /** Đối tượng khám tập trung tại trường (nhánh "Chưa khám"). */
+  exam_eligibility: { intro: string; items: string[] };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
   /** Ngày + ca khám tại trường; null khi đợt không chia ca (hoặc không còn nhận đăng ký). */
