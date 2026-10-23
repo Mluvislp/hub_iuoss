@@ -58,6 +58,21 @@ DATA_CONSENT_TEXT = {
 }
 
 
+# Đối tượng khám tập trung tại trường — hiện ở đầu phần 2 của nhánh "Chưa khám".
+# Câu chữ do Phòng CTSV đưa (23/10/2026); sửa ở đây, frontend chỉ hiển thị.
+EXAM_ELIGIBILITY = {
+    "intro": "Sinh viên đang học tập tại Trường Đại học Quốc tế đáp ứng đủ các yêu cầu:",
+    "items": [
+        "Đủ 18 tuổi trở lên và có thường trú hoặc tạm trú tại Thành phố Hồ Chí Minh (TP.HCM) "
+        "được xác thực qua VNeID;",
+        "Không phải là người lao động đã được đơn vị sử dụng lao động tổ chức khám sức khỏe định kỳ;",
+        "Không thuộc đối tượng do Bộ Quốc phòng, Bộ Công an tổ chức khám sức khỏe;",
+        "Chưa được khám sức khỏe định kỳ miễn phí theo Chương trình khám sức khỏe toàn dân "
+        "của TP.HCM trong năm.",
+    ],
+}
+
+
 def _data_consent(choice):
     return {"version": DATA_CONSENT_VERSION, "text": DATA_CONSENT_TEXT[choice],
             "at": timezone.now().isoformat()}
@@ -277,6 +292,7 @@ def build_state(student):
         "result_defaults": result_spec.defaults(female=is_female(student)),
         "female": is_female(student),
         "data_consent_text": DATA_CONSENT_TEXT,
+        "exam_eligibility": EXAM_ELIGIBILITY,
         # Luồng khám sức khỏe BẮT BUỘC có CCCD (cột C file gửi PYT).
         "cccd_missing": pc.cccd_missing(student),
         # Phần 1 của nhánh "Chưa khám" dựng lại đúng form ngoại trú.

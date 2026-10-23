@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, CalendarClock, Check, ChevronRight, ClipboardCheck,
-  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope,
+  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope, Users,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
@@ -89,6 +89,27 @@ function PackageInfo({ state }: { state: HealthCheckState }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Đối tượng khám tập trung tại trường — câu chữ ở backend `health_check.EXAM_ELIGIBILITY`. */
+function EligibilityInfo({ state }: { state: HealthCheckState }) {
+  const e = state.exam_eligibility;
+  return (
+    <div className="rounded-lg border border-line px-4 py-3 text-[0.86rem]">
+      <div className="flex items-center gap-1.5 text-[0.75rem] font-medium text-muted mb-1">
+        <Users size={14} className="text-slate-500" /> Đối tượng khám
+      </div>
+      <p className="text-ink">{e.intro}</p>
+      <div className="space-y-1.5 text-ink leading-relaxed mt-1.5">
+        {e.items.map((item, i) => (
+          <div key={i} className="flex gap-2 pl-1">
+            <span className="mt-[0.55em] w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -458,6 +479,11 @@ export default function HealthCheckPage() {
                   Thông tin và đăng ký khám
                   {!eligible && <Lock size={14} className="text-slate-400" />}
                 </h2>
+              </div>
+
+              {/* Hiện cả khi phần 2 đang khóa — SV ngoài TP.HCM biết vì sao không đăng ký được. */}
+              <div className="px-6 pt-5">
+                <EligibilityInfo state={state} />
               </div>
 
               {!eligible ? (
