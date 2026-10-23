@@ -33,7 +33,8 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 # Backend là nguồn sự thật duy nhất; frontend đọc qua GET /api/features/.
 FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS_PRODUCTION)
 FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
-FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
+# Khám sức khỏe đã mở cho sinh viên (23/10/2026) — bật ở mọi môi trường; tắt bằng FEATURE_HEALTH_CHECK=False.
+FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=True)
 FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
 FEATURE_PERSONAL_INFO = env_bool("FEATURE_PERSONAL_INFO", default=not IS_PRODUCTION)
 FEATURE_DIPLOMA = env_bool("FEATURE_DIPLOMA", default=not IS_PRODUCTION)
