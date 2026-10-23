@@ -16,7 +16,7 @@ Mặc định: **production → tắt (hiện trang chờ)**, **local/staging �
 |---|---|
 | `FEATURE_DOCUMENT_REQUESTS` | Route `/dashboard/requests/*`, nút CTA ở hero + bảng "Yêu cầu giấy tờ gần đây" ở trang chủ, và toàn bộ `/api/requests/*` (404 khi tắt) |
 | `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
-| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được |
+| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được. **Đã mở 23/10/2026: mặc định BẬT cả trên production** |
 | `FEATURE_DIRECT_SUBMISSIONS` | Route `/dashboard/nap-giay-to/*`, mục menu "Nạp giấy tờ trực tiếp" và toàn bộ `/api/submissions/*` (404 khi tắt) |
 | `FEATURE_SUPPORT_TICKETS` | Route `/dashboard/hoi-dap/*`, badge tin mới ở sidebar và toàn bộ `/api/tickets/*` (404 khi tắt). Nghiệp vụ: `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 
