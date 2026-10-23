@@ -590,6 +590,30 @@ export interface HealthCheckResponse {
   /** Thời điểm tích cam kết + đồng ý cung cấp thông tin. */
   data_consent_at: string | null;
   residence: HealthCheckResidence | null;
+  /** Ca khám tại trường đã chọn (nhánh "Chưa khám", đợt có chia ca). */
+  exam_slot: HealthCheckSlot | null;
+  exam_slot_label: string;
+}
+
+/** Một ca khám = ngày + giờ; `key` dạng "2026-10-27 07:30". */
+export interface HealthCheckSlot {
+  key: string;
+  date: string;
+  start: string;
+  end: string;
+  label: string;
+}
+
+export interface HealthCheckSlotOption extends HealthCheckSlot {
+  /** null = đợt không giới hạn chỗ. */
+  remaining: number | null;
+  available: boolean;
+  reason: string;
+}
+
+export interface HealthCheckSlotOptions {
+  capacity: number | null;
+  days: { date: string; label: string; shifts: HealthCheckSlotOption[] }[];
 }
 
 /** Danh mục trường kết quả khám — backend `core/health_check_result.py` là nguồn duy nhất. */
@@ -647,6 +671,8 @@ export interface HealthCheckState {
   data_consent_text: { examined: string; register: string };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
+  /** Ngày + ca khám tại trường; null khi đợt không chia ca (hoặc không còn nhận đăng ký). */
+  exam_slots: HealthCheckSlotOptions | null;
 }
 
 // ── Hỏi đáp (ticket) ─────────────────────────────────────────────────────────

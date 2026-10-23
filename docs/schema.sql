@@ -335,6 +335,8 @@ CREATE TABLE `health_check_rounds` (
   `package_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `package_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mỗi dòng một ý; dòng mở đầu bằng "+" là gạch đầu dòng',
   `schedule_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Thời gian và địa điểm dự kiến',
+  -- 23/10/2026: dashboard_iuoss/docs/sql/20261023_health_check_slots.sql
+  `exam_slots` json DEFAULT NULL COMMENT 'Ngày + ca khám tại trường: {"dates": [...], "shifts": [{label,start,end}], "capacity": null|int}',
   `created_by_id` int DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
