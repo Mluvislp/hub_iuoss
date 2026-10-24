@@ -8,13 +8,15 @@ import { RejectionNotice } from '@/components/rejection-notice';
 import { api, ApiError } from '@/lib/api';
 import { accentIcon, badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
-import type { TuitionExemptionApplication, TuitionExemptionState } from '@/lib/types';
+import type { TuitionExemptionApplication, TuitionExemptionAward, TuitionExemptionState } from '@/lib/types';
 import { TuitionApplicationModal } from './application-detail';
+import { AwardCard, fmtVnd } from './award';
 import { BASE, ErrorBox, fmtDateTime, MODE_BADGE, StatusBadge } from './shared';
 
 /**
  * Trang tổng quan Miễn giảm học phí — cùng khuôn trang BHYT: thẻ đơn của đợt hiện
- * tại, bảng lịch sử đơn (nút "Chi tiết" mở pop-up), khối nộp hồ sơ theo đợt.
+ * tại, thẻ kết quả miễn giảm theo kỳ (Phòng CTSV nạp từ danh sách kèm quyết định), bảng
+ * lịch sử đơn (nút "Chi tiết" mở pop-up), khối nộp hồ sơ theo đợt.
  * Nộp đơn ở `nop-ho-so/`. `?don=<id>` mở sẵn pop-up đơn đó (link cũ `ho-so/<id>`).
  */
 
@@ -25,6 +27,14 @@ const TH = 'px-5 py-2.5 text-left text-xs font-medium text-muted';
 const THEAD_ROW = 'border-b border-line bg-surface-subtle';
 
 const categoryNames = (app: TuitionExemptionApplication) => app.categories.map((c) => c.name).join(', ');
+
+type AwardOf = (app: TuitionExemptionApplication) => TuitionExemptionAward | undefined;
+
+/** Ô kết quả của một đơn: số thực nhận khi đã có danh sách; đơn Hoàn thành mà chưa có thì báo chờ. */
+function awardText(app: TuitionExemptionApplication, award: TuitionExemptionAward | undefined) {
+  if (award) return fmtVnd(award.received_vnd);
+  return app.status === 'done' ? 'Chờ danh sách chính thức' : '';
+}
 
 function DetailButton({ onClick }: { onClick: () => void }) {
   return (
@@ -44,9 +54,12 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /** Thẻ đầu trang: đơn của đợt đang mở (giống thẻ "Thẻ bảo hiểm y tế"). */
-function CurrentCard({ state, onOpen }: { state: TuitionExemptionState; onOpen: (id: number) => void }) {
+function CurrentCard({ state, awardOf, onOpen }: {
+  state: TuitionExemptionState; awardOf: AwardOf; onOpen: (id: number) => void;
+}) {
   const r = state.round;
   const app = state.application;
+  const award = app ? awardOf(app) : undefined;
   return (
     <section className={ui.card}>
       <div className={ui.cardHeader}>
@@ -90,6 +103,9 @@ function CurrentCard({ state, onOpen }: { state: TuitionExemptionState; onOpen: 
             <DefRow label="Đối tượng" value={categoryNames(app)} />
             {r && <DefRow label="Học kỳ" value={r.term_label} />}
             {r && <DefRow label="Hạn nộp hồ sơ" value={fmtDateTime(r.closes_at)} />}
+            {(award || app.status === 'done') && (
+              <DefRow label="Số tiền thực nhận" value={awardText(app, award)} />
+            )}
           </dl>
 
           <div className="mt-4 flex justify-end">
@@ -113,7 +129,9 @@ function CurrentCard({ state, onOpen }: { state: TuitionExemptionState; onOpen: 
 }
 
 /** Lịch sử đơn: thẻ trên điện thoại, bảng trên màn hình rộng — như "Lịch sử đăng ký BHYT". */
-function HistoryCard({ history, onOpen }: { history: TuitionExemptionApplication[]; onOpen: (id: number) => void }) {
+function HistoryCard({ history, awardOf, onOpen }: {
+  history: TuitionExemptionApplication[]; awardOf: AwardOf; onOpen: (id: number) => void;
+}) {
   return (
     <section className={ui.card}>
       <div className={ui.cardHeader}>
@@ -136,6 +154,9 @@ function HistoryCard({ history, onOpen }: { history: TuitionExemptionApplication
             {app.categories.length > 0 && (
               <p className="text-xs text-ink-3"><span className="text-muted">Đối tượng: </span>{categoryNames(app)}</p>
             )}
+            {awardText(app, awardOf(app)) && (
+              <p className="text-xs text-ink-3"><span className="text-muted">Thực nhận: </span>{awardText(app, awardOf(app))}</p>
+            )}
             <div className="flex [&>button]:w-full">
               <DetailButton onClick={() => onOpen(app.id)} />
             </div>
@@ -150,6 +171,7 @@ function HistoryCard({ history, onOpen }: { history: TuitionExemptionApplication
               <th className={cn(TH, 'px-3')}>Đối tượng</th>
               <th className={cn(TH, 'px-3')}>Ngày nộp</th>
               <th className={cn(TH, 'px-3')}>Trạng thái</th>
+              <th className={cn(TH, 'px-3 text-right')}>Thực nhận</th>
               <th className={cn(TH, 'text-right')}>Thao tác</th>
             </tr>
           </thead>
@@ -165,6 +187,7 @@ function HistoryCard({ history, onOpen }: { history: TuitionExemptionApplication
                 </td>
                 <td className="whitespace-nowrap px-3 py-3 text-meta text-ink-3">{fmtDateTime(app.submitted_at)}</td>
                 <td className="px-3 py-3"><StatusBadge status={app.status} label={app.status_label} /></td>
+                <td className="whitespace-nowrap px-3 py-3 text-right text-meta text-ink-3">{awardText(app, awardOf(app)) || '—'}</td>
                 <td className="px-5 py-3 text-right"><DetailButton onClick={() => onOpen(app.id)} /></td>
               </tr>
             ))}
@@ -257,6 +280,10 @@ export default function TuitionWaiverPage() {
   const [state, setState] = useState<TuitionExemptionState | null>(null);
   const [error, setError] = useState('');
   const [openId, setOpenId] = useState<number | null>(null);
+  // Một kết quả / kỳ: đơn nào thuộc kỳ đó thì hiện kết quả của kỳ.
+  const awardOf = useCallback<AwardOf>(
+    (app) => state?.awards.find((a) => a.term_code === app.term_code), [state]);
+  const openApp = openId ? state?.history.find((a) => a.id === openId) : undefined;
 
   const load = useCallback(() => {
     api.tuitionExemption.state()
@@ -290,13 +317,16 @@ export default function TuitionWaiverPage() {
 
       {state && (
         <>
-          <CurrentCard state={state} onOpen={setOpenId} />
-          {state.history.length > 0 && <HistoryCard history={state.history} onOpen={setOpenId} />}
+          <CurrentCard state={state} awardOf={awardOf} onOpen={setOpenId} />
+          {state.awards.length > 0 && <AwardCard awards={state.awards} />}
+          {state.history.length > 0 && <HistoryCard history={state.history} awardOf={awardOf} onOpen={setOpenId} />}
           <ApplyCard state={state} />
         </>
       )}
 
-      {openId && <TuitionApplicationModal id={openId} onClose={closeModal} onUpdated={load} />}
+      {openId && (
+        <TuitionApplicationModal id={openId} award={openApp && awardOf(openApp)} onClose={closeModal} onUpdated={load} />
+      )}
 
       <p className="text-xs text-muted">
         Hồ sơ miễn giảm học phí do Phòng Công tác Sinh viên tiếp nhận và xét duyệt. Nếu thông tin có sai sót, vui

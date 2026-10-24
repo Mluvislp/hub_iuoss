@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, FileText, FileUp, History, ListChecks, Loader2, Send, UserRound, X } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, FileText, FileUp, History, ListChecks, Loader2, Send, UserRound, X } from 'lucide-react';
 import { InsuranceModal } from '@/components/insurance-modal';
 import { RejectionNotice } from '@/components/rejection-notice';
 import { api, ApiError, newRequestKey } from '@/lib/api';
 import { accentIcon, badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
-import type { TuitionExemptionApplication } from '@/lib/types';
+import type { TuitionExemptionApplication, TuitionExemptionAward } from '@/lib/types';
+import { AwardDetails } from './award';
 import { ErrorBox, fmtDate, fmtDateTime, MODE_BADGE, REVIEW_BADGE, REVIEW_LABEL, StatusBadge } from './shared';
 
 /**
@@ -108,8 +109,9 @@ function SupplementForm({ app, saving, setSaving, onDone, onCancel }: {
   );
 }
 
-function ApplicationBody({ app, saving, setSaving, onUpdated, onError }: {
+function ApplicationBody({ app, award, saving, setSaving, onUpdated, onError }: {
   app: TuitionExemptionApplication;
+  award?: TuitionExemptionAward;
   saving: boolean;
   setSaving: (v: boolean) => void;
   onUpdated: (a: TuitionExemptionApplication) => void;
@@ -163,6 +165,15 @@ function ApplicationBody({ app, saving, setSaving, onUpdated, onError }: {
         </RejectionNotice>
       ) : (
         <RejectionNotice rejected={false} note={app.review_note} />
+      )}
+
+      {award && (
+        <section className={cn(ui.card, 'overflow-hidden')}>
+          <div className={ui.cardHeader}>
+            <h3 className={ui.sectionTitle}><BadgeCheck size={16} className={accentIcon.success} />Kết quả miễn giảm</h3>
+          </div>
+          <div className="px-5 py-4"><AwardDetails award={award} /></div>
+        </section>
       )}
 
       <section className={cn(ui.card, 'overflow-hidden')}>
@@ -268,8 +279,10 @@ function ApplicationBody({ app, saving, setSaving, onUpdated, onError }: {
   );
 }
 
-export function TuitionApplicationModal({ id, onClose, onUpdated }: {
+export function TuitionApplicationModal({ id, award, onClose, onUpdated }: {
   id: number;
+  /** Kết quả miễn giảm của kỳ chứa đơn (nếu Phòng CTSV đã nạp danh sách). */
+  award?: TuitionExemptionAward;
   onClose: () => void;
   /** Gọi sau khi bổ sung thành công — trang tổng quan tải lại danh sách. */
   onUpdated?: () => void;
@@ -294,7 +307,7 @@ export function TuitionApplicationModal({ id, onClose, onUpdated }: {
         </div>
       )}
       {app ? (
-        <ApplicationBody app={app} saving={saving} setSaving={setSaving} onError={setError}
+        <ApplicationBody app={app} award={award} saving={saving} setSaving={setSaving} onError={setError}
                          onUpdated={(a) => { setApp(a); setError(''); onUpdated?.(); }} />
       ) : !error && (
         <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted">

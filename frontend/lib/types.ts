@@ -777,6 +777,8 @@ export interface TuitionExemptionApplication {
   id: number;
   round_id: number;
   round_title: string;
+  /** Kỳ của đợt — khớp `TuitionExemptionAward.term_code`. */
+  term_code: string;
   submission_kind: string;
   submission_kind_label: string;
   status: TuitionExemptionStatus;
@@ -827,11 +829,39 @@ export interface TuitionExemptionPrefill {
   category_details: { code: string; values: Record<string, string | boolean> } | null;
 }
 
+/** Kết quả MGHP một kỳ — Phòng CTSV nạp từ danh sách kèm quyết định. Số tiền: VND. */
+export interface TuitionExemptionAward {
+  id: number;
+  term_code: string;
+  term_label: string;
+  /** Căn cứ suy từ mục trong danh sách, VD "Nghị định 238/2025/NĐ-CP"; rỗng nếu không rõ. */
+  basis: string;
+  category: string;
+  /** 0–100. */
+  percent: number | null;
+  first_fee_vnd: number | null;
+  retake_fee_vnd: number | null;
+  /** Học phí xét miễn giảm. */
+  base_fee_vnd: number | null;
+  decree_amount_vnd: number | null;
+  school_support_vnd: number | null;
+  received_vnd: number;
+  payment_status: 'paid' | 'unpaid' | null;
+  payment_label: string;
+  note: string;
+  /** Đã che, chỉ còn 4 số cuối. */
+  bank_account: string;
+  bank_name: string;
+  updated_at: string;
+}
+
 export interface TuitionExemptionState {
   round: TuitionExemptionRound | null;
   plan: TuitionExemptionPlan | null;
   application: TuitionExemptionApplication | null;
   history: TuitionExemptionApplication[];
+  /** Kết quả theo kỳ, kỳ mới nhất trước. */
+  awards: TuitionExemptionAward[];
   prefill: TuitionExemptionPrefill;
   limits: { max_files: number; max_pdf_mb: number; max_image_mb: number };
   /** Chỉ có trong phản hồi POST nộp đơn. */

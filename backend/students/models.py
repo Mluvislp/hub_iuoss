@@ -545,3 +545,35 @@ class StudentTuitionFee(models.Model):
     class Meta:
         managed = False
         db_table = "student_tuition_fees"
+
+
+class TuitionExemptionAward(models.Model):
+    """Kết quả MGHP một SV một kỳ — Dashboard nạp từ Excel danh sách kèm quyết định
+    (`dashboard_iuoss/tuition/award_import_service.py`). Hub CHỈ đọc dòng của chính SV
+    đăng nhập. Cố ý không khai cột nội bộ (lô import, người sửa)."""
+
+    id = models.BigAutoField(primary_key=True)
+    student = models.ForeignKey(Student, on_delete=models.DO_NOTHING, related_name="tuition_exemption_awards")
+    academic_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
+    section_title = models.CharField(max_length=500, null=True)
+    category = models.ForeignKey(TuitionExemptionCategory, on_delete=models.DO_NOTHING, null=True,
+                                 related_name="+")
+    category_code = models.CharField(max_length=32, null=True)
+    category_label = models.CharField(max_length=255, null=True)
+    percent = models.DecimalField(max_digits=5, decimal_places=2, null=True)
+    first_fee_vnd = models.BigIntegerField(null=True)
+    retake_fee_vnd = models.BigIntegerField(null=True)
+    base_fee_vnd = models.BigIntegerField(null=True)
+    decree_amount_vnd = models.BigIntegerField(null=True)
+    school_support_vnd = models.BigIntegerField(null=True)
+    received_vnd = models.BigIntegerField()
+    payment_status = models.CharField(max_length=16, null=True)
+    note = models.CharField(max_length=500, null=True)
+    bank_account_number = models.CharField(max_length=64, null=True)
+    bank_account_holder = models.CharField(max_length=255, null=True)
+    bank_name = models.CharField(max_length=255, null=True)
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "tuition_exemption_awards"

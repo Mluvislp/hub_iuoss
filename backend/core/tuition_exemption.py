@@ -33,6 +33,7 @@ from django.utils import timezone
 from students.models import (
     Student,
     StudentBankAccount,
+    TuitionExemptionAward,
     TuitionExemptionBeneficiary,
     TuitionExemptionCategory,
     TuitionExemptionRound,
@@ -272,6 +273,7 @@ def serialize_application(app, *, with_details=False):
         "id": app.pk,
         "round_id": app.round_id,
         "round_title": app.round.title,
+        "term_code": app.round.academic_term.term_code,
         "submission_kind": app.submission_kind,
         "submission_kind_label": contract.SUBMISSION_KINDS.get(app.submission_kind, app.submission_kind),
         "status": app.status,
@@ -321,17 +323,69 @@ def serialize_application(app, *, with_details=False):
     return data
 
 
+# Căn cứ hiện cho SV, suy từ tiêu đề mục trong file danh sách (so chữ hoa).
+_AWARD_BASES = (
+    ("238/2025", "Nghị định 238/2025/NĐ-CP"),
+    ("181/QĐ", "Quyết định 181/QĐ-ĐHQT của Hiệu trưởng"),
+    ("XÉT RIÊNG", "Trường hợp xét riêng, đặc biệt"),
+)
+
+PAYMENT_LABELS = {"paid": "Đã đóng học phí", "unpaid": "Chưa đóng học phí"}
+
+
+def _mask_account(number):
+    digits = (number or "").strip()
+    return ("•••• " + digits[-4:]) if len(digits) > 4 else digits
+
+
+def _award_basis(section_title):
+    title = (section_title or "").upper()
+    return next((label for key, label in _AWARD_BASES if key in title), "")
+
+
+def awards(student):
+    """Kết quả MGHP theo kỳ của SV, kỳ mới nhất trước. STK chỉ hiện 4 số cuối."""
+    rows = (TuitionExemptionAward.objects.filter(student=student)
+            .select_related("academic_term", "category")
+            .order_by("-academic_term__academic_year", "-academic_term__semester"))
+    out = []
+    for a in rows:
+        term = a.academic_term
+        out.append({
+            "id": a.pk,
+            "term_code": term.term_code,
+            "term_label": _term_label(_term_key(term)),
+            "basis": _award_basis(a.section_title),
+            "category": (a.category.name_vi if a.category else None) or a.category_label or a.category_code or "",
+            "percent": float(a.percent) if a.percent is not None else None,
+            "first_fee_vnd": a.first_fee_vnd,
+            "retake_fee_vnd": a.retake_fee_vnd,
+            "base_fee_vnd": a.base_fee_vnd,
+            "decree_amount_vnd": a.decree_amount_vnd,
+            "school_support_vnd": a.school_support_vnd,
+            "received_vnd": a.received_vnd,
+            "payment_status": a.payment_status,
+            "payment_label": PAYMENT_LABELS.get(a.payment_status, ""),
+            "note": a.note or "",
+            "bank_account": _mask_account(a.bank_account_number),
+            "bank_name": a.bank_name or "",
+            "updated_at": a.updated_at.isoformat(),
+        })
+    return out
+
+
 def build_state(student):
     """Toàn bộ dữ liệu trang MGHP của SV."""
     round_ = open_round()
     apps = list(TuitionExemptionApplication.objects.filter(student=student)
-                .select_related("round").order_by("-submitted_at"))
+                .select_related("round__academic_term").order_by("-submitted_at"))
     current = next((a for a in apps if round_ and a.round_id == round_.pk), None)
     return {
         "round": serialize_round(round_),
         "plan": build_plan(student, round_) if round_ else None,
         "application": serialize_application(current) if current else None,
         "history": [serialize_application(a) for a in apps],
+        "awards": awards(student),
         "prefill": build_prefill(student),
         "limits": {"max_files": contract.MAX_FILES_PER_APPLICATION,
                    "max_pdf_mb": contract.MAX_FILE_SIZE_BYTES // (1024 * 1024),
@@ -341,7 +395,7 @@ def build_state(student):
 
 def get_application(student, pk):
     """Đơn của CHÍNH SV đăng nhập — đơn của người khác coi như không tồn tại."""
-    return (TuitionExemptionApplication.objects.select_related("round")
+    return (TuitionExemptionApplication.objects.select_related("round__academic_term")
             .filter(pk=pk, student=student).first())
 
 

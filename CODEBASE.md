@@ -107,7 +107,7 @@ frontend/
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
-| `/dashboard/mien-giam-hoc-phi` | MGHP — đợt đang mở, đơn đã nộp, kết quả đã chốt (cờ `tuition_waiver`) |
+| `/dashboard/mien-giam-hoc-phi` | MGHP — đợt đang mở, đơn đã nộp, kết quả miễn giảm theo kỳ từ `tuition_exemption_awards` (cờ `tuition_waiver`) |
 | `/dashboard/mien-giam-hoc-phi/nop-ho-so` | form nộp đơn (KHUNG — backend trả 501) |
 | `/dashboard/mien-giam-hoc-phi/ho-so/[id]` | chi tiết đơn, bổ sung giấy tờ |
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |

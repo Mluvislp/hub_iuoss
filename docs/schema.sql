@@ -290,9 +290,11 @@ CREATE TABLE `health_check_responses` (
 
 -- ── Miễn giảm học phí (30/09/2026) — nguồn: dashboard_iuoss/docs/sql/20260930_mghp_schema.sql
 -- + 20260930_mghp_add_guardian.sql (3 cột guardian_* trên bảng đơn). Chỉ chép 4 bảng
--- hub_* ở đây; 6 bảng Dashboard sở hữu mà Hub đọc (tuition_exemption_categories,
--- _category_rates, _rounds, student_tuition_fees, tuition_fee_import_batches,
--- tuition_exemption_results) xem ở file nguồn. Cột ghi [DASH] = Dashboard được ghi.
+-- hub_* ở đây; các bảng Dashboard sở hữu mà Hub đọc (tuition_exemption_categories,
+-- _category_rates, _rounds, student_tuition_fees, tuition_exemption_awards) xem ở file
+-- nguồn — tuition_exemption_awards: dashboard_iuoss/docs/sql/20261024_mghp_awards.sql
+-- (Hub chỉ đọc dòng của chính SV; không đọc cột lô import / người sửa).
+-- Cột ghi [DASH] = Dashboard được ghi.
 
 CREATE TABLE `hub_tuition_exemption_applications` (
   `id` bigint NOT NULL AUTO_INCREMENT,
