@@ -74,6 +74,13 @@ class ExternalInsuranceTests(TestCase):
         self.assertEqual(detail['display']['permanent_ward'], 'Ward')
         self.assertEqual(detail['display']['hospital_code'], 'Hospital')
 
+    def test_hospital_lookup_url_comes_from_config(self):
+        self.assertEqual(self.client.get('/api/health-insurance/').data['periods'][0]['hospital_lookup_url'], '')
+        self.cfg.hospital_lookup_url = 'https://example.com/benh-vien'
+        self.cfg.save(update_fields=['hospital_lookup_url'])
+        self.assertEqual(self.client.get('/api/health-insurance/registrations/?period=MAIN').data['config']['hospital_lookup_url'],
+                         'https://example.com/benh-vien')
+
     def test_freshman_warning_only_for_matching_entry_year(self):
         self.cfg.freshman_warning = 'Tân sinh viên đã đăng ký mua BHYT trước đó.'
         self.cfg.save(update_fields=['freshman_warning'])

@@ -75,6 +75,9 @@ class Student(models.Model):
     # trên giấy tờ (xem documents.py::_bankloan_snapshot). Cột do Dashboard sở hữu;
     # Hub CHỈ ĐỌC. KHÔNG dùng để tính mốc đào tạo (vẫn qua infer_major_for_student).
     detailed_major_code = models.CharField(max_length=32, null=True, blank=True)
+    # Diện mồ côi: ENUM FATHER / MOTHER / BOTH, NULL = không thuộc diện. Dashboard
+    # ghi khi duyệt cụm cha/mẹ của trang "Thông tin cá nhân"; Hub CHỈ ĐỌC.
+    orphan_status = models.CharField(max_length=6, null=True, blank=True)
     current_department = models.ForeignKey(
         Department, on_delete=models.SET_NULL,
         null=True, blank=True, db_column="current_department_id",
@@ -98,6 +101,30 @@ class Student(models.Model):
 
     def __str__(self):
         return f"{self.current_student_code} - {self.full_name}"
+
+
+class StudentConductScore(models.Model):
+    """Điểm rèn luyện theo học kỳ — Dashboard sở hữu (import từ file của Phòng CTSV), Hub CHỈ ĐỌC.
+
+    `final_score` = điểm CVHT chốt (điểm in trên bảng điểm); `conduct_rank` lấy nguyên từ
+    file (EXCELLENT/GOOD/FAIR/AVERAGE/WEAK). Chỉ khai báo các cột Hub dùng.
+    """
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING, db_column="student_id", related_name="conduct_scores",
+    )
+    term = models.ForeignKey(
+        AcademicTerm, on_delete=models.DO_NOTHING, db_column="term_id", related_name="+",
+    )
+    final_score = models.SmallIntegerField()
+    conduct_rank = models.CharField(max_length=10)
+
+    class Meta:
+        managed = False
+        db_table = "student_conduct_scores"
+
+    def __str__(self):
+        return f"{self.student_id} @ {self.term_id}: {self.final_score}"
 
 
 class StudentCodeHistory(models.Model):
@@ -188,6 +215,8 @@ class HealthInsuranceCard(models.Model):
     valid_from = models.DateField(null=True, blank=True)
     valid_until = models.DateField(null=True, blank=True)
     registration_year = models.IntegerField(null=True, blank=True)
+    # Đơn Hub đã sinh thẻ này (Dashboard ghi lúc Phát hành); thẻ nhập tay/import để trống.
+    source_registration_id = models.BigIntegerField(null=True, blank=True)
     # ⚠️ is_current = "thẻ đang dùng", KHÔNG phải "còn hiệu lực".
     # Hiệu lực tính riêng theo valid_until so với hôm nay.
     is_current = models.BooleanField(default=False)
@@ -361,6 +390,7 @@ class ProfileChangeRequest(models.Model):
 
     SOURCE_OFFCAMPUS = "ngoai_tru"
     SOURCE_HEALTH_CHECK = "kham_suc_khoe"   # bổ sung CCCD trong luồng khám sức khỏe
+    SOURCE_PERSONAL_INFO = "thong_tin_ca_nhan"  # trang Thông tin cá nhân — luôn chờ duyệt
 
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,
@@ -386,6 +416,73 @@ class ProfileChangeRequest(models.Model):
 
     def __str__(self):
         return f"{self.target} #{self.pk} — {self.status}"
+
+
+class StudentFamilyMember(models.Model):
+    """Cha / mẹ / người giám hộ — Dashboard sở hữu, Hub CHỈ ĐỌC (SV sửa qua trang
+    "Thông tin cá nhân", nhân viên duyệt mới ghi). Mỗi SV một dòng cho mỗi quan hệ."""
+
+    REL_FATHER = "FATHER"
+    REL_MOTHER = "MOTHER"
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="family_members",
+    )
+    relationship = models.CharField(max_length=16)
+    # NULL = còn sống, DECEASED = đã mất, NONE = không có.
+    parent_status = models.CharField(max_length=8, null=True, blank=True)
+    full_name = models.CharField(max_length=255, null=True, blank=True)
+    phone = models.CharField(max_length=50, null=True, blank=True)
+    email = models.CharField(max_length=255, null=True, blank=True)
+    occupation = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_family_members"
+
+
+class StudentHighSchool(models.Model):
+    """Trường THPT — Dashboard sở hữu, Hub CHỈ ĐỌC."""
+
+    student = models.OneToOneField(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="high_school",
+    )
+    province = models.CharField(max_length=255, null=True, blank=True)
+    school_name = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_high_schools"
+
+
+class StudentBankAccount(models.Model):
+    """Tài khoản ngân hàng — Dashboard sở hữu, Hub CHỈ ĐỌC. `bank_name` là chữ tự do.
+
+    MGHP dùng để điền sẵn ô tài khoản hoàn tiền; SV sửa thì chỉ sửa ảnh chụp trong
+    đơn (`hub_tuition_exemption_applications`), KHÔNG ghi vào bảng này.
+    `is_current` = dòng đang dùng, không phải "còn hiệu lực".
+    """
+
+    student = models.ForeignKey(
+        Student, on_delete=models.DO_NOTHING,
+        db_column="student_id", related_name="bank_accounts",
+    )
+    bank_name = models.CharField(max_length=255)
+    account_number = models.CharField(max_length=64)
+    branch_address = models.CharField(max_length=500, null=True, blank=True)
+    is_current = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = "student_bank_accounts"
 
 
 class VnProvince(models.Model):
@@ -436,25 +533,6 @@ class VnEthnicity(models.Model):
 
     def __str__(self):
         return self.name
-
-
-class StudentBankAccount(models.Model):
-    """Tài khoản ngân hàng của SV — Dashboard sở hữu, Hub CHỈ ĐỌC.
-
-    MGHP dùng để điền sẵn ô tài khoản hoàn tiền; SV sửa thì chỉ sửa ảnh chụp trong
-    đơn (`hub_tuition_exemption_applications`), KHÔNG ghi vào bảng này.
-    `is_current` = dòng đang dùng, không phải "còn hiệu lực".
-    """
-
-    student = models.ForeignKey(Student, on_delete=models.DO_NOTHING, related_name="bank_accounts")
-    bank_name = models.CharField(max_length=255)
-    account_number = models.CharField(max_length=64)
-    branch_address = models.CharField(max_length=500, null=True, blank=True)
-    is_current = models.BooleanField(default=True)
-
-    class Meta:
-        managed = False
-        db_table = "student_bank_accounts"
 
 
 # ── Miễn giảm học phí — các bảng Dashboard sở hữu, Hub CHỈ ĐỌC ───────────────

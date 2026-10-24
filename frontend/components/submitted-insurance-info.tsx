@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Clock3, FileImage, History, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
-import { accentIcon, badge, ui } from '@/lib/ui';
+import { accentIcon, badge, ui, notice, noticeIcon } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { SubmittedInsurance } from '@/lib/types';
 
@@ -13,7 +13,8 @@ export const INSURANCE_FIELD_LABELS: Record<string,string> = {
   ethnicity:'Dân tộc', phone_number:'Số điện thoại', citizen_id:'CCCD',
   social_insurance_number:'Mã số BHXH', permanent_address:'Thường trú', permanent_province:'Tỉnh/thành thường trú',
   permanent_ward:'Phường/xã thường trú', permanent_street:'Địa chỉ thường trú',
-  hospital_code:'Nơi khám chữa bệnh', note:'Ghi chú', medical_insurance_code:'Mã thẻ BHYT',
+  hospital_code:'Nơi khám chữa bệnh', note:'Ghi chú thông tin BHYT bị sai',
+  medical_insurance_code:'Mã thẻ BHYT',
   valid_from:'Thẻ có hiệu lực từ', valid_until:'Thẻ có hiệu lực đến',
   cccd_image:'CCCD mặt trước', cccd_image_back:'CCCD mặt sau', bhyt_image:'Thẻ BHYT cũ',
   payment_receipt_image:'Biên lai chuyển khoản',
@@ -43,12 +44,6 @@ export function ChangeList({changes, images, submitted = false, className}:{
     </div>}
   </dl>;
 }
-
-const eventLabels: Record<string,string> = {
-  SUBMITTED:'Đã gửi bản khai', STUDENT_UPDATED:'Sinh viên chỉnh sửa',
-  RESUBMITTED:'Sinh viên gửi bổ sung', CONFIRMED:'Đã xác nhận', REJECTED:'Từ chối',
-  SUPPLEMENT_REVIEWED:'Đã kiểm tra bổ sung',
-};
 
 export function formatDateTime(value?: string | null) {
   if (!value) return '—';
@@ -91,9 +86,12 @@ export function PrivateImage({url, label, caption = true}:{url:string; label:str
   </figure>;
 }
 
-export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{data:SubmittedInsurance; external?:boolean; showEdit?:boolean}) {
+export function SubmittedInsuranceInfo({data, external=false, hospitalChange=false, showEdit=true}:{data:SubmittedInsurance; external?:boolean; hospitalChange?:boolean; showEdit?:boolean}) {
   const canEdit = data.can_edit ?? data.window?.can_edit;
   const canResubmit = data.can_resubmit ?? data.status === 'rejected';
+  // Khai nơi khác và đổi nơi KCB sửa/gửi lại trên trang form riêng của mình.
+  const formPath = '/dashboard/bao-hiem-y-te/' + (hospitalChange ? 'doi-noi-kcb' : external ? 'khai-noi-khac' : 'dang-ky');
+  const noun = hospitalChange ? 'yêu cầu' : external ? 'bản khai' : 'đơn';
   const displayValue = (key: string) => data.display?.[key] || data.prefill[key] || '—';
   return <section className={cn(ui.card, 'overflow-hidden')}>
     <div className={ui.cardHeader}>
@@ -107,18 +105,18 @@ export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{da
     </div>
 
     <div className="space-y-5 p-5">
-      {data.edited_at && <div className="flex items-start gap-2.5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-text">
-        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+      {data.edited_at && <div className={cn(notice.base, notice.warning)}>
+        <AlertTriangle className={noticeIcon.warning} />
         <span>Sinh viên đã chỉnh sửa vào lúc {formatDateTime(data.edited_at)}, không thể chỉnh sửa thêm</span>
       </div>}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 text-sm text-muted"><Clock3 size={15} />Hạn kết thúc: {formatDateTime(data.window?.end_date)}</p>
         {showEdit && <div className="flex flex-wrap gap-2">
-          {canEdit && <Link className={ui.btnSecondary} href={'/dashboard/bao-hiem-y-te/' + (external ? 'khai-noi-khac' : 'dang-ky') + '?edit=' + data.id}>
-            <Pencil size={14} />Chỉnh sửa {external ? 'bản khai' : 'đơn'}
+          {canEdit && <Link className={ui.btnSecondary} href={formPath + '?edit=' + data.id}>
+            <Pencil size={14} />Chỉnh sửa {noun}
           </Link>}
-          {external && canResubmit && <Link className={ui.btnSecondary} href={'/dashboard/bao-hiem-y-te/khai-noi-khac?edit=' + data.id + '&resubmit=1'}>
+          {(external || hospitalChange) && canResubmit && <Link className={ui.btnSecondary} href={formPath + '?edit=' + data.id + '&resubmit=1'}>
             Gửi lại sau từ chối
           </Link>}
         </div>}
@@ -134,17 +132,12 @@ export function SubmittedInsuranceInfo({data, external=false, showEdit=true}:{da
         <summary className="cursor-pointer font-medium text-ink">So sánh với hồ sơ tại lần lưu gần nhất</summary>
         <div className="mt-2 space-y-1 text-ink-3">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
       </details>}
-      {data.history?.map((event, index) => <details key={index} className="rounded-lg border border-line p-3 text-sm">
-        <summary className="cursor-pointer font-medium text-ink">{eventLabels[event.event_type] || event.event_type} · {formatDateTime(event.created_at)}</summary>
-        <div className="mt-2 space-y-1 text-ink-3">
-          {event.payload?.previous_rejection && <p>Phản hồi từ chối trước: {event.payload.previous_rejection}</p>}
-          <ChangeList changes={event.payload?.changes} images={event.payload?.images} submitted={event.event_type === 'SUBMITTED'} className="space-y-1" />
-        </div>
-      </details>)}
       {!!data.images?.length && <div>
         <h4 className="mb-3 text-sm font-semibold text-ink">Ảnh đã nộp</h4>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{data.images.map(i => <PrivateImage key={i.field} url={i.url} label={labels[i.field] || i.field}/>)}</div>
-        <p className="mt-2 text-xs text-muted">Các ảnh này được giữ nguyên. Chỉ chọn ảnh mới trong biểu mẫu khi muốn thay thế.</p>
+        <p className="mt-2 text-xs text-muted">{hospitalChange
+          ? 'Ảnh chép từ đơn đăng ký BHYT tại trường, không thay đổi được.'
+          : 'Các ảnh này được giữ nguyên. Chỉ chọn ảnh mới trong biểu mẫu khi muốn thay thế.'}</p>
       </div>}
     </div>
   </section>;

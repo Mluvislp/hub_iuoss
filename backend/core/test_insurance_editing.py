@@ -301,3 +301,25 @@ class ConcurrentEditingTests(TransactionTestCase):
     def test_external_two_sessions_do_not_overwrite(self):
         self.race(self.external(), external=True)
 
+
+
+class InfoCorrectionNoteTests(TestCase):
+    setUp = ExternalInsuranceTests.setUp
+    payload = ExternalInsuranceTests.payload
+    registration = EditingTests.registration
+    edit = EditingTests.edit
+    url = EditingTests.url
+
+    def test_edit_saves_note(self):
+        row = self.registration()
+        self.assertEqual(self.client.get(f'/api/health-insurance/registrations/{row.pk}/').data['prefill']['note'], '')
+        response = self.edit(row, note='Thẻ ghi CCCD cũ 012345678901')
+        self.assertEqual(response.status_code, 200, response.data)
+        row.refresh_from_db()
+        self.assertEqual(row.note, 'Thẻ ghi CCCD cũ 012345678901')
+        self.assertIn('note', row.events.get(event_type='STUDENT_UPDATED').payload['changes'])
+
+    def test_note_too_long_is_field_error(self):
+        response = self.edit(self.registration(), note='x' * 1001)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('note', response.data)

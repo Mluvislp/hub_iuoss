@@ -15,6 +15,8 @@ class HealthCheckRound(models.Model):
     package_name = models.CharField(max_length=255)
     package_content = models.TextField()
     schedule_note = models.CharField(max_length=255, null=True, blank=True)
+    # Ngày + ca khám tại trường — xem core/health_check_slots.py.
+    exam_slots = models.JSONField(null=True, blank=True)
     created_by_id = models.IntegerField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -6,7 +6,7 @@ import { ChevronRight, ArrowLeft, Check, AlertCircle, Loader2, Info, FileText } 
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
-import type { ConductScoreFormData, Province, Ward } from '@/lib/types';
+import type { ConductScoreFormData, ConductYearScore, Province, Ward } from '@/lib/types';
 import { RequestConsent, ConsentGate, CONSENT_REQUIRED_MSG } from '@/components/request-consent';
 import { RequestNoteField } from '@/components/request-note';
 import {
@@ -17,7 +17,6 @@ import {
   isValidDob, isValidIssueDate,
 } from '@/lib/form-validators';
 import { PermanentAddressCccdNote, STREET_PLACEHOLDER, StreetHint } from '@/components/street-hint';
-import { QuotaGuard, QuotaNotice, useRequestQuota } from '@/components/request-quota';
 import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue, purposeOf, pendingAddress } from '@/components/request-edit';
 
 // Bảng điểm rèn luyện: Phòng CTSV xuất từ hệ thống khác. Ngày sinh / CCCD + ngày cấp /
@@ -33,11 +32,11 @@ export default function ConductScoreRequestPage() {
   const [form, setForm] = useState<ConductScoreFormData | null>(null);
   const [loadError, setLoadError] = useState('');
 
-  const [semesterCode, setSemesterCode] = useState('');
+  // Năm học cấp bảng điểm — tích được nhiều năm (từ 09/10/2026; bỏ học kỳ lẻ).
+  const [selectedYears, setSelectedYears] = useState<string[]>([]);
+  // Sửa yêu cầu "Chờ bổ sung": năm học / học kỳ đã xin giữ nguyên — chỉ hiện nhãn.
+  const [lockedLabel, setLockedLabel] = useState('');
   const [delivery, setDelivery] = useState('');
-  // Học kỳ bảng điểm đã xin trong học kỳ hiện tại — làm mờ trong danh sách, không ẩn.
-  const quota = useRequestQuota();
-  const usedSemesters = quota?.types.conduct_score?.blocked_semesters ?? {};
   const [values, setValues] = useState<Record<FieldKey, string>>(
     { dob: '', citizen_id: '', citizen_id_issue_date: '' });
   const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>(
@@ -75,7 +74,8 @@ export default function ConductScoreRequestPage() {
         setOpenFields((s) => ({ ...s, [k]: true }));
       }
     });
-    setSemesterCode(purposeOf(r).code);
+    const prevPurpose = ((r.payload ?? {}) as { purpose?: { label?: string } }).purpose;
+    setLockedLabel(prevPurpose?.label || r.purpose || purposeOf(r).code);
     const prevDelivery = ((r.payload ?? {}) as { delivery?: { code?: string } }).delivery?.code;
     if (prevDelivery) setDelivery(prevDelivery);
     const a = pendingAddress(r);
@@ -163,7 +163,7 @@ export default function ConductScoreRequestPage() {
     const pf = form.prefill;
 
     const errs: FErr = {};
-    if (!semesterCode) errs.semester = 'Vui lòng chọn học kỳ hoặc cả năm học.';
+    if (!isEdit && selectedYears.length === 0) errs.semester = 'Vui lòng chọn ít nhất một năm học.';
     if (!delivery) errs.delivery = 'Vui lòng chọn hình thức nhận.';
     const de = validateDob(values.dob); if (de) errs.dob = de;
     const ce = validateCccd(values.citizen_id, pf.citizen_id); if (ce) errs.citizen_id = ce;
@@ -185,7 +185,7 @@ export default function ConductScoreRequestPage() {
     setLoading(true);
     try {
       await submitOrUpdate(edit, 'conduct_score', api.requests.createConductScore, {
-        semester_code: semesterCode,
+        semester_codes: selectedYears,
         delivery,
         dob: values.dob.trim(),
         citizen_id: values.citizen_id.trim(),
@@ -262,19 +262,15 @@ export default function ConductScoreRequestPage() {
 
       <EditRequestBanner edit={edit} />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         <div className="px-6 py-5 border-b border-line">
           <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+            <FileText size={17} className="text-slate-500" />
             Bảng điểm rèn luyện
           </h1>
-          <p className="text-sm text-muted mt-1">
-            Thông tin lấy từ hồ sơ. Chọn học kỳ hoặc cả năm học và hình thức nhận, kiểm tra thông tin, yêu cầu chỉnh sửa nếu sai rồi gửi.
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6">
-          <QuotaGuard type="conduct_score" bypass={isEdit}>
           {error && (
             <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-danger-soft border border-danger-line text-danger-text text-sm">
               <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />{error}
@@ -292,43 +288,52 @@ export default function ConductScoreRequestPage() {
             </div>
           </div>
 
-          {/* Học kỳ */}
-          <div className="sm:max-w-[360px]">
-            <label className={ui.fieldLabel}>Học kỳ / năm học cấp bảng điểm rèn luyện <span className="text-red-500">*</span></label>
-            {noSemester ? (
+          {/* Năm học — tích được nhiều năm */}
+          <div className="sm:max-w-[480px]">
+            <span className={ui.fieldLabel}>Năm học cấp bảng điểm rèn luyện <span className="text-red-500">*</span></span>
+            {isEdit ? (
+              <>
+                <LockedBox value={lockedLabel} />
+                <p className="mt-1 text-[0.75rem] text-muted">Năm học đã xin không đổi được khi cập nhật yêu cầu.</p>
+              </>
+            ) : noSemester ? (
               <p className="text-[0.85rem] text-muted">
-                Chưa có học kỳ nào kết thúc để cấp bảng điểm rèn luyện. Liên hệ Phòng CTSV nếu cần hỗ trợ.
+                Chưa có năm học nào kết thúc để cấp bảng điểm rèn luyện. Liên hệ Phòng CTSV nếu cần hỗ trợ.
               </p>
             ) : (
               <>
-                <select
-                  value={semesterCode}
-                  onChange={(e) => { setSemesterCode(e.target.value); setFieldErrors((f) => ({ ...f, semester: undefined })); }}
-                  disabled={isEdit}
-                  className={cn(ui.input, fieldErrors.semester && 'border-danger-line focus:border-danger-line focus:ring-red-100')}
-                >
-                  <option value="">— Chọn học kỳ hoặc cả năm học —</option>
+                <p className="mb-2 text-[0.78rem] text-muted">Chọn một hoặc nhiều năm học. Năm học đang diễn ra chưa có bảng điểm.</p>
+                <div className="space-y-1.5">
                   {form.semester_choices.map((c) => {
-                    const used = !isEdit ? usedSemesters[c.code] : undefined;
-                    // Đã xin cả năm ⇒ học kỳ lẻ của năm đó bị khoá ⇒ nêu lựa chọn đã xin nếu khác.
-                    const usedLabel = used?.semester_label;
-                    const suffix = !used ? ''
-                      : usedLabel && usedLabel !== c.label ? ` — đã xin ${usedLabel.toLowerCase()}`
-                      : ' — đã xin trong học kỳ này';
+                    const checked = selectedYears.includes(c.code);
                     return (
-                      <option key={c.code} value={c.code} disabled={!!used}>
-                        {c.label}{suffix}
-                      </option>
+                      <div
+                        key={c.code}
+                        className={cn(
+                          'rounded-lg border text-sm transition-colors',
+                          checked
+                            ? 'border-primary bg-primary-soft text-primary-text'
+                            : 'border-line bg-white text-ink hover:border-slate-400',
+                          fieldErrors.semester && !checked && 'border-danger-line',
+                        )}
+                      >
+                        <label className={cn('flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5', checked && 'font-medium')}>
+                          <input
+                            type="checkbox" value={c.code} checked={checked}
+                            onChange={() => {
+                              setSelectedYears((s) => (s.includes(c.code) ? s.filter((x) => x !== c.code) : [...s, c.code]));
+                              setFieldErrors((f) => ({ ...f, semester: undefined }));
+                            }}
+                            className="accent-primary"
+                          />
+                          <span className="flex-1">{c.label}</span>
+                        </label>
+                        {checked && <ConductYearScores score={form.conduct_scores?.[c.code]} />}
+                      </div>
                     );
                   })}
-                </select>
+                </div>
                 {fieldErrors.semester && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.semester}</p>}
-                {!isEdit && Object.keys(usedSemesters).length > 0 && quota && (
-                  <QuotaNotice
-                    className="mt-2"
-                    reason={`Lựa chọn đã xin trong ${quota.term.label.toLowerCase()} được làm mờ: mỗi học kỳ bảng điểm chỉ được xin 1 lần trong một học kỳ, đã xin cả năm học thì không xin lẻ từng học kỳ của năm học đó, được xin lại khi yêu cầu trước bị từ chối. Trường hợp cần xin cấp thêm, đề nghị liên hệ Phòng Công tác Sinh viên qua email ${quota.contact_email}.`}
-                  />
-                )}
               </>
             )}
           </div>
@@ -495,18 +500,17 @@ export default function ConductScoreRequestPage() {
           />
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-line -mx-6 px-6 -mb-5 pb-5">
-            <Link href="/dashboard/requests/new" className={ui.btnGhost}>
+          <div className={ui.formFooter}>
+            <Link href="/dashboard/requests/new" className={cn(ui.btnGhost, ui.formFooterBtn)}>
               <ArrowLeft size={15} /> Quay lại
             </Link>
-            <ConsentGate checked={confirmed}>
-              <button type="submit" disabled={loading || noSemester || (isEdit && !edit.request)} className={ui.btnPrimary}>
+            <ConsentGate checked={confirmed} className={ui.formFooterBtn}>
+              <button type="submit" disabled={loading || noSemester || (isEdit && !edit.request)} className={cn(ui.btnPrimary, ui.formFooterBtn)}>
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Đang gửi…' : isEdit ? 'Cập nhật yêu cầu' : 'Gửi yêu cầu'}
               </button>
             </ConsentGate>
           </div>
-        </QuotaGuard>
         </form>
       </div>
 
@@ -516,6 +520,36 @@ export default function ConductScoreRequestPage() {
           Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.
         </p>
       </div>
+    </div>
+  );
+}
+
+
+// Điểm rèn luyện HK1/HK2 của một năm học, hiện ngay dưới năm học SV vừa tích.
+// Không hiện điểm cả năm: con số tự tính có thể lệch bảng điểm chính thức (chốt 10/10/2026).
+function ConductYearScores({ score }: { score?: ConductYearScore }) {
+  if (!score || score.semester_count === 0) {
+    return (
+      <p className="mx-3.5 mb-3 rounded-md border border-line bg-white px-3 py-2 text-[0.78rem] font-normal text-muted">
+        Chưa có điểm rèn luyện của năm học này trong hệ thống. Phòng CTSV kiểm tra khi xử lý yêu cầu.
+      </p>
+    );
+  }
+  return (
+    <div className="mx-3.5 mb-3 grid grid-cols-2 divide-x divide-line2 rounded-md border border-primary-line bg-white font-normal">
+      {score.semesters.map((s) => (
+        <div key={s.semester} className="px-2 py-2 text-center">
+          <div className="text-[0.72rem] text-muted">Học kỳ {s.semester}</div>
+          {s.score === null ? (
+            <div className="mt-0.5 text-[0.8rem] italic text-slate-400">Chưa có điểm</div>
+          ) : (
+            <>
+              <div className="text-[1.05rem] font-semibold leading-tight text-ink">{s.score}</div>
+              <div className="text-[0.72rem] text-muted">{s.rank}</div>
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

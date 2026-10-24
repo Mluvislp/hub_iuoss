@@ -50,6 +50,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     // (SHCD) — tách khỏi nhóm dịch vụ (yêu cầu, khai báo lẻ).
     label: 'Hồ sơ của tôi',
     items: [
+      featureItem('personal_info'),
       { href: '/dashboard/bao-hiem-y-te', icon: ShieldCheck, label: 'Bảo hiểm y tế' },
       featureItem('tuition_waiver'),
       featureItem('civic_activities'),
@@ -67,6 +68,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         label: 'Tạo yêu cầu mới',
         feature: 'document_requests',
       },
+      featureItem('direct_submissions'),
       { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
       featureItem('health_check'),
       featureItem('support_tickets'),

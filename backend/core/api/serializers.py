@@ -238,7 +238,9 @@ class InsuranceRegistrationSerializer(serializers.Serializer):
         "null": "Vui lòng đính kèm ảnh biên lai thanh toán.",
         "invalid": "Vui lòng đính kèm ảnh biên lai thanh toán."
     })
-    note = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+    # Ghi chú thông tin BHYT bị sai (đổi CCCD, khai sinh, ngày sinh, tên…), không bắt buộc.
+    note = serializers.CharField(required=False, allow_blank=True, max_length=1000, error_messages={
+        'max_length': 'Ghi chú tối đa 1000 ký tự.'})
 
     def validate_phone_number(self, value):
         import re

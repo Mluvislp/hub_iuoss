@@ -82,6 +82,23 @@ export interface ExternalInsuranceDeclaration {
   reviewed_at: string | null;
 }
 
+/** Loại biểu mẫu dùng chung `InsuranceRegistrationForm`. */
+export type InsuranceFormMode = 'registration' | 'external' | 'hospital-change';
+
+export interface HospitalChangeRequestRow {
+  id: number;
+  old_hospital_code: string;
+  old_hospital_name: string | null;
+  hospital_code: string;
+  hospital_name: string | null;
+  intake_year: number;
+  intake_period: string;
+  status: 'iu_processing' | 'waiting_bhxh' | 'issued' | 'rejected';
+  review_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 export interface InsuranceRegistrationPrefill {
   full_name: string;
   student_code: string;
@@ -111,12 +128,16 @@ export interface HealthInsuranceData {
   history: HealthInsuranceCard[];
   registrations: HealthInsuranceRegistration[];
   external_declarations: ExternalInsuranceDeclaration[];
+  /** Đợt nhận yêu cầu đổi nơi KCB đang mở (nếu có) + các yêu cầu đã gửi. */
+  hospital_change?: { config: InsurancePeriodConfig | null; has_source: boolean; requests: HospitalChangeRequestRow[] };
   periods: InsurancePeriod[];
   is_eligible: boolean;
 }
 
 export interface InsurancePeriodConfig extends InsurancePeriod {
   description: string;
+  /** Link danh sách bệnh viện do staff cập nhật trên Dashboard; rỗng = ẩn dòng link. */
+  hospital_lookup_url?: string;
   insurance_fee: number;
   bank_name: string;
   bank_bin: string;
@@ -302,13 +323,23 @@ export interface ConductScorePrefill {
   street: string;
 }
 
-/** Mã `YYYYS` = một học kỳ, `YYYYN` = cả năm học (kind 'year'). */
+/** Mã `YYYYN` = cả năm học (kind 'year'). Từ 09/10/2026 chỉ còn năm học, SV tích được nhiều năm;
+ *  `YYYYS` (học kỳ lẻ) chỉ còn ở yêu cầu cũ. */
 export interface ConductSemesterChoice extends PurposeChoice {
   kind: 'semester' | 'year';
 }
 
+/** Điểm rèn luyện HK1/HK2 của một năm học, đúng như Phòng CTSV nhập — KHÔNG có điểm cả năm
+ *  tự tính. `score` null = học kỳ chưa có điểm. */
+export interface ConductYearScore {
+  semesters: { semester: number; score: number | null; rank: string }[];
+  semester_count: number;
+}
+
 export interface ConductScoreFormData {
   semester_choices: ConductSemesterChoice[];
+  /** Theo mã năm học `YYYYN`. */
+  conduct_scores?: Record<string, ConductYearScore>;
   /** Hình thức nhận: online = bản mềm, paper = bản cứng. */
   delivery_choices: PurposeChoice[];
   prefill: ConductScorePrefill;
@@ -413,6 +444,8 @@ export interface FeatureFlags {
   health_check: boolean;
   tuition_waiver: boolean;
   support_tickets: boolean;
+  personal_info: boolean;
+  direct_submissions: boolean;
 }
 
 /**
@@ -499,6 +532,11 @@ export interface SubmittedInsurance {
   created_at?:string; updated_at?:string; edited_at?:string|null; review_note?:string|null;
   history?:{event_type:string; created_at:string; source_app:string; payload:{changes?:Record<string,{before:unknown;after:unknown}>;images?:string[];previous_rejection?:string}}[];
   images?:{field:string; filename:string; url:string}[];
+  /** Yêu cầu đổi nơi KCB: nơi KCB trước khi đổi. */
+  old_hospital?:{code:string; name:string};
+  /** Yêu cầu đổi nơi KCB chưa gửi: đơn đăng ký tại trường làm nguồn. */
+  // id null = nguồn là thẻ diện ĐHQT còn hạn không có đơn (card_id).
+  source?:{id:number|null; card_id?:number; registration_year:number|null; registration_period:string; status:string; hospital_code:string; hospital_name:string};
 }
 export interface InsuranceDetail extends SubmittedInsurance {
   hospital_code: string;
@@ -553,6 +591,30 @@ export interface HealthCheckResponse {
   /** Thời điểm tích cam kết + đồng ý cung cấp thông tin. */
   data_consent_at: string | null;
   residence: HealthCheckResidence | null;
+  /** Ca khám tại trường đã chọn (nhánh "Chưa khám", đợt có chia ca). */
+  exam_slot: HealthCheckSlot | null;
+  exam_slot_label: string;
+}
+
+/** Một ca khám = ngày + giờ; `key` dạng "2026-10-27 07:30". */
+export interface HealthCheckSlot {
+  key: string;
+  date: string;
+  start: string;
+  end: string;
+  label: string;
+}
+
+export interface HealthCheckSlotOption extends HealthCheckSlot {
+  /** null = đợt không giới hạn chỗ. */
+  remaining: number | null;
+  available: boolean;
+  reason: string;
+}
+
+export interface HealthCheckSlotOptions {
+  capacity: number | null;
+  days: { date: string; label: string; shifts: HealthCheckSlotOption[] }[];
 }
 
 /** Danh mục trường kết quả khám — backend `core/health_check_result.py` là nguồn duy nhất. */
@@ -608,8 +670,12 @@ export interface HealthCheckState {
   cccd_missing: boolean;
   /** Câu cam kết + đồng ý cung cấp thông tin ở cuối form, theo từng lựa chọn. */
   data_consent_text: { examined: string; register: string };
+  /** Đối tượng khám tập trung tại trường (nhánh "Chưa khám"). */
+  exam_eligibility: { intro: string; items: string[] };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
+  /** Ngày + ca khám tại trường; null khi đợt không chia ca (hoặc không còn nhận đăng ký). */
+  exam_slots: HealthCheckSlotOptions | null;
 }
 
 // ── Hỏi đáp (ticket) ─────────────────────────────────────────────────────────
@@ -689,8 +755,8 @@ export interface QuotaTypeState {
   blocked: boolean;
   reason: string;
   blocking: QuotaBlocking | null;
-  /** Chỉ conduct_score: học kỳ bảng điểm đã xin trong học kỳ hiện tại. */
-  blocked_semesters?: Record<string, QuotaBlocking>;
+  /** GXN "Khác" + tiếng Anh: lượt tính theo mục đích — chỉ liệt kê mục đích đã hết lượt. */
+  purposes?: Record<string, QuotaTypeState>;
 }
 
 export interface RequestAvailability {
@@ -866,4 +932,114 @@ export interface TuitionExemptionState {
   limits: { max_files: number; max_pdf_mb: number; max_image_mb: number };
   /** Chỉ có trong phản hồi POST nộp đơn. */
   submitted_id?: number;
+}
+
+// ── Thông tin cá nhân (GET/POST /api/personal-info/) ─────────────────────────
+
+export interface CitizenIdValue { number: string; issue_place: string; issue_date: string }
+export interface BankAccountValue { bank_name: string; account_number: string; branch_address: string }
+/** Tình trạng cha/mẹ: '' = còn sống · DECEASED = đã mất · NONE = không có. */
+export type ParentStatus = '' | 'DECEASED' | 'NONE';
+export interface ParentValue {
+  status: ParentStatus; full_name: string; phone: string; email: string; occupation: string;
+}
+export interface HighSchoolValue { province: string; school_name: string }
+
+export type PersonalInfoKey =
+  | 'personal_email' | 'mobile_phone' | 'citizen_id' | 'bank_account'
+  | 'father' | 'mother' | 'high_school';
+
+/** Chuỗi với ô đơn (email, SĐT), object với cụm nhiều ô. */
+export type PersonalInfoValue = string | CitizenIdValue | BankAccountValue | ParentValue | HighSchoolValue;
+
+export interface PersonalInfoGroup {
+  key: PersonalInfoKey;
+  label: string;
+  value: PersonalInfoValue;
+  is_blank: boolean;
+  /** Đang chờ duyệt ⇒ cụm khóa, hiện giá trị đã gửi. */
+  pending: { value: PersonalInfoValue; submitted_at: string } | null;
+  /** Lần gửi gần nhất bị từ chối ⇒ cụm mở sẵn với giá trị đã gửi để sửa lại. */
+  rejection: { value: PersonalInfoValue; note: string; reviewed_at: string | null } | null;
+}
+
+export interface PersonalInfoData {
+  readonly: {
+    full_name: string; student_code: string; sex: string; date_of_birth: string;
+    department: string; university_email: string;
+  };
+  groups: PersonalInfoGroup[];
+  bank_suggestions: string[];
+  sent?: number;
+}
+
+// ── Nạp giấy tờ trực tiếp (backend core/direct_submissions.py) ─────────────────
+
+export interface SubmissionPrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  major: string;
+  class_code: string;
+  cur_status_group: string;
+  cur_status_vi: string;
+  dob: string;
+  phone: string;
+  email: string;
+  cccd_valid: boolean;
+  citizen_id: string;
+  citizen_id_issue_date: string;
+}
+
+export interface SubmissionLimits {
+  max_files: number;
+  image_max_bytes: number;
+  pdf_max_bytes: number;
+  total_max_bytes: number;
+  document_name_max: number;
+  note_max: number;
+  copies_max: number;
+}
+
+export interface SubmissionFormData {
+  prefill: SubmissionPrefill;
+  limits: SubmissionLimits;
+}
+
+export interface SubmissionSummary {
+  id: number;
+  code: string;
+  document_name: string;
+  copies: number;
+  status: RequestStatus;
+  status_label: string;
+  return_code: string | null;
+  created_at: string;
+  updated_at: string;
+  file_count: number;
+  comment_count: number;
+}
+
+export interface SubmissionFile {
+  id: number;
+  name: string;
+  size: number;
+  mime_type: string;
+  is_pdf: boolean;
+  created_at: string;
+}
+
+export interface SubmissionDetail extends SubmissionSummary {
+  contact_phone: string | null;
+  note: string | null;
+  consented_at: string;
+  payload: {
+    snapshot?: Partial<SubmissionPrefill>;
+    editable?: Record<string, { original: string; proposed: string; changed: boolean; review: string | null }>;
+  };
+  files: SubmissionFile[];
+  comments: RequestComment[];
+  student_can_comment: boolean;
+  student_can_edit: boolean;
+  returned_at: string | null;
 }

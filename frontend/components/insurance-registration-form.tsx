@@ -37,7 +37,7 @@ import { FreshmanWarningModal } from "@/components/freshman-warning-modal";
 import { api, ApiError, newRequestKey } from "@/lib/api";
 import { badge, ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
-import type { Province, InsurancePeriodConfig, InsuranceRegistrationPrefill, SubmittedInsurance } from "@/lib/types";
+import type { Province, InsuranceFormMode, InsurancePeriodConfig, InsuranceRegistrationPrefill, SubmittedInsurance } from "@/lib/types";
 import AddressFields from "@/app/(dashboard)/dashboard/khai-bao-ngoai-tru/AddressFields";
 import SearchableSelect from "@/components/searchable-select";
 import QRCode from "react-qr-code";
@@ -71,7 +71,7 @@ const ACCEPTED_IMAGE_TYPES = [
  * Tailwind xóa kiểu danh sách/liên kết nên phải khai lại ở đây.
  */
 const DESCRIPTION_CLS =
-  "text-sm leading-6 [&_a]:font-medium [&_a]:underline [&_h2]:font-semibold [&_h3]:font-semibold " +
+  "text-sm leading-6 [&_a]:font-medium [&_a]:text-primary-text [&_a]:underline [&_h2]:font-semibold [&_h3]:font-semibold " +
   "[&_h4]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5";
 
 const fileSchema = z
@@ -105,7 +105,7 @@ const schema = z.object({
     street: z.string().min(1, "Vui lòng nhập số nhà, đường"),
   }),
   hospital_code: z.string().min(1, "Vui lòng chọn nơi ĐK KCB ban đầu"),
-  note: z.string().optional(),
+  note: z.string().max(1000, "Ghi chú tối đa 1000 ký tự").optional(),
   cccd_image: fileSchema,
   cccd_image_back: fileSchema,
   bhyt_image: fileSchema,
@@ -146,6 +146,12 @@ const keptImages = {
 };
 const editSchema = schema.extend(keptImages);
 const externalEditSchema = withExternalRules(externalBase.extend(keptImages));
+// Đổi nơi KCB: mọi thông tin khác chép nguyên từ nguồn (đơn tại trường/thẻ) và bị khóa, nên chỉ
+// kiểm tra bệnh viện mới — ô đang khóa không được phép chặn việc gửi.
+const hospitalChangeSchema = z.object({
+  hospital_code: schema.shape.hospital_code,
+  confirm_declaration: schema.shape.confirm_declaration,
+});
 type FormData = z.infer<typeof schema> | z.infer<typeof externalSchema>;
 
 type ImageName = "cccd_image" | "cccd_image_back" | "bhyt_image" | "payment_receipt_image";
@@ -323,7 +329,7 @@ function ImageField({
   );
 }
 
-export default function InsuranceRegistrationPage({ external = false }: { external?: boolean }) {
+export default function InsuranceRegistrationPage({ mode = "registration" }: { mode?: InsuranceFormMode }) {
   return (
     <React.Suspense
       fallback={
@@ -332,19 +338,31 @@ export default function InsuranceRegistrationPage({ external = false }: { extern
         </div>
       }
     >
-      <InsuranceRegistrationForm external={external} />
+      <InsuranceRegistrationForm mode={mode} />
     </React.Suspense>
   );
 }
 
-function InsuranceRegistrationForm({ external }: { external: boolean }) {
+/** API của từng loại biểu mẫu; đăng ký tại trường có đường nộp/bổ sung riêng. */
+function apiFor(mode: InsuranceFormMode) {
+  if (mode === "hospital-change") return api.hospitalChange;
+  if (mode === "external") return api.externalInsurance;
+  return null;
+}
+
+function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
+  const external = mode === "external";
+  const hospitalChange = mode === "hospital-change";
+  const client = apiFor(mode);
   const router = useRouter();
   const searchParams = useSearchParams();
   const periodId = searchParams.get("period") || "";
   const editId = Number(searchParams.get("edit")) || 0;
-  const resubmitting = external && searchParams.get('resubmit') === '1';
+  const resubmitParam = !!client && searchParams.get('resubmit') === '1';
   const [submitted, setSubmitted] = useState<SubmittedInsurance | null>(null);
   const editingRecord = !!submitted?.id;
+  // Yêu cầu đổi nơi KCB bị từ chối thì luôn là gửi lại, kể cả khi mở thẳng từ trang BHYT.
+  const resubmitting = resubmitParam || (hospitalChange && submitted?.status === "rejected");
 
   // Hồ sơ đã nộp mở ra ở chế độ CHỈ XEM; sinh viên bấm "Chỉnh sửa" mới mở khóa.
   const [unlocked, setUnlocked] = useState(false);
@@ -382,13 +400,18 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
   const [hospitalProvince, setHospitalProvince] = useState("");
 
   const [config, setConfig] = useState<InsurancePeriodConfig | null>(null);
+  // Đổi nơi KCB chưa gửi: nguồn là đơn tại trường hoặc thẻ ĐHQT (ảnh + nơi KCB hiện tại).
+  const [source, setSource] = useState<Pick<SubmittedInsurance, "source" | "images"> | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Schema đổi theo việc đang tạo mới hay sửa hồ sơ; đọc qua ref để resolver
   // luôn dùng đúng schema của lần render gần nhất.
-  const activeSchema = useRef<object>(external ? externalSchema : schema);
-  activeSchema.current = editingRecord
-    ? (external ? externalEditSchema : editSchema)
-    : (external ? externalSchema : schema);
+  const activeSchema = useRef<object>(schema);
+  activeSchema.current = hospitalChange
+    ? hospitalChangeSchema
+    : editingRecord
+      ? (external ? externalEditSchema : editSchema)
+      : (external ? externalSchema : schema);
 
   const {
     watch,
@@ -435,12 +458,12 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
 
   useEffect(() => {
     let alive = true;
-    if (!external && !periodId && !editId) {
+    if (!client && !periodId && !editId) {
       router.push("/dashboard/bao-hiem-y-te");
       return;
     }
     Promise.all([
-      editId ? (external ? api.externalInsurance.detail(editId) : api.insuranceRegistration.detail(editId)) : external ? api.externalInsurance.prefill() : api.insuranceRegistration.prefill(periodId),
+      editId ? (client ? client.detail(editId) : api.insuranceRegistration.detail(editId)) : client ? client.prefill() : api.insuranceRegistration.prefill(periodId),
       api.locations.provinces(),
       api.locations.ethnicities(),
     ])
@@ -449,7 +472,9 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         const existing = pref as SubmittedInsurance;
         if (existing.id) {
           setSubmitted(existing);
-          setUnlocked(resubmitting);
+          setUnlocked(resubmitParam);
+        } else if (hospitalChange) {
+          setSource({ source: existing.source, images: existing.images });
         }
         setPrefill(pref.prefill);
         applyValues(pref.prefill);
@@ -461,13 +486,14 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       .catch((err) => {
         if (!alive) return;
         setError(err instanceof ApiError ? err.message : "Lỗi tải dữ liệu");
+        setLoadFailed(true);
         setLoading(false);
       });
 
     return () => {
       alive = false;
     };
-  }, [external, editId, periodId, resubmitting, router, applyValues]);
+  }, [client, hospitalChange, editId, periodId, resubmitParam, router, applyValues]);
 
   // Danh mục dân tộc nạp bất đồng bộ. Phải gán value SAU khi <option> đã render,
   // nếu không thẻ <select> lặng lẽ bỏ qua vì chưa có option nào khớp.
@@ -544,19 +570,26 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
   const canSubmit = submitted?.id
     ? !!(resubmitting ? submitted.can_resubmit : (submitted.can_edit ?? submitted.window?.can_edit))
     : config?.status === 'open';
-  const editLocked = editingRecord && !unlocked;
+  // Đổi nơi KCB: kể cả yêu cầu mới cũng mở ở chế độ chỉ xem, bấm nút đổi mới mở khóa.
+  const editLocked = (editingRecord || hospitalChange) && !unlocked;
   const formEnabled = canSubmit && !editLocked;
-  /** Trường thông tin cá nhân có bị khóa không. */
+  /** Trường thông tin cá nhân có bị khóa không. Đổi nơi KCB: luôn khóa. */
   const personalLocked = (value?: string | null) =>
-    editingRecord ? !unlocked : recorded(value) && !infoEditable;
+    hospitalChange || (editingRecord ? !unlocked : recorded(value) && !infoEditable);
   const hasAddress =
     recorded(prefill?.permanent_province) &&
     recorded(prefill?.permanent_ward) &&
     recorded(prefill?.permanent_street);
-  const addressLocked = editingRecord ? !unlocked : hasAddress && !infoEditable;
+  const addressLocked = hospitalChange || (editingRecord ? !unlocked : hasAddress && !infoEditable);
+  const noteValue = watch("note");
+  // Chỉ nhận http(s) để không đưa link lạ (javascript:…) vào href.
+  const hospitalLookupUrl = /^https?:\/\//i.test((config?.hospital_lookup_url ?? "").trim())
+    ? (config?.hospital_lookup_url ?? "").trim() : "";
+  // Ghi chú không lấy từ hồ sơ nên đơn mới luôn nhập được; đơn đã nộp theo nút Chỉnh sửa.
+  const noteLocked = hospitalChange || (editingRecord && !unlocked);
   const submittedImages = useMemo(
-    () => Object.fromEntries((submitted?.images ?? []).map((i) => [i.field, i.url])) as Partial<Record<ImageName, string>>,
-    [submitted],
+    () => Object.fromEntries((submitted?.images ?? source?.images ?? []).map((i) => [i.field, i.url])) as Partial<Record<ImageName, string>>,
+    [submitted, source],
   );
 
   // Tải ảnh CCCD lên là đọc QR ngay tại máy người dùng, IM LẶNG — không hiện
@@ -609,8 +642,9 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
 
   /** Bỏ mọi thay đổi chưa lưu, trả form về đúng đơn đã nộp và khóa lại. */
   const cancelEdit = () => {
-    if (!submitted) return;
-    applyValues(submitted.prefill);
+    const base = submitted?.prefill ?? prefill;
+    if (!base) return;
+    applyValues(base);
     // Ô file chỉ nhận chuỗi rỗng khi xóa lựa chọn.
     for (const name of IMAGE_NAMES) setValue(name, "");
     setValue("confirm_declaration", false);
@@ -626,6 +660,10 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
 
     try {
       const fd = new FormData();
+      if (hospitalChange) {
+        // Server tự chép mọi thông tin khác từ đơn tại trường; chỉ gửi bệnh viện mới.
+        fd.append("hospital_code", data.hospital_code);
+      } else {
       if (external) {
         for (const field of ['medical_insurance_code', 'valid_from', 'valid_until'] as const) {
           fd.append(field, data[field] || "");
@@ -656,16 +694,17 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
       if (cccdQrRaw) fd.append("cccd_qr_raw", cccdQrRaw);
       if (data.bhyt_image?.[0]) fd.append("bhyt_image", data.bhyt_image[0]);
       if (!external && data.payment_receipt_image?.[0]) fd.append("payment_receipt_image", data.payment_receipt_image[0]);
+      }
 
       requestKey.current ??= newRequestKey();
       fd.set('request_key', requestKey.current);
       if (submitted?.id) {
         fd.set('action', resubmitting ? 'resubmit' : 'edit');
         fd.set('row_version', String(submitted.row_version));
-        if (external) await api.externalInsurance.update(submitted.id, fd);
+        if (client) await client.update(submitted.id, fd);
         else await api.insuranceRegistration.supplement(submitted.id, fd);
         // Ở lại trang, hiện bản mới nhất ở chế độ chỉ xem.
-        const fresh = await (external ? api.externalInsurance.detail(submitted.id) : api.insuranceRegistration.detail(submitted.id));
+        const fresh = await (client ? client.detail(submitted.id) : api.insuranceRegistration.detail(submitted.id));
         requestKey.current = null;
         setSubmitted(fresh);
         setPrefill(fresh.prefill);
@@ -675,11 +714,11 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         setValue("confirm_declaration", false);
         setUnlocked(false);
         setNotice(resubmitting
-          ? "Đã gửi lại bản khai. Cán bộ sẽ kiểm tra lại thông tin."
+          ? `Đã gửi lại ${hospitalChange ? "yêu cầu" : "bản khai"}. Cán bộ sẽ kiểm tra lại thông tin.`
           : "Đã lưu thay đổi. Thông tin mới nhất được hiển thị bên dưới.");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        if (external) await api.externalInsurance.submit(fd);
+        if (client) await client.submit(fd);
         else await api.insuranceRegistration.submit(fd);
         setSuccess(true);
       }
@@ -730,11 +769,11 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         <div className="w-16 h-16 bg-success-soft text-success-text rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckSquare size={32} />
         </div>
-        <h2 className="text-title font-semibold text-ink mb-2">
-          {external ? "Khai báo thành công" : "Đăng ký thành công"}
+        <h2 className="text-xl font-semibold text-ink mb-2">
+          {hospitalChange ? "Đã gửi yêu cầu" : external ? "Khai báo thành công" : "Đăng ký thành công"}
         </h2>
-        <p className="text-ink-3 mb-6">
-          {external ? "Thông tin tham gia BHYT tại nơi khác đã được ghi nhận và đang chờ cán bộ xác nhận." : <>Yêu cầu đăng ký BHYT của sinh viên đã được ghi nhận. Phòng CTSV sẽ
+        <p className="text-slate-600 mb-6">
+          {hospitalChange ? "Yêu cầu đổi nơi khám chữa bệnh ban đầu đã được ghi nhận và đang chờ cán bộ xác nhận." : external ? "Thông tin tham gia BHYT tại nơi khác đã được ghi nhận và đang chờ cán bộ xác nhận." : <>Yêu cầu đăng ký BHYT của sinh viên đã được ghi nhận. Phòng CTSV sẽ
           tiến hành gửi hồ sơ lên BHXH để gia hạn/đăng ký mới. BHYT sẽ có hiệu
           lực từ ngày đầu quý tiếp theo.</>}
         </p>
@@ -745,19 +784,42 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
     );
   }
 
+  if (hospitalChange && loadFailed) {
+    return (
+      <div className="max-w-xl mx-auto mt-6 sm:mt-10 space-y-4 rounded-lg border border-line bg-white p-6 text-center shadow-card sm:p-8">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-warning-soft text-warning-text">
+          <AlertTriangle size={26} />
+        </div>
+        <h2 className="text-lg font-semibold text-ink">Chưa thể đổi nơi khám chữa bệnh ban đầu</h2>
+        <p className="text-sm text-slate-600">{error}</p>
+        <Link href="/dashboard/bao-hiem-y-te" className={cn(ui.btnPrimary, "w-full sm:w-auto")}>
+          Quay lại trang BHYT
+        </Link>
+      </div>
+    );
+  }
+
   const year = submitted?.registration_year ?? config?.registration_year;
-  const title = external
+  const title = hospitalChange
+    ? `${editingRecord ? "Yêu cầu" : "Gửi yêu cầu"} đổi nơi khám chữa bệnh ban đầu${config?.name ? ` - ${config.name}` : ""}`
+    : external
     ? (editingRecord ? "Bản khai BHYT tại nơi khác" : "Khai thông tin tham gia BHYT tại nơi khác")
     : editingRecord
       ? `Đơn đăng ký BHYT năm ${year ?? ""}${config?.name ? ` - ${config.name}` : ""}`
       : `Khai thông tin - Mua BHYT năm ${year ?? ""}${config?.name ? ` - ${config.name}` : ""}`;
   const windowInfo = submitted?.window ?? (config ? { start_date: config.start_date, end_date: config.end_date, can_edit: config.status === 'open' } : null);
   const imageSlots = ([
-    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-primary-soft text-primary" },
-    { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-sky-50 text-sky-500" },
-    { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-emerald-50 text-emerald-500" },
-    { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-indigo-50 text-indigo-500" },
-  ] as const).filter((slot) => !external || slot.name !== "payment_receipt_image");
+    { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-slate-100 text-slate-500" },
+    { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-slate-100 text-slate-500" },
+    { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-slate-100 text-slate-500" },
+    { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-slate-100 text-slate-500" },
+  ] as const).filter((slot) => hospitalChange
+    // Ảnh chép từ đơn tại trường: chỉ hiện ảnh đơn đó thực sự có.
+    ? !!submittedImages[slot.name]
+    : !external || slot.name !== "payment_receipt_image");
+  // Nơi KCB đang đăng ký trước khi đổi.
+  const currentHospital = submitted?.old_hospital?.name || submitted?.old_hospital?.code
+    || source?.source?.hospital_name || source?.source?.hospital_code || "";
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
@@ -774,16 +836,21 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         </Link>
         <ChevronRight size={14} />
         <span className="font-medium text-ink">
-          {editingRecord ? (external ? "Bản khai tại nơi khác" : "Đơn đăng ký BHYT") : external ? "Khai BHYT tại nơi khác" : "Đăng ký BHYT"}
+          {hospitalChange ? "Đổi nơi KCB ban đầu" : editingRecord ? (external ? "Bản khai tại nơi khác" : "Đơn đăng ký BHYT") : external ? "Khai BHYT tại nơi khác" : "Đăng ký BHYT"}
         </span>
       </nav>
 
       {/* Tiêu đề + mô tả của đợt. Đơn đã nộp dùng mô tả HIỆN HÀNH của chính đợt đó. */}
-      <div className="rounded-lg border border-primary-line bg-primary-soft p-4 text-primary-text sm:p-5">
+      <div className={cn(ui.card, "p-4 text-ink sm:p-5")}>
         <h1 className="flex items-start gap-2 text-base font-bold sm:text-lg">
-          <ShieldPlus size={20} className="mt-0.5 shrink-0" /> <span>{title}</span>
+          <ShieldPlus size={20} className="mt-0.5 shrink-0 text-slate-500" /> <span>{title}</span>
         </h1>
-        {external ? (
+        {hospitalChange && !config?.description ? (
+          <p className="mt-2 text-sm">
+            Thông tin được lấy nguyên từ thẻ BHYT mua tại trường của bạn (đơn đăng ký đã phát hành, hoặc hồ sơ sinh viên khi không có đơn) và không chỉnh sửa được.
+            Bấm <strong>Đổi nơi khám chữa bệnh ban đầu</strong> để chọn bệnh viện mới rồi gửi yêu cầu.
+          </p>
+        ) : external ? (
           <p className="mt-2 text-sm">Dành cho tất cả sinh viên đã tham gia BHYT tại nơi khác. Vui lòng khai đầy đủ thông tin và đính kèm 3 ảnh để nhà trường ghi nhận.</p>
         ) : config?.description ? (
           <div
@@ -808,7 +875,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         )}
       </div>
 
-      {!external && !editingRecord && config?.freshman_warning && !freshmanAck && (
+      {mode === "registration" && !editingRecord && config?.freshman_warning && !freshmanAck && (
         <FreshmanWarningModal message={config.freshman_warning} onConfirm={() => setFreshmanAck(true)} />
       )}
 
@@ -830,8 +897,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           <div className={cn(ui.cardHeader, "px-4 sm:px-5")}>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h2 className={ui.sectionTitle}>
-                <History size={16} className="text-primary" />
-                {external ? "Bản khai đã gửi" : "Đơn đã gửi"}
+                <History size={16} className="text-slate-500" />
+                {hospitalChange ? "Yêu cầu đã gửi" : external ? "Bản khai đã gửi" : "Đơn đã gửi"}
               </h2>
               {submitted.status && <InsuranceStatus status={submitted.status} />}
             </div>
@@ -860,7 +927,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
 
           {submitted.review_note && (
             <div className="border-t border-line2 p-4 sm:p-5">
-              <RejectionNotice rejected={submitted.status === "rejected"} eyebrow={external ? "Bản khai bị từ chối" : "Đơn bị từ chối"} note={submitted.review_note} />
+              <RejectionNotice rejected={submitted.status === "rejected"} eyebrow={hospitalChange ? "Yêu cầu bị từ chối" : external ? "Bản khai bị từ chối" : "Đơn bị từ chối"} note={submitted.review_note} />
             </div>
           )}
           {(() => {
@@ -894,6 +961,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         </div>
       ) : external ? (
         <p className="rounded-lg border border-line bg-white px-4 py-3 text-sm text-muted">Hiện chưa mở thời gian tiếp nhận khai báo. Các bản khai đã gửi vẫn xem được tại trang BHYT.</p>
+      ) : hospitalChange ? (
+        <p className="rounded-lg border border-line bg-white px-4 py-3 text-sm text-muted">Hiện chưa mở đợt nhận yêu cầu đổi nơi khám chữa bệnh ban đầu.</p>
       ) : null}
 
       <form ref={formRef} onChange={() => { requestKey.current = null; }} onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5 sm:space-y-6">
@@ -901,7 +970,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
         <fieldset disabled={saving || !formEnabled} className={cn("min-w-0 space-y-5 sm:space-y-6", saving && "opacity-60")}>
           {external && (
             <section className={ui.card}>
-              <div className={ui.cardHeader}><h2 className={ui.sectionTitle}><FileText size={16} className="text-primary" /> Thông tin thẻ tham gia ngoài nhà trường</h2></div>
+              <div className={ui.cardHeader}><h2 className={ui.sectionTitle}><FileText size={16} className="text-slate-500" /> Thông tin thẻ tham gia ngoài nhà trường</h2></div>
               <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
                 {([
                   ['medical_insurance_code', 'Mã thẻ BHYT', 'text'],
@@ -921,9 +990,9 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
-                <User size={16} className="text-primary" /> Thông tin cá nhân
+                <User size={16} className="text-slate-500" /> Thông tin cá nhân
               </h2>
-              {prefill && !editingRecord && (
+              {prefill && !editingRecord && !hospitalChange && (
                 <EditLink
                   disabled={saving}
                   active={infoEditable}
@@ -935,7 +1004,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 />
               )}
               {/* Mở khóa / hủy chỉnh sửa hồ sơ đã nộp: góc phải, cùng hàng tiêu đề */}
-              {editingRecord && submitted && canSubmit && (
+              {editingRecord && submitted && canSubmit && !hospitalChange && (
                 <EditLink
                   disabled={saving}
                   active={unlocked}
@@ -966,7 +1035,7 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                   <input
                     {...fieldA11y("student_code", !!errors.student_code)}
                     {...register("student_code")}
-                    readOnly={editingRecord || (recorded(prefill?.student_code) && !infoEditable)}
+                    readOnly={editingRecord || hospitalChange || (recorded(prefill?.student_code) && !infoEditable)}
                     className={fieldCls(editingRecord || personalLocked(prefill?.student_code), !!errors.student_code)}
                   />
                   <FieldError id={errorId("student_code")} message={errors.student_code?.message} />
@@ -1051,11 +1120,11 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                     disabled={personalLocked(prefill?.social_insurance_number)}
                     className={fieldCls(personalLocked(prefill?.social_insurance_number), !!errors.social_insurance_number)}
                   />
-                  <FieldError id={errorId("social_insurance_number")} message={errors.social_insurance_number?.message} />
-                  {!editLocked && (
-                    <div className="mt-2 rounded-lg border border-primary-line bg-primary-soft px-3 py-2.5 text-xs leading-5 text-primary-text">
+                  <FieldError message={errors.social_insurance_number?.message} />
+                  {!editLocked && !hospitalChange && (
+                    <div className="mt-2 rounded-lg border border-line2 bg-[#f8fafc] px-3 py-2.5 text-xs leading-5 text-ink">
                       <p className="flex items-center gap-1.5 font-semibold">
-                        <Info size={14} className="shrink-0" /> Cách lấy số sổ BHXH
+                        <Info size={14} className="shrink-0 text-slate-500" /> Cách lấy số sổ BHXH
                       </p>
                       <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-ink-2">
                         <li>
@@ -1122,16 +1191,77 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                   )}
                 />
               </div>
+
+              {/* Chỉ đơn đăng ký tại trường; đổi nơi KCB chỉ hiện lại ghi chú của đơn gốc. */}
+              {!external && (!hospitalChange || !!noteValue) && (
+                <div className="pt-4 border-t border-line2">
+                  <div className="mb-3 flex items-baseline justify-between gap-3">
+                    <h3 className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold">
+                      Ghi chú thông tin BHYT bị sai
+                      <span className="text-xs font-normal text-muted">(không bắt buộc)</span>
+                    </h3>
+                    {!noteLocked && (
+                      <span className="shrink-0 text-xs text-muted">{(noteValue ?? "").length}/1000</span>
+                    )}
+                  </div>
+                  <textarea
+                    id="insurance-note"
+                    aria-label="Ghi chú thông tin BHYT bị sai"
+                    rows={3}
+                    maxLength={1000}
+                    {...register("note")}
+                    disabled={noteLocked}
+                    placeholder="VD: Thẻ BHYT đang ghi CCCD cũ 0123…, đã đổi sang 0798…"
+                    className={cn(
+                      ui.textarea,
+                      noteLocked && "bg-slate-50 text-slate-500",
+                      errors.note && "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
+                    )}
+                  />
+                  <FieldError message={errors.note?.message} />
+                  {!noteLocked && (
+                    <div className="mt-2 rounded-lg border border-line2 bg-[#f8fafc] px-3 py-2.5 text-xs leading-5 text-ink">
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        <Info size={14} className="shrink-0 text-slate-500" /> Khi nào cần ghi chú
+                      </p>
+                      <p className="mt-1 text-slate-700">
+                        Chỉ điền khi thông tin trên thẻ BHYT/BHXH đang khác hồ sơ: đã đổi CCCD, đổi giấy khai sinh,
+                        sai ngày sinh, sai họ tên… Ghi rõ <strong>thông tin cũ</strong> và <strong>thông tin đúng</strong>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </section>
+
 
           <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
-                <ShieldPlus size={16} className="text-primary" /> Nơi đăng ký khám chữa bệnh ban đầu
+                <ShieldPlus size={16} className="text-slate-500" /> Nơi đăng ký khám chữa bệnh ban đầu
               </h2>
+              {/* Nút duy nhất mở khóa form đổi nơi KCB (span, không bị fieldset khóa). */}
+              {hospitalChange && canSubmit && (
+                <EditLink
+                  disabled={saving}
+                  active={unlocked}
+                  label={!editingRecord ? "Đổi nơi khám chữa bệnh ban đầu" : resubmitting ? "Gửi lại yêu cầu" : "Chỉnh sửa"}
+                  onClick={() => {
+                    setNotice("");
+                    if (unlocked) cancelEdit();
+                    else setUnlocked(true);
+                  }}
+                />
+              )}
             </div>
             <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
+              {hospitalChange && currentHospital && (
+                <p className="rounded-lg border border-line bg-slate-50 px-3 py-2.5 text-sm text-slate-600 md:col-span-2">
+                  Nơi KCB ban đầu {submitted?.status === "issued" ? "trước khi đổi" : "hiện tại"}:{" "}
+                  <strong className="font-medium text-ink">{currentHospital}</strong>
+                </p>
+              )}
               <div className="min-w-0">
                 <label className={cn(ui.fieldLabel, (!hospitalProvince && errors.hospital_code) && "text-danger-text")} htmlFor="kcb-province">
                   Tỉnh thành bệnh viện
@@ -1204,17 +1334,27 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 )}
               </div>
               {!external && formEnabled && (
-                <ul className="space-y-0.5 text-xs text-muted md:col-span-2">
+                <ul className="space-y-0.5 text-[0.75rem] text-muted md:col-span-2">
+                  {hospitalChange && (
+                    <li>• Nơi KCB mới phải <b>khác</b> nơi KCB ban đầu hiện tại.</li>
+                  )}
+                  {/* Link do staff cập nhật theo đợt trên Dashboard (Quản lý đợt); trống thì "tại đây" không bấm được. */}
                   <li>
                     • <b>Link tra cứu bệnh viện:</b>{" "}
-                    <a
-                      href="https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Xem tại đây
-                    </a>
+                    {hospitalLookupUrl ? (
+                      <a
+                        href={hospitalLookupUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        tại đây
+                      </a>
+                    ) : (
+                      <span aria-disabled="true" title="Chưa có link tra cứu, vui lòng liên hệ Phòng CTSV" className="cursor-not-allowed text-slate-400">
+                        tại đây
+                      </span>
+                    )}
                   </li>
                   <li>
                     • Sinh viên chỉ chọn các Bệnh viện tại <b>TP.HCM</b> hoặc{" "}
@@ -1234,12 +1374,12 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
           <section className={ui.card}>
             <div className={ui.cardHeader}>
               <h2 className={ui.sectionTitle}>
-                <CreditCard size={16} className="text-primary" /> {external ? "Hồ sơ đính kèm" : "Thanh toán & Hồ sơ"}
+                <CreditCard size={16} className="text-slate-500" /> {external || hospitalChange ? "Hồ sơ đính kèm" : "Thanh toán & Hồ sơ"}
               </h2>
             </div>
             <div className="space-y-5 p-4 sm:space-y-6 sm:p-5">
               {/* Đơn đã nộp: đã chuyển khoản rồi nên ẩn QR + thông tin chuyển khoản. */}
-              {!external && !editingRecord && <div className="flex flex-col items-center gap-5 rounded-lg border border-line bg-surface-subtle p-4 md:flex-row md:items-start md:gap-6">
+              {mode === "registration" && !editingRecord && <div className="flex flex-col items-center gap-5 rounded-lg border border-line bg-slate-50 p-4 md:flex-row md:items-start md:gap-6">
                 <div className="shrink-0 text-center">
                   {qrPayload ? (
                     <>
@@ -1324,7 +1464,13 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                 </div>
               </div>}
 
-              {editingRecord && (
+              {hospitalChange ? (
+                <p className="text-xs text-muted">
+                  {imageSlots.length
+                    ? "Ảnh lấy từ đơn đăng ký BHYT tại trường, không thay đổi được. Bấm vào ảnh để xem cỡ lớn."
+                    : "Không có ảnh đính kèm: thông tin lấy từ thẻ BHYT tại trường và hồ sơ sinh viên."}
+                </p>
+              ) : editingRecord && (
                 <p className="text-xs text-muted">
                   {editLocked
                     ? "Ảnh đã nộp. Bấm vào ảnh để xem cỡ lớn."
@@ -1344,10 +1490,10 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                       Icon={slot.Icon}
                       tone={slot.tone}
                       existingUrl={submittedImages[slot.name]}
-                      disabled={!formEnabled || saving}
+                      disabled={hospitalChange || !formEnabled || saving}
                       file={typeof value === "string" ? undefined : value?.[0]}
                       error={errors[slot.name]}
-                      input={register(slot.name)}
+                      input={hospitalChange ? undefined : register(slot.name)}
                     />
                   );
                 })}
@@ -1365,8 +1511,10 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
                   className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-line-strong text-primary focus:ring-primary", errors.confirm_declaration && "border-danger outline-none ring-2 ring-danger/20")}
                 />
                 <div>
-                  <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-danger-text" : "text-ink")}>
-                    {editingRecord
+                  <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-red-700" : "text-ink")}>
+                    {hospitalChange
+                      ? "Xác nhận yêu cầu đổi nơi khám chữa bệnh ban đầu và đồng ý cung cấp thông tin cho nhà trường."
+                      : editingRecord
                       ? "Xác nhận thông tin chỉnh sửa là chính xác và đồng ý cung cấp thông tin cho nhà trường."
                       : external
                         ? "Xác nhận đã khai đúng thông tin và đồng ý cung cấp thông tin cho nhà trường."
@@ -1400,8 +1548,8 @@ function InsuranceRegistrationForm({ external }: { external: boolean }) {
               <Link href="/dashboard/bao-hiem-y-te" className={cn(ui.btnGhost, "w-full sm:w-auto")}>
                 Hủy
               </Link>
-              <button type="submit" disabled={saving || !canSubmit} className={cn(ui.btnPrimary, "w-full sm:w-auto")}>
-                {saving && <Loader2 size={16} className="animate-spin" />} {external ? "Gửi khai báo" : "Gửi đăng ký"}
+              <button type="submit" disabled={saving || !formEnabled} className={cn(ui.btnPrimary, "w-full sm:w-auto")}>
+                {saving && <Loader2 size={16} className="animate-spin" />} {hospitalChange ? "Gửi yêu cầu" : external ? "Gửi khai báo" : "Gửi đăng ký"}
               </button>
             </>
           )}

@@ -11,7 +11,8 @@ import { useEffect, useState } from 'react';
 import { Ban } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import type { RequestAvailability } from '@/lib/types';
+import { notice, noticeIcon } from '@/lib/ui';
+import type { QuotaTypeState, RequestAvailability } from '@/lib/types';
 
 export function useRequestQuota(): RequestAvailability | null {
   const [data, setData] = useState<RequestAvailability | null>(null);
@@ -30,12 +31,22 @@ export function useRequestQuota(): RequestAvailability | null {
   return data;
 }
 
+/**
+ * GXN "Khác" + tiếng Anh tính lượt theo MỤC ĐÍCH (không chặn cả loại): trả các mục đích đã hết
+ * lượt trong học kỳ ⇒ form làm mờ đúng mục đích đó. Đang sửa yêu cầu cũ (`bypass`) ⇒ không chặn.
+ */
+export function usePurposeLocks(type: string, bypass = false): Record<string, QuotaTypeState> {
+  const quota = useRequestQuota();
+  if (bypass) return {};
+  return quota?.types[type]?.purposes ?? {};
+}
+
 /** Khối thông báo lý do hết lượt (dùng ở trang chọn loại + đầu mỗi form). */
 export function QuotaNotice({ reason, className }: { reason: string; className?: string }) {
   return (
-    <div className={cn('flex items-start gap-2.5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3', className)}>
-      <Ban size={16} className="mt-0.5 shrink-0 text-warning-text" />
-      <p className="text-[0.84rem] leading-relaxed text-warning-text">{reason}</p>
+    <div className={cn(notice.base, notice.warning, className)}>
+      <Ban className={noticeIcon.warning} />
+      <p className="text-[0.84rem] leading-relaxed">{reason}</p>
     </div>
   );
 }

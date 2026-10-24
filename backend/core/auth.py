@@ -28,6 +28,7 @@ def verify_ldap(uid: str, password: str) -> dict | None:
     """
     if not uid or not password:
         return None
+
     import os
     if os.getenv("BYPASS_LDAP", "False").lower() == "true":
         # Trả về luôn dict thông tin giả lập mà không cần kết nối server LDAP
@@ -38,6 +39,7 @@ def verify_ldap(uid: str, password: str) -> dict | None:
             "display_name": f"SV Test {uid}"
         }
     # ==========================================
+
     logger.debug("LDAP_START        | uid=%-20s", uid)
 
     server = ldap3.Server(

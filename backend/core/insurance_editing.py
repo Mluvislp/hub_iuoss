@@ -23,7 +23,11 @@ def period_config(year, period, snapshot=None, student=None):
     cfg = (HealthInsuranceConfig.objects.select_related('bank_account')
            .filter(registration_year=year, registration_period=period).first()) if year and period else None
     if cfg is None:
-        return snapshot if isinstance(snapshot, dict) else None
+        if not isinstance(snapshot, dict):
+            return None
+        # Snapshot lúc nộp không có link tra cứu (hoặc link cũ) → luôn dùng link hiện hành.
+        from .api.views import hospital_lookup_url
+        return {**snapshot, 'hospital_lookup_url': hospital_lookup_url()}
     return _insurance_config_payload(cfg, include_payment=True, student=student)
 
 

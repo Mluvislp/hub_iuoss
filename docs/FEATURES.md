@@ -16,8 +16,9 @@ Mặc định: **production → tắt (hiện trang chờ)**, **local/staging �
 |---|---|
 | `FEATURE_DOCUMENT_REQUESTS` | Route `/dashboard/requests/*`, nút CTA ở hero + bảng "Yêu cầu giấy tờ gần đây" ở trang chủ, và toàn bộ `/api/requests/*` (404 khi tắt) |
 | `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
-| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được |
+| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được. **Đã mở 23/10/2026: mặc định BẬT cả trên production** |
 | `FEATURE_TUITION_WAIVER` | Route `/dashboard/mien-giam-hoc-phi/*` và toàn bộ `/api/tuition-exemption/*` (404 khi tắt). Trang quản lý bên Dashboard (`/tuition/`) KHÔNG bị cờ này chặn — phòng cấu hình đợt/danh mục trước được |
+| `FEATURE_DIRECT_SUBMISSIONS` | Route `/dashboard/nap-giay-to/*`, mục menu "Nạp giấy tờ trực tiếp" và toàn bộ `/api/submissions/*` (404 khi tắt) |
 | `FEATURE_SUPPORT_TICKETS` | Route `/dashboard/hoi-dap/*`, badge tin mới ở sidebar và toàn bộ `/api/tickets/*` (404 khi tắt). Nghiệp vụ: `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 
 **Nguồn sự thật là backend** — `config/settings.py`, mặc định `not IS_PRODUCTION`
@@ -324,6 +325,28 @@ thời đề xuất sửa CCCD / email cá nhân / SĐT.
   `dashboard_iuoss/docs/OFFCAMPUS.md` — đọc file đó trước khi sửa.
 
 ---
+
+## 3d. Nạp giấy tờ trực tiếp — `/dashboard/nap-giay-to`
+
+Cờ `FEATURE_DIRECT_SUBMISSIONS`. SV khai thông tin (ngày sinh + CCCD xin sửa được), tên giấy tờ cần
+xét, số bản, SĐT, tải 1–10 ảnh/PDF, tích cam đoan → Phòng CTSV tiếp nhận / hoàn thành (mã trả hồ sơ) /
+trả giấy. Bảng riêng `hub_direct_submissions` (+ `_files`, `_comments`). API `GET/POST /api/submissions/`,
+`GET /api/submissions/form/`, `GET/PUT /api/submissions/<id>/` (PUT = sửa lúc "Chờ bổ sung", multipart,
+`remove_file_ids`), `POST …/comments/`, `GET …/files/<id>/`. Nghiệp vụ đầy đủ:
+`dashboard_iuoss/docs/DIRECT_SUBMISSIONS.md`.
+
+---
+
+## 3c. Thông tin cá nhân — `/dashboard/thong-tin-ca-nhan`
+
+Cờ `FEATURE_PERSONAL_INFO`. API `GET/POST /api/personal-info/` (`core/personal_info.py`).
+6 ô chỉ đọc + 7 cụm gửi duyệt (email cá nhân, SĐT, CCCD, tài khoản ngân hàng, cha, mẹ,
+THPT). Cha/mẹ có 2 ô bấm Đã mất / Không có (`parent_status`); không chọn = còn sống. **Mọi cụm chờ duyệt kể cả khai lần đầu**; Hub không ghi gì vào hồ sơ — mỗi cụm
+là một dòng `hub_profile_change_requests` (`source = thong_tin_ca_nhan`), nhân viên
+duyệt bên Dashboard. Cụm đang chờ bị khóa; cụm bị từ chối mở sẵn với giá trị đã gửi (lý do chỉ gửi qua
+email, trang không hiện). Lỗi trả
+theo từng cụm (`errors: {key: message}`), có lỗi thì không cụm nào được ghi. Luật
+read/clean là bản song sinh của Dashboard — chi tiết ở `dashboard_iuoss/docs/OFFCAMPUS.md` §2.
 
 ## 4. Logging
 

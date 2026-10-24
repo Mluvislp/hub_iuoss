@@ -1,8 +1,10 @@
 from django.urls import path
-from . import health_check_views, ticket_views, tuition_exemption_views, views
+from . import health_check_views, submission_views, ticket_views, tuition_exemption_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
+from .hospital_change_views import HospitalChangeView, HospitalChangeImageView
+from .personal_info_views import PersonalInfoView
 
 urlpatterns = [
     path('health-insurance/external/<int:pk>/', ExternalInsuranceView.as_view(), name='api_external_insurance_detail'),
@@ -11,6 +13,9 @@ urlpatterns = [
     path('health-insurance/external/', ExternalInsuranceView.as_view(), name='api_external_insurance'),
     path('health-insurance/registrations/<int:pk>/', InsuranceDetailView.as_view(), name='api_insurance_detail'),
     path('health-insurance/registrations/<int:pk>/evidence/<int:evidence_id>/', InsuranceEvidenceView.as_view(), name='api_insurance_evidence'),
+    path('health-insurance/hospital-change/', HospitalChangeView.as_view(), name='api_hospital_change'),
+    path('health-insurance/hospital-change/<int:pk>/', HospitalChangeView.as_view(), name='api_hospital_change_detail'),
+    path('health-insurance/hospital-change/<int:pk>/images/<str:field>/', HospitalChangeImageView.as_view(), name='api_hospital_change_image'),
     # Health check (no auth) — cho monitor / load balancer
     path("health/",              views.HealthView.as_view(),  name="api_health"),
 
@@ -32,6 +37,7 @@ urlpatterns = [
     path("health-insurance/registrations/", views.InsuranceRegistrationView.as_view(), name="api_health_insurance_registrations"),
     path("requests/",             views.RequestsView.as_view(),          name="api_requests"),
     path("requests/availability/", views.RequestAvailabilityView.as_view(), name="api_request_availability"),
+    path("requests/preview/",     views.RequestPreviewView.as_view(),    name="api_request_preview"),
     path("requests/<int:pk>/",          views.RequestDetailView.as_view(),   name="api_request_detail"),
     path("requests/<int:pk>/comments/", views.RequestCommentsView.as_view(), name="api_request_comments"),
     path("requests/<int:pk>/soft-copy/", views.RequestSoftCopyView.as_view(), name="api_request_soft_copy"),
@@ -42,7 +48,17 @@ urlpatterns = [
     path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
     path("requests/conduct-score/form/", views.ConductScoreRequestFormView.as_view(), name="api_conduct_request_form"),
 
+    # Nạp giấy tờ trực tiếp — core/direct_submissions.py
+    path("submissions/",            submission_views.SubmissionsView.as_view(),       name="api_submissions"),
+    path("submissions/form/",       submission_views.SubmissionFormView.as_view(),    name="api_submission_form"),
+    path("submissions/<int:pk>/",   submission_views.SubmissionDetailView.as_view(),  name="api_submission_detail"),
+    path("submissions/<int:pk>/comments/", submission_views.SubmissionCommentsView.as_view(),
+         name="api_submission_comments"),
+    path("submissions/<int:pk>/files/<int:file_id>/", submission_views.SubmissionFileView.as_view(),
+         name="api_submission_file"),
+
     # Khai báo thông tin ngoại trú
+    path("personal-info/", PersonalInfoView.as_view(), name="api_personal_info"),
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
     path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
          name="api_offcampus_request_reopen"),

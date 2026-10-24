@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ArrowRight, Info, FileText } from 'lucide-react';
+import { ChevronRight, ArrowRight, Info, FileText, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ui } from '@/lib/ui';
 import { REQUEST_TYPE_LABELS, type RequestType } from '@/lib/types';
@@ -32,7 +32,7 @@ const TYPE_HINTS: Record<RequestType, string> = {
   thuong_binh: 'Xác nhận để hưởng ưu đãi giáo dục (con thương binh, liệt sĩ…).',
   bank_loan: 'Xác nhận để vay vốn ngân hàng chính sách cho sinh viên.',
   english_form: 'Giấy xác nhận bằng tiếng Anh (du học, xin việc, visa…).',
-  conduct_score: 'Bảng điểm rèn luyện theo học kỳ hoặc cả năm học, bản mềm hoặc bản cứng.',
+  conduct_score: 'Bảng điểm rèn luyện theo năm học (chọn được nhiều năm), bản mềm hoặc bản cứng.',
   // Liệt kê theo OTHER_PURPOSE_CHOICES (backend/core/documents.py) — thêm/bớt mục đích thì xem lại câu này.
   other: 'Xác nhận cho vé Metro ưu đãi, xin visa, xin việc, thực tập, du học, thi Tiếng Anh đầu ra, giảm trừ gia cảnh, vay vốn theo nhu cầu, kết nạp Đảng…',
 };
@@ -54,11 +54,11 @@ export default function NewRequestPage() {
         <span className="text-ink font-medium">Yêu cầu giấy tờ</span>
       </nav>
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-line">
-          <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
-            <FileText size={17} className="text-primary" />
+          <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+            <FileText size={17} className="text-slate-500" />
             Tạo yêu cầu giấy tờ
           </h1>
           <p className="text-sm text-muted mt-1">
@@ -88,8 +88,8 @@ export default function NewRequestPage() {
                       blocked
                         ? 'cursor-not-allowed border-line bg-surface-subtle'
                         : selected
-                          ? 'cursor-pointer border-primary bg-primary-soft ring-1 ring-primary-line'
-                          : 'cursor-pointer border-line hover:border-line-strong hover:bg-surface-subtle',
+                          ? 'cursor-pointer border-primary bg-white ring-1 ring-primary'
+                          : 'cursor-pointer border-line hover:border-slate-300 hover:bg-slate-50',
                     )}
                   >
                     <input
@@ -109,7 +109,8 @@ export default function NewRequestPage() {
                         {TYPE_HINTS[value]}
                       </span>
                       {blocked && (
-                        <span className="mt-2 block rounded-md border border-warning-line bg-warning-soft px-2.5 py-2 text-xs leading-relaxed text-warning-text">
+                        <span className="mt-2 flex items-start gap-1.5 border-t border-line pt-2 text-[0.78rem] leading-relaxed text-slate-600">
+                          <Lock size={13} className="mt-[3px] shrink-0 text-slate-400" />
                           {lock!.reason}
                         </span>
                       )}
@@ -122,9 +123,9 @@ export default function NewRequestPage() {
 
           {/* CTA mở biểu mẫu chi tiết của loại đã chọn */}
           {dedicatedHref ? (
-            <div className="px-4 py-4 rounded-lg bg-primary-soft border border-primary-line">
+            <div className="px-4 py-4 rounded-lg border border-line bg-[#f8fafc]">
               <div className="flex items-start gap-3">
-                <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                <Info size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-ink flex-1">
                   Giấy <strong className="font-semibold">“{selectedLabel}”</strong> cần thêm một số thông tin
                   từ hồ sơ (ngày sinh, CCCD, địa chỉ…) để lập giấy chính xác.

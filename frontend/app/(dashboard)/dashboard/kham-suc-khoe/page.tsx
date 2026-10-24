@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, CalendarClock, Check, ChevronRight, ClipboardCheck,
-  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope,
+  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope, Users,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
@@ -19,6 +19,7 @@ import { EvidenceThumbs } from './Evidence';
 import ExaminedWizard from './ExaminedWizard';
 import CccdForm from './CccdForm';
 import ConsentBox from './ConsentBox';
+import SlotPicker from './SlotPicker';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -81,13 +82,34 @@ function PackageInfo({ state }: { state: HealthCheckState }) {
       </div>
       {r.schedule_note && (
         <div className="px-4 py-3 flex items-start gap-2">
-          <CalendarClock size={15} className="text-primary mt-0.5 flex-shrink-0" />
+          <CalendarClock size={15} className="text-slate-500 mt-0.5 flex-shrink-0" />
           <div>
             <div className="text-xs font-medium text-muted mb-0.5">Thời gian và địa điểm dự kiến</div>
             <div className="text-ink">{r.schedule_note}</div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Đối tượng khám tập trung tại trường — câu chữ ở backend `health_check.EXAM_ELIGIBILITY`. */
+function EligibilityInfo({ state }: { state: HealthCheckState }) {
+  const e = state.exam_eligibility;
+  return (
+    <div className="rounded-lg border border-line px-4 py-3 text-[0.86rem]">
+      <div className="flex items-center gap-1.5 text-[0.75rem] font-medium text-muted mb-1">
+        <Users size={14} className="text-slate-500" /> Đối tượng khám
+      </div>
+      <p className="text-ink">{e.intro}</p>
+      <div className="space-y-1.5 text-ink leading-relaxed mt-1.5">
+        {e.items.map((item, i) => (
+          <div key={i} className="flex gap-2 pl-1">
+            <span className="mt-[0.55em] w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -127,6 +149,8 @@ export default function HealthCheckPage() {
   const [choice, setChoice] = useState<'examined' | 'register' | null>(null);
   const [consent, setConsent] = useState(false);
   const [dataConsent, setDataConsent] = useState(false);
+  const [examSlot, setExamSlot] = useState('');
+  const [slotError, setSlotError] = useState('');
   const [error, setError] = useState('');
   const [resubmitting, setResubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -166,8 +190,8 @@ export default function HealthCheckPage() {
     <div className="px-6 py-5 border-b border-line">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-title font-semibold text-ink">
-            <HeartPulse size={17} className="text-primary" /> {round.title}
+          <h1 className="flex items-center gap-2 text-[1.05rem] font-semibold text-ink">
+            <HeartPulse size={17} className="text-slate-500" /> {round.title}
           </h1>
           <p className="text-sm text-muted mt-1">
             Năm học {round.academic_year} · Thời hạn khai báo {fmtDateTime(round.opens_at)} – {fmtDateTime(round.closes_at)}
@@ -231,7 +255,7 @@ export default function HealthCheckPage() {
             {response.choice === 'register' ? 'Đã ghi nhận đăng ký khám sức khỏe.' : 'Đã ghi nhận kết quả khám và minh chứng.'}
           </div>
         )}
-        <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+        <div className={ui.card}>
           {header}
           <div className="px-6 py-5 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -273,6 +297,12 @@ export default function HealthCheckPage() {
                     <span className={ui.dtValue}>{response.residence.temporary || '—'}</span>
                   </div>
                 </>
+              )}
+              {response.exam_slot && (
+                <div className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Ngày và ca khám</span>
+                  <span className={ui.dtValue}>{response.exam_slot_label}</span>
+                </div>
               )}
               {response.data_consent_at && (
                 <div className={ui.dtRow}>
@@ -324,7 +354,7 @@ export default function HealthCheckPage() {
     return (
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
-        <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+        <div className={ui.card}>
           {header}
           <div className="px-6 py-6 text-sm text-muted">
             {round.state === 'upcoming'
@@ -339,7 +369,7 @@ export default function HealthCheckPage() {
   // ── Đợt đang mở, chưa trả lời ──
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
-    setError(''); draft.setFieldErrors({});
+    setError(''); setSlotError(''); draft.setFieldErrors({});
     if (declarationLocked && state?.cccd_missing) {
       setError('Bổ sung số CCCD ở phần 1 trước khi gửi đăng ký.');
       return;
@@ -353,6 +383,11 @@ export default function HealthCheckPage() {
       }
     }
     if (!eligible) { setError('Phần đăng ký khám chưa được mở.'); return; }
+    if (state?.exam_slots && !examSlot) {
+      setSlotError('Chưa chọn ca khám.');
+      setError('Vui lòng chọn ngày và ca khám.');
+      return;
+    }
     if (!consent) { setError('Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.'); return; }
     if (!dataConsent) { setError('Vui lòng tích xác nhận cam kết và đồng ý cung cấp thông tin.'); return; }
     setSaving(true);
@@ -361,12 +396,19 @@ export default function HealthCheckPage() {
         declaration: declarationLocked ? undefined : draft.payload({ requireCccd: true }),
         consent: true,
         data_consent: true,
+        exam_slot: state?.exam_slots ? examSlot : undefined,
       }));
       setJustSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       if (err instanceof ApiError && err.data?.errors) {
         draft.setFieldErrors(err.data.errors as Record<string, string>);
+        const slotMsg = (err.data.errors as Record<string, string>).exam_slot;
+        if (slotMsg) {
+          // Ca vừa đầy / vừa qua giờ: tải lại lịch để SV thấy tình trạng mới rồi chọn ca khác.
+          setSlotError(slotMsg); setExamSlot('');
+          api.healthCheck.state().then(setState).catch(() => {});
+        }
       }
       setError(err instanceof ApiError ? err.message : 'Không gửi được đăng ký.');
     } finally { setSaving(false); }
@@ -376,7 +418,7 @@ export default function HealthCheckPage() {
     <div className="max-w-[860px] space-y-4">
       <Breadcrumb />
 
-      <div className={cn(ui.card, 'border-t-2 border-t-primary')}>
+      <div className={ui.card}>
         {header}
         <div className="px-6 py-5">
           <p className="text-section font-semibold text-ink mb-3">
@@ -439,11 +481,16 @@ export default function HealthCheckPage() {
                 </h2>
               </div>
 
+              {/* Hiện cả khi phần 2 đang khóa — SV ngoài TP.HCM biết vì sao không đăng ký được. */}
+              <div className="px-6 pt-5">
+                <EligibilityInfo state={state} />
+              </div>
+
               {!eligible ? (
                 <div className="px-6 py-5">
-                  <div role="alert" className="flex items-start gap-3 rounded-lg border border-warning-line bg-warning-soft px-4 py-3.5">
-                    <AlertTriangle size={20} className="text-warning-text flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-warning-text">
+                  <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
+                    <AlertTriangle size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-ink">
                       <div className="font-semibold">Phần đăng ký khám chưa mở</div>
                       <p className="mt-1">
                         Chỉ sinh viên có địa chỉ <b>thường trú</b> hoặc <b>tạm trú</b> tại Thành phố
@@ -473,6 +520,10 @@ export default function HealthCheckPage() {
                         : 'Tạm trú tại Thành phố Hồ Chí Minh'}
                   </div>
                   <PackageInfo state={state} />
+                  {state.exam_slots && (
+                    <SlotPicker options={state.exam_slots} value={examSlot} error={slotError}
+                                onChange={(key) => { setExamSlot(key); setSlotError(''); }} />
+                  )}
                   <label className={cn(
                     'flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
                     consent ? 'border-primary bg-primary-soft' : 'border-line hover:bg-surface-subtle',
@@ -490,7 +541,7 @@ export default function HealthCheckPage() {
 
               <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-line2">
                 <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>
-                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent} className={ui.btnPrimary}>
+                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent || (!!state.exam_slots && !examSlot)} className={ui.btnPrimary}>
                   {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
                           : <><ClipboardCheck size={15} /> Gửi đăng ký khám</>}
                 </button>

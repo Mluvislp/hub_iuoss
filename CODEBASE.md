@@ -8,7 +8,9 @@ gửi yêu cầu giấy tờ. Production: `hub.iuoss.com`.
 
 **Monorepo:** `backend/` (Django 5.2 + DRF, Gunicorn `:8002`) + `frontend/` (Next.js 14
 App Router + Tailwind, PM2 `:3000`). MySQL 8.4 **dùng chung với `dashboard_iuoss`** —
-hai app **không gọi API của nhau**, mọi thứ trao đổi qua DB.
+hai app **không gọi API của nhau**, mọi thứ trao đổi qua DB — ngoại lệ duy nhất: xem trước giấy tờ
+(`core/document_preview.py` gọi Dashboard `/documents/internal/preview/`; chi tiết ở dashboard
+`docs/DOCUMENT_REQUESTS.md` mục "Xem trước giấy").
 
 | Repo | Domain | Người dùng |
 |---|---|---|
@@ -52,6 +54,8 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo ngoại trú (form + submit)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
+  core/health_check_slots.py ← ngày + ca khám tại trường — bản song sinh GIỐNG HỆT dashboard healthcheck/slots.py
+  core/direct_submissions.py · submission_models.py · submission_code.py ← nạp giấy tờ trực tiếp (mã NG-…)
   core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách
   core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
@@ -103,6 +107,7 @@ frontend/
 | `/dashboard/bao-hiem-y-te` | xem thẻ BHYT + lịch sử thẻ |
 | `/dashboard/bao-hiem-y-te/dang-ky` | đăng ký BHYT theo đợt (trang nặng nhất) |
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
+| `/dashboard/bao-hiem-y-te/doi-noi-kcb` | yêu cầu đổi nơi KCB ban đầu (form đăng ký, khóa trừ bệnh viện) |
 | `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
@@ -113,6 +118,7 @@ frontend/
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
+| `/dashboard/nap-giay-to` · `/new` · `/[id]` | nạp giấy tờ trực tiếp: danh sách, form (tạo + `?edit=<id>`), chi tiết |
 
 ### 50 endpoint — `core/api/urls.py`
 
@@ -185,7 +191,8 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_TUITION_WAIVER · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_TUITION_WAIVER · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
+FEATURE_HEALTH_CHECK         # mặc định BẬT mọi môi trường (mở 23/10/2026)
 DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```

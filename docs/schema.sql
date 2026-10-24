@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS `hub_insurance_configs` (
   `bank_account_id` BIGINT NULL,
   `description` TEXT NULL,
   `freshman_warning` TEXT NULL COMMENT 'Cảnh báo khi academic_entry_year trùng registration_year',
+  `hospital_lookup_url` VARCHAR(500) NULL COMMENT 'Link danh sách bệnh viện cho SV tra cứu; NULL/rỗng = ẩn',
   `bank_name` VARCHAR(255) NOT NULL,
   `bank_bin` VARCHAR(6) NULL COMMENT 'Mã BIN 6 số của Napas, dùng dựng VietQR',
   `bank_account_number` VARCHAR(64) NOT NULL,
@@ -237,6 +238,90 @@ CREATE TABLE IF NOT EXISTS hub_external_insurance_events (
  KEY ix_external_event_timeline (declaration_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ── Đổi nơi KCB ban đầu (07/10/2026) — nguồn: docs/insurance_hospital_change_upgrade.sql
+
+-- 4 slot đợt nhận yêu cầu (MAIN/Q2/Q3/Q4), tách riêng với hub_insurance_configs.
+-- Staff tái sử dụng qua từng năm trên Dashboard; chỉ một slot được bật tại một thời điểm.
+CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_configs (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    change_period VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+    change_year INT NOT NULL,
+    opens_at DATETIME(6) NOT NULL,
+    closes_at DATETIME(6) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 0,
+    description TEXT NULL,
+    hospital_lookup_url VARCHAR(500) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_hospital_change_period (change_period)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT IGNORE INTO hub_insurance_hospital_change_configs
+    (change_period, change_year, opens_at, closes_at, is_active, description, hospital_lookup_url, created_at, updated_at)
+VALUES
+    ('MAIN', YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6)),
+    ('Q2',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6)),
+    ('Q3',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6)),
+    ('Q4',   YEAR(CURDATE()), NOW(6), NOW(6), 0, NULL, 'https://drive.google.com/file/d/1S1oznRw_hKKeYmA6H5qVqDz0w3KxsqaM/view?usp=sharing', NOW(6), NOW(6));
+
+-- Mỗi yêu cầu chụp lại toàn bộ đơn đăng ký tại trường làm nguồn (snapshot + ảnh)
+-- lúc gửi; sinh viên chỉ đổi được hospital_code. Không có đơn thì registration_id NULL,
+-- card_id = thẻ diện ĐHQT còn hạn làm nguồn (thông tin chép từ hồ sơ sinh viên).
+CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_requests (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    student_id BIGINT NOT NULL,
+    registration_id BIGINT NULL,
+    card_id BIGINT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    student_code VARCHAR(64) NOT NULL,
+    social_insurance_code VARCHAR(20) NOT NULL DEFAULT '',
+    old_hospital_code VARCHAR(16) NOT NULL DEFAULT '',
+    hospital_code VARCHAR(16) NOT NULL,
+    intake_year INT NOT NULL,
+    intake_period VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+    intake_snapshot JSON NULL,
+    row_version INT UNSIGNED NOT NULL DEFAULT 0,
+    supplement_pending BOOLEAN NOT NULL DEFAULT 0,
+    supplemented_at DATETIME(6) NULL,
+    supplement_reviewed_at DATETIME(6) NULL,
+    snapshot JSON NOT NULL,
+    images JSON NOT NULL,
+    request_key VARCHAR(80) NOT NULL,
+    request_digest VARCHAR(64) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'iu_processing',
+    review_note TEXT NULL,
+    reviewed_by_id BIGINT NULL,
+    reviewed_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_hospital_change_student_request (student_id, request_key),
+    KEY ix_hospital_change_student_created (student_id, created_at),
+    KEY ix_hospital_change_registration (registration_id),
+    KEY ix_hospital_change_student_code (student_code),
+    KEY ix_hospital_change_status_created (status, created_at),
+    KEY ix_hospital_change_supplement (supplement_pending, supplemented_at, id),
+    KEY ix_hospital_change_intake (student_id, intake_year, intake_period)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Timeline append-only của yêu cầu, cùng khuôn hub_external_insurance_events.
+CREATE TABLE IF NOT EXISTS hub_insurance_hospital_change_events (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    change_request_id BIGINT NOT NULL,
+    event_type VARCHAR(40) NOT NULL,
+    actor_id BIGINT NULL,
+    source_app VARCHAR(16) NOT NULL,
+    request_key VARCHAR(96) NULL,
+    payload JSON NULL,
+    created_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_hospital_change_event_key (change_request_id, request_key),
+    KEY ix_hospital_change_event_request (change_request_id, id),
+    CONSTRAINT fk_hospital_change_event_request FOREIGN KEY (change_request_id)
+        REFERENCES hub_insurance_hospital_change_requests (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ── Khám sức khỏe định kỳ (26/09/2026) — nguồn: dashboard_iuoss/docs/sql/20260926_health_check.sql
 -- Mỗi năm học MỘT đợt. Hub chỉ nhận phản hồi khi opens_at <= now <= closes_at;
 -- hết hạn là form tự khóa, năm sau tạo đợt mới trên Dashboard (không sửa code).
@@ -250,6 +335,8 @@ CREATE TABLE `health_check_rounds` (
   `package_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `package_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mỗi dòng một ý; dòng mở đầu bằng "+" là gạch đầu dòng',
   `schedule_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Thời gian và địa điểm dự kiến',
+  -- 23/10/2026: dashboard_iuoss/docs/sql/20261023_health_check_slots.sql
+  `exam_slots` json DEFAULT NULL COMMENT 'Ngày + ca khám tại trường: {"dates": [...], "shifts": [{label,start,end}], "capacity": null|int}',
   `created_by_id` int DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -580,4 +667,56 @@ CREATE TABLE `student_images` (
   CONSTRAINT `fk_si_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `chk_si_subject` CHECK (`subject` IN ('SELF','FATHER','MOTHER','GUARDIAN')),
   CONSTRAINT `chk_si_size` CHECK (`file_size_bytes` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════ Nạp giấy tờ trực tiếp — thêm 19/10/2026 (core/direct_submissions.py) ════════
+-- Bản gốc: dashboard_iuoss/docs/sql/20261019_direct_submissions.sql
+CREATE TABLE IF NOT EXISTS hub_direct_submissions (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  student_id     BIGINT        NOT NULL,
+  ldap_uid       VARCHAR(64)   NOT NULL,
+  document_name  VARCHAR(255)  NOT NULL,             -- tên loại giấy tờ SV cần xét
+  copies         SMALLINT      NOT NULL DEFAULT 1,   -- số bản giấy
+  contact_phone  VARCHAR(20)       NULL,             -- SĐT liên hệ (không ghi ngược hồ sơ)
+  note           TEXT              NULL,
+  payload        JSON              NULL,             -- snapshot + editable (ngày sinh, CCCD) + biên nhận
+  status         VARCHAR(16)   NOT NULL DEFAULT 'pending',
+  staff_note     TEXT              NULL,             -- ghi chú NỘI BỘ
+  return_code    VARCHAR(64)       NULL,             -- mã trả hồ sơ, nhập lúc Hoàn thành
+  consented_at   DATETIME(6)   NOT NULL,             -- lúc SV tích cam đoan
+  created_at     DATETIME(6)   NOT NULL,
+  updated_at     DATETIME(6)   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_hds_student (student_id),
+  KEY idx_hds_ldap_uid (ldap_uid),
+  KEY idx_hds_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_direct_submission_files (
+  id                BIGINT        NOT NULL AUTO_INCREMENT,
+  submission_id     BIGINT        NOT NULL,
+  storage_key       VARCHAR(255)  NOT NULL,          -- đường dẫn dưới MEDIA_ROOT của Hub
+  original_filename VARCHAR(255)  NOT NULL,
+  mime_type         VARCHAR(64)   NOT NULL,
+  file_size_bytes   INT UNSIGNED  NOT NULL,
+  sha256            CHAR(64)      NOT NULL,
+  is_removed        TINYINT(1)    NOT NULL DEFAULT 0, -- SV gỡ khi sửa yêu cầu (xoá MỀM, file còn trên đĩa)
+  created_at        DATETIME(6)   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_hdsf_submission (submission_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_direct_submission_comments (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  submission_id  BIGINT        NOT NULL,
+  author_role    VARCHAR(16)   NOT NULL,             -- 'student' | 'staff'
+  author_user_id BIGINT            NULL,
+  author_name    VARCHAR(255)  NOT NULL,
+  body           TEXT          NOT NULL,
+  is_internal    TINYINT(1)    NOT NULL DEFAULT 0,
+  is_removed     TINYINT(1)    NOT NULL DEFAULT 0,
+  event          VARCHAR(32)       NULL,             -- NULL = trao đổi thường
+  created_at     DATETIME(6)   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_hdsc_submission (submission_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

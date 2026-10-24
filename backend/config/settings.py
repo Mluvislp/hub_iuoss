@@ -33,13 +33,23 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 # Backend là nguồn sự thật duy nhất; frontend đọc qua GET /api/features/.
 FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS_PRODUCTION)
 FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
-FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
+# Khám sức khỏe đã mở cho sinh viên (23/10/2026) — bật ở mọi môi trường; tắt bằng FEATURE_HEALTH_CHECK=False.
+FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=True)
 FEATURE_TUITION_WAIVER = env_bool("FEATURE_TUITION_WAIVER", default=not IS_PRODUCTION)
 FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
+FEATURE_PERSONAL_INFO = env_bool("FEATURE_PERSONAL_INFO", default=not IS_PRODUCTION)
+# Nạp giấy tờ trực tiếp (core/direct_submissions.py) — production bật bằng FEATURE_DIRECT_SUBMISSIONS=1.
+FEATURE_DIRECT_SUBMISSIONS = env_bool("FEATURE_DIRECT_SUBMISSIONS", default=not IS_PRODUCTION)
 
 # Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
 # Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.
 DASHBOARD_PUBLIC_URL = os.getenv("DASHBOARD_PUBLIC_URL", "https://dashboard.iuoss.com").strip().rstrip("/")
+
+# Bản xem trước giấy tờ (core/document_preview.py): Hub backend gọi THẲNG Dashboard qua cổng nội bộ
+# (vd http://127.0.0.1:8003 ở sandbox) — ngoại lệ duy nhất của luật "hai app không gọi API nhau",
+# vì mẫu .docx + luật dựng giấy chỉ có ở Dashboard. Thiếu một trong hai biến ⇒ tính năng tắt.
+DASHBOARD_INTERNAL_URL = os.getenv("DASHBOARD_INTERNAL_URL", "").strip().rstrip("/")
+DOCUMENT_PREVIEW_TOKEN = os.getenv("DOCUMENT_PREVIEW_TOKEN", "").strip()
 
 # Origin của frontend — dùng chung cho CORS và CSRF (khai báo 1 nơi, tránh lệch).
 FRONTEND_ORIGINS = env_list(
@@ -202,6 +212,8 @@ REST_FRAMEWORK = {
         # Nới rộng để tránh chặn nhầm khi nhiều SV dùng chung IP (NAT ký túc xá/wifi trường)
         "login": os.getenv("THROTTLE_LOGIN", "30/min"),
         "create_request": os.getenv("THROTTLE_CREATE_REQUEST", "60/hour"),
+        # Xem trước giấy: mỗi lượt chạy LibreOffice trên server ⇒ chặt theo người dùng.
+        "preview_request": os.getenv("THROTTLE_PREVIEW_REQUEST", "20/hour"),
         # Ticket hỏi đáp: tạo mới chặt, nhắn trong ticket nới hơn (đang trò chuyện).
         "ticket_create": os.getenv("THROTTLE_TICKET_CREATE", "10/hour"),
         "ticket_message": os.getenv("THROTTLE_TICKET_MESSAGE", "120/hour"),

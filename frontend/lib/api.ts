@@ -20,6 +20,9 @@ import type {
   OffCampusForm,
   OffCampusSubmit,
   OffCampusResult,
+  PersonalInfoData,
+  PersonalInfoKey,
+  PersonalInfoValue,
   InsuranceRegistrationPrefill,
   TicketDetail,
   TicketMessage,
@@ -97,7 +100,7 @@ async function request<T>(
 async function requestMultipart<T>(
   path: string,
   formData: FormData,
-  opts: RequestOptions = {},
+  opts: RequestOptions & { method?: 'POST' | 'PUT' } = {},
 ): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
@@ -107,7 +110,7 @@ async function requestMultipart<T>(
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
-      method: 'POST',
+      method: opts.method ?? 'POST',
       headers,
       body: formData,
     });
@@ -205,6 +208,13 @@ export const api = {
     /** Loại giấy nào còn lượt trong học kỳ hiện tại (1 lần / loại / học kỳ). */
     availability(): Promise<import('./types').RequestAvailability> {
       return request('/requests/availability/');
+    },
+    /** Xem trước giấy (core/document_preview.py): GET = bật hay chưa; POST = ảnh JPEG base64 có dấu chìm. */
+    previewStatus(): Promise<{ enabled: boolean; types: string[] }> {
+      return request('/requests/preview/');
+    },
+    preview(data: { request_type: string } & Record<string, unknown>): Promise<{ pages: string[] }> {
+      return request('/requests/preview/', { method: 'POST', body: JSON.stringify(data) });
     },
     detail(id: number): Promise<ConfirmationRequestDetail> {
       return request(`/requests/${id}/`);
@@ -314,7 +324,8 @@ export const api = {
       return request('/requests/conduct-score/form/');
     },
     createConductScore(data: {
-      semester_code: string;
+      /** Một hoặc nhiều năm học (mã `YYYYN`). */
+      semester_codes: string[];
       delivery: string;
       dob: string;
       citizen_id: string;
@@ -328,6 +339,41 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'conduct_score', ...data }),
       });
+    },
+  },
+
+  /** Nạp giấy tờ trực tiếp — backend core/api/submission_views.py. */
+  submissions: {
+    list(): Promise<import('./types').SubmissionSummary[]> {
+      return request('/submissions/');
+    },
+    form(): Promise<import('./types').SubmissionFormData> {
+      return request('/submissions/form/');
+    },
+    detail(id: number): Promise<import('./types').SubmissionDetail> {
+      return request(`/submissions/${id}/`);
+    },
+    /** FormData: các ô form + `files` (nhiều lần) + `consent=1`. */
+    create(body: FormData): Promise<{ id: number; code: string }> {
+      return requestMultipart('/submissions/', body);
+    },
+    /** Sửa lúc "Chờ bổ sung": như create + `remove_file_ids` (nhiều lần). */
+    update(id: number, body: FormData): Promise<import('./types').SubmissionDetail> {
+      return requestMultipart(`/submissions/${id}/`, body, { method: 'PUT' });
+    },
+    addComment(id: number, body: string): Promise<{
+      comment: RequestComment; status: RequestStatus; status_label: string;
+      student_can_comment: boolean; student_can_edit: boolean;
+    }> {
+      return request(`/submissions/${id}/comments/`, { method: 'POST', body: JSON.stringify({ body }) });
+    },
+    /** File đã nạp — cần token nên tải qua fetch rồi dựng blob URL. */
+    async file(id: number, fileId: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/submissions/${id}/files/${fileId}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
     },
   },
 
@@ -369,6 +415,15 @@ export const api = {
     },
   },
 
+  personalInfo: {
+    get(): Promise<PersonalInfoData> {
+      return request('/personal-info/');
+    },
+    submit(groups: Partial<Record<PersonalInfoKey, PersonalInfoValue>>): Promise<PersonalInfoData> {
+      return request('/personal-info/', { method: 'POST', body: JSON.stringify({ groups }) });
+    },
+  },
+
   offcampus: {
     form(): Promise<OffCampusForm> {
       return request('/offcampus/');
@@ -390,7 +445,7 @@ export const api = {
     submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
       return requestMultipart('/health-check/evidence/', body);
     },
-    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean }):
+    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
     },
@@ -467,6 +522,12 @@ export const api = {
       return requestMultipart('/health-insurance/external/', body);
     },
   },
+  hospitalChange: {
+    detail(id: number): Promise<import('./types').SubmittedInsurance> { return request('/health-insurance/hospital-change/' + id + '/'); },
+    update(id: number, body: FormData): Promise<{ id: number; status: string }> { return requestMultipart('/health-insurance/hospital-change/' + id + '/', body); },
+    prefill(): Promise<import('./types').SubmittedInsurance> { return request('/health-insurance/hospital-change/'); },
+    submit(body: FormData): Promise<{ id: number; status: string }> { return requestMultipart('/health-insurance/hospital-change/', body); },
+  },
   insuranceRegistration: {
     detail(id:number): Promise<import('./types').InsuranceDetail> {
       return request(`/health-insurance/registrations/${id}/`);
@@ -475,7 +536,7 @@ export const api = {
       return requestMultipart(`/health-insurance/registrations/${id}/`, body);
     },
     async evidence(path:string): Promise<Blob> {
-      if (!/^\/api\/health-insurance\/(?:registrations|external)\/\d+\/(?:evidence\/\d+|images\/[a-z_]+)\/(?:\?v=\d+)?$/.test(path)) throw new Error('Đường dẫn ảnh không hợp lệ.');
+      if (!/^\/api\/health-insurance\/(?:registrations|external|hospital-change)\/\d+\/(?:evidence\/\d+|images\/[a-z_]+)\/(?:\?v=\d+)?$/.test(path)) throw new Error('Đường dẫn ảnh không hợp lệ.');
       const res = await fetch(`${API_BASE}${path.slice(4)}`, {headers:{Authorization:`Bearer ${getToken()}`}});
       if (!res.ok) throw new Error('Không tải được ảnh.');
       return res.blob();

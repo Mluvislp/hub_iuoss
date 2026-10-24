@@ -27,7 +27,7 @@ from core.models import (
     ConfirmationRequestComment,
     ExternalInsuranceDeclaration,
 )
-from core import request_quota, request_edit, student_images
+from core import document_preview, request_quota, request_edit, student_images
 from core.documents import (
     BANKLOAN_FEE_EXEMPTION_CHOICES,
     BANKLOAN_ORPHAN_CHOICES,
@@ -48,6 +48,7 @@ from core.documents import (
     build_conduct_payload,
     build_conduct_prefill,
     conduct_semester_choices,
+    conduct_scores_by_year,
     CONDUCT_DELIVERY_CHOICES,
 )
 from core import offcampus
@@ -81,6 +82,8 @@ def feature_flags() -> dict:
         "health_check": settings.FEATURE_HEALTH_CHECK,
         "tuition_waiver": settings.FEATURE_TUITION_WAIVER,
         "support_tickets": settings.FEATURE_SUPPORT_TICKETS,
+        "personal_info": settings.FEATURE_PERSONAL_INFO,
+        "direct_submissions": settings.FEATURE_DIRECT_SUBMISSIONS,
         # Không phải cờ FEATURE_* bật/tắt bằng tay: tự suy ra từ việc đã cấu hình
         # app registration hay chưa, để không bao giờ hiện nút dẫn tới endpoint chết.
         "microsoft_login": settings.MS_LOGIN_ENABLED,
@@ -198,6 +201,19 @@ def _get_str(data, key) -> str:
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         return str(v)
     return ""
+
+
+def _get_codes(data):
+    """Danh sách mã năm học bảng điểm rèn luyện: `semester_codes` (mảng JSON) hoặc chuỗi cách
+    nhau bằng dấu phẩy; lùi về `semester_code` của client cũ. Phần tử lạ bị bỏ."""
+    raw = data.get("semester_codes")
+    if raw is None:
+        raw = data.get("semester_code")
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    if not isinstance(raw, (list, tuple)):
+        return []
+    return [v.strip() for v in raw if isinstance(v, str) and v.strip()][:20]
 
 
 # ── GET /api/health/ ─────────────────────────────────────────────────────────
@@ -558,6 +574,17 @@ def _insurance_config_error(cfg, student=None):
     return ""
 
 
+def hospital_lookup_url(own=None):
+    """Link "tra cứu bệnh viện" cho form. Ưu tiên link của chính đợt; trống (đợt đổi nơi KCB
+    chưa nhập, snapshot đơn cũ…) thì lấy link của đợt đăng ký BHYT đang bật / sửa gần nhất."""
+    own = (own or "").strip()
+    if own:
+        return own
+    cfg = (HealthInsuranceConfig.objects.exclude(hospital_lookup_url__isnull=True)
+           .exclude(hospital_lookup_url="").order_by("-is_active", "-updated_at", "-id").first())
+    return cfg.hospital_lookup_url.strip() if cfg else ""
+
+
 def _insurance_config_payload(cfg, *, include_payment, student=None):
     coverage_start, coverage_end = _coverage_dates(
         cfg.registration_period, cfg.registration_year,
@@ -573,6 +600,7 @@ def _insurance_config_payload(cfg, *, include_payment, student=None):
         "coverage_end": coverage_end.isoformat(),
         "status": _insurance_config_status(cfg, student=student),
         "is_active": cfg.is_active,
+        "hospital_lookup_url": hospital_lookup_url(cfg.hospital_lookup_url),
         "freshman_warning": (
             cfg.freshman_warning or ""
             if student and student.academic_entry_year == timezone.localdate().year
@@ -609,6 +637,7 @@ class HealthInsuranceView(APIView):
             return Response({
                 "is_eligible": False, "current": None, "history": [], "registrations": [],
                 "external_declarations": [],
+                "hospital_change": {"config": None, "has_source": False, "requests": []},
                 "periods": periods,
             })
 
@@ -667,6 +696,32 @@ class HealthInsuranceView(APIView):
             "reviewed_at": row.reviewed_at,
 
         } for row in external_rows]
+        from core.hospital_change_models import HospitalChangeRequest
+        from .hospital_change_views import active_config as change_config, config_payload, has_change_source
+        change_rows = list(HospitalChangeRequest.objects.filter(student_id=student_id)
+                           .defer("snapshot", "images", "intake_snapshot").order_by("-created_at"))
+        change_hospitals = dict(Hospital.objects.filter(
+            code__in={code for row in change_rows for code in (row.hospital_code, row.old_hospital_code) if code}
+        ).values_list("code", "name"))
+        open_change = change_config()
+        hospital_change = {
+            "config": config_payload(open_change) if open_change else None,
+            # Chỉ thẻ đã mua tại trường (đơn Phát hành / thẻ ĐHQT còn hạn) mới đổi được nơi KCB.
+            "has_source": has_change_source(student),
+            "requests": [{
+                "id": row.id,
+                "old_hospital_code": row.old_hospital_code,
+                "old_hospital_name": change_hospitals.get(row.old_hospital_code),
+                "hospital_code": row.hospital_code,
+                "hospital_name": change_hospitals.get(row.hospital_code),
+                "intake_year": row.intake_year,
+                "intake_period": row.intake_period,
+                "status": row.status,
+                "review_note": row.review_note,
+                "created_at": row.created_at,
+                "reviewed_at": row.reviewed_at,
+            } for row in change_rows],
+        }
 
         # Đợt 1 (MAIN) đăng ký BHYT cho năm kế tiếp nên mọi sinh viên đều
         # được đăng ký, bất kể thẻ hiện tại còn hạn bao lâu. Điều kiện thẻ
@@ -688,6 +743,7 @@ class HealthInsuranceView(APIView):
             "history": HealthInsuranceCardSerializer(history, many=True, context=ctx).data,
             "registrations": reg_data,
             "external_declarations": external_data,
+            "hospital_change": hospital_change,
             "periods": periods,
         })
 
@@ -897,7 +953,7 @@ class InsuranceRegistrationView(APIView):
             # ----------------------------------------
             
             hospital_code=data["hospital_code"],
-            note=data.get("note", ""),
+            note=(data.get("note") or "").strip() or None,
             change_log=change_log, # Giữ lại change_log để tiện xem chênh lệch
             config_snapshot=_insurance_config_payload(cfg, include_payment=True, student=student),
             status="iu_processing",
@@ -1000,20 +1056,16 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
         return Response(ConfirmationRequestSerializer(qs, many=True).data)
 
     def post(self, request):
-        """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py)."""
+        """Tạo yêu cầu — chặn theo hạn mức 1 lần / loại giấy / học kỳ (core/request_quota.py),
+        trừ bảng điểm rèn luyện (không giới hạn); GXN "Khác" + tiếng Anh tính theo mục đích."""
         request_type = _get_str(request.data, "request_type")
         sid = request.user.student_id
         if not sid:
             return self._create(request, request_type)
-        semester_code, semester_label = None, None
-        if request_type == request_quota.CONDUCT_TYPE:
-            semester_code = _get_str(request.data, "semester_code")
-            student = self._resolve_student(request)
-            choices = {c["code"]: c["label"] for c in conduct_semester_choices(student)} if student else {}
-            semester_label = choices.get(semester_code)
         # Khoá theo SV: kiểm hạn mức + tạo yêu cầu là một bước, bấm gửi hai lần không lọt.
+        # Bảng điểm rèn luyện không giới hạn số lần (request_quota.UNLIMITED_TYPES).
         with request_quota.student_lock(sid):
-            reason = request_quota.check(sid, request_type, semester_code, semester_label)
+            reason = request_quota.check(sid, request_type, _get_str(request.data, "purpose_code"))
             if reason:
                 return Response({"detail": reason, "code": "quota_exceeded"}, status=status.HTTP_409_CONFLICT)
             return self._create(request, request_type)
@@ -1276,10 +1328,13 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
             return Response({"detail": "Ghi chú quá dài (tối đa 1000 ký tự)."},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # Sửa yêu cầu "Chờ bổ sung": giữ nguyên năm học / học kỳ đã xin.
+        locked = ((self.editing.payload or {}).get("purpose") if self.editing is not None else None)
         try:
             payload, semester_label = build_conduct_payload(
                 student,
-                semester_code=_get_str(request.data, "semester_code"),
+                semester_codes=_get_codes(request.data),
+                locked_purpose=locked,
                 delivery=_get_str(request.data, "delivery"),
                 dob=_get_str(request.data, "dob"),
                 citizen_id=_get_str(request.data, "citizen_id"),
@@ -1314,6 +1369,60 @@ def _visible_comments():
     prefetch nên đếm và hiển thị không thể lệch nhau.
     """
     return Prefetch("comments", queryset=ConfirmationRequestComment.visible_qs())
+
+
+class _PreviewCaptured(Exception):
+    """Dừng đường tạo yêu cầu đúng ở bước ghi DB — mang theo các cột lẽ ra được lưu."""
+
+    def __init__(self, fields):
+        super().__init__("preview")
+        self.fields = fields
+
+
+class RequestPreviewView(RequestsView):
+    """POST /api/requests/preview/ — xem trước giấy với thông tin SV vừa nhập, KHÔNG tạo yêu cầu.
+
+    Đi chung TOÀN BỘ đường kiểm tra + dựng payload của `RequestsView` (cùng body như lúc gửi),
+    chỉ chặn ở `_persist` ⇒ bản xem trước luôn khớp đúng yêu cầu sẽ gửi. Bỏ qua hạn mức (không
+    tốn lượt). Ảnh do Dashboard dựng, đã đóng dấu chìm — core/document_preview.py.
+    """
+
+    def get_throttles(self):
+        if self.request.method != "POST":
+            return []
+        self.throttle_scope = "preview_request"
+        return super(RequestsView, self).get_throttles()
+
+    def get(self, request):
+        return Response({"enabled": document_preview.enabled(),
+                         "types": sorted(document_preview.PREVIEW_TYPES)})
+
+    def _persist(self, request, **fields):
+        raise _PreviewCaptured(fields)
+
+    def post(self, request):
+        request_type = _get_str(request.data, "request_type")
+        if request_type not in document_preview.PREVIEW_TYPES:
+            return Response({"detail": "Loại giấy này chưa hỗ trợ xem trước."}, status=status.HTTP_400_BAD_REQUEST)
+        if not document_preview.enabled():
+            return Response({"detail": "Tính năng xem trước chưa được bật."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        try:
+            resp = self._create(request, request_type)
+        except _PreviewCaptured as cap:
+            fields = cap.fields
+        else:
+            return resp   # lỗi kiểm tra dữ liệu (400) — trả y như lúc gửi thật
+        student = self._resolve_student(request)
+        viewer = (student.current_student_code if student else "") or request.user.ldap_uid or ""
+        try:
+            pages = document_preview.render(fields["request_type"], fields.get("student_id"),
+                                            fields.get("payload") or {}, viewer)
+        except document_preview.PreviewUnavailable as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        logger.info("DOCUMENT_PREVIEW | uid=%-20s | type=%s | pages=%d", request.user.ldap_uid, request_type, len(pages))
+        resp = Response({"pages": pages})
+        resp["Cache-Control"] = "no-store"
+        return resp
 
 
 class _OwnRequestMixin(DocumentRequestsRequiredMixin):
@@ -1573,10 +1682,13 @@ class ConductScoreRequestFormView(DocumentRequestsRequiredMixin, APIView):
                 {"detail": "Không tìm thấy hồ sơ sinh viên."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        choices = conduct_semester_choices(student)
         return Response({
-            "semester_choices": conduct_semester_choices(student),
+            "semester_choices": choices,
             "delivery_choices": CONDUCT_DELIVERY_CHOICES,
             "prefill": build_conduct_prefill(student),
+            # Điểm rèn luyện từng năm học để SV xem trước khi xin (Phòng CTSV import ở Dashboard).
+            "conduct_scores": conduct_scores_by_year(student, choices),
         })
 
 

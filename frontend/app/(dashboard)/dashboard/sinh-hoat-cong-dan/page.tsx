@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { AlertCircle, ClipboardList, Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, accentIcon } from '@/lib/ui';
+import { ui, accentIcon, notice, noticeIcon } from '@/lib/ui';
 import { CivicActivitiesTable } from '@/components/civic-activities';
 import type { CivicActivity } from '@/lib/types';
 
@@ -32,8 +33,8 @@ export default function CivicActivitiesPage() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
-          <AlertCircle size={16} className="flex-shrink-0" />
+        <div className={cn(notice.base, notice.warning)}>
+          <AlertCircle className={noticeIcon.warning} />
           {error}
         </div>
       )}

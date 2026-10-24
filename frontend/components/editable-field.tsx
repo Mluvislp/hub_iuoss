@@ -33,7 +33,8 @@ export function RequestEditButton({ onClick, label = 'Yêu cầu chỉnh sửa' 
     <button
       type="button"
       onClick={onClick}
-      className="touch-target mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-text hover:underline"
+      // py-2 -my-2: vùng chạm ~35px trên điện thoại, giữ nguyên khoảng cách hiển thị.
+      className="-mb-2 mt-[-2px] inline-flex items-center gap-1 py-2 text-[0.78rem] font-medium text-primary-text hover:underline"
     >
       <PencilLine size={12} /> {label}
     </button>

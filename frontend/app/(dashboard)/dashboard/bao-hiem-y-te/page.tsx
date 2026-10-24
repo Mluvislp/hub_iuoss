@@ -5,15 +5,16 @@ import { InsuranceStatus } from '@/components/insurance-status';
 import { InsuranceSupplement } from '@/components/insurance-supplement';
 import { useEffect, useState } from 'react';
 import { InsuranceModal } from '@/components/insurance-modal';
+import { InsuranceTimeline, historyTimeline } from '@/components/insurance-timeline';
 import { RejectionNotice } from '@/components/rejection-notice';
 import Link from 'next/link';
 import { getVisibleInsurancePeriods } from '@/lib/insurance-periods';
-import { AlertCircle, FileClock, History, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, FileClock, History, Hospital, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, accentIcon } from '@/lib/ui';
+import { ui, accentIcon, notice, noticeIcon, subtle } from '@/lib/ui';
 import { cn, formatDate } from '@/lib/utils';
 import { HealthValidityBadge, daysLeft, validityState } from '@/components/health-insurance';
-import type { ExternalInsuranceDeclaration, HealthInsuranceCard, HealthInsuranceData } from '@/lib/types';
+import type { ExternalInsuranceDeclaration, HealthInsuranceCard, HealthInsuranceData, HospitalChangeRequestRow } from '@/lib/types';
 
 /** Ngưỡng nhắc gia hạn — dưới mức này thì hiện dòng lưu ý. */
 const EXPIRING_SOON_DAYS = 60;
@@ -96,6 +97,41 @@ function ExternalDeclarationDetail({ row }: { row: ExternalInsuranceDeclaration 
         <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={status} /></div>
         <RejectionNotice rejected={status === 'rejected'} eyebrow="Bản khai bị từ chối" note={detail.review_note} />
         <SubmittedInsuranceInfo data={detail} external />
+        <InsuranceTimeline items={historyTimeline(detail.history, 'external')} empty="Bản khai chưa có lịch sử chi tiết." />
+      </div> : !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 size={16} className="animate-spin" />Đang tải…</p>}
+    </InsuranceModal>}
+  </>;
+}
+
+function HospitalChangeDetail({ row, className }: { row: HospitalChangeRequestRow; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<import('@/lib/types').SubmittedInsurance | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    api.hospitalChange.detail(row.id).then(d => { if (active) setDetail(d); }).catch(e => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [open, row.id]);
+  const status = detail?.status || row.status;
+  const oldHospital = detail?.old_hospital?.name || detail?.old_hospital?.code || row.old_hospital_name || row.old_hospital_code || '—';
+  const newHospital = detail?.display?.hospital_code || row.hospital_name || row.hospital_code;
+  return <>
+    <button type="button" className={cn(ui.btnSecondary, className)} onClick={() => { setError(''); setOpen(true); }}>
+      <FileClock className="h-4 w-4" />Chi tiết
+    </button>
+    {open && <InsuranceModal eyebrow="Đổi nơi khám chữa bệnh ban đầu" title={'Yêu cầu #' + row.id} onClose={() => setOpen(false)}>
+      {error && <p role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-text">{error}</p>}
+      {detail ? <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">Trạng thái hiện tại</span><InsuranceStatus status={status} /></div>
+        <RejectionNotice rejected={status === 'rejected'} eyebrow="Yêu cầu bị từ chối" note={detail.review_note} />
+        <p className="rounded-lg border border-line bg-slate-50 px-4 py-3 text-sm">
+          <span className="text-muted">Nơi KCB ban đầu: </span>
+          <span className="text-slate-400 line-through">{oldHospital}</span>
+          {' → '}<span className="font-medium text-ink">{newHospital}</span>
+        </p>
+        <SubmittedInsuranceInfo data={detail} hospitalChange />
+        <InsuranceTimeline items={historyTimeline(detail.history, 'hospital-change')} empty="Yêu cầu chưa có lịch sử chi tiết." />
       </div> : !error && <p className="flex items-center justify-center gap-2 py-10 text-sm text-muted"><Loader2 size={16} className="animate-spin" />Đang tải…</p>}
     </InsuranceModal>}
   </>;
@@ -131,8 +167,8 @@ export default function HealthInsurancePage() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-soft border border-warning-line text-warning-text text-sm">
-          <AlertCircle size={16} className="flex-shrink-0" />
+        <div className={cn(notice.base, notice.warning)}>
+          <AlertCircle className={noticeIcon.warning} />
           {error}
         </div>
       )}
@@ -155,7 +191,7 @@ export default function HealthInsurancePage() {
         {current ? (
           <div className="px-5 py-5">
             {/* Mã thẻ là thứ SV cần nhất khi đi khám → cho nổi lên trên cùng. */}
-            <div className="rounded-lg border border-primary-line bg-primary-wash px-5 py-4">
+            <div className={cn(subtle, 'px-5 py-4')}>
               <div className={ui.label}>Mã thẻ BHYT</div>
               <div className="mt-1.5 font-mono text-xl font-semibold text-ink tracking-wide break-all">
                 {current.medical_insurance_code || <Empty />}
@@ -404,19 +440,103 @@ export default function HealthInsurancePage() {
         </section>
       )}
 
+      {!!data?.hospital_change?.requests.length && (
+        <section className={ui.card}>
+          <div className={ui.cardHeader}>
+            <h2 className={ui.sectionTitle}>
+              <History size={16} className={accentIcon.primary} />
+              Lịch sử yêu cầu đổi nơi khám chữa bệnh ban đầu
+            </h2>
+          </div>
+          <div className="divide-y divide-line2 md:hidden">
+            {data.hospital_change.requests.map(row => (
+              <article key={row.id} className="space-y-3 px-4 py-4">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">{PERIOD_LABELS[row.intake_period] ?? row.intake_period} năm {row.intake_year}</p>
+                    <p className="mt-1 text-xs text-muted">Gửi lúc {new Date(row.created_at).toLocaleString('vi-VN')}</p>
+                  </div>
+                  <InsuranceStatus status={row.status} />
+                </div>
+                <p className="text-xs text-slate-600">
+                  <span className="text-slate-400 line-through">{row.old_hospital_name || row.old_hospital_code || '—'}</span>
+                  {' → '}<span className="font-medium text-ink">{row.hospital_name || row.hospital_code}</span>
+                </p>
+                <HospitalChangeDetail row={row} className="w-full" />
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead><tr className={THEAD_ROW}>
+                <th className={TH}>Đợt</th>
+                <th className={TH}>Nơi KCB cũ → mới</th>
+                <th className={TH}>Ngày gửi</th>
+                <th className={TH}>Trạng thái</th>
+                <th className={cn(TH, 'text-right')}>Thao tác</th>
+              </tr></thead>
+              <tbody className="divide-y divide-line2">
+                {data.hospital_change.requests.map(row => (
+                  <tr key={row.id} className="hover:bg-[#f9fafb] transition-colors">
+                    <td className="px-5 py-3 font-medium text-[0.85rem] text-ink whitespace-nowrap">{PERIOD_LABELS[row.intake_period] ?? row.intake_period} năm {row.intake_year}</td>
+                    <td className="px-5 py-3 text-[0.82rem] text-slate-600 max-w-[320px]">
+                      <span className="text-slate-400 line-through">{row.old_hospital_name || row.old_hospital_code || '—'}</span>
+                      {' → '}<span className="font-medium text-ink">{row.hospital_name || row.hospital_code}</span>
+                    </td>
+                    <td className="px-5 py-3 text-[0.82rem] whitespace-nowrap">{new Date(row.created_at).toLocaleString('vi-VN')}</td>
+                    <td className="px-5 py-3"><InsuranceStatus status={row.status} /></td>
+                    <td className="px-5 py-3 text-right">
+                      <HospitalChangeDetail row={row} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* ── Các cách tham gia BHYT ─────────────────────────── */}
       <section className={ui.card}>
         <div className={ui.cardHeader}>
           <h2 className={ui.sectionTitle}>Tham gia Bảo hiểm Y tế</h2>
         </div>
         <div className="p-5 space-y-6">
-          <div className="rounded-lg border border-primary-line bg-primary-soft p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <div className="rounded-lg border border-line bg-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div>
               <h3 className="text-sm font-semibold text-ink">Đã tham gia BHYT tại nơi khác?</h3>
               <p className="mt-1 text-meta text-muted">Khai thông tin thẻ để nhà trường kiểm tra và xác nhận.</p>
             </div>
             <Link href="/dashboard/bao-hiem-y-te/khai-noi-khac" className={cn(ui.btnOutline, "mt-3 shrink-0 sm:mt-0")}>Khai thông tin tại nơi khác</Link>
           </div>
+          {(() => {
+            const change = data?.hospital_change;
+            const open = !!change?.config && change.config.status === 'open';
+            const enabled = open && !!change?.has_source;
+            return (
+              <div className="rounded-lg border border-line bg-white p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                <div>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                    <Hospital size={15} className="text-slate-500" />Đổi nơi khám chữa bệnh ban đầu
+                  </h3>
+                  <p className="mt-1 text-[0.82rem] text-muted">
+                    {!open
+                      ? 'Hiện chưa mở đợt nhận yêu cầu đổi nơi khám chữa bệnh ban đầu.'
+                      : !change?.has_source
+                        ? 'Chỉ áp dụng khi đã có thẻ BHYT mua tại trường: đơn đăng ký tại trường đã Phát hành hoặc thẻ diện ĐHQT còn hạn.'
+                        : `${change.config!.name} · hạn cuối ${formatDate(change.config!.end_date)}. Thông tin lấy từ thẻ BHYT mua tại trường của bạn.`}
+                  </p>
+                </div>
+                {enabled ? (
+                  <Link href="/dashboard/bao-hiem-y-te/doi-noi-kcb" className={cn(ui.btnOutline, 'mt-3 shrink-0 sm:mt-0')}>Gửi yêu cầu đổi nơi KCB</Link>
+                ) : (
+                  <button disabled className={cn(ui.btnOutline, 'mt-3 shrink-0 cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 sm:mt-0')}>
+                    {open ? 'Chưa đủ điều kiện' : 'Chưa mở'}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           <div className="border-t border-line2 pt-5">
             <h3 className="text-sm font-semibold text-ink">Đăng ký BHYT tại trường</h3>
             <p className="text-sm text-muted mb-4">
@@ -437,7 +557,7 @@ export default function HealthInsurancePage() {
               const blockedByEarlierRegistration = !!blockingRegistration;
               const blocked = !data?.is_eligible || blockedByEarlierRegistration;
               return (
-                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-surface-subtle flex flex-col justify-between">
+                <div key={`${p.id}-${p.registration_year}`} className="p-4 rounded-lg border border-line bg-white flex flex-col justify-between">
                   <div>
                     <h3 className="font-semibold text-ink text-sm">{p.name}</h3>
                     <p className="text-xs text-muted mt-1">
@@ -454,7 +574,12 @@ export default function HealthInsurancePage() {
                     )}
                   </div>
                   <div className="mt-4">
-                    {isOpen ? (
+                    {isOpen && blocked ? (
+                      // Nút xanh mờ 50% trông như lỗi hiển thị → dùng đúng kiểu nút vô hiệu như "Chưa mở".
+                      <button disabled className={ui.btnOutline + " w-full bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed"}>
+                        {!data?.is_eligible ? 'Không đủ điều kiện' : 'Đã đăng ký đợt trước'}
+                      </button>
+                    ) : isOpen ? (
                       <Link
                         href={`/dashboard/bao-hiem-y-te/dang-ky?period=${p.id}`}
                         className={cn(ui.btnPrimary, "w-full text-center")}
