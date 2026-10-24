@@ -43,7 +43,7 @@ def _loai(key, label, col, **kw):
     return _f(key, label, "class", col=col, choices=LOAI_CLASSES, **kw)
 
 
-def _vision(key, label, col, required=False):
+def _vision(key, label, col, required=False, hint=None):
     """Thị lực điểm thang 10. Nhận "10/10" hoặc "10" (phiếu ghi kiểu nào nhập kiểu đó),
     lưu và xuất ra điểm — mẫu ghi chú cột W–Z là "điểm thang 10". Không đặt mặc định:
     thị lực phải chép từ phiếu, điền sẵn 10/10 dễ thành số liệu sai."""
@@ -51,7 +51,7 @@ def _vision(key, label, col, required=False):
     # điền sẵn; hướng dẫn nằm ở dòng chú thích bên dưới.
     return _f(key, label, "vision", col=col, min_=0, max_=10, required=required,
               placeholder="" if required else "VD: 10/10",
-              hint="Nhập theo phiếu, VD 10/10" if required else "Để trống nếu không đeo kính")
+              hint=hint or ("Nhập theo phiếu, VD 10/10" if required else "Để trống nếu không đeo kính"))
 
 
 def _lab(key, label, col, unit, max_=None):
@@ -103,8 +103,8 @@ SCHEMA = [
                 _loai("dental", "Răng - hàm - mặt", "AC"),
             ]},
             {"title": "Mắt (thị lực, điểm thang 10)", "layout": "grid", "cols": 5, "fields": [
-                _vision("eye_left_bare", "Không kính - mắt trái", "W", required=True),
-                _vision("eye_right_bare", "Không kính - mắt phải", "X", required=True),
+                _vision("eye_left_bare", "Không kính - mắt trái", "W", hint="Để trống nếu phiếu không ghi"),
+                _vision("eye_right_bare", "Không kính - mắt phải", "X", hint="Để trống nếu phiếu không ghi"),
                 _vision("eye_left_glasses", "Có kính - mắt trái", "Y"),
                 _vision("eye_right_glasses", "Có kính - mắt phải", "Z"),
                 _f("vision_class", "Phân loại thị lực", "class", col="AA", default="I",
