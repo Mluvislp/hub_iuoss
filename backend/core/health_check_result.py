@@ -55,10 +55,11 @@ def _vision(key, label, col, required=False, hint=None):
 
 
 def _lab(key, label, col, unit, max_=None):
-    return _f(key, label, "number", col=col, unit=unit, min_=0, max_=max_, required=True)
+    # Không bắt buộc: SV khám ngoài thường không có đủ phiếu xét nghiệm.
+    return _f(key, label, "number", col=col, unit=unit, min_=0, max_=max_)
 
 
-# layout: "grid" — ô nhập xếp lưới `cols` cột.
+# layout: "grid" — ô nhập xếp lưới `cols` cột. note (tùy chọn): thông báo nhỏ đầu bước.
 SCHEMA = [
     {
         "key": "visit", "title": "Lần khám và thể lực",
@@ -115,6 +116,7 @@ SCHEMA = [
     {
         "key": "lab", "title": "Cận lâm sàng",
         "desc": "Nhập theo phiếu kết quả xét nghiệm. Dùng dấu chấm hoặc dấu phẩy cho số thập phân.",
+        "note": "Sinh viên có thể bỏ qua phần này nếu không có thông tin, bắt buộc phải ghi đầy đủ nếu có.",
         "groups": [
             {"title": "Xét nghiệm máu", "layout": "grid", "cols": 4, "fields": [
                 _lab("rbc", "Số lượng hồng cầu (RBC)", "AD", "T/L", 20),
