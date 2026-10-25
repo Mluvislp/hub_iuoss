@@ -248,6 +248,11 @@ export default function ExaminedWizard({
         {section && (
           <>
             <p className="text-[0.8rem] text-muted -mt-1">{section.desc}</p>
+            {section.note && (
+              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-2.5 text-[0.8rem] text-ink">
+                {section.note}
+              </div>
+            )}
             <ResultSectionFields section={section} values={values} set={set} errors={errors} />
           </>
         )}

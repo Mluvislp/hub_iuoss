@@ -653,6 +653,8 @@ export interface ResultSection {
   key: string;
   title: string;
   desc: string;
+  /** Thông báo nhỏ hiển thị đầu bước (nếu có). */
+  note?: string;
   groups: ResultGroup[];
 }
 
