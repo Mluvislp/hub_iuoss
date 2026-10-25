@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, CalendarClock, Check, ChevronRight, ClipboardCheck,
-  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope, Users,
+  HeartPulse, Loader2, Lock, MapPin, PencilLine, Repeat, Stethoscope, Users,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
@@ -153,6 +153,8 @@ export default function HealthCheckPage() {
   const [slotError, setSlotError] = useState('');
   const [error, setError] = useState('');
   const [resubmitting, setResubmitting] = useState(false);
+  // Đã khai "đã khám" (chưa được xác nhận) → chuyển sang đăng ký khám tại trường.
+  const [switching, setSwitching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const draft = useDeclarationDraft(state?.offcampus ?? null);
@@ -228,6 +230,18 @@ export default function HealthCheckPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Chỉ coi là đang chuyển khi server vẫn cho phép (đợt mở, khai báo cũ chưa được xác nhận).
+  const isSwitching = switching && !!response && state.can_switch_to_register;
+  const startSwitch = () => {
+    setSwitching(true); setChoice('register'); setJustSubmitted(false);
+    setConsent(false); setDataConsent(false); setExamSlot(''); setSlotError(''); setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const cancelSwitch = () => {
+    setSwitching(false); setChoice(null); setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // ── Nộp lại sau khi bị từ chối: đi lại toàn bộ các bước, nạp sẵn lần khai trước ──
   if (response && resubmitting && state.can_resubmit) {
     return (
@@ -244,15 +258,17 @@ export default function HealthCheckPage() {
     );
   }
 
-  // ── Đã có phản hồi: xem lại (+ nộp lại nếu bị từ chối) ──
-  if (response) {
+  // ── Đã có phản hồi: xem lại (+ nộp lại nếu bị từ chối, + chuyển sang đăng ký) ──
+  if (response && !isSwitching) {
     return (
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
         {justSubmitted && (
           <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-success-soft border border-success-line text-success-text text-sm">
             <Check size={16} className="flex-shrink-0 mt-0.5" />
-            {response.choice === 'register' ? 'Đã ghi nhận đăng ký khám sức khỏe.' : 'Đã ghi nhận kết quả khám và minh chứng.'}
+            {response.choice === 'register'
+              ? (response.superseded ? 'Đã chuyển sang đăng ký khám sức khỏe tại trường.' : 'Đã ghi nhận đăng ký khám sức khỏe.')
+              : 'Đã ghi nhận kết quả khám và minh chứng.'}
           </div>
         )}
         <div className={ui.card}>
@@ -304,6 +320,15 @@ export default function HealthCheckPage() {
                   <span className={ui.dtValue}>{response.exam_slot_label}</span>
                 </div>
               )}
+              {response.superseded && (
+                <div className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Khai báo đã khám trước đó</span>
+                  <span className={ui.dtValue}>
+                    {response.superseded.label}
+                    {response.superseded.at ? ` lúc ${fmtDateTime(response.superseded.at)}` : ''}
+                  </span>
+                </div>
+              )}
               {response.data_consent_at && (
                 <div className={ui.dtRow}>
                   <span className={ui.dtLabel}>Cam kết, đồng ý cung cấp thông tin</span>
@@ -343,6 +368,18 @@ export default function HealthCheckPage() {
                 </button>
               </div>
             )}
+
+            {state.can_switch_to_register && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
+                <p className="text-[0.82rem] text-muted max-w-[520px]">
+                  Chưa khám theo chương trình của Thành phố? Sinh viên có thể chuyển sang đăng ký khám
+                  sức khỏe tập trung tại trường.
+                </p>
+                <button type="button" className={ui.btnGhost} onClick={startSwitch}>
+                  <Repeat size={15} /> Chuyển sang đăng ký khám tại trường
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -350,7 +387,7 @@ export default function HealthCheckPage() {
   }
 
   // ── Chưa trả lời mà đợt không mở ──
-  if (!state.can_submit) {
+  if (!state.can_submit && !isSwitching) {
     return (
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
@@ -397,7 +434,9 @@ export default function HealthCheckPage() {
         consent: true,
         data_consent: true,
         exam_slot: state?.exam_slots ? examSlot : undefined,
+        switch_from_examined: isSwitching || undefined,
       }));
+      setSwitching(false);
       setJustSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -420,24 +459,43 @@ export default function HealthCheckPage() {
 
       <div className={ui.card}>
         {header}
-        <div className="px-6 py-5">
-          <p className="text-[0.9rem] font-semibold text-ink mb-3">
-            Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
-            Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
-          </p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
-                        desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
-                        onClick={() => { setChoice('examined'); setError(''); }} />
-            <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
-                        desc="Đăng ký khám sức khỏe tập trung tại trường"
-                        onClick={() => { setChoice('register'); setError(''); }} />
+        {isSwitching ? (
+          <div className="px-6 py-5">
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
+              <Repeat size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-ink">
+                <div className="font-semibold">Chuyển sang đăng ký khám sức khỏe tại trường</div>
+                <p className="mt-1">
+                  Khai báo đã khám gửi lúc {fmtDateTime(response!.submitted_at)} sẽ <b>không còn được dùng</b>.
+                  Thông tin đã khai vẫn được Nhà trường lưu lại. Sau khi chuyển, sinh viên không quay lại
+                  khai báo đã khám được nữa.
+                </p>
+                <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
+                  Giữ khai báo đã khám
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="px-6 py-5">
+            <p className="text-[0.9rem] font-semibold text-ink mb-3">
+              Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
+              Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                          desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                          onClick={() => { setChoice('examined'); setError(''); }} />
+              <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
+                          desc="Đăng ký khám sức khỏe tập trung tại trường"
+                          onClick={() => { setChoice('register'); setError(''); }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Nhánh "Đã khám rồi" ── */}
-      {choice === 'examined' && (
+      {choice === 'examined' && !isSwitching && (
         <ExaminedWizard state={state} provinces={provinces} onDone={done} onStateChange={setState} />
       )}
 
@@ -540,10 +598,12 @@ export default function HealthCheckPage() {
               )}
 
               <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-line2">
-                <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>
+                {isSwitching
+                  ? <button type="button" className={ui.btnGhost} onClick={cancelSwitch}>Hủy</button>
+                  : <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>}
                 <button type="submit" disabled={saving || !eligible || !consent || !dataConsent || (!!state.exam_slots && !examSlot)} className={ui.btnPrimary}>
                   {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
-                          : <><ClipboardCheck size={15} /> Gửi đăng ký khám</>}
+                          : <><ClipboardCheck size={15} /> {isSwitching ? 'Chuyển sang đăng ký khám' : 'Gửi đăng ký khám'}</>}
                 </button>
               </div>
             </div>
