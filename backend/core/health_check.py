@@ -267,6 +267,12 @@ def _serialize_response(resp):
         "residence": resp.residence or None,
         "exam_slot": slots.chosen(resp.evidence),
         "exam_slot_label": slots.describe(slots.chosen(resp.evidence)),
+        # Đã chuyển từ "Đã khám" sang đăng ký: chỉ báo lúc nào + trạng thái cũ.
+        "superseded": (
+            {"at": info.get("superseded_at"), "label": SUPERSEDED_LABEL,
+             "previous_status_label": info.get("previous_status_label", "")}
+            if (info := superseded_info(resp.evidence)) else None
+        ),
     }
 
 
@@ -278,10 +284,13 @@ def build_state(student):
         if round_ else None
     )
     state = round_state(round_) if round_ else None
+    can_switch_now = state == "open" and can_switch(resp)
     return {
         "round": serialize_round(round_),
         "response": _serialize_response(resp),
         "can_submit": state == "open" and resp is None,
+        # Đã khai "đã khám" (chưa được xác nhận) → được chuyển sang đăng ký khám tại trường.
+        "can_switch_to_register": can_switch_now,
         "can_resubmit": bool(
             resp and resp.choice == Response_.CHOICE_EXAMINED
             and resp.status == Response_.STATUS_REJECTED
@@ -301,7 +310,8 @@ def build_state(student):
         # Form còn mở thì frontend tự tính theo ô đang nhập, server tính lại lúc nộp.
         "residence": residence_snapshot(student),
         # Ngày + ca khám tại trường (nhánh "Chưa khám"); None khi đợt không chia ca.
-        "exam_slots": slot_options(round_) if round_ and resp is None and state == "open" else None,
+        "exam_slots": (slot_options(round_)
+                       if round_ and state == "open" and (resp is None or can_switch_now) else None),
     }
 
 
@@ -460,9 +470,52 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
         raise
 
 
+# ── Chuyển từ "Đã khám" sang "Chưa khám — đăng ký khám tại trường" ─────────────
+# Mỗi SV một dòng mỗi đợt (UNIQUE round_id, student_id), nên chuyển nhánh = đổi chính
+# dòng đó sang đăng ký; khai báo cũ cất ở evidence[SUPERSEDED_KEY] với trạng thái
+# SUPERSEDED. Chỉ chuyển một chiều, một lần, khi khai báo cũ CHƯA được xác nhận.
+SUPERSEDED_KEY = "superseded_examined"
+SUPERSEDED = "superseded"
+SUPERSEDED_LABEL = "Đã thay bằng đăng ký khám"
+SWITCHABLE_STATUSES = (Response_.STATUS_PENDING, Response_.STATUS_REJECTED)
+
+
+def can_switch(resp):
+    return bool(resp and resp.choice == Response_.CHOICE_EXAMINED
+                and resp.status in SWITCHABLE_STATUSES)
+
+
+def superseded_info(evidence):
+    """Khai báo "đã khám" đã bị thay thế (cất trong evidence); None nếu không có."""
+    info = evidence.get(SUPERSEDED_KEY) if isinstance(evidence, dict) else None
+    return info if isinstance(info, dict) else None
+
+
+def _superseded_snapshot(resp, now):
+    def iso(value):
+        return value.isoformat() if value else None
+    return {
+        "status": SUPERSEDED,
+        "superseded_at": now.isoformat(),
+        "previous_status": resp.status,
+        "previous_status_label": Response_.STATUS_LABELS.get(resp.status, resp.status),
+        "evidence": resp.evidence,            # {"files", "result", "data_consent"} giữ nguyên
+        "residence": resp.residence,
+        "submit_count": resp.submit_count,
+        "submitted_at": iso(resp.submitted_at),
+        "created_at": iso(resp.created_at),
+        "review_note": resp.review_note,
+        "reviewed_by_id": resp.reviewed_by_id,
+        "reviewed_at": iso(resp.reviewed_at),
+    }
+
+
 def register(student, data):
     """Nhánh "Chưa khám": khai báo (nếu form ngoại trú đang mở) + đăng ký khám
-    (+ ngày và ca khám nếu đợt có chia ca)."""
+    (+ ngày và ca khám nếu đợt có chia ca).
+
+    `switch_from_examined=True`: SV đã khai "đã khám" (chờ xác nhận / bị từ chối) chuyển
+    sang đăng ký. Mọi kiểm tra như đăng ký mới; không đạt thì khai báo cũ giữ nguyên."""
     if data.get("consent") is not True:
         raise HealthCheckError(
             "Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.",
@@ -475,7 +528,10 @@ def register(student, data):
             round_ = display_round()
             if round_ is None or round_state(round_) != "open":
                 raise HealthCheckError(_closed_message(round_), code="closed")
-            if Response_.objects.filter(round=round_, student_id=student.pk).exists():
+            existing = (Response_.objects.select_for_update()
+                        .filter(round=round_, student_id=student.pk).first())
+            switching = existing is not None
+            if switching and not (data.get("switch_from_examined") is True and can_switch(existing)):
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
             # Khóa dòng đợt: các lượt đăng ký xếp hàng nhau, đếm chỗ trong ca không bị lọt.
             round_ = HealthCheckRound.objects.select_for_update().get(pk=round_.pk)
@@ -504,13 +560,33 @@ def register(student, data):
                 )
             residence["declared_with_registration"] = declared_now
             now = timezone.now()
-            return Response_.objects.create(
-                round=round_, student_id=student.pk,
-                choice=Response_.CHOICE_REGISTER, status=Response_.STATUS_REGISTERED,
-                residence=residence, consent_at=now, submit_count=1, submitted_at=now,
-                evidence={"data_consent": _data_consent(Response_.CHOICE_REGISTER),
-                          **({"exam_slot": exam_slot} if exam_slot else {})},
-            )
+            evidence = {"data_consent": _data_consent(Response_.CHOICE_REGISTER),
+                        **({"exam_slot": exam_slot} if exam_slot else {})}
+            if not switching:
+                return Response_.objects.create(
+                    round=round_, student_id=student.pk,
+                    choice=Response_.CHOICE_REGISTER, status=Response_.STATUS_REGISTERED,
+                    residence=residence, consent_at=now, submit_count=1, submitted_at=now,
+                    evidence=evidence,
+                )
+            # Chuyển nhánh: CHÍNH dòng này thành đăng ký khám; khai báo "đã khám" cũ
+            # (kết quả, ảnh, trạng thái duyệt) cất nguyên vào evidence — không xoá gì.
+            evidence[SUPERSEDED_KEY] = _superseded_snapshot(existing, now)
+            existing.choice = Response_.CHOICE_REGISTER
+            existing.status = Response_.STATUS_REGISTERED
+            existing.evidence = evidence
+            existing.residence = residence
+            existing.consent_at = now
+            existing.submit_count = 1
+            existing.submitted_at = now
+            existing.review_note = None
+            existing.reviewed_by_id = None
+            existing.reviewed_at = None
+            existing.save(update_fields=[
+                "choice", "status", "evidence", "residence", "consent_at", "submit_count",
+                "submitted_at", "review_note", "reviewed_by_id", "reviewed_at", "updated_at",
+            ])
+            return existing
     except IntegrityError as exc:
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc
 

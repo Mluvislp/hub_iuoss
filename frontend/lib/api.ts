@@ -418,7 +418,11 @@ export const api = {
     submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
       return requestMultipart('/health-check/evidence/', body);
     },
-    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string }):
+    register(data: {
+      declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string;
+      /** Chuyển từ khai "đã khám" (chờ xác nhận / từ chối) sang đăng ký khám tại trường. */
+      switch_from_examined?: boolean;
+    }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
     },

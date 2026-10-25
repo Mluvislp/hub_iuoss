@@ -101,7 +101,8 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
-    """POST JSON {declaration?, consent, data_consent, exam_slot?} — nhánh "Chưa khám"."""
+    """POST JSON {declaration?, consent, data_consent, exam_slot?, switch_from_examined?} — nhánh
+    "Chưa khám"; `switch_from_examined` = chuyển từ khai "đã khám" sang đăng ký."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [JSONParser]
@@ -115,9 +116,10 @@ class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
             resp = health_check.register(student, data)
         except health_check.HealthCheckError as exc:
             return _error(exc)
-        logger.info("HEALTH_CHECK_REGISTER | uid=%s | student_id=%s | round=%s | declared_now=%s",
+        logger.info("HEALTH_CHECK_REGISTER | uid=%s | student_id=%s | round=%s | declared_now=%s | switched=%s",
                     request.user.ldap_uid, student.pk, resp.round_id,
-                    (resp.residence or {}).get("declared_with_registration"))
+                    (resp.residence or {}).get("declared_with_registration"),
+                    bool(health_check.superseded_info(resp.evidence)))
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 
