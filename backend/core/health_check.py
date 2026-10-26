@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from students.models import ProfileChangeRequest, Student
@@ -101,47 +102,62 @@ class HealthCheckError(ValueError):
         super().__init__(message)
 
 
-# ── Đợt ──────────────────────────────────────────────────────────────────────
-# Công tắc `open_mode` (Dashboard đặt) là mức ƯU TIÊN CAO NHẤT, tách khỏi thời hạn:
-#   auto   → mở/đóng theo opens_at / closes_at
+# ── Đợt + 3 lựa chọn ─────────────────────────────────────────────────────────
+# MỖI lựa chọn (examined "Đã khám SK" · register "Chưa khám SK" · other "Đối tượng khác") có
+# thời hạn `<lựa chọn>_opens_at/_closes_at` + công tắc `<lựa chọn>_open_mode` RIÊNG (26/10/2026).
+# Công tắc là mức ƯU TIÊN CAO NHẤT:
+#   auto   → mở/đóng theo thời hạn của lựa chọn đó
 #   open   → luôn mở, bất kể thời hạn
 #   closed → luôn đóng, bất kể thời hạn — khóa cả nộp lại minh chứng bị từ chối
-# Bản đối ứng: dashboard healthcheck/models.py::HealthCheckRound.state.
+# Cột `open_mode` của đợt thôi dùng. Bản đối ứng: dashboard healthcheck/models.py::option_state.
 OPEN_MODE_AUTO, OPEN_MODE_OPEN, OPEN_MODE_CLOSED = "auto", "open", "closed"
+OPTIONS = ("examined", "register", "other")
+# Nhãn trên ô lựa chọn khi KHÔNG mở — ô vẫn hiện, làm mờ (không ẩn).
+OPTION_CLOSED_LABELS = {
+    "upcoming": "Chưa mở đăng ký",
+    "disabled": "Chưa mở đăng ký",
+    "expired": "Hết thời hạn đăng ký",
+    "paused": "Tạm đóng đăng ký",
+}
+
+
+def option_status(round_, choice, now=None):
+    """Chi tiết trạng thái một lựa chọn: open | upcoming | disabled | expired | paused."""
+    if round_ is None:
+        return "disabled"
+    mode = getattr(round_, f"{choice}_open_mode", OPEN_MODE_AUTO)
+    if mode == OPEN_MODE_OPEN:
+        return "open"
+    if mode == OPEN_MODE_CLOSED:
+        return "paused"
+    opens_at = getattr(round_, f"{choice}_opens_at")
+    closes_at = getattr(round_, f"{choice}_closes_at")
+    if not opens_at or not closes_at:
+        return "disabled"
+    now = now or timezone.now()
+    if now < opens_at:
+        return "upcoming"
+    if now > closes_at:
+        return "expired"
+    return "open"
+
+
+def option_state(round_, choice, now=None):
+    """open | upcoming | closed | disabled — gọn cho các phép kiểm."""
+    status = option_status(round_, choice, now)
+    return "closed" if status in ("expired", "paused") else status
 
 
 def round_state(round_, now=None):
-    mode = getattr(round_, "open_mode", OPEN_MODE_AUTO)
-    if mode == OPEN_MODE_OPEN:
+    """Trạng thái chung của đợt: 'open' khi CÓ lựa chọn đang mở."""
+    if any(option_state(round_, c, now) == "open" for c in OPTIONS):
         return "open"
-    if mode == OPEN_MODE_CLOSED:
-        return "closed"
     now = now or timezone.now()
-    if now < round_.opens_at:
-        return "upcoming"
-    if now > round_.closes_at:
-        return "closed"
-    return "open"
+    return "upcoming" if now < round_.opens_at else "closed"
 
 
 def other_state(round_, now=None):
-    """Luồng "Dành cho đối tượng khác": thời hạn + công tắc RIÊNG, độc lập luồng Thành phố.
-    'disabled' khi chưa đặt thời hạn (và công tắc không bật "Mở") — Hub ẩn lựa chọn."""
-    if round_ is None:
-        return "disabled"
-    mode = getattr(round_, "other_open_mode", OPEN_MODE_AUTO)
-    if mode == OPEN_MODE_OPEN:
-        return "open"
-    if mode == OPEN_MODE_CLOSED:
-        return "closed"
-    if not round_.other_opens_at or not round_.other_closes_at:
-        return "disabled"
-    now = now or timezone.now()
-    if now < round_.other_opens_at:
-        return "upcoming"
-    if now > round_.other_closes_at:
-        return "closed"
-    return "open"
+    return option_state(round_, "other", now)
 
 
 def display_round(now=None):
@@ -149,7 +165,8 @@ def display_round(now=None):
     không có thì đợt gần nhất đã mở (để SV xem lại phản hồi); không có nữa thì đợt sắp mở."""
     now = now or timezone.now()
     rounds = HealthCheckRound.objects.all()
-    forced = rounds.filter(open_mode=OPEN_MODE_OPEN).order_by("-opens_at").first()
+    forced = rounds.filter(Q(examined_open_mode=OPEN_MODE_OPEN) | Q(register_open_mode=OPEN_MODE_OPEN)
+                           | Q(other_open_mode=OPEN_MODE_OPEN)).order_by("-opens_at").first()
     if forced:
         return forced
     current = rounds.filter(opens_at__lte=now, closes_at__gte=now).order_by("-opens_at").first()
@@ -185,8 +202,9 @@ def serialize_round(round_):
         "opens_at": round_.opens_at.isoformat(),
         "closes_at": round_.closes_at.isoformat(),
         "state": round_state(round_),
-        # "closed" do công tắc (tạm đóng) — khác hết hạn; Hub hiện câu riêng.
-        "manually_closed": round_.open_mode == OPEN_MODE_CLOSED,
+        # Từng lựa chọn: mở hay không + nhãn khi không mở (ô làm mờ, không ẩn).
+        "options": {c: {"open": (st := option_status(round_, c)) == "open",
+                        "status": st, "label": OPTION_CLOSED_LABELS.get(st, "")} for c in OPTIONS},
         "package_name": round_.package_name,
         "package_lines": _package_lines(round_.package_content),
         "schedule_note": round_.schedule_note or "",
@@ -327,12 +345,15 @@ def build_state(student):
         Response_.objects.filter(round=round_, student_id=student.pk).first()
         if round_ else None
     )
-    state = round_state(round_) if round_ else None
-    can_switch_now = state == "open" and can_switch(resp)
+    examined_open = option_state(round_, "examined") == "open"
+    register_open = option_state(round_, "register") == "open"
+    can_switch_now = register_open and can_switch(resp)
     return {
         "round": serialize_round(round_),
         "response": _serialize_response(resp),
-        "can_submit": state == "open" and resp is None,
+        "can_submit": (examined_open or register_open) and resp is None,
+        "can_submit_examined": examined_open and resp is None,
+        "can_submit_register": register_open and resp is None,
         # Đã khai "đã khám" (chưa được xác nhận) → được chuyển sang đăng ký khám tại trường.
         "can_switch_to_register": can_switch_now,
         # Luồng "đối tượng khác" — chỉ hiện lựa chọn khi luồng đang mở (không hiện thời hạn).
@@ -354,7 +375,7 @@ def build_state(student):
         "residence": residence_snapshot(student),
         # Ngày + ca khám tại trường (nhánh "Chưa khám"); None khi đợt không chia ca.
         "exam_slots": (slot_options(round_)
-                       if round_ and state == "open" and (resp is None or can_switch_now) else None),
+                       if round_ and register_open and (resp is None or can_switch_now) else None),
     }
 
 
@@ -414,7 +435,7 @@ def _can_resubmit(resp, round_):
     if not (resp and resp.status == Response_.STATUS_REJECTED):
         return False
     if resp.choice == Response_.CHOICE_EXAMINED:
-        return round_.open_mode != OPEN_MODE_CLOSED
+        return round_.examined_open_mode != OPEN_MODE_CLOSED
     if resp.choice == Response_.CHOICE_OTHER:
         return round_.other_open_mode != OPEN_MODE_CLOSED
     return False
@@ -468,14 +489,10 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                             and resp.status == Response_.STATUS_REJECTED)
             if resp is not None and not resubmit:
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
-            if choice == Response_.CHOICE_OTHER:
-                if resp is None and other_state(round_) != "open":
-                    raise HealthCheckError(OTHER_CLOSED_MESSAGE, code="closed")
-            elif resp is None and round_state(round_) != "open":
-                raise HealthCheckError(_closed_message(round_), code="closed")
+            if resp is None and option_state(round_, choice) != "open":
+                raise HealthCheckError(_closed_message(round_, choice), code="closed")
             if resubmit and not _can_resubmit(resp, round_):
-                raise HealthCheckError(OTHER_CLOSED_MESSAGE if choice == Response_.CHOICE_OTHER
-                                       else _closed_message(round_), code="closed")
+                raise HealthCheckError(_closed_message(round_, choice), code="closed")
 
             # Như nhánh đăng ký khám: chưa khai ngoại trú thì khai luôn ở đây.
             locked, _ = offcampus.lock_state(student)
@@ -603,8 +620,8 @@ def register(student, data):
         with transaction.atomic():
             _lock_student(student)
             round_ = display_round()
-            if round_ is None or round_state(round_) != "open":
-                raise HealthCheckError(_closed_message(round_), code="closed")
+            if round_ is None or option_state(round_, "register") != "open":
+                raise HealthCheckError(_closed_message(round_, "register"), code="closed")
             existing = (Response_.objects.select_for_update()
                         .filter(round=round_, student_id=student.pk).first())
             switching = existing is not None
@@ -668,18 +685,18 @@ def register(student, data):
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc
 
 
-OTHER_CLOSED_MESSAGE = "Luồng khai báo dành cho đối tượng khác hiện không mở."
+OPTION_NAMES = {"examined": "Đã tham khám sức khoẻ", "register": "Chưa tham gia khám sức khoẻ",
+                "other": "Dành cho đối tượng khác"}
 
 
-def _closed_message(round_):
+def _closed_message(round_, choice=None):
+    """Câu báo khi lựa chọn không mở — không nêu mốc giờ (Hub không hiển thị thời hạn)."""
     if round_ is None:
         return "Chưa có đợt khai báo khám sức khỏe nào."
-    if round_.open_mode == OPEN_MODE_CLOSED:
-        return "Đợt khai báo năm học " + round_.academic_year + " đang tạm đóng."
-    if round_state(round_) == "upcoming":
-        return "Đợt khai báo năm học " + round_.academic_year + " chưa mở."
-    # Không nêu mốc giờ: trang Khám sức khỏe không hiển thị thời hạn đăng ký (26/10/2026).
-    return "Đợt khai báo năm học " + round_.academic_year + " đã kết thúc."
+    if choice is None:
+        return "Đợt khai báo năm học " + round_.academic_year + " hiện không mở."
+    label = OPTION_CLOSED_LABELS.get(option_status(round_, choice), "Không mở đăng ký")
+    return f"Lựa chọn “{OPTION_NAMES[choice]}”: {label.lower()}."
 
 
 def _cleanup(paths):
