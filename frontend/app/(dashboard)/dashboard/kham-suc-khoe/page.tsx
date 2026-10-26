@@ -36,10 +36,6 @@ function fmtDateTime(iso: string) {
     d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function daysLeft(iso: string) {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
-}
-
 function Breadcrumb() {
   return (
     <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
@@ -196,15 +192,9 @@ export default function HealthCheckPage() {
             <HeartPulse size={17} className="text-slate-500" /> {round.title}
           </h1>
           <p className="text-sm text-muted mt-1">
-            Năm học {round.academic_year} · Thời hạn khai báo {fmtDateTime(round.opens_at)} – {fmtDateTime(round.closes_at)}
+            Năm học {round.academic_year}
           </p>
         </div>
-        {round.state === 'open' && (
-          <span className={cn(badge.base, daysLeft(round.closes_at) <= 3 ? badge.warning : badge.info)}>
-            <CalendarClock size={12} />
-            {daysLeft(round.closes_at) <= 1 ? 'Hết hạn trong hôm nay' : `Còn ${daysLeft(round.closes_at)} ngày`}
-          </span>
-        )}
         {round.state === 'closed' && <span className={cn(badge.base, badge.neutral)}><Lock size={12} /> Đã kết thúc</span>}
         {round.state === 'upcoming' && <span className={cn(badge.base, badge.neutral)}>Chưa mở</span>}
       </div>
@@ -395,8 +385,8 @@ export default function HealthCheckPage() {
           {header}
           <div className="px-6 py-6 text-sm text-muted">
             {round.state === 'upcoming'
-              ? `Đợt khai báo mở lúc ${fmtDateTime(round.opens_at)}.`
-              : `Đợt khai báo đã kết thúc lúc ${fmtDateTime(round.closes_at)}. Không ghi nhận phản hồi cho đợt này.`}
+              ? 'Đợt khai báo chưa mở.'
+              : 'Đợt khai báo đã kết thúc. Không ghi nhận phản hồi cho đợt này.'}
           </div>
         </div>
       </div>
