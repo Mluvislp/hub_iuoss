@@ -29,6 +29,8 @@ interface Props {
   provinces: Province[];
   /** Nộp lại sau khi bị từ chối: nạp kết quả đã khai lần trước. */
   resubmit?: boolean;
+  /** `other` = luồng "Dành cho đối tượng khác": cùng form, server kiểm SV ngoại tỉnh. */
+  choice?: 'examined' | 'other';
   onDone: (next: HealthCheckState) => void;
   /** Cập nhật state trang mà không coi là đã nộp — dùng sau khi lưu khai báo ở bước 1. */
   onStateChange: (next: HealthCheckState) => void;
@@ -47,7 +49,7 @@ function readDraft(key: string): Draft | null {
 }
 
 export default function ExaminedWizard({
-  state, provinces, resubmit, onDone, onStateChange, onCancel,
+  state, provinces, resubmit, choice = 'examined', onDone, onStateChange, onCancel,
 }: Props) {
   const schema = state.result_schema;
   const locked = state.offcampus.locked;
@@ -162,6 +164,7 @@ export default function ExaminedWizard({
       files.forEach((f) => fd.append('files', f));
       fd.append('result', JSON.stringify(values));
       fd.append('data_consent', 'true');
+      fd.append('choice', choice);
       if (!locked) fd.append('declaration', JSON.stringify(declaration.payload()));
       const next = await api.healthCheck.submitEvidence(fd);
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
@@ -268,7 +271,7 @@ export default function ExaminedWizard({
         )}
 
         {last && (
-          <ConsentBox checked={dataConsent} text={state.data_consent_text.examined}
+          <ConsentBox checked={dataConsent} text={state.data_consent_text[choice]}
                       error={errors.data_consent}
                       onChange={(v) => { setDataConsent(v); setErrors(({ data_consent: _, ...rest }) => rest); }} />
         )}
