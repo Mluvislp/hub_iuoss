@@ -73,6 +73,9 @@ class HealthCheckResponse(models.Model):
     choice = models.CharField(max_length=16)
     status = models.CharField(max_length=16)
     evidence = models.JSONField(null=True)
+    # Mã phiếu khám "STT-dd/mm/yyyy" — Phòng CTSV gán theo danh sách gửi PYT (26/10/2026);
+    # có mã = đã phát hành phiếu khám. ⚠️ Cột thêm bằng ALTER, phải có trước khi deploy.
+    exam_code = models.CharField(max_length=32, null=True, blank=True)
     residence = models.JSONField(null=True)
     consent_at = models.DateTimeField(null=True)
     submit_count = models.PositiveSmallIntegerField(default=1)

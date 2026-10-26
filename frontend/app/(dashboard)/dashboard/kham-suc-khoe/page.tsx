@@ -20,6 +20,7 @@ import ExaminedWizard from './ExaminedWizard';
 import CccdForm from './CccdForm';
 import ConsentBox from './ConsentBox';
 import SlotPicker from './SlotPicker';
+import ExamTicket from './ExamTicket';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -280,6 +281,7 @@ export default function HealthCheckPage() {
               : 'Đã ghi nhận kết quả khám và minh chứng.'}
           </div>
         )}
+        {state.exam_ticket && <ExamTicket ticket={state.exam_ticket} />}
         <div className={ui.card}>
           {header}
           <div className="px-6 py-5 space-y-5">
