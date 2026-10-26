@@ -74,7 +74,7 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
             {ticket.place && (
               <div className="flex items-start gap-2.5 px-3.5 py-2.5">
                 <MapPin size={15} className="text-slate-500 mt-0.5 shrink-0" />
-                <div><span className="text-muted">Địa điểm: </span><span className="text-ink">{ticket.place}</span></div>
+                <div><span className="text-muted">Ghi chú: </span><span className="text-ink">{ticket.place}</span></div>
               </div>
             )}
           </div>
