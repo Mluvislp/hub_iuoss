@@ -1,7 +1,7 @@
 'use client';
 
 import QRCode from 'react-qr-code';
-import { CalendarDays, Clock, Info, MapPin, Printer, Ticket } from 'lucide-react';
+import { CalendarDays, Clock, Info, Printer, Ticket } from 'lucide-react';
 import { badge, notice, noticeIcon, subtle, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { HealthCheckTicket } from '@/lib/types';
@@ -27,6 +27,18 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
+/** Thông tin định danh — đặt ngay dưới mã phiếu, chữ lớn hơn để đối chiếu nhanh tại bàn khám. */
+function BigField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[0.75rem] text-muted">{label}</div>
+      <div className={cn('text-[1.02rem] font-semibold text-ink break-words mt-0.5', mono && 'font-mono tracking-wide')}>
+        {value || <span className="italic font-normal text-sm text-slate-400">Chưa cập nhật</span>}
+      </div>
+    </div>
+  );
+}
+
 /** Phiếu khám sức khỏe — chỉ hiện khi Phòng CTSV đã gán mã (`exam_code`) cho đăng ký khám tại trường. */
 export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
   const s = ticket.student;
@@ -47,15 +59,16 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
 
       <div className="px-5 py-5 grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
         <div className="space-y-4 min-w-0">
-          <div className="flex items-end gap-5">
-            <div>
-              <div className="text-[0.75rem] font-medium text-muted">Số thứ tự</div>
-              <div className="text-[2.6rem] leading-none font-bold text-ink mt-1">{ticket.number}</div>
-            </div>
-            <div className="pb-1 min-w-0">
-              <div className="text-[0.75rem] font-medium text-muted">Mã phiếu</div>
-              <div className="font-mono text-[0.95rem] font-semibold text-primary-text tracking-wide mt-0.5 break-all">{ticket.code}</div>
-            </div>
+          <div>
+            <div className="text-[0.75rem] font-medium text-muted">Mã phiếu khám</div>
+            <div className="font-mono text-[1.35rem] font-bold text-primary-text tracking-wide mt-0.5 break-all">{ticket.code}</div>
+          </div>
+
+          <div className="grid gap-x-6 gap-y-3.5 grid-cols-1 sm:grid-cols-2">
+            <BigField label="Họ và tên" value={s.full_name} />
+            <BigField label="Mã số sinh viên" value={s.student_code} mono />
+            <BigField label="Số CCCD" value={s.citizen_id} mono />
+            <BigField label="Ngày sinh" value={s.date_of_birth} />
           </div>
 
           <div className={cn(subtle, 'divide-y divide-line2 text-sm')}>
@@ -71,12 +84,6 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
                 {ticket.slot_time && <span className="text-ink"> ({ticket.slot_time})</span>}
               </div>
             </div>
-            {ticket.place && (
-              <div className="flex items-start gap-2.5 px-3.5 py-2.5">
-                <MapPin size={15} className="text-slate-500 mt-0.5 shrink-0" />
-                <div><span className="text-muted">Ghi chú: </span><span className="text-ink">{ticket.place}</span></div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -91,17 +98,13 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
       <div className="mx-5 border-t border-dashed border-line" />
 
       <div className="px-5 py-5">
-        <div className="text-[0.82rem] font-semibold text-ink mb-3">Thông tin sinh viên</div>
+        <div className="text-[0.82rem] font-semibold text-ink mb-3">Thông tin khác</div>
         <div className="grid gap-x-6 gap-y-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Họ và tên" value={s.full_name} />
-          <Field label="Mã số sinh viên" value={s.student_code} mono />
-          <Field label="Ngày sinh" value={s.date_of_birth} />
           <Field label="Giới tính" value={s.sex} />
-          <Field label="Số CCCD" value={s.citizen_id} mono />
           <Field label="Số điện thoại" value={s.phone} mono />
+          <Field label="Mã thẻ BHYT" value={s.health_insurance_code} mono />
           <Field label="Lớp" value={s.class_code} />
           <Field label="Khoa" value={s.department} />
-          <Field label="Mã thẻ BHYT" value={s.health_insurance_code} mono />
         </div>
       </div>
 
