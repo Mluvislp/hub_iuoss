@@ -44,9 +44,9 @@ class ExamTicketTests(TestCase):
     def test_co_ma_thi_phat_hanh_phieu_kem_thong_tin(self):
         resp = self._resp(exam_code="100-27/10/2026")
         t = hc.exam_ticket(self.student, resp, self.round)
-        self.assertEqual((t["code"], t["number"]), ("100-27/10/2026", "100"))
+        self.assertEqual(t["code"], "100-27/10/2026")
         self.assertEqual(t["date_label"], "Thứ Ba, 27/10/2026")
-        self.assertEqual((t["slot_label"], t["slot_time"], t["place"]), ("Ca sáng thứ nhất", "07:30–09:30", "Hội trường A2"))
+        self.assertEqual((t["slot_label"], t["slot_time"]), ("Ca sáng thứ nhất", "07:30–09:30"))
         s = t["student"]
         self.assertEqual((s["student_code"], s["date_of_birth"], s["citizen_id"], s["phone"]),
                          ("ITCSIU24092", "02/01/2006", "079206000001", "0911111111"))

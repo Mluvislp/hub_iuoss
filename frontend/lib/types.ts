@@ -673,11 +673,9 @@ export interface ResultSection {
 /** Phiếu khám — backend `health_check.exam_ticket`; null khi chưa được gán mã. */
 export interface HealthCheckTicket {
   code: string;
-  number: string;
   date_label: string;
   slot_label: string;
   slot_time: string;
-  place: string;
   issued_at: string | null;
   student: {
     full_name: string;

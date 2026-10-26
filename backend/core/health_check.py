@@ -352,11 +352,9 @@ def exam_ticket(student, resp, round_):
     dept = student.current_department
     return {
         "code": code,
-        "number": code.split("-", 1)[0],
         "date_label": slots.date_label(slot["date"]) if slot else "",
         "slot_label": slot.get("label", "") if slot else "",
         "slot_time": f"{slot.get('start', '')}–{slot.get('end', '')}" if slot else "",
-        "place": (round_.schedule_note or "") if round_ else "",
         "issued_at": timezone.localtime(resp.updated_at).isoformat() if resp.updated_at else None,
         "student": {
             "full_name": student.full_name or "",
