@@ -174,7 +174,7 @@ def slot_options(round_, now=None):
             started = slots.has_started(slot, now)
             shifts.append({**slots.snapshot(slot), "remaining": remaining,
                            "available": not started and remaining != 0,
-                           "reason": "Đã qua giờ đăng ký" if started else "Đã đủ chỗ" if remaining == 0 else ""})
+                           "reason": "Ca đã bắt đầu" if started else "Đã đủ chỗ" if remaining == 0 else ""})
         days.append({"date": day, "label": slots.date_label(day), "shifts": shifts})
     return {"capacity": cfg["capacity"], "days": days}
 
@@ -189,8 +189,8 @@ def _pick_slot(round_, key):
         raise HealthCheckError("Vui lòng chọn ngày và ca khám.",
                                errors={"exam_slot": "Chưa chọn ca khám."}, code="exam_slot")
     if slots.has_started(slot):
-        raise HealthCheckError("Ca khám đã chọn đã qua giờ đăng ký. Vui lòng chọn ca khác.",
-                               errors={"exam_slot": "Ca đã qua giờ đăng ký."}, code="exam_slot")
+        raise HealthCheckError("Ca khám đã chọn đã bắt đầu. Vui lòng chọn ca khác.",
+                               errors={"exam_slot": "Ca đã bắt đầu."}, code="exam_slot")
     if cfg["capacity"] is not None:
         used = slots.taken(Response_.objects.filter(round=round_, choice=Response_.CHOICE_REGISTER)
                            .values_list("evidence", flat=True))
@@ -595,10 +595,9 @@ def _closed_message(round_):
     if round_ is None:
         return "Chưa có đợt khai báo khám sức khỏe nào."
     if round_state(round_) == "upcoming":
-        return ("Đợt khai báo năm học " + round_.academic_year + " chưa mở. Thời gian mở: "
-                + timezone.localtime(round_.opens_at).strftime("%H:%M %d/%m/%Y") + ".")
-    return ("Đợt khai báo năm học " + round_.academic_year + " đã kết thúc lúc "
-            + timezone.localtime(round_.closes_at).strftime("%H:%M %d/%m/%Y") + ".")
+        return "Đợt khai báo năm học " + round_.academic_year + " chưa mở."
+    # Không nêu mốc giờ: trang Khám sức khỏe không hiển thị thời hạn đăng ký (26/10/2026).
+    return "Đợt khai báo năm học " + round_.academic_year + " đã kết thúc."
 
 
 def _cleanup(paths):
