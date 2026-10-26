@@ -334,6 +334,10 @@ CREATE TABLE `health_check_rounds` (
   `closes_at` datetime(6) NOT NULL COMMENT 'Hạn chót; sau mốc này Hub khóa form',
   -- 26/10/2026: dashboard_iuoss/docs/sql/20261026_health_check_open_mode.sql
   `open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto' COMMENT 'Công tắc mở form, ưu tiên hơn thời hạn: auto | open | closed',
+  -- 26/10/2026: dashboard_iuoss/docs/sql/20261026_health_check_other_flow.sql — luồng "đối tượng khác"
+  `other_opens_at` datetime(6) DEFAULT NULL,
+  `other_closes_at` datetime(6) DEFAULT NULL,
+  `other_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
   `package_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `package_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mỗi dòng một ý; dòng mở đầu bằng "+" là gạch đầu dòng',
   `schedule_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Thời gian và địa điểm dự kiến',

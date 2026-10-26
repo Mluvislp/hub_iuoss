@@ -142,7 +142,7 @@ export default function HealthCheckPage() {
   const [state, setState] = useState<HealthCheckState | null>(null);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [loadError, setLoadError] = useState('');
-  const [choice, setChoice] = useState<'examined' | 'register' | null>(null);
+  const [choice, setChoice] = useState<'examined' | 'register' | 'other' | null>(null);
   const [consent, setConsent] = useState(false);
   const [dataConsent, setDataConsent] = useState(false);
   const [examSlot, setExamSlot] = useState('');
@@ -195,7 +195,7 @@ export default function HealthCheckPage() {
             Năm học {round.academic_year}
           </p>
         </div>
-        {round.state === 'closed' && (
+        {round.state === 'closed' && !state.can_submit_other && (
           <span className={cn(badge.base, badge.neutral)}>
             <Lock size={12} /> {round.manually_closed ? 'Tạm đóng' : 'Đã kết thúc'}
           </span>
@@ -247,6 +247,7 @@ export default function HealthCheckPage() {
           </div>
         )}
         <ExaminedWizard state={state} provinces={provinces} resubmit onDone={done}
+                        choice={response.choice === 'other' ? 'other' : 'examined'}
                         onStateChange={setState} onCancel={() => setResubmitting(false)} />
       </div>
     );
@@ -274,7 +275,9 @@ export default function HealthCheckPage() {
                 <div className="text-sm font-semibold text-ink mt-0.5">
                   {response.choice === 'register'
                     ? 'Chưa khám — đăng ký khám tập trung tại trường'
-                    : 'Đã khám theo chương trình của Thành phố'}
+                    : response.choice === 'other'
+                      ? 'Dành cho đối tượng khác — sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP.HCM'
+                      : 'Đã khám theo chương trình của Thành phố'}
                 </div>
               </div>
               <span className={cn(badge.base, STATUS_BADGE[response.status] ?? badge.neutral)}>
@@ -346,9 +349,9 @@ export default function HealthCheckPage() {
 
             {response.choice === 'register' && <PackageInfo state={state} />}
 
-            {response.choice === 'examined' && <ResultSummary response={response} />}
+            {response.choice !== 'register' && <ResultSummary response={response} />}
 
-            {response.choice === 'examined' && (
+            {response.choice !== 'register' && (
               <div>
                 <div className="text-[0.82rem] font-medium text-ink mb-2">Minh chứng đã nộp</div>
                 <EvidenceThumbs response={response} />
@@ -381,7 +384,7 @@ export default function HealthCheckPage() {
   }
 
   // ── Chưa trả lời mà đợt không mở ──
-  if (!state.can_submit && !isSwitching) {
+  if (!state.can_submit && !state.can_submit_other && !isSwitching) {
     return (
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
@@ -478,25 +481,40 @@ export default function HealthCheckPage() {
               Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
               Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
-                          desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
-                          onClick={() => { setChoice('examined'); setError(''); }} />
-              <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
-                          desc="Đăng ký khám sức khỏe tập trung tại trường"
-                          onClick={() => { setChoice('register'); setError(''); }} />
+            <div className={cn('grid gap-3', state.can_submit && state.can_submit_other ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+              {state.can_submit && (
+                <>
+                  <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                              desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                              onClick={() => { setChoice('examined'); setError(''); }} />
+                  <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
+                              desc="Đăng ký khám sức khỏe tập trung tại trường"
+                              onClick={() => { setChoice('register'); setError(''); }} />
+                </>
+              )}
+              {state.can_submit_other && (
+                <ChoiceTile active={choice === 'other'} title="Dành cho đối tượng khác"
+                            desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('other'); setError(''); }} />
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* ── Nhánh "Đã khám rồi" ── */}
-      {choice === 'examined' && !isSwitching && (
-        <ExaminedWizard state={state} provinces={provinces} onDone={done} onStateChange={setState} />
+      {choice === 'examined' && !isSwitching && state.can_submit && (
+        <ExaminedWizard key="examined" state={state} provinces={provinces} onDone={done} onStateChange={setState} />
+      )}
+
+      {/* ── Luồng "Dành cho đối tượng khác": cùng form 5 bước, thời hạn/công tắc riêng ── */}
+      {choice === 'other' && !isSwitching && state.can_submit_other && (
+        <ExaminedWizard key="other" choice="other" state={state} provinces={provinces}
+                        onDone={done} onStateChange={setState} />
       )}
 
       {/* ── Nhánh "Chưa khám": phần 1 khai báo + phần 2 đăng ký ── */}
-      {choice === 'register' && (
+      {choice === 'register' && (state.can_submit || isSwitching) && (
         <form onSubmit={submitRegister} className="space-y-4">
           <FormBusy busy={saving} label="Đang gửi đăng ký…" className="space-y-4">
             {error && <ErrorBox text={error} />}

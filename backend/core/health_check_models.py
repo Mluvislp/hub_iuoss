@@ -14,6 +14,11 @@ class HealthCheckRound(models.Model):
     closes_at = models.DateTimeField()
     # Công tắc mở form, ưu tiên HƠN thời hạn: auto | open | closed — xem health_check.round_state.
     open_mode = models.CharField(max_length=10, default="auto")
+    # Luồng "Dành cho đối tượng khác" (SV ngoại tỉnh chưa tạm trú TP.HCM): thời hạn +
+    # công tắc RIÊNG, độc lập luồng Thành phố. Không đặt thời hạn = luồng ẩn.
+    other_opens_at = models.DateTimeField(null=True, blank=True)
+    other_closes_at = models.DateTimeField(null=True, blank=True)
+    other_open_mode = models.CharField(max_length=10, default="auto")
     package_name = models.CharField(max_length=255)
     package_content = models.TextField()
     schedule_note = models.CharField(max_length=255, null=True, blank=True)
@@ -37,6 +42,7 @@ class HealthCheckResponse(models.Model):
 
     CHOICE_EXAMINED = "examined"
     CHOICE_REGISTER = "register"
+    CHOICE_OTHER = "other"        # đối tượng khác — cùng form + trạng thái như "examined"
 
     STATUS_PENDING = "pending"
     STATUS_APPROVED = "approved"
