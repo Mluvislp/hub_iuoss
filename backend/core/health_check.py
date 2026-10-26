@@ -189,9 +189,11 @@ def slot_options(round_, now=None):
         for slot in slots.iter_slots({**cfg, "dates": [day]}):
             remaining = None if cfg["capacity"] is None else max(0, cfg["capacity"] - used[slot["key"]])
             started = slots.has_started(slot, now)
+            closed = slots.is_closed(cfg, slot)
             shifts.append({**slots.snapshot(slot), "remaining": remaining,
-                           "available": not started and remaining != 0,
-                           "reason": "Ca đã bắt đầu" if started else "Đã đủ chỗ" if remaining == 0 else ""})
+                           "available": not started and not closed and remaining != 0,
+                           "reason": ("Ca đã bắt đầu" if started else "Đã khóa" if closed
+                                      else "Đã đủ chỗ" if remaining == 0 else "")})
         days.append({"date": day, "label": slots.date_label(day), "shifts": shifts})
     return {"capacity": cfg["capacity"], "days": days}
 
@@ -205,6 +207,9 @@ def _pick_slot(round_, key):
     if slot is None:
         raise HealthCheckError("Vui lòng chọn ngày và ca khám.",
                                errors={"exam_slot": "Chưa chọn ca khám."}, code="exam_slot")
+    if slots.is_closed(cfg, slot):
+        raise HealthCheckError("Ngày khám đã chọn đã ngừng nhận đăng ký. Vui lòng chọn ngày khác.",
+                               errors={"exam_slot": "Ngày này đã khóa."}, code="exam_slot")
     if slots.has_started(slot):
         raise HealthCheckError("Ca khám đã chọn đã bắt đầu. Vui lòng chọn ca khác.",
                                errors={"exam_slot": "Ca đã bắt đầu."}, code="exam_slot")
