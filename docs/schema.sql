@@ -338,6 +338,13 @@ CREATE TABLE `health_check_rounds` (
   `other_opens_at` datetime(6) DEFAULT NULL,
   `other_closes_at` datetime(6) DEFAULT NULL,
   `other_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
+  -- 26/10/2026: dashboard_iuoss/docs/sql/20261026_health_check_option_windows.sql — lịch + công tắc từng lựa chọn
+  `examined_opens_at` datetime(6) DEFAULT NULL,
+  `examined_closes_at` datetime(6) DEFAULT NULL,
+  `examined_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
+  `register_opens_at` datetime(6) DEFAULT NULL,
+  `register_closes_at` datetime(6) DEFAULT NULL,
+  `register_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
   `package_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `package_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mỗi dòng một ý; dòng mở đầu bằng "+" là gạch đầu dòng',
   `schedule_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Thời gian và địa điểm dự kiến',

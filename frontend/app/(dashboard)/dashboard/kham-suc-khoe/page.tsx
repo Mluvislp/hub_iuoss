@@ -10,7 +10,7 @@ import {
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
-import type { HealthCheckResponse, HealthCheckState, Province } from '@/lib/types';
+import type { HealthCheckOptionState, HealthCheckResponse, HealthCheckState, Province } from '@/lib/types';
 import {
   ChoiceTile, DeclarationFields, DeclarationSummary, useDeclarationDraft,
 } from '../khai-bao-ngoai-tru/DeclarationForm';
@@ -110,6 +110,26 @@ function EligibilityInfo({ state }: { state: HealthCheckState }) {
   );
 }
 
+/** Ô lựa chọn: đang mở → bấm chọn được; không mở → làm mờ + nhãn ("Hết thời hạn đăng ký"…), không ẩn. */
+function OptionTile({ option, active, title, desc, onClick }: {
+  option: HealthCheckOptionState; active: boolean; title: string; desc: string; onClick: () => void;
+}) {
+  if (option.open) return <ChoiceTile active={active} title={title} desc={desc} onClick={onClick} />;
+  return (
+    <div aria-disabled="true"
+         className="flex items-start gap-3 w-full text-left px-4 py-3 rounded-lg border border-line bg-slate-50 opacity-75 cursor-not-allowed">
+      <span className="mt-0.5 w-4 h-4 rounded-full border-2 border-slate-300 flex-shrink-0" />
+      <span>
+        <span className="block text-sm font-semibold text-slate-500">{title}</span>
+        <span className="block text-[0.78rem] text-slate-400 mt-0.5">{desc}</span>
+        <span className="inline-flex items-center gap-1 mt-1.5 rounded border border-line bg-white px-1.5 py-0.5 text-[0.72rem] font-semibold text-slate-600">
+          <Lock size={11} /> {option.label}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /** Tóm tắt kết quả khám SV đã khai — các chỉ số chính, đủ để tự kiểm lại. */
 function ResultSummary({ response }: { response: HealthCheckResponse }) {
   const r = response.result || {};
@@ -195,12 +215,6 @@ export default function HealthCheckPage() {
             Năm học {round.academic_year}
           </p>
         </div>
-        {round.state === 'closed' && !state.can_submit_other && (
-          <span className={cn(badge.base, badge.neutral)}>
-            <Lock size={12} /> {round.manually_closed ? 'Tạm đóng' : 'Đã kết thúc'}
-          </span>
-        )}
-        {round.state === 'upcoming' && <span className={cn(badge.base, badge.neutral)}>Chưa mở</span>}
       </div>
     </div>
   );
@@ -383,25 +397,6 @@ export default function HealthCheckPage() {
     );
   }
 
-  // ── Chưa trả lời mà đợt không mở ──
-  if (!state.can_submit && !state.can_submit_other && !isSwitching) {
-    return (
-      <div className="max-w-[860px] space-y-4">
-        <Breadcrumb />
-        <div className={ui.card}>
-          {header}
-          <div className="px-6 py-6 text-sm text-muted">
-            {round.manually_closed
-              ? 'Đợt khai báo đang tạm đóng. Vui lòng quay lại sau.'
-              : round.state === 'upcoming'
-                ? 'Đợt khai báo chưa mở.'
-                : 'Đợt khai báo đã kết thúc. Không ghi nhận phản hồi cho đợt này.'}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ── Đợt đang mở, chưa trả lời ──
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -481,29 +476,23 @@ export default function HealthCheckPage() {
               Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
               Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
             </p>
-            <div className={cn('grid gap-3', state.can_submit && state.can_submit_other ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
-              {state.can_submit && (
-                <>
-                  <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
-                              desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
-                              onClick={() => { setChoice('examined'); setError(''); }} />
-                  <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
-                              desc="Đăng ký khám sức khỏe tập trung tại trường"
-                              onClick={() => { setChoice('register'); setError(''); }} />
-                </>
-              )}
-              {state.can_submit_other && (
-                <ChoiceTile active={choice === 'other'} title="Dành cho đối tượng khác"
-                            desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
-                            onClick={() => { setChoice('other'); setError(''); }} />
-              )}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                          desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                          onClick={() => { setChoice('examined'); setError(''); }} />
+              <OptionTile option={round.options.register} active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
+                          desc="Đăng ký khám sức khỏe tập trung tại trường"
+                          onClick={() => { setChoice('register'); setError(''); }} />
+              <OptionTile option={round.options.other} active={choice === 'other'} title="Dành cho đối tượng khác"
+                          desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
+                          onClick={() => { setChoice('other'); setError(''); }} />
             </div>
           </div>
         )}
       </div>
 
       {/* ── Nhánh "Đã khám rồi" ── */}
-      {choice === 'examined' && !isSwitching && state.can_submit && (
+      {choice === 'examined' && !isSwitching && state.can_submit_examined && (
         <ExaminedWizard key="examined" state={state} provinces={provinces} onDone={done} onStateChange={setState} />
       )}
 
@@ -514,7 +503,7 @@ export default function HealthCheckPage() {
       )}
 
       {/* ── Nhánh "Chưa khám": phần 1 khai báo + phần 2 đăng ký ── */}
-      {choice === 'register' && (state.can_submit || isSwitching) && (
+      {choice === 'register' && (state.can_submit_register || isSwitching) && (
         <form onSubmit={submitRegister} className="space-y-4">
           <FormBusy busy={saving} label="Đang gửi đăng ký…" className="space-y-4">
             {error && <ErrorBox text={error} />}

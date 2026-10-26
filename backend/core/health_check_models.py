@@ -19,6 +19,13 @@ class HealthCheckRound(models.Model):
     other_opens_at = models.DateTimeField(null=True, blank=True)
     other_closes_at = models.DateTimeField(null=True, blank=True)
     other_open_mode = models.CharField(max_length=10, default="auto")
+    # Mỗi lựa chọn một thời hạn + công tắc riêng (26/10/2026). `open_mode` của đợt thôi dùng.
+    examined_opens_at = models.DateTimeField(null=True, blank=True)
+    examined_closes_at = models.DateTimeField(null=True, blank=True)
+    examined_open_mode = models.CharField(max_length=10, default="auto")
+    register_opens_at = models.DateTimeField(null=True, blank=True)
+    register_closes_at = models.DateTimeField(null=True, blank=True)
+    register_open_mode = models.CharField(max_length=10, default="auto")
     package_name = models.CharField(max_length=255)
     package_content = models.TextField()
     schedule_note = models.CharField(max_length=255, null=True, blank=True)

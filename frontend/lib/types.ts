@@ -556,12 +556,19 @@ export interface HealthCheckRound {
   opens_at: string;
   closes_at: string;
   state: HealthCheckRoundState;
-  /** Đóng bằng công tắc trên Dashboard (tạm đóng), không phải hết hạn. */
-  manually_closed: boolean;
+  /** Từng lựa chọn có thời hạn + công tắc riêng; không mở thì ô làm mờ kèm `label`. */
+  options: Record<'examined' | 'register' | 'other', HealthCheckOptionState>;
   package_name: string;
   /** Dòng `bullet` là gạch đầu dòng con của dòng thường đứng trước nó. */
   package_lines: { bullet: boolean; text: string }[];
   schedule_note: string;
+}
+
+export interface HealthCheckOptionState {
+  open: boolean;
+  status: 'open' | 'upcoming' | 'disabled' | 'expired' | 'paused';
+  /** "Hết thời hạn đăng ký" · "Chưa mở đăng ký" · "Tạm đóng đăng ký" — rỗng khi đang mở. */
+  label: string;
 }
 
 export interface HealthCheckResidence {
@@ -670,6 +677,8 @@ export interface HealthCheckState {
   can_resubmit: boolean;
   /** Luồng "Dành cho đối tượng khác" đang mở (thời hạn/công tắc riêng) và SV chưa trả lời. */
   can_submit_other: boolean;
+  can_submit_examined: boolean;
+  can_submit_register: boolean;
   /** Đã khai "đã khám" (chờ xác nhận / từ chối), đợt còn mở → được chuyển sang đăng ký khám. */
   can_switch_to_register: boolean;
   max_evidence_files: number;
