@@ -87,11 +87,13 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
           </div>
         </div>
 
-        <div className="flex sm:flex-col items-center gap-3 sm:gap-1.5 justify-self-center">
-          <div className="rounded-lg border border-line bg-white p-2.5">
-            <QRCode value={ticket.code} size={112} />
+        {/* Điện thoại: QR lên đầu phiếu, to gần hết bề ngang để quét dễ; máy tính: cột phải 180px. */}
+        <div className="order-first sm:order-none flex flex-col items-center gap-1.5 justify-self-center w-full sm:w-auto">
+          <div className="rounded-lg border border-line bg-white p-3 w-full max-w-[260px] sm:w-[180px]">
+            <QRCode value={ticket.code} size={256} viewBox="0 0 256 256"
+                    style={{ width: '100%', height: 'auto', display: 'block' }} />
           </div>
-          <div className="text-[0.72rem] text-muted text-center">Quét để tra mã phiếu</div>
+          <div className="text-[0.75rem] text-muted text-center">Quét để tra mã phiếu</div>
         </div>
       </div>
 
