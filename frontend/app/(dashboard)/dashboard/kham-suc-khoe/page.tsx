@@ -195,7 +195,11 @@ export default function HealthCheckPage() {
             Năm học {round.academic_year}
           </p>
         </div>
-        {round.state === 'closed' && <span className={cn(badge.base, badge.neutral)}><Lock size={12} /> Đã kết thúc</span>}
+        {round.state === 'closed' && (
+          <span className={cn(badge.base, badge.neutral)}>
+            <Lock size={12} /> {round.manually_closed ? 'Tạm đóng' : 'Đã kết thúc'}
+          </span>
+        )}
         {round.state === 'upcoming' && <span className={cn(badge.base, badge.neutral)}>Chưa mở</span>}
       </div>
     </div>
@@ -384,9 +388,11 @@ export default function HealthCheckPage() {
         <div className={ui.card}>
           {header}
           <div className="px-6 py-6 text-sm text-muted">
-            {round.state === 'upcoming'
-              ? 'Đợt khai báo chưa mở.'
-              : 'Đợt khai báo đã kết thúc. Không ghi nhận phản hồi cho đợt này.'}
+            {round.manually_closed
+              ? 'Đợt khai báo đang tạm đóng. Vui lòng quay lại sau.'
+              : round.state === 'upcoming'
+                ? 'Đợt khai báo chưa mở.'
+                : 'Đợt khai báo đã kết thúc. Không ghi nhận phản hồi cho đợt này.'}
           </div>
         </div>
       </div>

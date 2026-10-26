@@ -556,6 +556,8 @@ export interface HealthCheckRound {
   opens_at: string;
   closes_at: string;
   state: HealthCheckRoundState;
+  /** Đóng bằng công tắc trên Dashboard (tạm đóng), không phải hết hạn. */
+  manually_closed: boolean;
   package_name: string;
   /** Dòng `bullet` là gạch đầu dòng con của dòng thường đứng trước nó. */
   package_lines: { bullet: boolean; text: string }[];
