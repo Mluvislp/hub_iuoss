@@ -578,7 +578,7 @@ export type HealthCheckStatus =
 
 export interface HealthCheckResponse {
   id: number;
-  choice: 'examined' | 'register';
+  choice: 'examined' | 'register' | 'other';
   status: HealthCheckStatus;
   status_label: string;
   submitted_at: string;
@@ -667,6 +667,8 @@ export interface HealthCheckState {
   response: HealthCheckResponse | null;
   can_submit: boolean;
   can_resubmit: boolean;
+  /** Luồng "Dành cho đối tượng khác" đang mở (thời hạn/công tắc riêng) và SV chưa trả lời. */
+  can_submit_other: boolean;
   /** Đã khai "đã khám" (chờ xác nhận / từ chối), đợt còn mở → được chuyển sang đăng ký khám. */
   can_switch_to_register: boolean;
   max_evidence_files: number;
@@ -676,7 +678,7 @@ export interface HealthCheckState {
   /** Hồ sơ chưa có CCCD 12 số — luồng khám sức khỏe bắt buộc bổ sung. */
   cccd_missing: boolean;
   /** Câu cam kết + đồng ý cung cấp thông tin ở cuối form, theo từng lựa chọn. */
-  data_consent_text: { examined: string; register: string };
+  data_consent_text: { examined: string; register: string; other: string };
   /** Đối tượng khám tập trung tại trường (nhánh "Chưa khám"). */
   exam_eligibility: { intro: string; items: string[] };
   offcampus: OffCampusForm;

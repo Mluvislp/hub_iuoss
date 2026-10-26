@@ -56,6 +56,8 @@ DATA_CONSENT_TEXT = {
         "thẩm quyền, theo quy định về bảo vệ dữ liệu cá nhân."
     ),
 }
+# Luồng "đối tượng khác" khai đúng form "đã khám" → cùng câu cam kết.
+DATA_CONSENT_TEXT["other"] = DATA_CONSENT_TEXT["examined"]
 
 
 # Đối tượng khám tập trung tại trường — hiện ở đầu phần 2 của nhánh "Chưa khám".
@@ -118,6 +120,26 @@ def round_state(round_, now=None):
     if now < round_.opens_at:
         return "upcoming"
     if now > round_.closes_at:
+        return "closed"
+    return "open"
+
+
+def other_state(round_, now=None):
+    """Luồng "Dành cho đối tượng khác": thời hạn + công tắc RIÊNG, độc lập luồng Thành phố.
+    'disabled' khi chưa đặt thời hạn (và công tắc không bật "Mở") — Hub ẩn lựa chọn."""
+    if round_ is None:
+        return "disabled"
+    mode = getattr(round_, "other_open_mode", OPEN_MODE_AUTO)
+    if mode == OPEN_MODE_OPEN:
+        return "open"
+    if mode == OPEN_MODE_CLOSED:
+        return "closed"
+    if not round_.other_opens_at or not round_.other_closes_at:
+        return "disabled"
+    now = now or timezone.now()
+    if now < round_.other_opens_at:
+        return "upcoming"
+    if now > round_.other_closes_at:
         return "closed"
     return "open"
 
@@ -313,11 +335,9 @@ def build_state(student):
         "can_submit": state == "open" and resp is None,
         # Đã khai "đã khám" (chưa được xác nhận) → được chuyển sang đăng ký khám tại trường.
         "can_switch_to_register": can_switch_now,
-        "can_resubmit": bool(
-            resp and resp.choice == Response_.CHOICE_EXAMINED
-            and resp.status == Response_.STATUS_REJECTED
-            and round_.open_mode != OPEN_MODE_CLOSED      # công tắc "Đóng" khóa cả nộp lại
-        ),
+        # Luồng "đối tượng khác" — chỉ hiện lựa chọn khi luồng đang mở (không hiện thời hạn).
+        "can_submit_other": other_state(round_) == "open" and resp is None,
+        "can_resubmit": _can_resubmit(resp, round_),
         "max_evidence_files": MAX_EVIDENCE_FILES,
         # Form kết quả khám dựng hoàn toàn từ đây — xem core/health_check_result.py.
         "result_schema": result_spec.SCHEMA,
@@ -388,14 +408,34 @@ def _lock_student(student):
     Student.objects.select_for_update().filter(pk=student.pk).first()
 
 
-def submit_evidence(student, uploads, result_raw=None, declaration=None, data_consent=None):
-    """Nhánh "Đã khám rồi": khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu
-    + ảnh minh chứng, chờ chuyên viên xác nhận.
+def _can_resubmit(resp, round_):
+    """Minh chứng bị từ chối được nộp lại — kể cả sau hạn chót, TRỪ khi công tắc của
+    đúng luồng đó đang "Đóng"."""
+    if not (resp and resp.status == Response_.STATUS_REJECTED):
+        return False
+    if resp.choice == Response_.CHOICE_EXAMINED:
+        return round_.open_mode != OPEN_MODE_CLOSED
+    if resp.choice == Response_.CHOICE_OTHER:
+        return round_.other_open_mode != OPEN_MODE_CLOSED
+    return False
+
+
+EVIDENCE_CHOICES = (Response_.CHOICE_EXAMINED, Response_.CHOICE_OTHER)
+
+
+def submit_evidence(student, uploads, result_raw=None, declaration=None, data_consent=None,
+                    choice=Response_.CHOICE_EXAMINED):
+    """Nhánh "Đã khám rồi" (`examined`) và luồng "Dành cho đối tượng khác" (`other`):
+    khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu + ảnh minh chứng, chờ chuyên
+    viên xác nhận. Luồng `other` mở theo thời hạn/công tắc riêng và chỉ nhận SV KHÔNG có
+    thường trú lẫn tạm trú ở TP.HCM (kiểm lại ở server từ địa chỉ đã ghi).
 
     Kiểm kết quả khám và định dạng ảnh TRƯỚC transaction (đọc file chậm), ghi file
     trong transaction; lỗi ở bất kỳ bước nào thì rollback cả khai báo ngoại trú và
     xóa sạch file đã ghi. Lỗi trả về theo từng ô: ô kết quả mang tiền tố `result.`.
     """
+    if choice not in EVIDENCE_CHOICES:
+        raise HealthCheckError("Lựa chọn không hợp lệ.", code="choice")
     _require_data_consent(data_consent)
     result, result_errors = result_spec.clean(result_raw)
     if result_errors:
@@ -424,14 +464,18 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 raise HealthCheckError("Chưa có đợt khai báo khám sức khỏe nào.")
             resp = (Response_.objects.select_for_update()
                     .filter(round=round_, student_id=student.pk).first())
-            resubmit = bool(resp and resp.choice == Response_.CHOICE_EXAMINED
+            resubmit = bool(resp and resp.choice == choice
                             and resp.status == Response_.STATUS_REJECTED)
             if resp is not None and not resubmit:
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
-            if resp is None and round_state(round_) != "open":
+            if choice == Response_.CHOICE_OTHER:
+                if resp is None and other_state(round_) != "open":
+                    raise HealthCheckError(OTHER_CLOSED_MESSAGE, code="closed")
+            elif resp is None and round_state(round_) != "open":
                 raise HealthCheckError(_closed_message(round_), code="closed")
-            if resubmit and round_.open_mode == OPEN_MODE_CLOSED:
-                raise HealthCheckError(_closed_message(round_), code="closed")
+            if resubmit and not _can_resubmit(resp, round_):
+                raise HealthCheckError(OTHER_CLOSED_MESSAGE if choice == Response_.CHOICE_OTHER
+                                       else _closed_message(round_), code="closed")
 
             # Như nhánh đăng ký khám: chưa khai ngoại trú thì khai luôn ở đây.
             locked, _ = offcampus.lock_state(student)
@@ -445,6 +489,14 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 declared_now = True
             _require_cccd(student)
             residence = residence_snapshot(student)
+            if choice == Response_.CHOICE_OTHER and residence["eligible"]:
+                # Exception → rollback cả phần khai báo vừa ghi ở trên.
+                raise HealthCheckError(
+                    "Luồng này dành cho sinh viên ngoại tỉnh chưa đăng ký tạm trú tại Thành phố "
+                    "Hồ Chí Minh. Sinh viên có thường trú hoặc tạm trú tại Thành phố Hồ Chí Minh "
+                    "vui lòng chọn một trong hai lựa chọn còn lại.",
+                    code="not_eligible_other",
+                )
             residence["declared_with_registration"] = declared_now
 
             root = Path(settings.MEDIA_ROOT).resolve()
@@ -465,9 +517,9 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
             if resp is None:
                 resp = Response_.objects.create(
                     round=round_, student_id=student.pk,
-                    choice=Response_.CHOICE_EXAMINED, status=Response_.STATUS_PENDING,
+                    choice=choice, status=Response_.STATUS_PENDING,
                     evidence={"files": items, "result": result,
-                              "data_consent": _data_consent(Response_.CHOICE_EXAMINED)},
+                              "data_consent": _data_consent(choice)},
                     residence=residence,
                     submit_count=1, submitted_at=now,
                 )
@@ -475,7 +527,7 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 # Nộp lại sau khi bị từ chối: thay bộ ảnh, đưa về hàng chờ. Lý do
                 # từ chối cũ giữ lại để chuyên viên biết lần trước sai ở đâu.
                 resp.evidence = {"files": items, "result": result,
-                                 "data_consent": _data_consent(Response_.CHOICE_EXAMINED)}
+                                 "data_consent": _data_consent(choice)}
                 resp.residence = residence
                 resp.status = Response_.STATUS_PENDING
                 resp.submit_count += 1
@@ -614,6 +666,9 @@ def register(student, data):
             return existing
     except IntegrityError as exc:
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc
+
+
+OTHER_CLOSED_MESSAGE = "Luồng khai báo dành cho đối tượng khác hiện không mở."
 
 
 def _closed_message(round_):

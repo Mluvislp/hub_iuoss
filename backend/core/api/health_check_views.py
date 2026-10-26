@@ -76,8 +76,9 @@ class HealthCheckView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
-    """POST multipart: `files` (1–10 ảnh) + `result` + `declaration` (JSON dạng chuỗi) —
-    nhánh "Đã khám rồi" / nộp lại."""
+    """POST multipart: `files` (1–10 ảnh) + `result` + `declaration` (JSON dạng chuỗi) +
+    `choice` (examined | other, mặc định examined) — nhánh "Đã khám rồi", luồng "Dành cho
+    đối tượng khác", và nộp lại."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -92,11 +93,12 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
                 result_raw=_json_field(request.data.get("result")),
                 declaration=_json_field(request.data.get("declaration")),
                 data_consent=request.data.get("data_consent"),
+                choice=(request.data.get("choice") or "examined").strip(),
             )
         except health_check.HealthCheckError as exc:
             return _error(exc)
-        logger.info("HEALTH_CHECK_EVIDENCE | uid=%s | student_id=%s | round=%s | count=%s",
-                    request.user.ldap_uid, student.pk, resp.round_id, resp.submit_count)
+        logger.info("HEALTH_CHECK_EVIDENCE | uid=%s | student_id=%s | round=%s | choice=%s | count=%s",
+                    request.user.ldap_uid, student.pk, resp.round_id, resp.choice, resp.submit_count)
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 
