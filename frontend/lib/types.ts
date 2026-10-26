@@ -669,9 +669,32 @@ export interface ResultSection {
   groups: ResultGroup[];
 }
 
+/** Phiếu khám — backend `health_check.exam_ticket`; null khi chưa được gán mã. */
+export interface HealthCheckTicket {
+  code: string;
+  number: string;
+  date_label: string;
+  slot_label: string;
+  slot_time: string;
+  place: string;
+  issued_at: string | null;
+  student: {
+    full_name: string;
+    student_code: string;
+    date_of_birth: string;
+    sex: string;
+    citizen_id: string;
+    class_code: string;
+    department: string;
+    phone: string;
+    health_insurance_code: string;
+  };
+}
+
 export interface HealthCheckState {
   round: HealthCheckRound | null;
   response: HealthCheckResponse | null;
+  exam_ticket: HealthCheckTicket | null;
   can_submit: boolean;
   can_resubmit: boolean;
   /** Luồng "Dành cho đối tượng khác" đang mở (thời hạn/công tắc riêng) và SV chưa trả lời. */

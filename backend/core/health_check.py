@@ -338,6 +338,40 @@ def _serialize_response(resp):
     }
 
 
+def exam_ticket(student, resp, round_):
+    """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`."""
+    if resp is None or resp.choice != Response_.CHOICE_REGISTER or not resp.exam_code:
+        return None
+    from students.models import HealthInsuranceCard, StudentContactPoint
+
+    code = resp.exam_code.strip()
+    slot = slots.chosen(resp.evidence)
+    card = (HealthInsuranceCard.objects.filter(student=student, is_current=True)
+            .exclude(medical_insurance_code__isnull=True).exclude(medical_insurance_code="")
+            .order_by("-updated_at").first())
+    dept = student.current_department
+    return {
+        "code": code,
+        "number": code.split("-", 1)[0],
+        "date_label": slots.date_label(slot["date"]) if slot else "",
+        "slot_label": slot.get("label", "") if slot else "",
+        "slot_time": f"{slot.get('start', '')}–{slot.get('end', '')}" if slot else "",
+        "place": (round_.schedule_note or "") if round_ else "",
+        "issued_at": timezone.localtime(resp.updated_at).isoformat() if resp.updated_at else None,
+        "student": {
+            "full_name": student.full_name or "",
+            "student_code": student.current_student_code or "",
+            "date_of_birth": student.date_of_birth.strftime("%d/%m/%Y") if student.date_of_birth else "",
+            "sex": (student.sex or "").strip(),
+            "citizen_id": pc._current_cccd(student)["number"],
+            "class_code": student.class_code or "",
+            "department": dept.name_vi if dept else "",
+            "phone": pc._current_contact(student, StudentContactPoint.TYPE_MOBILE_PHONE),
+            "health_insurance_code": card.medical_insurance_code if card else "",
+        },
+    }
+
+
 def build_state(student):
     """Toàn bộ dữ liệu dựng trang cho SV."""
     round_ = display_round()
@@ -351,6 +385,7 @@ def build_state(student):
     return {
         "round": serialize_round(round_),
         "response": _serialize_response(resp),
+        "exam_ticket": exam_ticket(student, resp, round_),
         "can_submit": (examined_open or register_open) and resp is None,
         "can_submit_examined": examined_open and resp is None,
         "can_submit_register": register_open and resp is None,
