@@ -111,8 +111,7 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
       <div className="px-5 pb-5">
         <div className={cn(notice.base, notice.info)}>
           <Info className={noticeIcon.info} />
-          <span>Xuất trình phiếu khám (bản in hoặc trên điện thoại) kèm CCCD khi đến khám. Thông tin cá nhân chưa đúng
-            thì cập nhật ở trang Thông tin cá nhân trước ngày khám.</span>
+          <span>Xuất trình phiếu khám (bản in hoặc trên điện thoại) kèm CCCD khi đến khám.</span>
         </div>
       </div>
     </section>
