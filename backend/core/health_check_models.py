@@ -12,6 +12,8 @@ class HealthCheckRound(models.Model):
     title = models.CharField(max_length=255)
     opens_at = models.DateTimeField()
     closes_at = models.DateTimeField()
+    # Công tắc mở form, ưu tiên HƠN thời hạn: auto | open | closed — xem health_check.round_state.
+    open_mode = models.CharField(max_length=10, default="auto")
     package_name = models.CharField(max_length=255)
     package_content = models.TextField()
     schedule_note = models.CharField(max_length=255, null=True, blank=True)

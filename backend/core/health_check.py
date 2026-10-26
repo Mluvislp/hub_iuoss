@@ -100,8 +100,20 @@ class HealthCheckError(ValueError):
 
 
 # ── Đợt ──────────────────────────────────────────────────────────────────────
+# Công tắc `open_mode` (Dashboard đặt) là mức ƯU TIÊN CAO NHẤT, tách khỏi thời hạn:
+#   auto   → mở/đóng theo opens_at / closes_at
+#   open   → luôn mở, bất kể thời hạn
+#   closed → luôn đóng, bất kể thời hạn — khóa cả nộp lại minh chứng bị từ chối
+# Bản đối ứng: dashboard healthcheck/models.py::HealthCheckRound.state.
+OPEN_MODE_AUTO, OPEN_MODE_OPEN, OPEN_MODE_CLOSED = "auto", "open", "closed"
+
 
 def round_state(round_, now=None):
+    mode = getattr(round_, "open_mode", OPEN_MODE_AUTO)
+    if mode == OPEN_MODE_OPEN:
+        return "open"
+    if mode == OPEN_MODE_CLOSED:
+        return "closed"
     now = now or timezone.now()
     if now < round_.opens_at:
         return "upcoming"
@@ -111,10 +123,13 @@ def round_state(round_, now=None):
 
 
 def display_round(now=None):
-    """Đợt Hub đang hiển thị: đợt đang mở; không có thì đợt gần nhất đã mở
-    (để SV xem lại phản hồi của mình); không có nữa thì đợt sắp mở."""
+    """Đợt Hub đang hiển thị: đợt bật công tắc "Mở"; rồi đợt đang trong thời hạn;
+    không có thì đợt gần nhất đã mở (để SV xem lại phản hồi); không có nữa thì đợt sắp mở."""
     now = now or timezone.now()
     rounds = HealthCheckRound.objects.all()
+    forced = rounds.filter(open_mode=OPEN_MODE_OPEN).order_by("-opens_at").first()
+    if forced:
+        return forced
     current = rounds.filter(opens_at__lte=now, closes_at__gte=now).order_by("-opens_at").first()
     if current:
         return current
@@ -148,6 +163,8 @@ def serialize_round(round_):
         "opens_at": round_.opens_at.isoformat(),
         "closes_at": round_.closes_at.isoformat(),
         "state": round_state(round_),
+        # "closed" do công tắc (tạm đóng) — khác hết hạn; Hub hiện câu riêng.
+        "manually_closed": round_.open_mode == OPEN_MODE_CLOSED,
         "package_name": round_.package_name,
         "package_lines": _package_lines(round_.package_content),
         "schedule_note": round_.schedule_note or "",
@@ -294,6 +311,7 @@ def build_state(student):
         "can_resubmit": bool(
             resp and resp.choice == Response_.CHOICE_EXAMINED
             and resp.status == Response_.STATUS_REJECTED
+            and round_.open_mode != OPEN_MODE_CLOSED      # công tắc "Đóng" khóa cả nộp lại
         ),
         "max_evidence_files": MAX_EVIDENCE_FILES,
         # Form kết quả khám dựng hoàn toàn từ đây — xem core/health_check_result.py.
@@ -406,6 +424,8 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
             if resp is not None and not resubmit:
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
             if resp is None and round_state(round_) != "open":
+                raise HealthCheckError(_closed_message(round_), code="closed")
+            if resubmit and round_.open_mode == OPEN_MODE_CLOSED:
                 raise HealthCheckError(_closed_message(round_), code="closed")
 
             # Như nhánh đăng ký khám: chưa khai ngoại trú thì khai luôn ở đây.
@@ -594,6 +614,8 @@ def register(student, data):
 def _closed_message(round_):
     if round_ is None:
         return "Chưa có đợt khai báo khám sức khỏe nào."
+    if round_.open_mode == OPEN_MODE_CLOSED:
+        return "Đợt khai báo năm học " + round_.academic_year + " đang tạm đóng."
     if round_state(round_) == "upcoming":
         return "Đợt khai báo năm học " + round_.academic_year + " chưa mở."
     # Không nêu mốc giờ: trang Khám sức khỏe không hiển thị thời hạn đăng ký (26/10/2026).
