@@ -8,9 +8,11 @@ Dashboard:
     {"dates": ["2026-10-27", ...],
      "shifts": [{"label": "Ca sáng thứ nhất", "start": "07:30", "end": "09:30"}, ...],
      "capacity": null | số chỗ tối đa MỖI ca,
-     "closed_dates": ["2026-10-27", ...]}   ← ngày NGỪNG nhận đăng ký (26/10/2026)
-Mỗi ngày có đủ mọi ca. Ngày trong `closed_dates` vẫn là ngày khám (SV đã đăng ký giữ
-nguyên ca, vẫn thống kê/xuất file) nhưng Hub không cho chọn thêm. Một ca = ngày + giờ bắt đầu, khóa `"2026-10-27 07:30"`.
+     "closed_dates": ["2026-10-27", ...],   ← ngày NGỪNG nhận đăng ký (26/10/2026)
+     "closed_slots": ["2026-10-28 07:30", ...]}  ← từng CA ngừng nhận đăng ký (27/10/2026)
+Mỗi ngày có đủ mọi ca. Ngày trong `closed_dates` / ca trong `closed_slots` vẫn là ngày, ca khám
+(SV đã đăng ký giữ nguyên ca, vẫn thống kê/xuất file) nhưng Hub không cho chọn thêm. Một ca = ngày +
+giờ bắt đầu, khóa `"2026-10-27 07:30"`.
 
 Ca SV chọn lưu trong `health_check_responses.evidence["exam_slot"]` dạng ảnh chụp
 `{key, date, start, end, label}` — đợt có sửa tên/giờ ca sau đó thì phản hồi cũ vẫn
@@ -56,12 +58,16 @@ def config(round_):
     capacity = raw.get("capacity")
     capacity = capacity if isinstance(capacity, int) and capacity > 0 else None
     closed = sorted({str(d) for d in raw.get("closed_dates") or [] if str(d) in dates})
-    return {"dates": dates, "shifts": shifts, "capacity": capacity, "closed_dates": closed}
+    keys = {slot_key(d, s["start"]) for d in dates for s in shifts}
+    closed_slots = sorted({str(k) for k in raw.get("closed_slots") or [] if str(k) in keys})
+    return {"dates": dates, "shifts": shifts, "capacity": capacity, "closed_dates": closed,
+            "closed_slots": closed_slots}
 
 
 def is_closed(cfg, slot):
-    """Ca thuộc ngày đã ngừng nhận đăng ký."""
-    return bool(cfg and slot and slot.get("date") in cfg.get("closed_dates", []))
+    """Ca thuộc ngày đã ngừng nhận đăng ký, hoặc chính ca đó đã ngừng nhận đăng ký."""
+    return bool(cfg and slot and (slot.get("date") in cfg.get("closed_dates", [])
+                                  or slot.get("key") in cfg.get("closed_slots", [])))
 
 
 def slot_key(day, start):
