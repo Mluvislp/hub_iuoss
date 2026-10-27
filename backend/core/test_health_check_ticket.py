@@ -55,3 +55,27 @@ class ExamTicketTests(TestCase):
     def test_nhanh_da_kham_khong_co_phieu(self):
         resp = self._resp(choice=R.CHOICE_EXAMINED, status=R.STATUS_PENDING, exam_code="5-27/10/2026")
         self.assertIsNone(hc.exam_ticket(self.student, resp, self.round))
+
+
+class ClosedSlotTests(TestCase):
+    """Khóa riêng một ca (`exam_slots.closed_slots`, 27/10/2026): Hub không cho chọn, gửi lên bị từ chối."""
+
+    @classmethod
+    def setUpTestData(cls):
+        now = timezone.now()
+        cls.round = HealthCheckRound.objects.create(
+            academic_year="2026-2027", title="KSK", opens_at=now, closes_at=now, package_name="Gói",
+            package_content="x",
+            exam_slots={"dates": ["2099-10-28"],
+                        "shifts": [{"label": "Ca sáng thứ nhất", "start": "07:30", "end": "09:30"},
+                                   {"label": "Ca chiều thứ nhất", "start": "13:00", "end": "15:00"}],
+                        "closed_slots": ["2099-10-28 07:30"]})
+
+    def test_ca_khoa_khong_chon_duoc(self):
+        shifts = {s["key"]: s for s in hc.slot_options(self.round)["days"][0]["shifts"]}
+        self.assertEqual((shifts["2099-10-28 07:30"]["available"], shifts["2099-10-28 07:30"]["reason"]),
+                         (False, "Đã khóa"))
+        self.assertTrue(shifts["2099-10-28 13:00"]["available"])
+        with self.assertRaises(hc.HealthCheckError):
+            hc._pick_slot(self.round, "2099-10-28 07:30")
+        self.assertEqual(hc._pick_slot(self.round, "2099-10-28 13:00")["key"], "2099-10-28 13:00")

@@ -248,8 +248,8 @@ def _pick_slot(round_, key):
         raise HealthCheckError("Vui lòng chọn ngày và ca khám.",
                                errors={"exam_slot": "Chưa chọn ca khám."}, code="exam_slot")
     if slots.is_closed(cfg, slot):
-        raise HealthCheckError("Ngày khám đã chọn đã ngừng nhận đăng ký. Vui lòng chọn ngày khác.",
-                               errors={"exam_slot": "Ngày này đã khóa."}, code="exam_slot")
+        raise HealthCheckError("Ca khám đã chọn đã ngừng nhận đăng ký. Vui lòng chọn ca khác.",
+                               errors={"exam_slot": "Ca này đã khóa."}, code="exam_slot")
     if slots.has_started(slot):
         raise HealthCheckError("Ca khám đã chọn đã bắt đầu. Vui lòng chọn ca khác.",
                                errors={"exam_slot": "Ca đã bắt đầu."}, code="exam_slot")
