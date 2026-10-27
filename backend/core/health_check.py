@@ -352,6 +352,7 @@ def exam_ticket(student, resp, round_):
     dept = student.current_department
     return {
         "code": code,
+        "number": code.split("-", 1)[0],        # số phiếu = phần STT trước dấu "-"
         "date_label": slots.date_label(slot["date"]) if slot else "",
         "slot_label": slot.get("label", "") if slot else "",
         "slot_time": f"{slot.get('start', '')}–{slot.get('end', '')}" if slot else "",
