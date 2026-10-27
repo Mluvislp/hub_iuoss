@@ -59,9 +59,15 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
 
       <div className="px-5 py-5 grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
         <div className="space-y-4 min-w-0">
-          <div>
-            <div className="text-[0.75rem] font-medium text-muted">Mã phiếu khám</div>
-            <div className="font-mono text-[1.35rem] font-bold text-primary-text tracking-wide mt-0.5 break-all">{ticket.code}</div>
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+            <div>
+              <div className="text-[0.75rem] font-medium text-muted">Số phiếu</div>
+              <div className="text-[2.4rem] leading-none font-bold text-ink mt-1">{ticket.number}</div>
+            </div>
+            <div className="min-w-0 pb-0.5">
+              <div className="text-[0.75rem] font-medium text-muted">Mã phiếu khám</div>
+              <div className="font-mono text-[1.2rem] font-bold text-primary-text tracking-wide mt-0.5 break-all">{ticket.code}</div>
+            </div>
           </div>
 
           <div className="grid gap-x-6 gap-y-3.5 grid-cols-1 sm:grid-cols-2">

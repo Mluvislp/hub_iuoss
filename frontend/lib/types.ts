@@ -673,6 +673,8 @@ export interface ResultSection {
 /** Phiếu khám — backend `health_check.exam_ticket`; null khi chưa được gán mã. */
 export interface HealthCheckTicket {
   code: string;
+  /** Số phiếu — phần STT trước dấu "-" của mã. */
+  number: string;
   date_label: string;
   slot_label: string;
   slot_time: string;
