@@ -21,6 +21,7 @@ import CccdForm from './CccdForm';
 import ConsentBox from './ConsentBox';
 import SlotPicker from './SlotPicker';
 import ExamTicket from './ExamTicket';
+import CancelRequest from './CancelRequest';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -381,6 +382,8 @@ export default function HealthCheckPage() {
                 </button>
               </div>
             )}
+
+            <CancelRequest state={state} onChange={(next) => { setState(next); setJustSubmitted(false); }} />
 
             {state.can_switch_to_register && (
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">

@@ -73,6 +73,8 @@ urlpatterns = [
          name="api_health_check_register"),
     path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
          name="api_health_check_citizen_id"),
+    path("health-check/cancel/", health_check_views.HealthCheckCancelView.as_view(),
+         name="api_health_check_cancel"),
 
     # Nộp bằng tốt nghiệp THPT — core/diploma.py
     path("diploma/", diploma_views.DiplomaView.as_view(), name="api_diploma"),
