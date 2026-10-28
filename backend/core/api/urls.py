@@ -73,6 +73,8 @@ urlpatterns = [
          name="api_health_check_register"),
     path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
          name="api_health_check_citizen_id"),
+    path("health-check/cancel/", health_check_views.HealthCheckCancelView.as_view(),
+         name="api_health_check_cancel"),
 
     # Hỏi đáp (ticket) — core/tickets.py
     path("tickets/",                 ticket_views.TicketsView.as_view(),       name="api_tickets"),

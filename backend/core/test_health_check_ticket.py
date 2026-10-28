@@ -2,7 +2,7 @@
 
 Chạy: python manage.py test core.test_health_check_ticket --settings=config.insurance_test_settings
 """
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import TestCase
 from django.utils import timezone
@@ -79,3 +79,54 @@ class ClosedSlotTests(TestCase):
         with self.assertRaises(hc.HealthCheckError):
             hc._pick_slot(self.round, "2099-10-28 07:30")
         self.assertEqual(hc._pick_slot(self.round, "2099-10-28 13:00")["key"], "2099-10-28 13:00")
+
+
+class CancelRequestTests(TestCase):
+    """Yêu cầu hủy đăng ký khám tại trường (core/health_check.py::request_cancel)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        now = timezone.now()
+        cls.round = HealthCheckRound.objects.create(
+            academic_year="2026-2027", title="KSK", opens_at=now, closes_at=now + timedelta(days=30),
+            package_name="Gói", package_content="x")
+        cls.student = Student.objects.create(current_student_code="ITCSIU24092", full_name="SV Test")
+
+    def _resp(self, **over):
+        data = dict(round=self.round, student_id=self.student.pk, choice=R.CHOICE_REGISTER,
+                    status=R.STATUS_ATTENDED, evidence={"exam_slot": SLOT}, submitted_at=timezone.now())
+        data.update(over)
+        return R.objects.create(**data)
+
+    def test_gui_va_rut_yeu_cau_ke_ca_da_kham(self):
+        resp = self._resp()
+        self.assertTrue(hc.can_request_cancel(resp))
+        hc.request_cancel(self.student, {"reason": "Đăng ký nhầm"})
+        resp.refresh_from_db()
+        info = hc.cancel_info(resp.evidence)
+        self.assertEqual((info["status"], info["reason"], info["status_at_request"]),
+                         ("pending", "Đăng ký nhầm", R.STATUS_ATTENDED))
+        self.assertEqual(resp.evidence["exam_slot"], SLOT)          # không đụng ca
+        self.assertFalse(hc.can_request_cancel(resp))
+        with self.assertRaises(hc.HealthCheckError):
+            hc.request_cancel(self.student, {"reason": "lần 2"})
+        hc.withdraw_cancel(self.student)
+        resp.refresh_from_db()
+        self.assertIsNone(hc.cancel_info(resp.evidence))
+        self.assertEqual(hc.build_state(self.student)["response"]["cancel_request"], None)
+
+    def test_bat_buoc_ly_do_va_chi_nhanh_dang_ky(self):
+        self._resp()
+        with self.assertRaises(hc.HealthCheckError):
+            hc.request_cancel(self.student, {"reason": "  "})
+        R.objects.all().delete()
+        self._resp(choice=R.CHOICE_EXAMINED, status=R.STATUS_PENDING)
+        with self.assertRaises(hc.HealthCheckError):
+            hc.request_cancel(self.student, {"reason": "x"})
+
+    def test_bi_tu_choi_thi_gui_lai_duoc(self):
+        self._resp(evidence={"exam_slot": SLOT, "cancel_request": {"status": "rejected", "reason": "a",
+                                                                   "review_note": "Không"}})
+        state = hc.build_state(self.student)
+        self.assertTrue(state["can_request_cancel"])
+        self.assertEqual(state["response"]["cancel_request"]["review_note"], "Không")

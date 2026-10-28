@@ -604,6 +604,16 @@ export interface HealthCheckResponse {
   exam_slot_label: string;
   /** Đã chuyển từ khai "đã khám" sang đăng ký: khai báo cũ được lưu lại, không dùng nữa. */
   superseded: { at: string | null; label: string; previous_status_label: string } | null;
+  /** Yêu cầu hủy đăng ký khám tại trường: chờ duyệt / bị từ chối. Duyệt ⇒ phản hồi bị xoá. */
+  cancel_request: HealthCheckCancelRequest | null;
+}
+
+export interface HealthCheckCancelRequest {
+  status: 'pending' | 'rejected';
+  reason: string;
+  requested_at: string | null;
+  review_note: string;
+  reviewed_at: string | null;
 }
 
 /** Một ca khám = ngày + giờ; `key` dạng "2026-10-27 07:30". */
@@ -703,6 +713,8 @@ export interface HealthCheckState {
   can_submit_register: boolean;
   /** Đã khai "đã khám" (chờ xác nhận / từ chối), đợt còn mở → được chuyển sang đăng ký khám. */
   can_switch_to_register: boolean;
+  /** Đăng ký khám tại trường (kể cả đã khám), chưa có yêu cầu hủy đang chờ duyệt. */
+  can_request_cancel: boolean;
   max_evidence_files: number;
   result_schema: ResultSection[];
   result_defaults: Record<string, string>;

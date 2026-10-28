@@ -161,3 +161,36 @@ class HealthCheckEvidenceFileView(HealthCheckRequiredMixin, APIView):
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
+
+
+class HealthCheckCancelView(HealthCheckRequiredMixin, APIView):
+    """POST JSON {reason} — gửi yêu cầu hủy đăng ký khám tại trường (Phòng CTSV duyệt).
+    DELETE — rút yêu cầu đang chờ duyệt."""
+
+    permission_classes = [IsHubAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        student = _student(request)
+        if student is None:
+            return _no_student()
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            resp = health_check.request_cancel(student, data)
+        except health_check.HealthCheckError as exc:
+            return _error(exc)
+        logger.info("HEALTH_CHECK_CANCEL_REQUEST | uid=%s | student_id=%s | round=%s | status=%s",
+                    request.user.ldap_uid, student.pk, resp.round_id, resp.status)
+        return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        student = _student(request)
+        if student is None:
+            return _no_student()
+        try:
+            resp = health_check.withdraw_cancel(student)
+        except health_check.HealthCheckError as exc:
+            return _error(exc)
+        logger.info("HEALTH_CHECK_CANCEL_WITHDRAW | uid=%s | student_id=%s | round=%s",
+                    request.user.ldap_uid, student.pk, resp.round_id)
+        return Response(health_check.build_state(student))

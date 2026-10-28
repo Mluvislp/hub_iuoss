@@ -335,6 +335,8 @@ def _serialize_response(resp):
              "previous_status_label": info.get("previous_status_label", "")}
             if (info := superseded_info(resp.evidence)) else None
         ),
+        # Yêu cầu hủy đăng ký khám tại trường (chờ duyệt / bị từ chối); None nếu chưa gửi.
+        "cancel_request": _serialize_cancel(resp.evidence),
     }
 
 
@@ -393,6 +395,7 @@ def build_state(student):
         # Luồng "đối tượng khác" — chỉ hiện lựa chọn khi luồng đang mở (không hiện thời hạn).
         "can_submit_other": other_state(round_) == "open" and resp is None,
         "can_resubmit": _can_resubmit(resp, round_),
+        "can_request_cancel": can_request_cancel(resp),
         "max_evidence_files": MAX_EVIDENCE_FILES,
         # Form kết quả khám dựng hoàn toàn từ đây — xem core/health_check_result.py.
         "result_schema": result_spec.SCHEMA,
@@ -717,6 +720,78 @@ def register(student, data):
             return existing
     except IntegrityError as exc:
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc
+
+
+# ── Yêu cầu hủy đăng ký khám tại trường ──────────────────────────────────────
+# SV đã đăng ký (kể cả đã khám xong) gửi yêu cầu kèm lý do; Phòng CTSV duyệt trên
+# Dashboard. Không thêm cột: yêu cầu nằm ở evidence[CANCEL_KEY]. Duyệt = Dashboard XOÁ
+# dòng phản hồi (ảnh chụp vào AuditLog) ⇒ SV trả lời lại được; từ chối = giữ đăng ký,
+# yêu cầu chuyển "rejected" kèm lý do. Khoá + trạng thái dùng chung với Dashboard
+# healthcheck/services.py (CANCEL_*).
+CANCEL_KEY = "cancel_request"
+CANCEL_PENDING, CANCEL_REJECTED = "pending", "rejected"
+CANCEL_REASON_MAX = 500
+
+
+def cancel_info(evidence):
+    info = evidence.get(CANCEL_KEY) if isinstance(evidence, dict) else None
+    return info if isinstance(info, dict) else None
+
+
+def can_request_cancel(resp):
+    """Đăng ký khám tại trường, chưa có yêu cầu hủy đang chờ duyệt."""
+    if not (resp and resp.choice == Response_.CHOICE_REGISTER):
+        return False
+    return (cancel_info(resp.evidence) or {}).get("status") != CANCEL_PENDING
+
+
+def _serialize_cancel(evidence):
+    info = cancel_info(evidence)
+    if not info:
+        return None
+    return {k: info.get(k) or ("" if k in ("reason", "review_note") else None)
+            for k in ("status", "reason", "requested_at", "review_note", "reviewed_at")}
+
+
+def _own_response_for_update(student):
+    round_ = display_round()
+    if round_ is None:
+        raise HealthCheckError("Chưa có đợt khai báo khám sức khỏe nào.", code="closed")
+    return Response_.objects.select_for_update().filter(round=round_, student_id=student.pk).first()
+
+
+def request_cancel(student, data):
+    """SV gửi yêu cầu hủy đăng ký khám tại trường (chờ Phòng CTSV duyệt)."""
+    reason = (data.get("reason") or "").strip()
+    if not reason:
+        raise HealthCheckError("Vui lòng nhập lý do hủy đăng ký.", errors={"reason": "Không được để trống."})
+    if len(reason) > CANCEL_REASON_MAX:
+        raise HealthCheckError(f"Lý do tối đa {CANCEL_REASON_MAX} ký tự.",
+                               errors={"reason": f"Tối đa {CANCEL_REASON_MAX} ký tự."})
+    with transaction.atomic():
+        resp = _own_response_for_update(student)
+        if not can_request_cancel(resp):
+            raise HealthCheckError("Không gửi được yêu cầu hủy cho đăng ký này.", code="exists")
+        evidence = dict(resp.evidence or {})
+        evidence[CANCEL_KEY] = {"status": CANCEL_PENDING, "reason": reason,
+                                "requested_at": timezone.localtime().isoformat(),
+                                "status_at_request": resp.status}
+        resp.evidence = evidence
+        resp.save(update_fields=["evidence", "updated_at"])
+        return resp
+
+
+def withdraw_cancel(student):
+    """SV rút yêu cầu hủy đang chờ duyệt — đăng ký giữ nguyên."""
+    with transaction.atomic():
+        resp = _own_response_for_update(student)
+        if not resp or (cancel_info(resp.evidence) or {}).get("status") != CANCEL_PENDING:
+            raise HealthCheckError("Không có yêu cầu hủy đang chờ duyệt.", code="exists")
+        evidence = dict(resp.evidence)
+        evidence.pop(CANCEL_KEY, None)
+        resp.evidence = evidence
+        resp.save(update_fields=["evidence", "updated_at"])
+        return resp
 
 
 OPTION_NAMES = {"examined": "Đã tham khám sức khoẻ", "register": "Chưa tham gia khám sức khoẻ",

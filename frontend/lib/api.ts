@@ -431,6 +431,14 @@ export const api = {
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/citizen-id/', { method: 'POST', body: JSON.stringify(data) });
     },
+    /** Gửi yêu cầu hủy đăng ký khám tại trường — Phòng CTSV duyệt. */
+    requestCancel(reason: string): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/cancel/', { method: 'POST', body: JSON.stringify({ reason }) });
+    },
+    /** Rút yêu cầu hủy đang chờ duyệt. */
+    withdrawCancel(): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/cancel/', { method: 'DELETE' });
+    },
     /** Ảnh minh chứng của chính SV — cần token nên phải tải qua fetch, không dùng <img src>. */
     async evidence(index: number): Promise<Blob> {
       const res = await fetch(`${API_BASE}/health-check/evidence/${index}/`, {
