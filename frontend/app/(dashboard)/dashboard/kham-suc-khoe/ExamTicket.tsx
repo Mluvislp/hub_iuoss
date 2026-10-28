@@ -27,7 +27,7 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
-/** Thông tin định danh — đặt ngay dưới mã phiếu, chữ lớn hơn để đối chiếu nhanh tại bàn khám. */
+/** Thông tin định danh — dưới mã phiếu + ngày/ca khám, chữ lớn hơn để đối chiếu nhanh tại bàn khám. */
 function BigField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="min-w-0">
@@ -70,13 +70,6 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
             </div>
           </div>
 
-          <div className="grid gap-x-6 gap-y-3.5 grid-cols-1 sm:grid-cols-2">
-            <BigField label="Họ và tên" value={s.full_name} />
-            <BigField label="Mã số sinh viên" value={s.student_code} mono />
-            <BigField label="Số CCCD" value={s.citizen_id} mono />
-            <BigField label="Ngày sinh" value={s.date_of_birth} />
-          </div>
-
           <div className={cn(subtle, 'divide-y divide-line2 text-sm')}>
             <div className="flex items-start gap-2.5 px-3.5 py-2.5">
               <CalendarDays size={15} className="text-slate-500 mt-0.5 shrink-0" />
@@ -90,6 +83,13 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
                 {ticket.slot_time && <span className="text-ink"> ({ticket.slot_time})</span>}
               </div>
             </div>
+          </div>
+
+          <div className="grid gap-x-6 gap-y-3.5 grid-cols-1 sm:grid-cols-2">
+            <BigField label="Họ và tên" value={s.full_name} />
+            <BigField label="Mã số sinh viên" value={s.student_code} mono />
+            <BigField label="Số CCCD" value={s.citizen_id} mono />
+            <BigField label="Ngày sinh" value={s.date_of_birth} />
           </div>
         </div>
 
