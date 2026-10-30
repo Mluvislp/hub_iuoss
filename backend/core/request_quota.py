@@ -60,6 +60,9 @@ def current_term(today=None):
     return {"key": f"{year}{sem}", "label": label, "start": start, "end": end}
 
 
+STAFF_LDAP_PREFIX = "staff:"
+
+
 def is_exempt(req):
     return bool((req.payload or {}).get("quota_exempt"))
 
@@ -69,6 +72,9 @@ def _counted(student_id, term):
     rows = (ConfirmationRequest.objects
             .filter(student_id=student_id, created_at__gte=term["start"], created_at__lt=term["end"])
             .exclude(status__in=FREE_STATUSES)
+            # Phòng CTSV tự tạo trên Dashboard (ldap_uid "staff:<tài khoản>") — không phải SV xin,
+            # không chiếm lượt của SV (dashboard documents/staff_create.py).
+            .exclude(ldap_uid__startswith=STAFF_LDAP_PREFIX)
             .only("id", "request_type", "status", "payload", "created_at")
             .order_by("id"))
     return [r for r in rows if not is_exempt(r)]

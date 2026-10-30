@@ -199,6 +199,15 @@ class ConductQuotaTests(TestCase):
         self.assertEqual(set(types["other"]["purposes"]), {"visa"})
         self.assertIn("chương trình", types["english_form"]["purposes"]["program"]["reason"])
 
+    def test_staff_created_request_does_not_use_quota(self):
+        # Phòng CTSV tạo trên Dashboard (documents/staff_create.py) — SV vẫn tự xin được.
+        ConfirmationRequest.objects.create(
+            student_id=self.student.pk, ldap_uid="staff:ctsv", request_type="deferment",
+            purpose="Hoãn nghĩa vụ quân sự", status=ConfirmationRequest.STATUS_PROCESSING,
+            payload={"purpose": {"code": "deferment"}, "origin": {"kind": "staff"}},
+        )
+        self.assertIsNone(request_quota.check(self.student.pk, "deferment"))
+
     def test_rejected_purpose_can_be_requested_again(self):
         self._request("other", {"code": "visa", "label": "v"}, status=ConfirmationRequest.STATUS_REJECTED)
         self.assertIsNone(request_quota.check(self.student.pk, "other", "visa"))

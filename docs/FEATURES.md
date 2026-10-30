@@ -236,7 +236,7 @@ Chi tiết luồng + DDL: `dashboard_iuoss/docs/DOCUMENT_REQUESTS.md`.
 |---|---|---|
 | `enrollment` | Xác nhận đang học | (legacy) |
 | `graduation` | Xác nhận tốt nghiệp | (legacy) |
-| `deferment` | Hoãn nghĩa vụ quân sự | (legacy) |
+| `deferment` | Hoãn nghĩa vụ quân sự | ✅ form riêng — giấy Phòng CTSV tự tạo trên Dashboard (`ldap_uid` `staff:…`) không tính lượt |
 | `other` | Xác nhận (lý do khác) | ✅ đã có (10 mục đích cố định) |
 
 > Loại `other` prefill từ hồ sơ (view-only) + cho sửa DOB/CCCD (staff duyệt). Chi
