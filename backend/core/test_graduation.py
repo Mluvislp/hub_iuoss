@@ -159,9 +159,23 @@ class GraduationTests(TestCase):
         self.assertEqual((self.m_sv.registration_status, self.m_sv.verified_via), ("registered", "ldap"))
         self.assertEqual(self.client.post("/api/graduation/register/", {}, format="multipart").status_code, 400)
 
-    def test_register_closed_window(self):
+    def test_verify_blocked_before_window_opens_but_allowed_after_close(self):
+        now = timezone.now()
         GraduationRound.objects.filter(pk=self.round.pk).update(registration_opens_at=None, registration_closes_at=None)
+        self.assertEqual(self._verify_hv().status_code, 403)
+        self.assertIn("Chưa mở", self._verify_hv().json()["detail"])
+        GraduationRound.objects.filter(pk=self.round.pk).update(
+            registration_opens_at=now + timedelta(hours=2), registration_closes_at=now + timedelta(days=2))
+        self.assertEqual(self._verify_hv().status_code, 403)
+        GraduationRound.objects.filter(pk=self.round.pk).update(
+            registration_opens_at=now - timedelta(days=3), registration_closes_at=now - timedelta(days=1))
+        self.assertEqual(self._verify_hv().status_code, 200)        # hết hạn: vẫn xem lại được
+
+    def test_register_closed_window(self):
         self._login_sv()
+        now = timezone.now()
+        GraduationRound.objects.filter(pk=self.round.pk).update(
+            registration_opens_at=now - timedelta(days=3), registration_closes_at=now - timedelta(days=1))
         res = self.client.post("/api/graduation/register/", {}, format="multipart")
         self.assertEqual(res.status_code, 400)
         self.assertIn("Ngoài thời gian", res.json()["detail"])

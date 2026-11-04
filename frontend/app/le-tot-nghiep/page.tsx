@@ -185,6 +185,11 @@ export default function GraduationPage() {
   const logout = useCallback(() => { clearGradToken(); setMember(null); }, []);
 
   const round = member?.round ?? info?.round ?? null;
+  // Chưa mở đợt (chưa đặt hạn hoặc chưa tới giờ mở) ⇒ khóa chọn đối tượng. Đã qua hạn ⇒ vẫn cho xác minh
+  // để người đã đăng ký xem lại QR.
+  const closedAlready = !!round && !round.registration_open && !!round.registration_closes_at
+    && new Date(round.registration_closes_at) < new Date();
+  const notOpenYet = !!round && !round.registration_open && !closedAlready;
   const reg = member?.registration;
   const registered = reg?.status === 'registered' || reg?.status === 'cancel_requested';
 
@@ -219,13 +224,16 @@ export default function GraduationPage() {
               <Verify
                 msEnabled={info?.microsoft_login ?? false}
                 onVerified={onVerified}
-                notice={!round.registration_open && (
+                lockedMessage={notOpenYet
+                  ? (round.registration_opens_at
+                    ? `Chưa mở đợt đăng ký tham dự — mở lúc ${fmt(round.registration_opens_at)}.`
+                    : 'Chưa mở đợt đăng ký tham dự.')
+                  : undefined}
+                notice={closedAlready && (
                   <div className={cn(notice.base, notice.neutral, 'mb-6')}>
                     <CalendarHeart size={16} className={noticeIcon.neutral} />
                     <p className="text-sm">
-                      {round.registration_closes_at && new Date(round.registration_closes_at) < new Date()
-                        ? 'Đã hết thời gian đăng ký tham dự. Sinh viên, học viên đã đăng ký vẫn xác minh được để xem lại mã QR.'
-                        : 'Chưa mở đăng ký tham dự. Sinh viên, học viên có tên trong danh sách vẫn xác minh được để xem buổi lễ của mình.'}
+                      Đã hết thời gian đăng ký tham dự. Sinh viên, học viên đã đăng ký vẫn xác minh được để xem lại mã QR.
                     </p>
                   </div>
                 )}

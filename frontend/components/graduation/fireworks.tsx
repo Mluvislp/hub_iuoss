@@ -20,7 +20,7 @@ interface Spark {
   split: boolean;     // tách thêm chùm nhỏ khi gần tàn (crossette)
 }
 
-const MAX_SPARKS = 2600;   // trần để máy yếu không giật
+const MAX_SPARKS = 1500;   // trần để máy yếu không giật
 
 const Fireworks = forwardRef<FireworksHandle, { className?: string; intro?: boolean }>(function Fireworks(
   { className, intro = true }, ref,
@@ -28,7 +28,7 @@ const Fireworks = forwardRef<FireworksHandle, { className?: string; intro?: bool
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const launchRef = useRef<(n: number) => void>(() => {});
 
-  useImperativeHandle(ref, () => ({ celebrate: () => launchRef.current(14) }), []);
+  useImperativeHandle(ref, () => ({ celebrate: () => launchRef.current(9) }), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,7 +91,7 @@ const Fireworks = forwardRef<FireworksHandle, { className?: string; intro?: bool
 
     const explode = (r: Rocket) => {
       const kind = Math.random();
-      const n = (rand(90, 140) * scale()) | 0;
+      const n = (rand(60, 95) * scale()) | 0;
       const power = rand(3.8, 6.5) * Math.sqrt(Math.max(height, 500) / 800);
       if (kind < 0.25) {
         // Vòng kép: vòng ngoài + lõi khác màu.
@@ -163,15 +163,14 @@ const Fireworks = forwardRef<FireworksHandle, { className?: string; intro?: bool
     };
     raf = requestAnimationFrame(frame);
 
-    // Màn mở đầu 4 đợt dày, sau đó vẫn bắn đều 1–3 quả mỗi ~1,5 giây.
+    // Màn mở đầu 3 đợt, sau đó bắn thưa 1–2 quả mỗi ~2,8 giây.
     const timers: number[] = [];
     if (intro) {
-      timers.push(window.setTimeout(() => launch(6), 300));
-      timers.push(window.setTimeout(() => launch(6), 1500));
-      timers.push(window.setTimeout(() => launch(6), 2900));
-      timers.push(window.setTimeout(() => launch(5), 4300));
+      timers.push(window.setTimeout(() => launch(4), 300));
+      timers.push(window.setTimeout(() => launch(4), 1700));
+      timers.push(window.setTimeout(() => launch(3), 3300));
     }
-    const idle = window.setInterval(() => { if (!document.hidden) launch(1 + ((Math.random() * 3) | 0)); }, 1500);
+    const idle = window.setInterval(() => { if (!document.hidden) launch(1 + ((Math.random() * 2) | 0)); }, 2800);
 
     const onVisibility = () => {
       if (document.hidden) { running = false; cancelAnimationFrame(raf); }

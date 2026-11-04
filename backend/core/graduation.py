@@ -71,6 +71,14 @@ def current_round():
     return GraduationRound.objects.order_by("-id").first()
 
 
+def not_open_yet(round_, now=None):
+    """Chưa mở đợt: chưa đặt hạn, hoặc chưa tới giờ mở. (Đã qua hạn chót KHÔNG tính là chưa mở.)"""
+    now = now or timezone.now()
+    if not (round_.registration_opens_at and round_.registration_closes_at):
+        return True
+    return now < round_.registration_opens_at
+
+
 def round_payload(round_):
     if round_ is None:
         return None
