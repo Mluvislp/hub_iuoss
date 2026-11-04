@@ -277,12 +277,16 @@ export interface BankLoanPrefill {
   cccd_valid: boolean;
   citizen_id: string;
   citizen_id_issue_date: string;
+  /** Nơi cấp CCCD đã chuẩn hoá về 1 trong `issue_place_choices` — đúng chuỗi in trên giấy. */
+  citizen_id_issue_place: string;
   /** Mã lớp hồ sơ; rỗng ⇒ ô mở sẵn, bắt buộc nhập. SV sửa thì chuyên viên duyệt. */
   class_code: string;
 }
 
 export interface BankLoanFormData {
   prefill: BankLoanPrefill;
+  /** 3 cơ quan cấp thẻ căn cước (backend core/cccd_rules.py::ISSUE_PLACES). */
+  issue_place_choices: string[];
   /** "Thuộc diện" (miễn / giảm học phí) — SV chọn, Phòng CTSV duyệt hoặc sửa. */
   fee_exemption_choices: PurposeChoice[];
   /** "Thuộc đối tượng" (mồ côi). */

@@ -269,6 +269,7 @@ export const api = {
       dob: string;
       citizen_id: string;
       citizen_id_issue_date: string;
+      citizen_id_issue_place: string;
       class_code: string;
       fee_exemption: string;
       orphan: string;
