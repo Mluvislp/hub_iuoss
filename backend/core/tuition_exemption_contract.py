@@ -306,7 +306,7 @@ def special_area_reason(in_list, ward_label):
     """Lý do không đủ điều kiện vùng ĐBKK theo xã thường trú trong hồ sơ — None nếu đạt.
     `in_list`: True/False theo danh sách xã ĐBKK; None khi hồ sơ chưa có xã thường trú."""
     if in_list is None:
-        return 'hồ sơ chưa có xã/phường thường trú (liên hệ Phòng CTSV để cập nhật)'
+        return 'hồ sơ chưa có xã/phường thường trú theo địa giới hành chính mới (liên hệ Phòng CTSV để cập nhật)'
     if not in_list:
         return ('bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới'
                 + (f' (thường trú theo hồ sơ: {ward_label})' if ward_label else ''))

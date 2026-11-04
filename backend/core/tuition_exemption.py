@@ -171,15 +171,19 @@ def _serialize_category(c, mode=None, last_key=None):
 def special_area_status(student):
     """(có trong danh sách xã ĐBKK?, tên xã) theo xã thường trú trong hồ sơ — dòng
     thường trú đang dùng của `address_service` (CURRENT_STD trước, CURRENT sau).
-    (None, "") khi hồ sơ chưa có xã thường trú."""
+    (None, …) khi hồ sơ chưa có xã thường trú, hoặc mã xã không có trong vn_wards (dòng
+    thường trú cũ chưa chuẩn hóa theo cơ cấu 2025) — báo SV liên hệ Phòng CTSV thay vì
+    kết luận sai là "không thường trú tại xã ĐBKK"."""
     address = addr.get_permanent(student)
     code = (getattr(address, "ward_code", None) or "").strip()
     if not code:
         return None, ""
-    ward = VnWard.objects.filter(code=code).first()
+    ward = VnWard.objects.filter(code=code, is_active=True).first()
     label = ward.name if ward else (address.ward or code)
     if getattr(address, "province", None):
         label = f"{label}, {address.province}"
+    if ward is None:
+        return None, label
     return TuitionSpecialAreaWard.objects.filter(ward_code=code).exists(), label
 
 

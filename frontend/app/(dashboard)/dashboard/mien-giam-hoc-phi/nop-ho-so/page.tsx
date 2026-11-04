@@ -94,7 +94,7 @@ function ineligibleReasons(c: TuitionExemptionCategory, plan: TuitionExemptionPl
   }
   if (c.requires_special_area) {
     const { in_list, ward } = plan.special_area;
-    if (in_list === null) reasons.push('hồ sơ chưa có xã/phường thường trú (liên hệ Phòng CTSV để cập nhật)');
+    if (in_list === null) reasons.push('hồ sơ chưa có xã/phường thường trú theo địa giới hành chính mới (liên hệ Phòng CTSV để cập nhật)');
     else if (!in_list) {
       reasons.push(`bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới${ward ? ` (thường trú theo hồ sơ: ${ward})` : ''}`);
     }
