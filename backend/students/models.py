@@ -646,6 +646,7 @@ class TuitionExemptionAward(models.Model):
     first_fee_vnd = models.BigIntegerField(null=True)
     retake_fee_vnd = models.BigIntegerField(null=True)
     base_fee_vnd = models.BigIntegerField(null=True)
+    ceiling_vnd = models.BigIntegerField(null=True)
     decree_amount_vnd = models.BigIntegerField(null=True)
     school_support_vnd = models.BigIntegerField(null=True)
     received_vnd = models.BigIntegerField()

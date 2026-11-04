@@ -390,6 +390,12 @@ def awards(student):
     out = []
     for a in rows:
         term = a.academic_term
+        fee = a.base_fee_vnd if a.base_fee_vnd is not None else a.first_fee_vnd
+        payable = a.payable_vnd if a.payable_vnd is not None else (
+            max(fee - a.received_vnd, 0) if fee is not None else None)
+        # Đối tượng nhà nước chi trả bị giới hạn bởi mức trần: được giảm < HP × %.
+        capped = (a.ceiling_vnd is not None and fee is not None and a.percent is not None
+                  and a.received_vnd < round(fee * float(a.percent) / 100))
         out.append({
             "id": a.pk,
             "term_code": term.term_code,
@@ -403,7 +409,9 @@ def awards(student):
             "decree_amount_vnd": a.decree_amount_vnd,
             "school_support_vnd": a.school_support_vnd,
             "received_vnd": a.received_vnd,
-            "payable_vnd": a.payable_vnd,
+            "payable_vnd": payable,
+            "ceiling_vnd": a.ceiling_vnd,
+            "capped_by_ceiling": capped,
             "payment_status": a.payment_status,
             "payment_label": PAYMENT_LABELS.get(a.payment_status, ""),
             "note": a.note or "",

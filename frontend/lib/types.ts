@@ -978,8 +978,12 @@ export interface TuitionExemptionAward {
   decree_amount_vnd: number | null;
   school_support_vnd: number | null;
   received_vnd: number;
-  /** Học phí còn phải đóng sau miễn giảm — chỉ có khi Phòng CTSV tính trên hệ thống. */
+  /** Học phí còn phải đóng sau miễn giảm (HP − được giảm); null khi không rõ học phí. */
   payable_vnd: number | null;
+  /** Mức trần chưa căn cứ HP = 5 tháng × mức trần × % (đối tượng nhà nước chi trả). */
+  ceiling_vnd: number | null;
+  /** Được giảm thấp hơn HP × % vì chạm mức trần nhà nước hỗ trợ. */
+  capped_by_ceiling: boolean;
   payment_status: 'paid' | 'unpaid' | null;
   payment_label: string;
   note: string;
