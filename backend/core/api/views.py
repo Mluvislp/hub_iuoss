@@ -20,7 +20,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core import microsoft_auth
 from core.auth import verify_ldap
 from core.login_policy import check_login, is_bhyt_only
-from core import address_service
+from core import address_service, cccd_rules
 from core.models import (
     HubStudent,
     ConfirmationRequest,
@@ -1264,6 +1264,7 @@ class RequestsView(DocumentRequestsRequiredMixin, APIView):
                 class_code=_get_str(request.data, "class_code"),
                 fee_exemption=_get_str(request.data, "fee_exemption"),
                 orphan=_get_str(request.data, "orphan"),
+                citizen_id_issue_place=_get_str(request.data, "citizen_id_issue_place"),
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1634,6 +1635,7 @@ class BankLoanRequestFormView(DocumentRequestsRequiredMixin, APIView):
             )
         return Response({
             "prefill": build_bankloan_prefill(student),
+            "issue_place_choices": list(cccd_rules.ISSUE_PLACES),
             "fee_exemption_choices": BANKLOAN_FEE_EXEMPTION_CHOICES,
             "orphan_choices": BANKLOAN_ORPHAN_CHOICES,
         })

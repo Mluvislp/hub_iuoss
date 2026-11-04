@@ -144,6 +144,22 @@ class ConductPayloadTests(TestCase):
                                    citizen_id_issue_date="01/01/2099", class_code="ITIT20A1",
                                    fee_exemption="none", orphan="no")
 
+    def test_bankloan_issue_place(self):
+        # Hồ sơ không ghi nơi cấp ⇒ chụp cơ quan mặc định; SV chọn khác ⇒ chờ duyệt (04/11/2026).
+        from core import cccd_rules
+        from core.documents import build_bankloan_prefill
+        self.assertEqual(build_bankloan_prefill(self.student)["citizen_id_issue_place"],
+                         cccd_rules.ISSUE_PLACE_DEFAULT)
+        base = dict(dob="01/05/2002", citizen_id="079202000001", citizen_id_issue_date="10/04/2021",
+                    class_code="ITIT20A1", fee_exemption="none", orphan="no")
+        payload, _ = build_bankloan_payload(self.student, **base)
+        self.assertFalse(payload["editable"]["citizen_id_issue_place"]["changed"])
+        payload, _ = build_bankloan_payload(self.student, citizen_id_issue_place="Bộ Công an", **base)
+        place = payload["editable"]["citizen_id_issue_place"]
+        self.assertEqual((place["proposed"], place["review"]), ("Bộ Công an", "pending"))
+        with self.assertRaises(ValueError):
+            build_bankloan_payload(self.student, citizen_id_issue_place="Tỉnh Đồng Nai", **base)
+
     def test_delivery_saved_in_payload_and_snapshot(self):
         payload, _ = self._payload(delivery="paper")
         self.assertEqual(payload["delivery"], {"code": "paper", "label": "Bản cứng (giấy)"})

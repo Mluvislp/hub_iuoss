@@ -20,9 +20,11 @@ import { useEditRequest, EditRequestBanner, submitOrUpdate, pendingValue } from 
 
 // Ô XIN SỬA (khóa sẵn, "Yêu cầu chỉnh sửa"; trống / không hợp lệ thì mở sẵn) —
 // chuyên viên duyệt ở Dashboard. Các nhãn tiến độ học thuộc NHÓM CỨNG — chỉ xem.
-type FieldKey = 'dob' | 'class_code' | 'citizen_id' | 'citizen_id_issue_date';
-const FIELD_KEYS: FieldKey[] = ['dob', 'class_code', 'citizen_id', 'citizen_id_issue_date'];
-const EMPTY: Record<FieldKey, string> = { dob: '', class_code: '', citizen_id: '', citizen_id_issue_date: '' };
+type FieldKey = 'dob' | 'class_code' | 'citizen_id' | 'citizen_id_issue_date' | 'citizen_id_issue_place';
+const FIELD_KEYS: FieldKey[] = ['dob', 'class_code', 'citizen_id', 'citizen_id_issue_date', 'citizen_id_issue_place'];
+const EMPTY: Record<FieldKey, string> = {
+  dob: '', class_code: '', citizen_id: '', citizen_id_issue_date: '', citizen_id_issue_place: '',
+};
 
 type FErr = Partial<Record<FieldKey | 'fee_exemption' | 'orphan', string>>;
 
@@ -32,7 +34,7 @@ export default function BankLoanRequestPage() {
 
   const [values, setValues] = useState<Record<FieldKey, string>>(EMPTY);
   const [openFields, setOpenFields] = useState<Record<FieldKey, boolean>>(
-    { dob: false, class_code: false, citizen_id: false, citizen_id_issue_date: false });
+    { dob: false, class_code: false, citizen_id: false, citizen_id_issue_date: false, citizen_id_issue_place: false });
   const [note, setNote] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   // Thuộc diện / Thuộc đối tượng — SV chọn, Phòng CTSV duyệt hoặc sửa trước khi in giấy.
@@ -78,6 +80,7 @@ export default function BankLoanRequestPage() {
           class_code: pf.class_code ?? '',
           citizen_id: pf.citizen_id,
           citizen_id_issue_date: pf.citizen_id_issue_date,
+          citizen_id_issue_place: pf.citizen_id_issue_place ?? '',
         });
         // Hồ sơ có giá trị hợp lệ thì khóa sẵn; trống hoặc không hợp lệ ⇒ mở sẵn.
         setOpenFields({
@@ -85,6 +88,8 @@ export default function BankLoanRequestPage() {
           class_code: !isValidClassCode(pf.class_code ?? ''),
           citizen_id: !pf.cccd_valid,
           citizen_id_issue_date: !pf.cccd_valid || !isValidIssueDate(pf.citizen_id_issue_date),
+          // Nơi cấp luôn có giá trị (hồ sơ trống ⇒ cơ quan mặc định) ⇒ khóa sẵn.
+          citizen_id_issue_place: !pf.citizen_id_issue_place,
         });
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Không tải được thông tin sinh viên.'));
@@ -119,6 +124,7 @@ export default function BankLoanRequestPage() {
     if (cidChanged || issueChanged || !isValidIssueDate(pf.citizen_id_issue_date)) {
       const ie = validateIssueDate(values.citizen_id_issue_date); if (ie) errs.citizen_id_issue_date = ie;
     }
+    if (!values.citizen_id_issue_place) errs.citizen_id_issue_place = 'Vui lòng chọn nơi cấp CCCD.';
     if (!feeExemption) errs.fee_exemption = 'Vui lòng chọn Thuộc diện.';
     if (!orphan) errs.orphan = 'Vui lòng chọn Thuộc đối tượng.';
     setFieldErrors(errs);
@@ -128,6 +134,7 @@ export default function BankLoanRequestPage() {
       dob: values.dob.trim(),
       citizen_id: values.citizen_id.trim(),
       citizen_id_issue_date: values.citizen_id_issue_date.trim(),
+      citizen_id_issue_place: values.citizen_id_issue_place,
       class_code: values.class_code.trim(),
       fee_exemption: feeExemption,
       orphan,
@@ -179,6 +186,7 @@ export default function BankLoanRequestPage() {
     class_code: p.class_code ?? '',
     citizen_id: p.citizen_id,
     citizen_id_issue_date: p.citizen_id_issue_date,
+    citizen_id_issue_place: p.citizen_id_issue_place ?? '',
   };
   // Giá trị gốc hợp lệ thì có chỗ để quay về ⇒ khóa được + có nút hủy.
   const lockable: Record<FieldKey, boolean> = {
@@ -186,6 +194,7 @@ export default function BankLoanRequestPage() {
     class_code: isValidClassCode(p.class_code ?? ''),
     citizen_id: p.cccd_valid,
     citizen_id_issue_date: p.cccd_valid && isValidIssueDate(p.citizen_id_issue_date),
+    citizen_id_issue_place: !!p.citizen_id_issue_place,
   };
   // Mã lớp so sau khi viết hoa — backend coi khác hoa/thường là không sửa.
   const editCount = FIELD_KEYS.filter((k) => (k === 'class_code'
@@ -292,6 +301,19 @@ export default function BankLoanRequestPage() {
                 onOpen={() => openField('citizen_id_issue_date')}
                 onCancel={() => cancelField('citizen_id_issue_date', originals)}
               />
+              <div className="sm:col-span-2">
+                <EditableField
+                  label="Nơi cấp"
+                  kind="select" options={form.issue_place_choices}
+                  value={values.citizen_id_issue_place} original={originals.citizen_id_issue_place}
+                  open={openFields.citizen_id_issue_place} lockable={lockable.citizen_id_issue_place}
+                  error={fieldErrors.citizen_id_issue_place}
+                  maxLength={255}
+                  onChange={(v) => setValue('citizen_id_issue_place', v)}
+                  onOpen={() => openField('citizen_id_issue_place')}
+                  onCancel={() => cancelField('citizen_id_issue_place', originals)}
+                />
+              </div>
             </div>
             <p className="mt-2 text-[0.78rem] text-muted">
               {p.cccd_valid
