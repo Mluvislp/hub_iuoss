@@ -161,6 +161,11 @@ MS_ALLOWED_EMAIL_DOMAIN = os.getenv("MS_ALLOWED_EMAIL_DOMAIN", "student.hcmiu.ed
 # core/login_policy.py::find_graduate_code_by_email. Để trống = tắt đường này.
 MS_GRADUATE_EMAIL_DOMAIN = os.getenv("MS_GRADUATE_EMAIL_DOMAIN", "mp.hcmiu.edu.vn")
 MS_LOGIN_ENABLED = bool(MS_TENANT_ID and MS_CLIENT_ID and MS_CLIENT_SECRET)
+# Địa chỉ quay về THÊM (cách nhau dấu phẩy) cho tên miền khác cùng app — vd trang Lễ tốt nghiệp
+# graduation.iuoss.com. Mỗi địa chỉ PHẢI được khai ở Azure (App registration → Authentication → Web),
+# nếu không Microsoft từ chối (AADSTS50011). Tên miền chưa khai ⇒ nút Outlook trên tên miền đó tự ẩn.
+MS_EXTRA_REDIRECT_URIS = [u.strip() for u in os.getenv("MS_EXTRA_REDIRECT_URIS", "").split(",") if u.strip()]
+MS_REDIRECT_URIS = [MS_REDIRECT_URI, *MS_EXTRA_REDIRECT_URIS]
 
 # ── Bảo mật & Reverse proxy ──────────────────────────────────────────────────
 # Django chạy sau Nginx + Cloudflare Tunnel: SSL kết thúc ở tầng trên, Gunicorn

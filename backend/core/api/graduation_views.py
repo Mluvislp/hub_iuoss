@@ -59,7 +59,9 @@ class GraduationInfoView(_Public):
         return Response({
             "round": grad.round_payload(grad.current_round()),
             "sessions": grad.SESSIONS,
-            "microsoft_login": settings.MS_LOGIN_ENABLED,
+            # Chỉ hiện nút Outlook khi tên miền đang mở có địa chỉ quay về đã khai ở Azure.
+            "microsoft_login": settings.MS_LOGIN_ENABLED
+                               and microsoft_auth.redirect_uri_for_host(request.get_host()) is not None,
         })
 
 

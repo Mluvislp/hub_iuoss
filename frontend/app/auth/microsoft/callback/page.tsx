@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, GraduationCap, Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { setToken } from '@/lib/auth';
-import { GRAD_PATH, MS_PURPOSE_KEY, gradApi } from '@/lib/graduation';
+import { MS_PURPOSE_KEY, gradApi, gradHomePath } from '@/lib/graduation';
 
 // Trang Microsoft chuyển hướng về sau khi sinh viên đăng nhập. Nhiệm vụ duy nhất:
 // chuyển tiếp `code` + `state` cho backend đổi lấy phiên của Hub. Trang này KHÔNG
@@ -51,7 +51,7 @@ function CallbackHandler() {
       setFromGraduation(true);
       gradApi
         .verifyMicrosoft(code, state)
-        .then(() => router.replace(GRAD_PATH + '#dang-ky'))
+        .then(() => window.location.replace(gradHomePath() + '#dang-ky'))
         .catch((err) => setError(err?.message || 'Không kết nối được máy chủ. Vui lòng thử lại.'));
       return;
     }
@@ -93,7 +93,7 @@ function CallbackHandler() {
               <span>{error}</span>
             </div>
             <Link
-              href={fromGraduation ? GRAD_PATH : '/login'}
+              href={fromGraduation ? gradHomePath() : '/login'}
               className="inline-block mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold
                          bg-white border border-slate-300 hover:border-slate-400
                          hover:bg-slate-50 text-slate-700 transition-colors"
