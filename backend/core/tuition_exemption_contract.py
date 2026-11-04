@@ -239,10 +239,16 @@ def validate_categories(selected_codes, active_codes):
 # Frontend Hub dựng ô nhập từ đây; Dashboard hiển thị nhãn từ đây. Thêm trường cho một
 # đối tượng = thêm vào dict này (không phải ALTER — cột là JSON).
 #   type: text | textarea | checkbox ; required: bắt buộc nhập ; max: độ dài tối đa
+#   system: True — HỆ THỐNG điền (không hiện ô cho SV, bỏ qua giá trị SV gửi lên), chỉ để
+#           lưu lại căn cứ và hiển thị cho cán bộ.
 CATEGORY_FIELDS = {
     'TSKK': [
-        {'name': 'self_special_area', 'type': 'checkbox',
-         'label': 'Nơi thường trú của tôi thuộc xã, thôn đặc biệt khó khăn hoặc xã biên giới'},
+        # Từ 05/11/2026: tra xã thường trú trong hồ sơ SV với danh sách xã ĐBKK
+        # (tuition_special_area_wards) — SV không tự khai nữa.
+        {'name': 'self_special_area', 'type': 'checkbox', 'system': True,
+         'label': 'Nơi thường trú của sinh viên (theo hồ sơ) thuộc xã đặc biệt khó khăn hoặc xã biên giới'},
+        {'name': 'self_permanent_ward', 'type': 'text', 'system': True,
+         'label': 'Xã/phường thường trú theo hồ sơ'},
         {'name': 'father_permanent_address', 'type': 'text', 'max': 500,
          'label': 'Địa chỉ thường trú của cha (số nhà/thôn, xã/phường, tỉnh/thành)'},
         {'name': 'father_special_area', 'type': 'checkbox',
@@ -259,6 +265,9 @@ CATEGORY_FIELDS = {
 }
 # Đối tượng bắt buộc là người dân tộc thiểu số (theo hồ sơ SV — students.ethnicity).
 ETHNIC_MINORITY_CATEGORIES = {'TSKK'}
+# Đối tượng vùng đặc biệt khó khăn: hệ thống loại SV có xã thường trú (hồ sơ) không thuộc
+# danh sách xã ĐBKK / biên giới (tuition_special_area_wards).
+SPECIAL_AREA_CATEGORIES = {'TSKK'}
 KINH_CODE = '01'
 
 
@@ -284,8 +293,32 @@ def _truthy(value):
     return value in (True, 1, '1', 'true', 'True', 'on', 'yes')
 
 
-def clean_category_details(code, raw, ethnicity):
+def system_fields(code):
+    return [f for f in CATEGORY_FIELDS.get(code, []) if f.get('system')]
+
+
+def student_fields(code):
+    """Ô SV tự nhập trên Hub (bỏ các trường hệ thống điền)."""
+    return [f for f in CATEGORY_FIELDS.get(code, []) if not f.get('system')]
+
+
+def special_area_reason(in_list, ward_label):
+    """Lý do không đủ điều kiện vùng ĐBKK theo xã thường trú trong hồ sơ — None nếu đạt.
+    `in_list`: True/False theo danh sách xã ĐBKK; None khi hồ sơ chưa có xã thường trú."""
+    if in_list is None:
+        return 'hồ sơ chưa có xã/phường thường trú (liên hệ Phòng CTSV để cập nhật)'
+    if not in_list:
+        return ('bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới'
+                + (f' (thường trú theo hồ sơ: {ward_label})' if ward_label else ''))
+    return None
+
+
+def clean_category_details(code, raw, ethnicity, special_area=None, ward_label=''):
     """Kiểm thông tin riêng của đối tượng `code`.
+
+    `special_area` / `ward_label`: xã thường trú của SV (bảng student_addresses) có trong
+    danh sách xã ĐBKK không, và tên xã đó — app tra rồi truyền vào (file này không đụng DB).
+    Chỉ dùng cho đối tượng thuộc SPECIAL_AREA_CATEGORIES.
 
     Trả (details, errors, ineligible):
       details    — dict đã chuẩn hóa để lưu (rỗng nếu đối tượng không có trường riêng)
@@ -296,6 +329,8 @@ def clean_category_details(code, raw, ethnicity):
     details, errors, ineligible = {}, {}, []
     for f in CATEGORY_FIELDS.get(code, []):
         name = f['name']
+        if f.get('system'):
+            continue
         if f['type'] == 'checkbox':
             details[name] = _truthy(raw.get(name))
             continue
@@ -315,14 +350,19 @@ def clean_category_details(code, raw, ethnicity):
         elif not minority:
             ineligible.append(f'không thuộc dân tộc thiểu số (hồ sơ ghi: {ethnicity_name(ethnicity) or "Kinh"})')
 
+    if code in SPECIAL_AREA_CATEGORIES:
+        details['self_special_area'] = bool(special_area)
+        details['self_permanent_ward'] = ward_label or ''
+        reason = special_area_reason(special_area, ward_label)
+        if reason:
+            ineligible.append(reason)
+
     if code == 'TSKK':
         if not (details['father_permanent_address'] or details['mother_permanent_address']):
             errors['father_permanent_address'] = ['Nhập địa chỉ thường trú của cha hoặc mẹ.']
         for parent in ('father', 'mother'):
             if details[f'{parent}_special_area'] and not details[f'{parent}_permanent_address']:
                 errors[f'{parent}_permanent_address'] = ['Nhập địa chỉ thường trú tương ứng.']
-        if not details['self_special_area']:
-            ineligible.append('bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới')
         if not (details['father_special_area'] or details['mother_special_area']):
             ineligible.append('cả cha và mẹ đều không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới')
     return details, errors, ineligible

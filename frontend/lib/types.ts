@@ -874,6 +874,8 @@ export interface TuitionExemptionCategory {
   fields: TuitionCategoryField[];
   /** Đối tượng chỉ dành cho người dân tộc thiểu số (theo hồ sơ). */
   requires_ethnic_minority: boolean;
+  /** Đối tượng vùng ĐBKK: hệ thống tra xã thường trú trong hồ sơ với danh sách xã ĐBKK. */
+  requires_special_area: boolean;
   mode: TuitionCategoryMode;
   mode_label: string;
   /** Kỳ gần nhất được xác nhận (chỉ có với diện đang hưởng). */
@@ -894,6 +896,8 @@ export interface TuitionExemptionPlan {
   ethnicity: string;
   /** null = hồ sơ chưa có thông tin dân tộc. */
   is_ethnic_minority: boolean | null;
+  /** Xã thường trú theo hồ sơ có thuộc danh sách xã ĐBKK không — in_list null = hồ sơ chưa có xã. */
+  special_area: { in_list: boolean | null; ward: string };
   inactive_history: { code: string; name: string }[];
 }
 
@@ -970,6 +974,8 @@ export interface TuitionExemptionAward {
   decree_amount_vnd: number | null;
   school_support_vnd: number | null;
   received_vnd: number;
+  /** Học phí còn phải đóng sau miễn giảm — chỉ có khi Phòng CTSV tính trên hệ thống. */
+  payable_vnd: number | null;
   payment_status: 'paid' | 'unpaid' | null;
   payment_label: string;
   note: string;

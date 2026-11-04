@@ -627,8 +627,9 @@ class StudentTuitionFee(models.Model):
 
 class TuitionExemptionAward(models.Model):
     """Kết quả MGHP một SV một kỳ — Dashboard nạp từ Excel danh sách kèm quyết định
-    (`dashboard_iuoss/tuition/award_import_service.py`). Hub CHỈ đọc dòng của chính SV
-    đăng nhập. Cố ý không khai cột nội bộ (lô import, người sửa)."""
+    (`award_import_service.py`) hoặc tự tính từ đợt (`round_calc.py`, có `payable_vnd`).
+    Hub CHỈ đọc dòng của chính SV đăng nhập. Cố ý không khai cột nội bộ (lô import,
+    người sửa)."""
 
     id = models.BigAutoField(primary_key=True)
     student = models.ForeignKey(Student, on_delete=models.DO_NOTHING, related_name="tuition_exemption_awards")
@@ -645,6 +646,7 @@ class TuitionExemptionAward(models.Model):
     decree_amount_vnd = models.BigIntegerField(null=True)
     school_support_vnd = models.BigIntegerField(null=True)
     received_vnd = models.BigIntegerField()
+    payable_vnd = models.BigIntegerField(null=True)
     payment_status = models.CharField(max_length=16, null=True)
     note = models.CharField(max_length=500, null=True)
     bank_account_number = models.CharField(max_length=64, null=True)
@@ -655,3 +657,16 @@ class TuitionExemptionAward(models.Model):
     class Meta:
         managed = False
         db_table = "tuition_exemption_awards"
+
+
+class TuitionSpecialAreaWard(models.Model):
+    """Xã/phường đặc biệt khó khăn hoặc biên giới (mã vn_wards 2025) — Dashboard ghi, Hub
+    đọc để loại SV chọn đối tượng vùng ĐBKK mà xã thường trú trong hồ sơ không thuộc
+    danh sách. Schema: dashboard_iuoss/docs/sql/20261105_mghp_ceilings_special_wards.sql."""
+
+    ward_code = models.CharField(max_length=5, primary_key=True)
+    note = models.CharField(max_length=255, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "tuition_special_area_wards"

@@ -37,6 +37,8 @@ from students.models import (
     TuitionExemptionBeneficiary,
     TuitionExemptionCategory,
     TuitionExemptionRound,
+    TuitionSpecialAreaWard,
+    VnWard,
 )
 
 from . import address_service as addr
@@ -157,12 +159,28 @@ def _serialize_category(c, mode=None, last_key=None):
         # Giấy phải nộp THEO CHẾ ĐỘ: gia hạn có bổ sung chỉ còn giấy renewal_required;
         # chỉ xác nhận → rỗng (contract.documents_for_mode).
         "documents": contract.documents_for_mode(docs, mode) if mode else docs,
-        "fields": contract.CATEGORY_FIELDS.get(c.code, []),
+        "fields": contract.student_fields(c.code),
         "requires_ethnic_minority": c.code in contract.ETHNIC_MINORITY_CATEGORIES,
+        "requires_special_area": c.code in contract.SPECIAL_AREA_CATEGORIES,
         "mode": mode,
         "mode_label": contract.RENEWAL_MODES.get(mode, "") if mode else "",
         "last_verified": _term_label(last_key) if last_key else None,
     }
+
+
+def special_area_status(student):
+    """(có trong danh sách xã ĐBKK?, tên xã) theo xã thường trú trong hồ sơ — dòng
+    thường trú đang dùng của `address_service` (CURRENT_STD trước, CURRENT sau).
+    (None, "") khi hồ sơ chưa có xã thường trú."""
+    address = addr.get_permanent(student)
+    code = (getattr(address, "ward_code", None) or "").strip()
+    if not code:
+        return None, ""
+    ward = VnWard.objects.filter(code=code).first()
+    label = ward.name if ward else (address.ward or code)
+    if getattr(address, "province", None):
+        label = f"{label}, {address.province}"
+    return TuitionSpecialAreaWard.objects.filter(ward_code=code).exists(), label
 
 
 def build_plan(student, round_):
@@ -198,6 +216,8 @@ def build_plan(student, round_):
         "max_categories": contract.MAX_CATEGORIES_PER_APPLICATION,
         "ethnicity": contract.ethnicity_name(student.ethnicity),
         "is_ethnic_minority": contract.is_ethnic_minority(student.ethnicity),
+        # Xã thường trú theo hồ sơ có thuộc danh sách xã ĐBKK không (null = hồ sơ chưa có).
+        "special_area": dict(zip(("in_list", "ward"), special_area_status(student))),
         "inactive_history": [
             {"code": c.code, "name": c.name_vi}
             for c in TuitionExemptionCategory.objects.filter(pk__in=inactive)
@@ -364,6 +384,7 @@ def awards(student):
             "decree_amount_vnd": a.decree_amount_vnd,
             "school_support_vnd": a.school_support_vnd,
             "received_vnd": a.received_vnd,
+            "payable_vnd": a.payable_vnd,
             "payment_status": a.payment_status,
             "payment_label": PAYMENT_LABELS.get(a.payment_status, ""),
             "note": a.note or "",
@@ -486,8 +507,10 @@ def submit(student, data, uploads, *, request_key):
     # ── Thông tin riêng + điều kiện của đối tượng (TSKK: DTTS + thường trú ĐBKK) ──
     details = None
     if codes:
+        special_area, ward_label = (special_area_status(student)
+                                    if codes[0] in contract.SPECIAL_AREA_CATEGORIES else (None, ""))
         details, detail_errors, ineligible = contract.clean_category_details(
-            codes[0], data.get("category_details"), student.ethnicity)
+            codes[0], data.get("category_details"), student.ethnicity, special_area, ward_label)
         if ineligible:
             message = contract.ineligible_message(codes[0], ineligible)
             raise TuitionExemptionError(message, code="ineligible", errors={"eligibility": [message]})

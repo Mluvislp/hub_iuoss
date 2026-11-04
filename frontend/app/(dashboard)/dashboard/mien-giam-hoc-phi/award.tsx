@@ -51,6 +51,9 @@ export function AwardDetails({ award }: { award: TuitionExemptionAward }) {
         {award.school_support_vnd != null && award.school_support_vnd > 0 && (
           <Row label="Trường hỗ trợ" value={fmtVnd(award.school_support_vnd)} />
         )}
+        {award.payable_vnd != null && (
+          <Row label="Học phí còn phải đóng" value={fmtVnd(award.payable_vnd)} />
+        )}
         {award.payment_label && (
           <Row label="Tình trạng học phí"
                value={<span className={cn(badge.base, award.payment_status === 'paid' ? badge.success : badge.warning)}>{award.payment_label}</span>} />

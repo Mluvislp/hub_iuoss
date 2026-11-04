@@ -92,8 +92,14 @@ function ineligibleReasons(c: TuitionExemptionCategory, plan: TuitionExemptionPl
     if (plan.is_ethnic_minority === null) reasons.push('hồ sơ chưa có thông tin dân tộc (liên hệ Phòng CTSV để cập nhật)');
     else if (!plan.is_ethnic_minority) reasons.push(`không thuộc dân tộc thiểu số (hồ sơ ghi: ${plan.ethnicity || 'Kinh'})`);
   }
+  if (c.requires_special_area) {
+    const { in_list, ward } = plan.special_area;
+    if (in_list === null) reasons.push('hồ sơ chưa có xã/phường thường trú (liên hệ Phòng CTSV để cập nhật)');
+    else if (!in_list) {
+      reasons.push(`bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới${ward ? ` (thường trú theo hồ sơ: ${ward})` : ''}`);
+    }
+  }
   if (full && c.code === 'TSKK') {
-    if (!details.self_special_area) reasons.push('bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới');
     if (!details.father_special_area && !details.mother_special_area) {
       reasons.push('cả cha và mẹ đều không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới');
     }
