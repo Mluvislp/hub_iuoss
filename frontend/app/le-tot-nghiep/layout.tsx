@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
-import { Playfair_Display } from 'next/font/google';
+import { Be_Vietnam_Pro, Cormorant_Garamond } from 'next/font/google';
 
-// Font tiêu đề trang trọng — chỉ nạp cho trang Lễ tốt nghiệp (tailwind `font-display`).
-const display = Playfair_Display({
+// Chỉ trang Lễ tốt nghiệp: tiêu đề serif cổ điển (Cormorant Garamond) cho không khí lễ,
+// nội dung Be Vietnam Pro — font thiết kế cho tiếng Việt, dấu đặt đẹp hơn Inter.
+const display = Cormorant_Garamond({
   subsets: ['latin', 'vietnamese'],
-  weight: ['600', '700'],
+  weight: ['500', '600', '700'],
+  style: ['normal', 'italic'],
   variable: '--font-display',
+  display: 'swap',
+});
+const body = Be_Vietnam_Pro({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-grad-body',
   display: 'swap',
 });
 
@@ -15,5 +23,5 @@ export const metadata: Metadata = {
 };
 
 export default function GraduationLayout({ children }: { children: React.ReactNode }) {
-  return <div className={display.variable}>{children}</div>;
+  return <div className={`${display.variable} ${body.variable} font-grad`}>{children}</div>;
 }
