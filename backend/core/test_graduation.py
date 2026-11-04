@@ -257,3 +257,44 @@ class GraduationTests(TestCase):
 def grad_views_limit():
     from core.api.graduation_views import INFO_FAIL_LIMIT
     return INFO_FAIL_LIMIT
+
+
+@override_settings(MS_TENANT_ID="t", MS_CLIENT_ID="c", MS_CLIENT_SECRET="s", MS_LOGIN_ENABLED=True,
+                   MS_REDIRECT_URI="https://hub.iuoss.com/auth/microsoft/callback",
+                   MS_REDIRECT_URIS=["https://hub.iuoss.com/auth/microsoft/callback",
+                                     "https://graduation.iuoss.com/auth/microsoft/callback"],
+                   ALLOWED_HOSTS=["testserver", "hub.iuoss.com", "graduation.iuoss.com", "graduation-sandbox.iuoss.com"])
+class GraduationDomainTests(TestCase):
+    """Tên miền riêng graduation.iuoss.com: Microsoft quay về đúng tên miền đã khai ở Azure."""
+
+    def test_redirect_uri_only_for_registered_hosts(self):
+        from core import microsoft_auth as ms
+        self.assertEqual(ms.redirect_uri_for_host("graduation.iuoss.com"),
+                         "https://graduation.iuoss.com/auth/microsoft/callback")
+        self.assertIsNone(ms.redirect_uri_for_host("graduation-sandbox.iuoss.com"))
+        self.assertIsNone(ms.redirect_uri_for_host("evil.example.com"))
+
+    def test_start_url_and_state_carry_host_redirect(self):
+        from urllib.parse import parse_qs, urlsplit
+        from django.core import signing
+        from core import microsoft_auth as ms
+        res = APIClient().get("/api/auth/microsoft/start/", HTTP_HOST="graduation.iuoss.com")
+        q = parse_qs(urlsplit(res.json()["authorize_url"]).query)
+        self.assertEqual(q["redirect_uri"], ["https://graduation.iuoss.com/auth/microsoft/callback"])
+        state = signing.loads(q["state"][0], salt=ms.STATE_SALT)
+        self.assertEqual(state["r"], "https://graduation.iuoss.com/auth/microsoft/callback")
+        # Tên miền chưa khai ⇒ về địa chỉ mặc định của Hub.
+        res = APIClient().get("/api/auth/microsoft/start/", HTTP_HOST="graduation-sandbox.iuoss.com")
+        self.assertIn("redirect_uri=https%3A%2F%2Fhub.iuoss.com", res.json()["authorize_url"])
+
+    def test_exchange_rejects_tampered_redirect(self):
+        from django.core import signing
+        from core import microsoft_auth as ms
+        bad = signing.dumps({"v": "x", "n": "y", "r": "https://evil.example.com/cb"}, salt=ms.STATE_SALT)
+        with self.assertRaises(ms.MicrosoftAuthError):
+            ms.exchange_code("code", bad)
+
+    def test_info_hides_outlook_on_unregistered_host(self):
+        GraduationRound.objects.create(title="Lễ tốt nghiệp 2026")
+        self.assertTrue(APIClient().get("/api/graduation/", HTTP_HOST="graduation.iuoss.com").json()["microsoft_login"])
+        self.assertFalse(APIClient().get("/api/graduation/", HTTP_HOST="graduation-sandbox.iuoss.com").json()["microsoft_login"])

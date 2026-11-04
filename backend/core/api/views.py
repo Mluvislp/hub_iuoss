@@ -328,7 +328,9 @@ class MicrosoftStartView(MicrosoftLoginRequiredMixin, APIView):
     permission_classes = []
 
     def get(self, request):
-        return Response({"authorize_url": microsoft_auth.build_authorize_url()})
+        # Tên miền khác cùng app (graduation.iuoss.com) quay về chính nó nếu đã khai ở Azure.
+        redirect_uri = microsoft_auth.redirect_uri_for_host(request.get_host())
+        return Response({"authorize_url": microsoft_auth.build_authorize_url(redirect_uri)})
 
 
 class MicrosoftCallbackView(MicrosoftLoginRequiredMixin, APIView):

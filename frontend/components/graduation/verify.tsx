@@ -5,7 +5,7 @@ import {
   AlertCircle, ArrowLeft, ChevronDown, GraduationCap, Loader2, LockKeyhole, QrCode, ShieldCheck, UserRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { GRAD_PATH, GradError, MS_PURPOSE_KEY, gradApi, type Audience, type GradMember } from '@/lib/graduation';
+import { GradError, MS_PURPOSE_KEY, gradApi, gradHomePath, type Audience, type GradMember } from '@/lib/graduation';
 
 // Ô nhập riêng của trang tốt nghiệp: cao 44px đồng đều cho input / select, viền mảnh, focus vàng-navy.
 const field =
@@ -180,7 +180,7 @@ function StudentVerify({ msEnabled, onVerified }: { msEnabled: boolean; onVerifi
       const { authorize_url } = await gradApi.microsoftStart();
       // Trang callback đọc khóa này để đổi code lấy phiên TỐT NGHIỆP, không phải phiên Hub.
       sessionStorage.setItem(MS_PURPOSE_KEY, 'graduation');
-      sessionStorage.setItem('hub_ms_next', GRAD_PATH + '#dang-ky');
+      sessionStorage.setItem('hub_ms_next', gradHomePath() + '#dang-ky');
       window.location.href = authorize_url;
     } catch {
       setError('Chưa mở được trang đăng nhập Microsoft. Vui lòng thử lại.');

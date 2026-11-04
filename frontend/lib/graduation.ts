@@ -10,6 +10,12 @@ const TOKEN_KEY = 'hub_grad_token';
 export const MS_PURPOSE_KEY = 'hub_ms_purpose';
 export const GRAD_PATH = '/le-tot-nghiep';
 
+/** Đường dẫn trang tốt nghiệp trên tên miền đang mở: "/" ở graduation(-sandbox).iuoss.com, còn lại /le-tot-nghiep. */
+export function gradHomePath(): string {
+  if (typeof window === 'undefined') return GRAD_PATH;
+  return window.location.hostname.startsWith('graduation') ? '/' : GRAD_PATH;
+}
+
 export type Audience = 'student' | 'graduate';
 export type RegistrationStatus = null | 'registered' | 'cancel_requested' | 'cancelled';
 
