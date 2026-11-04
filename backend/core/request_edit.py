@@ -22,6 +22,7 @@ FIELD_LABELS = {
     "dob": "Ngày sinh",
     "citizen_id": "Số CCCD",
     "citizen_id_issue_date": "Ngày cấp CCCD",
+    "citizen_id_issue_place": "Nơi cấp CCCD",
     "permanent_address": "Địa chỉ thường trú",
     "class_code": "Mã lớp",
 }

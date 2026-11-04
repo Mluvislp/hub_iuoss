@@ -23,6 +23,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from students.models import ProfileChangeRequest, Student
@@ -56,6 +57,8 @@ DATA_CONSENT_TEXT = {
         "thẩm quyền, theo quy định về bảo vệ dữ liệu cá nhân."
     ),
 }
+# Luồng "đối tượng khác" khai đúng form "đã khám" → cùng câu cam kết.
+DATA_CONSENT_TEXT["other"] = DATA_CONSENT_TEXT["examined"]
 
 
 # Đối tượng khám tập trung tại trường — hiện ở đầu phần 2 của nhánh "Chưa khám".
@@ -99,22 +102,73 @@ class HealthCheckError(ValueError):
         super().__init__(message)
 
 
-# ── Đợt ──────────────────────────────────────────────────────────────────────
+# ── Đợt + 3 lựa chọn ─────────────────────────────────────────────────────────
+# MỖI lựa chọn (examined "Đã khám SK" · register "Chưa khám SK" · other "Đối tượng khác") có
+# thời hạn `<lựa chọn>_opens_at/_closes_at` + công tắc `<lựa chọn>_open_mode` RIÊNG (26/10/2026).
+# Công tắc là mức ƯU TIÊN CAO NHẤT:
+#   auto   → mở/đóng theo thời hạn của lựa chọn đó
+#   open   → luôn mở, bất kể thời hạn
+#   closed → luôn đóng, bất kể thời hạn — khóa cả nộp lại minh chứng bị từ chối
+# Cột `open_mode` của đợt thôi dùng. Bản đối ứng: dashboard healthcheck/models.py::option_state.
+OPEN_MODE_AUTO, OPEN_MODE_OPEN, OPEN_MODE_CLOSED = "auto", "open", "closed"
+OPTIONS = ("examined", "register", "other")
+# Nhãn trên ô lựa chọn khi KHÔNG mở — ô vẫn hiện, làm mờ (không ẩn).
+OPTION_CLOSED_LABELS = {
+    "upcoming": "Chưa mở đăng ký",
+    "disabled": "Chưa mở đăng ký",
+    "expired": "Hết thời hạn đăng ký",
+    "paused": "Tạm đóng đăng ký",
+}
 
-def round_state(round_, now=None):
+
+def option_status(round_, choice, now=None):
+    """Chi tiết trạng thái một lựa chọn: open | upcoming | disabled | expired | paused."""
+    if round_ is None:
+        return "disabled"
+    mode = getattr(round_, f"{choice}_open_mode", OPEN_MODE_AUTO)
+    if mode == OPEN_MODE_OPEN:
+        return "open"
+    if mode == OPEN_MODE_CLOSED:
+        return "paused"
+    opens_at = getattr(round_, f"{choice}_opens_at")
+    closes_at = getattr(round_, f"{choice}_closes_at")
+    if not opens_at or not closes_at:
+        return "disabled"
     now = now or timezone.now()
-    if now < round_.opens_at:
+    if now < opens_at:
         return "upcoming"
-    if now > round_.closes_at:
-        return "closed"
+    if now > closes_at:
+        return "expired"
     return "open"
 
 
+def option_state(round_, choice, now=None):
+    """open | upcoming | closed | disabled — gọn cho các phép kiểm."""
+    status = option_status(round_, choice, now)
+    return "closed" if status in ("expired", "paused") else status
+
+
+def round_state(round_, now=None):
+    """Trạng thái chung của đợt: 'open' khi CÓ lựa chọn đang mở."""
+    if any(option_state(round_, c, now) == "open" for c in OPTIONS):
+        return "open"
+    now = now or timezone.now()
+    return "upcoming" if now < round_.opens_at else "closed"
+
+
+def other_state(round_, now=None):
+    return option_state(round_, "other", now)
+
+
 def display_round(now=None):
-    """Đợt Hub đang hiển thị: đợt đang mở; không có thì đợt gần nhất đã mở
-    (để SV xem lại phản hồi của mình); không có nữa thì đợt sắp mở."""
+    """Đợt Hub đang hiển thị: đợt bật công tắc "Mở"; rồi đợt đang trong thời hạn;
+    không có thì đợt gần nhất đã mở (để SV xem lại phản hồi); không có nữa thì đợt sắp mở."""
     now = now or timezone.now()
     rounds = HealthCheckRound.objects.all()
+    forced = rounds.filter(Q(examined_open_mode=OPEN_MODE_OPEN) | Q(register_open_mode=OPEN_MODE_OPEN)
+                           | Q(other_open_mode=OPEN_MODE_OPEN)).order_by("-opens_at").first()
+    if forced:
+        return forced
     current = rounds.filter(opens_at__lte=now, closes_at__gte=now).order_by("-opens_at").first()
     if current:
         return current
@@ -148,6 +202,9 @@ def serialize_round(round_):
         "opens_at": round_.opens_at.isoformat(),
         "closes_at": round_.closes_at.isoformat(),
         "state": round_state(round_),
+        # Từng lựa chọn: mở hay không + nhãn khi không mở (ô làm mờ, không ẩn).
+        "options": {c: {"open": (st := option_status(round_, c)) == "open",
+                        "status": st, "label": OPTION_CLOSED_LABELS.get(st, "")} for c in OPTIONS},
         "package_name": round_.package_name,
         "package_lines": _package_lines(round_.package_content),
         "schedule_note": round_.schedule_note or "",
@@ -172,9 +229,11 @@ def slot_options(round_, now=None):
         for slot in slots.iter_slots({**cfg, "dates": [day]}):
             remaining = None if cfg["capacity"] is None else max(0, cfg["capacity"] - used[slot["key"]])
             started = slots.has_started(slot, now)
+            closed = slots.is_closed(cfg, slot)
             shifts.append({**slots.snapshot(slot), "remaining": remaining,
-                           "available": not started and remaining != 0,
-                           "reason": "Đã qua giờ đăng ký" if started else "Đã đủ chỗ" if remaining == 0 else ""})
+                           "available": not started and not closed and remaining != 0,
+                           "reason": ("Ca đã bắt đầu" if started else "Đã khóa" if closed
+                                      else "Đã đủ chỗ" if remaining == 0 else "")})
         days.append({"date": day, "label": slots.date_label(day), "shifts": shifts})
     return {"capacity": cfg["capacity"], "days": days}
 
@@ -188,9 +247,12 @@ def _pick_slot(round_, key):
     if slot is None:
         raise HealthCheckError("Vui lòng chọn ngày và ca khám.",
                                errors={"exam_slot": "Chưa chọn ca khám."}, code="exam_slot")
+    if slots.is_closed(cfg, slot):
+        raise HealthCheckError("Ca khám đã chọn đã ngừng nhận đăng ký. Vui lòng chọn ca khác.",
+                               errors={"exam_slot": "Ca này đã khóa."}, code="exam_slot")
     if slots.has_started(slot):
-        raise HealthCheckError("Ca khám đã chọn đã qua giờ đăng ký. Vui lòng chọn ca khác.",
-                               errors={"exam_slot": "Ca đã qua giờ đăng ký."}, code="exam_slot")
+        raise HealthCheckError("Ca khám đã chọn đã bắt đầu. Vui lòng chọn ca khác.",
+                               errors={"exam_slot": "Ca đã bắt đầu."}, code="exam_slot")
     if cfg["capacity"] is not None:
         used = slots.taken(Response_.objects.filter(round=round_, choice=Response_.CHOICE_REGISTER)
                            .values_list("evidence", flat=True))
@@ -267,6 +329,47 @@ def _serialize_response(resp):
         "residence": resp.residence or None,
         "exam_slot": slots.chosen(resp.evidence),
         "exam_slot_label": slots.describe(slots.chosen(resp.evidence)),
+        # Đã chuyển từ "Đã khám" sang đăng ký: chỉ báo lúc nào + trạng thái cũ.
+        "superseded": (
+            {"at": info.get("superseded_at"), "label": SUPERSEDED_LABEL,
+             "previous_status_label": info.get("previous_status_label", "")}
+            if (info := superseded_info(resp.evidence)) else None
+        ),
+        # Yêu cầu hủy đăng ký khám tại trường (chờ duyệt / bị từ chối); None nếu chưa gửi.
+        "cancel_request": _serialize_cancel(resp.evidence),
+    }
+
+
+def exam_ticket(student, resp, round_):
+    """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`."""
+    if resp is None or resp.choice != Response_.CHOICE_REGISTER or not resp.exam_code:
+        return None
+    from students.models import HealthInsuranceCard, StudentContactPoint
+
+    code = resp.exam_code.strip()
+    slot = slots.chosen(resp.evidence)
+    card = (HealthInsuranceCard.objects.filter(student=student, is_current=True)
+            .exclude(medical_insurance_code__isnull=True).exclude(medical_insurance_code="")
+            .order_by("-updated_at").first())
+    dept = student.current_department
+    return {
+        "code": code,
+        "number": code.split("-", 1)[0],        # số phiếu = phần STT trước dấu "-"
+        "date_label": slots.date_label(slot["date"]) if slot else "",
+        "slot_label": slot.get("label", "") if slot else "",
+        "slot_time": f"{slot.get('start', '')}–{slot.get('end', '')}" if slot else "",
+        "issued_at": timezone.localtime(resp.updated_at).isoformat() if resp.updated_at else None,
+        "student": {
+            "full_name": student.full_name or "",
+            "student_code": student.current_student_code or "",
+            "date_of_birth": student.date_of_birth.strftime("%d/%m/%Y") if student.date_of_birth else "",
+            "sex": (student.sex or "").strip(),
+            "citizen_id": pc._current_cccd(student)["number"],
+            "class_code": student.class_code or "",
+            "department": dept.name_vi if dept else "",
+            "phone": pc._current_contact(student, StudentContactPoint.TYPE_MOBILE_PHONE),
+            "health_insurance_code": card.medical_insurance_code if card else "",
+        },
     }
 
 
@@ -277,15 +380,22 @@ def build_state(student):
         Response_.objects.filter(round=round_, student_id=student.pk).first()
         if round_ else None
     )
-    state = round_state(round_) if round_ else None
+    examined_open = option_state(round_, "examined") == "open"
+    register_open = option_state(round_, "register") == "open"
+    can_switch_now = register_open and can_switch(resp)
     return {
         "round": serialize_round(round_),
         "response": _serialize_response(resp),
-        "can_submit": state == "open" and resp is None,
-        "can_resubmit": bool(
-            resp and resp.choice == Response_.CHOICE_EXAMINED
-            and resp.status == Response_.STATUS_REJECTED
-        ),
+        "exam_ticket": exam_ticket(student, resp, round_),
+        "can_submit": (examined_open or register_open) and resp is None,
+        "can_submit_examined": examined_open and resp is None,
+        "can_submit_register": register_open and resp is None,
+        # Đã khai "đã khám" (chưa được xác nhận) → được chuyển sang đăng ký khám tại trường.
+        "can_switch_to_register": can_switch_now,
+        # Luồng "đối tượng khác" — chỉ hiện lựa chọn khi luồng đang mở (không hiện thời hạn).
+        "can_submit_other": other_state(round_) == "open" and resp is None,
+        "can_resubmit": _can_resubmit(resp, round_),
+        "can_request_cancel": can_request_cancel(resp),
         "max_evidence_files": MAX_EVIDENCE_FILES,
         # Form kết quả khám dựng hoàn toàn từ đây — xem core/health_check_result.py.
         "result_schema": result_spec.SCHEMA,
@@ -301,7 +411,8 @@ def build_state(student):
         # Form còn mở thì frontend tự tính theo ô đang nhập, server tính lại lúc nộp.
         "residence": residence_snapshot(student),
         # Ngày + ca khám tại trường (nhánh "Chưa khám"); None khi đợt không chia ca.
-        "exam_slots": slot_options(round_) if round_ and resp is None and state == "open" else None,
+        "exam_slots": (slot_options(round_)
+                       if round_ and register_open and (resp is None or can_switch_now) else None),
     }
 
 
@@ -355,14 +466,34 @@ def _lock_student(student):
     Student.objects.select_for_update().filter(pk=student.pk).first()
 
 
-def submit_evidence(student, uploads, result_raw=None, declaration=None, data_consent=None):
-    """Nhánh "Đã khám rồi": khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu
-    + ảnh minh chứng, chờ chuyên viên xác nhận.
+def _can_resubmit(resp, round_):
+    """Minh chứng bị từ chối được nộp lại — kể cả sau hạn chót, TRỪ khi công tắc của
+    đúng luồng đó đang "Đóng"."""
+    if not (resp and resp.status == Response_.STATUS_REJECTED):
+        return False
+    if resp.choice == Response_.CHOICE_EXAMINED:
+        return round_.examined_open_mode != OPEN_MODE_CLOSED
+    if resp.choice == Response_.CHOICE_OTHER:
+        return round_.other_open_mode != OPEN_MODE_CLOSED
+    return False
+
+
+EVIDENCE_CHOICES = (Response_.CHOICE_EXAMINED, Response_.CHOICE_OTHER)
+
+
+def submit_evidence(student, uploads, result_raw=None, declaration=None, data_consent=None,
+                    choice=Response_.CHOICE_EXAMINED):
+    """Nhánh "Đã khám rồi" (`examined`) và luồng "Dành cho đối tượng khác" (`other`):
+    khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu + ảnh minh chứng, chờ chuyên
+    viên xác nhận. Luồng `other` mở theo thời hạn/công tắc riêng và chỉ nhận SV KHÔNG có
+    thường trú lẫn tạm trú ở TP.HCM (kiểm lại ở server từ địa chỉ đã ghi).
 
     Kiểm kết quả khám và định dạng ảnh TRƯỚC transaction (đọc file chậm), ghi file
     trong transaction; lỗi ở bất kỳ bước nào thì rollback cả khai báo ngoại trú và
     xóa sạch file đã ghi. Lỗi trả về theo từng ô: ô kết quả mang tiền tố `result.`.
     """
+    if choice not in EVIDENCE_CHOICES:
+        raise HealthCheckError("Lựa chọn không hợp lệ.", code="choice")
     _require_data_consent(data_consent)
     result, result_errors = result_spec.clean(result_raw)
     if result_errors:
@@ -391,12 +522,14 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 raise HealthCheckError("Chưa có đợt khai báo khám sức khỏe nào.")
             resp = (Response_.objects.select_for_update()
                     .filter(round=round_, student_id=student.pk).first())
-            resubmit = bool(resp and resp.choice == Response_.CHOICE_EXAMINED
+            resubmit = bool(resp and resp.choice == choice
                             and resp.status == Response_.STATUS_REJECTED)
             if resp is not None and not resubmit:
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
-            if resp is None and round_state(round_) != "open":
-                raise HealthCheckError(_closed_message(round_), code="closed")
+            if resp is None and option_state(round_, choice) != "open":
+                raise HealthCheckError(_closed_message(round_, choice), code="closed")
+            if resubmit and not _can_resubmit(resp, round_):
+                raise HealthCheckError(_closed_message(round_, choice), code="closed")
 
             # Như nhánh đăng ký khám: chưa khai ngoại trú thì khai luôn ở đây.
             locked, _ = offcampus.lock_state(student)
@@ -410,6 +543,14 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 declared_now = True
             _require_cccd(student)
             residence = residence_snapshot(student)
+            if choice == Response_.CHOICE_OTHER and residence["eligible"]:
+                # Exception → rollback cả phần khai báo vừa ghi ở trên.
+                raise HealthCheckError(
+                    "Luồng này dành cho sinh viên ngoại tỉnh chưa đăng ký tạm trú tại Thành phố "
+                    "Hồ Chí Minh. Sinh viên có thường trú hoặc tạm trú tại Thành phố Hồ Chí Minh "
+                    "vui lòng chọn một trong hai lựa chọn còn lại.",
+                    code="not_eligible_other",
+                )
             residence["declared_with_registration"] = declared_now
 
             root = Path(settings.MEDIA_ROOT).resolve()
@@ -430,9 +571,9 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
             if resp is None:
                 resp = Response_.objects.create(
                     round=round_, student_id=student.pk,
-                    choice=Response_.CHOICE_EXAMINED, status=Response_.STATUS_PENDING,
+                    choice=choice, status=Response_.STATUS_PENDING,
                     evidence={"files": items, "result": result,
-                              "data_consent": _data_consent(Response_.CHOICE_EXAMINED)},
+                              "data_consent": _data_consent(choice)},
                     residence=residence,
                     submit_count=1, submitted_at=now,
                 )
@@ -440,7 +581,7 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 # Nộp lại sau khi bị từ chối: thay bộ ảnh, đưa về hàng chờ. Lý do
                 # từ chối cũ giữ lại để chuyên viên biết lần trước sai ở đâu.
                 resp.evidence = {"files": items, "result": result,
-                                 "data_consent": _data_consent(Response_.CHOICE_EXAMINED)}
+                                 "data_consent": _data_consent(choice)}
                 resp.residence = residence
                 resp.status = Response_.STATUS_PENDING
                 resp.submit_count += 1
@@ -460,9 +601,52 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
         raise
 
 
+# ── Chuyển từ "Đã khám" sang "Chưa khám — đăng ký khám tại trường" ─────────────
+# Mỗi SV một dòng mỗi đợt (UNIQUE round_id, student_id), nên chuyển nhánh = đổi chính
+# dòng đó sang đăng ký; khai báo cũ cất ở evidence[SUPERSEDED_KEY] với trạng thái
+# SUPERSEDED. Chỉ chuyển một chiều, một lần, khi khai báo cũ CHƯA được xác nhận.
+SUPERSEDED_KEY = "superseded_examined"
+SUPERSEDED = "superseded"
+SUPERSEDED_LABEL = "Đã thay bằng đăng ký khám"
+SWITCHABLE_STATUSES = (Response_.STATUS_PENDING, Response_.STATUS_REJECTED)
+
+
+def can_switch(resp):
+    return bool(resp and resp.choice == Response_.CHOICE_EXAMINED
+                and resp.status in SWITCHABLE_STATUSES)
+
+
+def superseded_info(evidence):
+    """Khai báo "đã khám" đã bị thay thế (cất trong evidence); None nếu không có."""
+    info = evidence.get(SUPERSEDED_KEY) if isinstance(evidence, dict) else None
+    return info if isinstance(info, dict) else None
+
+
+def _superseded_snapshot(resp, now):
+    def iso(value):
+        return value.isoformat() if value else None
+    return {
+        "status": SUPERSEDED,
+        "superseded_at": now.isoformat(),
+        "previous_status": resp.status,
+        "previous_status_label": Response_.STATUS_LABELS.get(resp.status, resp.status),
+        "evidence": resp.evidence,            # {"files", "result", "data_consent"} giữ nguyên
+        "residence": resp.residence,
+        "submit_count": resp.submit_count,
+        "submitted_at": iso(resp.submitted_at),
+        "created_at": iso(resp.created_at),
+        "review_note": resp.review_note,
+        "reviewed_by_id": resp.reviewed_by_id,
+        "reviewed_at": iso(resp.reviewed_at),
+    }
+
+
 def register(student, data):
     """Nhánh "Chưa khám": khai báo (nếu form ngoại trú đang mở) + đăng ký khám
-    (+ ngày và ca khám nếu đợt có chia ca)."""
+    (+ ngày và ca khám nếu đợt có chia ca).
+
+    `switch_from_examined=True`: SV đã khai "đã khám" (chờ xác nhận / bị từ chối) chuyển
+    sang đăng ký. Mọi kiểm tra như đăng ký mới; không đạt thì khai báo cũ giữ nguyên."""
     if data.get("consent") is not True:
         raise HealthCheckError(
             "Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.",
@@ -473,9 +657,12 @@ def register(student, data):
         with transaction.atomic():
             _lock_student(student)
             round_ = display_round()
-            if round_ is None or round_state(round_) != "open":
-                raise HealthCheckError(_closed_message(round_), code="closed")
-            if Response_.objects.filter(round=round_, student_id=student.pk).exists():
+            if round_ is None or option_state(round_, "register") != "open":
+                raise HealthCheckError(_closed_message(round_, "register"), code="closed")
+            existing = (Response_.objects.select_for_update()
+                        .filter(round=round_, student_id=student.pk).first())
+            switching = existing is not None
+            if switching and not (data.get("switch_from_examined") is True and can_switch(existing)):
                 raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists")
             # Khóa dòng đợt: các lượt đăng ký xếp hàng nhau, đếm chỗ trong ca không bị lọt.
             round_ = HealthCheckRound.objects.select_for_update().get(pk=round_.pk)
@@ -504,25 +691,121 @@ def register(student, data):
                 )
             residence["declared_with_registration"] = declared_now
             now = timezone.now()
-            return Response_.objects.create(
-                round=round_, student_id=student.pk,
-                choice=Response_.CHOICE_REGISTER, status=Response_.STATUS_REGISTERED,
-                residence=residence, consent_at=now, submit_count=1, submitted_at=now,
-                evidence={"data_consent": _data_consent(Response_.CHOICE_REGISTER),
-                          **({"exam_slot": exam_slot} if exam_slot else {})},
-            )
+            evidence = {"data_consent": _data_consent(Response_.CHOICE_REGISTER),
+                        **({"exam_slot": exam_slot} if exam_slot else {})}
+            if not switching:
+                return Response_.objects.create(
+                    round=round_, student_id=student.pk,
+                    choice=Response_.CHOICE_REGISTER, status=Response_.STATUS_REGISTERED,
+                    residence=residence, consent_at=now, submit_count=1, submitted_at=now,
+                    evidence=evidence,
+                )
+            # Chuyển nhánh: CHÍNH dòng này thành đăng ký khám; khai báo "đã khám" cũ
+            # (kết quả, ảnh, trạng thái duyệt) cất nguyên vào evidence — không xoá gì.
+            evidence[SUPERSEDED_KEY] = _superseded_snapshot(existing, now)
+            existing.choice = Response_.CHOICE_REGISTER
+            existing.status = Response_.STATUS_REGISTERED
+            existing.evidence = evidence
+            existing.residence = residence
+            existing.consent_at = now
+            existing.submit_count = 1
+            existing.submitted_at = now
+            existing.review_note = None
+            existing.reviewed_by_id = None
+            existing.reviewed_at = None
+            existing.save(update_fields=[
+                "choice", "status", "evidence", "residence", "consent_at", "submit_count",
+                "submitted_at", "review_note", "reviewed_by_id", "reviewed_at", "updated_at",
+            ])
+            return existing
     except IntegrityError as exc:
         raise HealthCheckError("Đã có phản hồi cho đợt này.", code="exists") from exc
 
 
-def _closed_message(round_):
+# ── Yêu cầu hủy đăng ký khám tại trường ──────────────────────────────────────
+# SV đã đăng ký (kể cả đã khám xong) gửi yêu cầu kèm lý do; Phòng CTSV duyệt trên
+# Dashboard. Không thêm cột: yêu cầu nằm ở evidence[CANCEL_KEY]. Duyệt = Dashboard XOÁ
+# dòng phản hồi (ảnh chụp vào AuditLog) ⇒ SV trả lời lại được; từ chối = giữ đăng ký,
+# yêu cầu chuyển "rejected" kèm lý do. Khoá + trạng thái dùng chung với Dashboard
+# healthcheck/services.py (CANCEL_*).
+CANCEL_KEY = "cancel_request"
+CANCEL_PENDING, CANCEL_REJECTED = "pending", "rejected"
+CANCEL_REASON_MAX = 500
+
+
+def cancel_info(evidence):
+    info = evidence.get(CANCEL_KEY) if isinstance(evidence, dict) else None
+    return info if isinstance(info, dict) else None
+
+
+def can_request_cancel(resp):
+    """Đăng ký khám tại trường, chưa có yêu cầu hủy đang chờ duyệt."""
+    if not (resp and resp.choice == Response_.CHOICE_REGISTER):
+        return False
+    return (cancel_info(resp.evidence) or {}).get("status") != CANCEL_PENDING
+
+
+def _serialize_cancel(evidence):
+    info = cancel_info(evidence)
+    if not info:
+        return None
+    return {k: info.get(k) or ("" if k in ("reason", "review_note") else None)
+            for k in ("status", "reason", "requested_at", "review_note", "reviewed_at")}
+
+
+def _own_response_for_update(student):
+    round_ = display_round()
+    if round_ is None:
+        raise HealthCheckError("Chưa có đợt khai báo khám sức khỏe nào.", code="closed")
+    return Response_.objects.select_for_update().filter(round=round_, student_id=student.pk).first()
+
+
+def request_cancel(student, data):
+    """SV gửi yêu cầu hủy đăng ký khám tại trường (chờ Phòng CTSV duyệt)."""
+    reason = (data.get("reason") or "").strip()
+    if not reason:
+        raise HealthCheckError("Vui lòng nhập lý do hủy đăng ký.", errors={"reason": "Không được để trống."})
+    if len(reason) > CANCEL_REASON_MAX:
+        raise HealthCheckError(f"Lý do tối đa {CANCEL_REASON_MAX} ký tự.",
+                               errors={"reason": f"Tối đa {CANCEL_REASON_MAX} ký tự."})
+    with transaction.atomic():
+        resp = _own_response_for_update(student)
+        if not can_request_cancel(resp):
+            raise HealthCheckError("Không gửi được yêu cầu hủy cho đăng ký này.", code="exists")
+        evidence = dict(resp.evidence or {})
+        evidence[CANCEL_KEY] = {"status": CANCEL_PENDING, "reason": reason,
+                                "requested_at": timezone.localtime().isoformat(),
+                                "status_at_request": resp.status}
+        resp.evidence = evidence
+        resp.save(update_fields=["evidence", "updated_at"])
+        return resp
+
+
+def withdraw_cancel(student):
+    """SV rút yêu cầu hủy đang chờ duyệt — đăng ký giữ nguyên."""
+    with transaction.atomic():
+        resp = _own_response_for_update(student)
+        if not resp or (cancel_info(resp.evidence) or {}).get("status") != CANCEL_PENDING:
+            raise HealthCheckError("Không có yêu cầu hủy đang chờ duyệt.", code="exists")
+        evidence = dict(resp.evidence)
+        evidence.pop(CANCEL_KEY, None)
+        resp.evidence = evidence
+        resp.save(update_fields=["evidence", "updated_at"])
+        return resp
+
+
+OPTION_NAMES = {"examined": "Đã tham khám sức khoẻ", "register": "Chưa tham gia khám sức khoẻ",
+                "other": "Dành cho đối tượng khác"}
+
+
+def _closed_message(round_, choice=None):
+    """Câu báo khi lựa chọn không mở — không nêu mốc giờ (Hub không hiển thị thời hạn)."""
     if round_ is None:
         return "Chưa có đợt khai báo khám sức khỏe nào."
-    if round_state(round_) == "upcoming":
-        return ("Đợt khai báo năm học " + round_.academic_year + " chưa mở. Thời gian mở: "
-                + timezone.localtime(round_.opens_at).strftime("%H:%M %d/%m/%Y") + ".")
-    return ("Đợt khai báo năm học " + round_.academic_year + " đã kết thúc lúc "
-            + timezone.localtime(round_.closes_at).strftime("%H:%M %d/%m/%Y") + ".")
+    if choice is None:
+        return "Đợt khai báo năm học " + round_.academic_year + " hiện không mở."
+    label = OPTION_CLOSED_LABELS.get(option_status(round_, choice), "Không mở đăng ký")
+    return f"Lựa chọn “{OPTION_NAMES[choice]}”: {label.lower()}."
 
 
 def _cleanup(paths):

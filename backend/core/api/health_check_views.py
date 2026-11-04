@@ -76,8 +76,9 @@ class HealthCheckView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
-    """POST multipart: `files` (1–10 ảnh) + `result` + `declaration` (JSON dạng chuỗi) —
-    nhánh "Đã khám rồi" / nộp lại."""
+    """POST multipart: `files` (1–10 ảnh) + `result` + `declaration` (JSON dạng chuỗi) +
+    `choice` (examined | other, mặc định examined) — nhánh "Đã khám rồi", luồng "Dành cho
+    đối tượng khác", và nộp lại."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -92,16 +93,18 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
                 result_raw=_json_field(request.data.get("result")),
                 declaration=_json_field(request.data.get("declaration")),
                 data_consent=request.data.get("data_consent"),
+                choice=(request.data.get("choice") or "examined").strip(),
             )
         except health_check.HealthCheckError as exc:
             return _error(exc)
-        logger.info("HEALTH_CHECK_EVIDENCE | uid=%s | student_id=%s | round=%s | count=%s",
-                    request.user.ldap_uid, student.pk, resp.round_id, resp.submit_count)
+        logger.info("HEALTH_CHECK_EVIDENCE | uid=%s | student_id=%s | round=%s | choice=%s | count=%s",
+                    request.user.ldap_uid, student.pk, resp.round_id, resp.choice, resp.submit_count)
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 
 class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
-    """POST JSON {declaration?, consent, data_consent, exam_slot?} — nhánh "Chưa khám"."""
+    """POST JSON {declaration?, consent, data_consent, exam_slot?, switch_from_examined?} — nhánh
+    "Chưa khám"; `switch_from_examined` = chuyển từ khai "đã khám" sang đăng ký."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [JSONParser]
@@ -115,9 +118,10 @@ class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
             resp = health_check.register(student, data)
         except health_check.HealthCheckError as exc:
             return _error(exc)
-        logger.info("HEALTH_CHECK_REGISTER | uid=%s | student_id=%s | round=%s | declared_now=%s",
+        logger.info("HEALTH_CHECK_REGISTER | uid=%s | student_id=%s | round=%s | declared_now=%s | switched=%s",
                     request.user.ldap_uid, student.pk, resp.round_id,
-                    (resp.residence or {}).get("declared_with_registration"))
+                    (resp.residence or {}).get("declared_with_registration"),
+                    bool(health_check.superseded_info(resp.evidence)))
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 
@@ -157,3 +161,36 @@ class HealthCheckEvidenceFileView(HealthCheckRequiredMixin, APIView):
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
+
+
+class HealthCheckCancelView(HealthCheckRequiredMixin, APIView):
+    """POST JSON {reason} — gửi yêu cầu hủy đăng ký khám tại trường (Phòng CTSV duyệt).
+    DELETE — rút yêu cầu đang chờ duyệt."""
+
+    permission_classes = [IsHubAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        student = _student(request)
+        if student is None:
+            return _no_student()
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            resp = health_check.request_cancel(student, data)
+        except health_check.HealthCheckError as exc:
+            return _error(exc)
+        logger.info("HEALTH_CHECK_CANCEL_REQUEST | uid=%s | student_id=%s | round=%s | status=%s",
+                    request.user.ldap_uid, student.pk, resp.round_id, resp.status)
+        return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        student = _student(request)
+        if student is None:
+            return _no_student()
+        try:
+            resp = health_check.withdraw_cancel(student)
+        except health_check.HealthCheckError as exc:
+            return _error(exc)
+        logger.info("HEALTH_CHECK_CANCEL_WITHDRAW | uid=%s | student_id=%s | round=%s",
+                    request.user.ldap_uid, student.pk, resp.round_id)
+        return Response(health_check.build_state(student))

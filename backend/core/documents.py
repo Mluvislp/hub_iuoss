@@ -611,6 +611,24 @@ def normalize_class_code(value):
     return (value or "").strip().upper()
 
 
+def get_current_issue_place(student):
+    """Nơi cấp của CCCD đang dùng, ĐÃ chuẩn hoá về 1 trong 3 cơ quan cấp (`cccd_rules.ISSUE_PLACES`)
+    — đúng chuỗi Dashboard in lên giấy vay vốn. Hồ sơ trống / ghi tên tỉnh ⇒ mặc định."""
+    row = get_current_cccd_row(student)
+    return cccd_rules.normalize_issue_place(row.issue_place if row else "")
+
+
+def _issue_place_field(student, submitted):
+    """Ô `editable.citizen_id_issue_place` (vay vốn, 04/11/2026): SV chọn 1 trong 3 cơ quan cấp.
+    Đổi ⇒ chờ Phòng CTSV duyệt; duyệt cùng nhóm với số + ngày cấp (một dòng CCCD mới)."""
+    field = _editable_field(get_current_issue_place(student), submitted)
+    if field["changed"]:
+        field["proposed"] = cccd_rules.check_issue_place(field["proposed"])
+        field["changed"] = field["proposed"] != field["original"]
+        field["review"] = "pending" if field["changed"] else None
+    return field
+
+
 def build_bankloan_prefill(student):
     """Prefill form vay vốn.
 
@@ -624,6 +642,7 @@ def build_bankloan_prefill(student):
     snap.update({
         "dob": format_student_birth_date(student),
         **_cccd_prefill(student),
+        "citizen_id_issue_place": get_current_issue_place(student),
         "class_code": (student.class_code or "").strip(),
     })
     return snap
@@ -655,7 +674,7 @@ def _bankloan_student_choices(fee_exemption, orphan):
 
 
 def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, class_code,
-                           fee_exemption, orphan):
+                           fee_exemption, orphan, citizen_id_issue_place=""):
     """Dựng payload vay vốn. Trả (payload, purpose_label).
 
     Các nhãn tiến độ học (niên khóa, học kỳ, mốc nhập học/ra trường, số năm–tháng
@@ -680,6 +699,7 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
         validate_dob(dob_field["proposed"])
 
     cid_field, issue_field = _cccd_fields(student, citizen_id, citizen_id_issue_date)
+    place_field = _issue_place_field(student, citizen_id_issue_place)
     student_choices = _bankloan_student_choices(fee_exemption, orphan)
 
     class_code = profile_class
@@ -694,6 +714,7 @@ def build_bankloan_payload(student, *, dob, citizen_id, citizen_id_issue_date, c
             "dob": dob_field,
             "citizen_id": cid_field,
             "citizen_id_issue_date": issue_field,
+            "citizen_id_issue_place": place_field,
             "class_code": class_field,
         },
         "student_choices": student_choices,

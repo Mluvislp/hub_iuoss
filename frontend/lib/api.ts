@@ -296,6 +296,7 @@ export const api = {
       dob: string;
       citizen_id: string;
       citizen_id_issue_date: string;
+      citizen_id_issue_place: string;
       class_code: string;
       fee_exemption: string;
       orphan: string;
@@ -445,7 +446,11 @@ export const api = {
     submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
       return requestMultipart('/health-check/evidence/', body);
     },
-    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string }):
+    register(data: {
+      declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string;
+      /** Chuyển từ khai "đã khám" (chờ xác nhận / từ chối) sang đăng ký khám tại trường. */
+      switch_from_examined?: boolean;
+    }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
     },
@@ -453,6 +458,14 @@ export const api = {
     addCitizenId(data: { number: string; issue_place: string; issue_date: string }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/citizen-id/', { method: 'POST', body: JSON.stringify(data) });
+    },
+    /** Gửi yêu cầu hủy đăng ký khám tại trường — Phòng CTSV duyệt. */
+    requestCancel(reason: string): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/cancel/', { method: 'POST', body: JSON.stringify({ reason }) });
+    },
+    /** Rút yêu cầu hủy đang chờ duyệt. */
+    withdrawCancel(): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/cancel/', { method: 'DELETE' });
     },
     /** Ảnh minh chứng của chính SV — cần token nên phải tải qua fetch, không dùng <img src>. */
     async evidence(index: number): Promise<Blob> {
