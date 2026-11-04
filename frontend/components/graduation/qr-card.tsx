@@ -2,9 +2,7 @@
 
 import { useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
-import { Download, Loader2, QrCode, ShieldCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { ui } from '@/lib/ui';
+import { Download, Loader2, ShieldCheck } from 'lucide-react';
 import type { GradMember } from '@/lib/graduation';
 
 // Vẽ thẻ PNG: SVG của QR → <img> → canvas, kèm tên + mã + buổi lễ để đem in / lưu điện thoại.
@@ -68,25 +66,32 @@ export default function QrCard({ member }: { member: GradMember }) {
   }
 
   return (
-    <div className={cn(ui.card, 'overflow-hidden')}>
-      <div className={ui.cardHeader}>
-        <span className={ui.sectionTitle}><QrCode size={16} className="text-slate-500" /> Mã QR check-in</span>
+    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-[0_10px_40px_-22px_rgba(15,42,92,0.35)] lg:sticky lg:top-6">
+      <div className="relative bg-[#0f2a5c] px-5 py-4 text-white">
+        <p className="text-[0.7rem] font-semibold tracking-[0.22em] uppercase text-[#f5d27a]">Mã QR check-in</p>
+        <p className="mt-0.5 font-display text-xl font-semibold">{member.round.title}</p>
       </div>
-      <div className="p-5 flex flex-col items-center text-center">
-        <div ref={holder} className="rounded-lg border border-line p-4 bg-white">
-          <QRCode value={qr} size={220} level="M" viewBox="0 0 256 256" style={{ width: 220, height: 220 }} />
+      {/* Đường răng cưa giả vé */}
+      <div aria-hidden className="relative h-0 border-t-2 border-dashed border-line">
+        <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-canvas border border-line" />
+        <span className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-canvas border border-line" />
+      </div>
+      <div className="px-5 pb-5 pt-6 flex flex-col items-center text-center">
+        <div ref={holder} className="rounded-lg border border-line p-3 bg-white">
+          <QRCode value={qr} size={208} level="M" viewBox="0 0 256 256" style={{ width: 208, height: 208 }} />
         </div>
         <div className="mt-3 font-semibold text-ink">{member.student.full_name}</div>
-        <div className="font-mono text-sm font-semibold text-primary-text">{member.student.student_code}</div>
+        <div className="font-mono text-sm font-semibold text-[#0f2a5c]">{member.student.student_code}</div>
         {member.student.session_label && <div className="text-sm text-muted mt-0.5">{member.student.session_label}</div>}
-        <button type="button" onClick={download} disabled={busy} className={cn(ui.btnPrimary, 'mt-4')}>
+        <button type="button" onClick={download} disabled={busy}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 h-11 rounded-lg bg-[#0f2a5c] hover:bg-[#163a7a]
+                           text-white font-semibold transition-colors disabled:opacity-60">
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
           Tải mã QR
         </button>
-        <p className="mt-3 text-xs text-muted flex items-start gap-1.5 text-left max-w-xs">
-          <ShieldCheck size={14} className="shrink-0 mt-0.5 text-success-text" />
-          Mã QR gắn với riêng từng người và được đối chiếu trên hệ thống khi check-in. Mã bị hủy sẽ không còn hiệu lực.
-          Xuất trình mã QR tại bàn check-in.
+        <p className="mt-3 text-xs text-muted flex items-start gap-1.5 text-left">
+          <ShieldCheck size={14} className="shrink-0 mt-0.5 text-emerald-600" />
+          Mã gắn với riêng từng người, đối chiếu trên hệ thống khi check-in. Xuất trình mã này tại bàn check-in; không chia sẻ cho người khác.
         </p>
       </div>
     </div>
