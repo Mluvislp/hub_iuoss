@@ -161,7 +161,11 @@ export const gradApi = {
 export const PHOTO_MIN_BYTES = 1024 * 1024;
 export const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 export const PHOTO_MIN_SIDE = 600;
-const NAME_RE = /^([A-Za-z0-9]+)\.(jpg|jpeg|png)$/i;
+
+/** Tên file máy chủ đặt khi lưu — giống `core/graduation.py::stored_photo_name`. */
+export function storedPhotoName(code: string, file: File): string {
+  return `${code.toUpperCase()}.${/\.png$/i.test(file.name) || file.type === 'image/png' ? 'png' : 'jpg'}`;
+}
 
 export function formatMB(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2).replace('.', ',')} MB`;
@@ -187,17 +191,8 @@ function dimensions(file: File): Promise<{ width: number; height: number }> {
   });
 }
 
-/** Trả câu lỗi (tiếng Việt) hoặc null nếu ảnh hợp lệ. */
-export async function checkPhoto(file: File, code: string): Promise<string | null> {
-  const expected = code.toUpperCase();
-  const name = file.name;
-  if (/\s/.test(name)) {
-    return `Tên file “${name}” có khoảng trắng. Đổi tên thành ${expected}.jpg (hoặc .jpeg / .png), không có khoảng trắng.`;
-  }
-  const m = NAME_RE.exec(name);
-  if (!m) return `Tên file phải là mã số kèm đuôi JPG / JPEG / PNG, ví dụ ${expected}.jpg.`;
-  const ext = m[2].toLowerCase();
-  if (m[1].toUpperCase() !== expected) return `Tên file phải đúng mã số: ${expected}.${ext} (đang là ${name}).`;
+/** Kiểm nội dung ảnh — trả câu lỗi (tiếng Việt) hoặc null. Tên file KHÔNG xét: máy chủ tự đặt <mã>.jpg|png. */
+export async function checkPhoto(file: File): Promise<string | null> {
   if (file.size >= PHOTO_MAX_BYTES) return `Ảnh quá lớn (${formatMB(file.size)}). Dung lượng phải dưới 5 MB.`;
   if (file.size < PHOTO_MIN_BYTES) {
     return `Ảnh quá nhỏ (${formatMB(file.size)}). Dung lượng cần từ 1 MB trở lên để không bị vỡ nét khi trình chiếu.`;
@@ -207,9 +202,6 @@ export async function checkPhoto(file: File, code: string): Promise<string | nul
   const isPng = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => head[i] === b);
   if (!isJpeg && !isPng) {
     return 'File không phải ảnh JPG / PNG thật (có thể chỉ đổi đuôi). Vui lòng xuất lại ảnh ở định dạng JPG hoặc PNG.';
-  }
-  if ((isJpeg && ext === 'png') || (isPng && ext !== 'png')) {
-    return `Ảnh là định dạng ${isJpeg ? 'JPG' : 'PNG'} nhưng đuôi file là .${ext}. Đổi tên thành ${expected}.${isJpeg ? 'jpg' : 'png'}.`;
   }
   try {
     const { width, height } = await dimensions(file);

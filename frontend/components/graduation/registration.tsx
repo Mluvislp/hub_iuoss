@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { notice, noticeIcon, ui } from '@/lib/ui';
-import { GradError, checkPhoto, formatMB, gradApi, type GradMember } from '@/lib/graduation';
+import { GradError, checkPhoto, formatMB, gradApi, storedPhotoName, type GradMember } from '@/lib/graduation';
 
 const dt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
@@ -36,10 +36,7 @@ export function PhotoGuidelines({ code }: { code: string }) {
         <ul className="list-disc pl-5 space-y-1">
           <li>Dung lượng ảnh nên từ <b>1MB đến dưới 5MB</b> (lưu ý tránh gửi ảnh dưới 1MB để không bị vỡ nét hay mờ khi trình chiếu trên màn hình LED).</li>
           <li>Ảnh cần đảm bảo độ rõ nét, không bị rung mờ.</li>
-          <li>
-            Đổi tên file ảnh thành Mã số sinh viên, mã số học viên trước khi gửi — ví dụ <code className="font-mono font-semibold text-primary-text">{code}.jpg</code>.
-            Lưu ý vui lòng ghi đúng mã số do IU quản lý, ví dụ hệ UWE là BABAWExxxx, ITITWExxxx. SV/HV lưu ý không được để khoảng trắng sau tên hình.
-          </li>
+          <li>Không cần đổi tên file — hệ thống tự lưu ảnh theo mã số <code className="font-mono font-semibold text-primary-text">{code}</code>.</li>
           <li>Hình ảnh chỉ chấp nhận kiểu <b>JPG / JPEG / PNG</b>.</li>
         </ul>
       </div>
@@ -81,7 +78,7 @@ function PhotoPicker({ code, file, onFile, disabled }: {
     setError('');
     if (!f) return;
     setChecking(true);
-    const problem = await checkPhoto(f, code);
+    const problem = await checkPhoto(f);
     setChecking(false);
     if (problem) { setError(problem); onFile(null); return; }
     onFile(f);
@@ -96,7 +93,7 @@ function PhotoPicker({ code, file, onFile, disabled }: {
           <img src={preview} alt="Ảnh xem trước" className="w-28 h-36 object-cover rounded-md border border-line" />
           <div className="min-w-0 text-sm">
             <div className="font-medium text-ink break-all">{file.name}</div>
-            <div className="text-muted">{formatMB(file.size)}</div>
+            <div className="text-muted">{formatMB(file.size)} · lưu thành <span className="font-mono">{storedPhotoName(code, file)}</span></div>
             <div className="flex items-center gap-1 text-success-text mt-1"><CheckCircle2 size={14} /> Ảnh hợp lệ</div>
             <div className="flex gap-2 mt-3">
               <button type="button" className={ui.btnSecondary} onClick={() => input.current?.click()} disabled={disabled}>
@@ -116,7 +113,7 @@ function PhotoPicker({ code, file, onFile, disabled }: {
         >
           {checking ? <Loader2 size={22} className="mx-auto animate-spin text-slate-400" /> : <ImagePlus size={22} className="mx-auto text-slate-400" />}
           <div className="mt-2 text-sm font-medium text-ink">{checking ? 'Đang kiểm tra ảnh…' : 'Chọn ảnh trình chiếu'}</div>
-          <div className="text-xs text-muted mt-0.5">JPG / JPEG / PNG · 1 MB đến dưới 5 MB · tên file {code}.jpg</div>
+          <div className="text-xs text-muted mt-0.5">JPG / JPEG / PNG · 1 MB đến dưới 5 MB</div>
         </button>
       )}
       <div className="mt-2"><Alert message={error} /></div>

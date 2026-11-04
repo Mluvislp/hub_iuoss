@@ -16,7 +16,6 @@ MSSV và Dashboard chỉ nhận token còn trong DB ⇒ QR tự chế / QR của
 """
 import io
 import logging
-import re
 import secrets
 import unicodedata
 from datetime import date
@@ -56,7 +55,6 @@ PHOTO_MIN_BYTES = 1024 * 1024          # 1 MB — dưới mức này dễ vỡ n
 PHOTO_MAX_BYTES = 5 * 1024 * 1024      # dưới 5 MB
 PHOTO_MIN_SIDE = 600                   # cạnh ngắn tối thiểu (px)
 PHOTO_MAX_PIXELS = 80_000_000          # chặn ảnh "bom giải nén"
-PHOTO_NAME_RE = re.compile(r"^([A-Za-z0-9]+)\.(jpg|jpeg|png)$", re.IGNORECASE)
 CANCEL_REASON_MIN, CANCEL_REASON_MAX = 5, 500
 
 
@@ -172,24 +170,16 @@ def _mb(n):
     return f"{n / (1024 * 1024):.2f} MB".replace(".", ",")
 
 
+def stored_photo_name(member, ext):
+    """Tên file chuẩn khi lưu: <mã trong danh sách>.<jpg|png> — SV không phải tự đổi tên (bỏ luật 05/11/2026)."""
+    return f"{member.student_code.upper()}.{ext}"
+
+
 def validate_photo(upload, member):
-    """Kiểm ảnh tải lên → (bytes, ext 'jpg' | 'png'). Ném GraduationError với câu cụ thể."""
+    """Kiểm NỘI DUNG ảnh tải lên → (bytes, ext 'jpg' | 'png'). Không xét tên file: tên do máy chủ đặt lại
+    (`stored_photo_name`), đuôi theo định dạng thật của ảnh. Ném GraduationError với câu cụ thể."""
     if upload is None:
         raise GraduationError("Chưa chọn ảnh.")
-    raw_name = (upload.name or "").replace("\\", "/").rsplit("/", 1)[-1]
-    expected = member.student_code.upper()
-    if not raw_name:
-        raise GraduationError("File ảnh không có tên.")
-    if any(ch.isspace() for ch in raw_name):
-        raise GraduationError(f"Tên file “{raw_name}” có khoảng trắng. Đổi tên thành {expected}.jpg "
-                              "(hoặc .jpeg / .png), không có khoảng trắng.")
-    match = PHOTO_NAME_RE.match(raw_name)
-    if not match:
-        raise GraduationError(f"Tên file phải là mã số kèm đuôi JPG / JPEG / PNG, ví dụ {expected}.jpg.")
-    stem, ext = match.group(1).upper(), match.group(2).lower()
-    if stem != expected:
-        raise GraduationError(f"Tên file phải đúng mã số: {expected}.{ext} (đang là {raw_name}).")
-
     data = upload.read(PHOTO_MAX_BYTES + 1)
     size = len(data)
     if size >= PHOTO_MAX_BYTES:
@@ -204,10 +194,6 @@ def validate_photo(upload, member):
     if not (is_jpeg or is_png):
         raise GraduationError("File không phải ảnh JPG / PNG thật (có thể chỉ đổi đuôi). Vui lòng xuất lại ảnh "
                               "ở định dạng JPG hoặc PNG.")
-    if is_jpeg and ext == "png" or is_png and ext in ("jpg", "jpeg"):
-        real = "JPG" if is_jpeg else "PNG"
-        raise GraduationError(f"Ảnh là định dạng {real} nhưng đuôi file là .{ext}. Đổi tên thành "
-                              f"{expected}.{'jpg' if is_jpeg else 'png'}.")
     try:
         Image.MAX_IMAGE_PIXELS = PHOTO_MAX_PIXELS
         with Image.open(io.BytesIO(data)) as probe:
@@ -254,7 +240,7 @@ def _apply_photo(member, upload, written):
     data, ext = validate_photo(upload, member)
     old_key = member.photo_storage_key
     member.photo_storage_key = _write_photo(member, data, ext, written)
-    member.photo_original_filename = (upload.name or "")[-255:]
+    member.photo_original_filename = stored_photo_name(member, ext)
     member.photo_size_bytes = len(data)
     member.photo_uploaded_at = timezone.now()
     return old_key
