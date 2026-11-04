@@ -110,11 +110,13 @@ function MemberSummary({ m, onLogout }: { m: GradMember; onLogout: () => void })
         <div aria-hidden className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full border border-[#f5d27a]/25" />
         <p className="text-[0.7rem] font-semibold tracking-[0.22em] uppercase text-[#f5d27a]">{s.group_label}</p>
         <h3 className="mt-2 font-display text-[2rem] sm:text-[2.3rem] font-semibold leading-[1.1]">{s.full_name}</h3>
-        <div className="mt-2 inline-flex items-center rounded-md border border-white/20 bg-white/[0.07] px-2.5 py-1 font-mono text-sm tracking-wide">
-          {s.student_code}
+        <div className="mt-3">
+          <span className="inline-flex items-center rounded-md border border-white/20 bg-white/[0.07] px-2.5 py-1 font-mono text-sm tracking-wide">
+            {s.student_code}
+          </span>
         </div>
         <button type="button" onClick={onLogout}
-                className="mt-6 inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white">
+                className="relative mt-6 flex items-center gap-1.5 text-sm text-white/70 hover:text-white">
           <LogOut size={15} /> Thoát, xác minh người khác
         </button>
       </div>

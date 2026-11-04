@@ -55,9 +55,6 @@ function Group({ icon: Icon, title, children }: { icon: typeof Info; title: stri
 const Yes = ({ children }: { children: React.ReactNode }) => (
   <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span>{children}</span></li>
 );
-const No = ({ children }: { children: React.ReactNode }) => (
-  <li className="flex gap-2"><X size={15} className="mt-0.5 shrink-0 text-rose-500" /><span>{children}</span></li>
-);
 
 export function PhotoGuidelines() {
   return (
@@ -75,13 +72,13 @@ export function PhotoGuidelines() {
           <Yes>Thấy rõ khuôn mặt, tươi tắn nhưng vẫn trang trọng.</Yes>
         </ul>
         <p className="mt-3 mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">Nhà trường không nhận</p>
-        <ul className="grid gap-1.5 sm:grid-cols-2">
-          <No>Ảnh selfie</No>
-          <No>Ảnh thẻ</No>
-          <No>Toàn thân (góc quá xa)</No>
-          <No>Filter, tai mèo, sticker…</No>
-          <No>Ảnh không trang trọng</No>
-          <No>Áo thun không cổ</No>
+        <ul className="flex flex-wrap gap-1.5">
+          {['Ảnh selfie', 'Ảnh thẻ', 'Toàn thân (góc quá xa)', 'Filter, tai mèo, sticker…', 'Ảnh không trang trọng',
+            'Áo thun không cổ'].map((t) => (
+            <li key={t} className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50/60 px-2.5 py-0.5 text-[0.8rem] text-rose-800">
+              <X size={12} className="text-rose-500" /> {t}
+            </li>
+          ))}
         </ul>
       </Group>
       <Group icon={Shirt} title="Trang phục">
@@ -210,12 +207,12 @@ export function RegisterForm({ member, onRegistered }: { member: GradMember; onR
           </div>
           <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
           <Alert message={error} />
-          <div className="rounded-xl bg-[#0f2a5c] p-4 sm:p-5 text-white flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex-1 text-sm text-white/80">
+          <div className="rounded-xl bg-[#0f2a5c] p-4 sm:p-5 text-white flex flex-col gap-3.5">
+            <div className="text-sm text-white/80">
               {file ? 'Ảnh sẽ được gửi cùng đăng ký.' : 'Chưa chọn ảnh — vẫn đăng ký được, có thể tải ảnh sau khi còn hạn.'}
             </div>
             <button type="button" onClick={submit} disabled={busy}
-                    className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-lg bg-[#f5d27a] hover:bg-[#f0c75c]
+                    className="inline-flex w-full items-center justify-center gap-2 h-12 px-6 rounded-lg bg-[#f5d27a] hover:bg-[#f0c75c]
                                text-[#0f2a5c] font-semibold transition-colors disabled:opacity-60 whitespace-nowrap
                                focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40">
               {busy ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
