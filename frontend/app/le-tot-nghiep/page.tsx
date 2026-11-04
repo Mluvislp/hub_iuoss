@@ -5,11 +5,14 @@ import { CalendarHeart, ChevronDown, Loader2, LogOut, MapPin, Sparkles } from 'l
 import { cn } from '@/lib/utils';
 import { notice, noticeIcon, ui } from '@/lib/ui';
 import Fireworks, { type FireworksHandle } from '@/components/graduation/fireworks';
+import Countdown from '@/components/graduation/countdown';
 import Schedule from '@/components/graduation/schedule';
 import Verify from '@/components/graduation/verify';
 import QrCard from '@/components/graduation/qr-card';
 import { RegisterForm, Registered } from '@/components/graduation/registration';
-import { GradError, clearGradToken, getGradToken, gradApi, type GradInfo, type GradMember } from '@/lib/graduation';
+import {
+  GradError, clearGradToken, getGradToken, gradApi, type GradInfo, type GradMember, type GradRound,
+} from '@/lib/graduation';
 
 /** Cuộn mượt tới một phần của trang (bỏ hiệu ứng nếu người dùng bật giảm chuyển động). */
 function scrollToSection(id: string) {
@@ -31,7 +34,9 @@ function anchor(id: string) {
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
-function Hero({ fireworks }: { fireworks: React.RefObject<FireworksHandle> }) {
+function Hero({ fireworks, round, onElapsed }: {
+  fireworks: React.RefObject<FireworksHandle>; round: GradRound | null; onElapsed: () => void;
+}) {
   return (
     <header className="relative isolate min-h-[88vh] flex flex-col overflow-hidden text-white">
       <picture>
@@ -77,7 +82,8 @@ function Hero({ fireworks }: { fireworks: React.RefObject<FireworksHandle> }) {
               Xem lịch tổ chức
             </a>
           </div>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/80">
+          <div className="mt-10"><Countdown round={round} onElapsed={onElapsed} /></div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/80">
             <span className="inline-flex items-center gap-1.5"><CalendarHeart size={15} className="text-[#f5d27a]" /> Tổng dợt chiều 27/11/2026</span>
             <span className="inline-flex items-center gap-1.5"><CalendarHeart size={15} className="text-[#f5d27a]" /> Lễ Tốt nghiệp 28 &amp; 29/11/2026</span>
           </div>
@@ -157,6 +163,14 @@ export default function GraduationPage() {
     }
   }, [loading]);
 
+  // Đồng hồ chạm mốc mở / hạn chót → lấy lại trạng thái từ máy chủ (nút đăng ký tự mở / khóa).
+  const refresh = useCallback(async () => {
+    try {
+      setInfo(await gradApi.info());
+      if (getGradToken()) setMember(await gradApi.me());
+    } catch { /* giữ trạng thái cũ; lượt sau thử lại */ }
+  }, []);
+
   const onVerified = useCallback((m: GradMember) => {
     setMember(m);
     requestAnimationFrame(() => scrollToSection('dang-ky'));
@@ -176,7 +190,7 @@ export default function GraduationPage() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <Hero fireworks={fireworks} />
+      <Hero fireworks={fireworks} round={info?.round ?? null} onElapsed={refresh} />
 
       <main className="mx-auto max-w-content px-5 py-16 space-y-20 pb-28">
         <Schedule highlight={member?.student.session} />
@@ -186,9 +200,7 @@ export default function GraduationPage() {
             <p className="text-[0.72rem] font-semibold tracking-[0.22em] uppercase text-[#a07d1c]">Đăng ký tham dự</p>
             <h2 className="mt-2 font-display font-semibold text-4xl sm:text-5xl text-[#0f2a5c]">Xác nhận tham dự Lễ Tốt nghiệp</h2>
             {round && (round.registration_opens_at && round.registration_closes_at ? (
-              <p className="mt-3 text-sm text-muted">
-                Thời gian đăng ký: {fmt(round.registration_opens_at)} — {fmt(round.registration_closes_at)}
-              </p>
+              <div className="mt-6"><Countdown round={round} onElapsed={refresh} variant="light" /></div>
             ) : (
               <p className="mt-3 text-sm text-muted">Thời gian đăng ký sẽ được thông báo sau.</p>
             ))}
