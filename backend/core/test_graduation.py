@@ -182,21 +182,23 @@ class GraduationTests(TestCase):
 
     def test_register_with_photo_then_replace_deletes_old_file(self):
         self._login_hv()
-        res = self.client.post("/api/graduation/register/", {"photo": _jpeg("MBAIU23031.jpg")}, format="multipart")
+        res = self.client.post("/api/graduation/register/", {"photo": _jpeg("IMG 0042 (1).JPG")}, format="multipart")
         self.assertEqual(res.status_code, 200, res.content)
         self.m_hv.refresh_from_db()
         old = Path(self.media) / self.m_hv.photo_storage_key
         self.assertTrue(old.exists())
+        self.assertEqual(self.m_hv.photo_original_filename, "MBAIU23031.jpg")
         photo = self.client.get("/api/graduation/photo/")
         self.assertEqual(photo.status_code, 200)
         photo.close()
         with self.captureOnCommitCallbacks(execute=True):
-            res = self.client.post("/api/graduation/photo/", {"photo": _png_big("mbaiu23031.PNG")}, format="multipart")
+            res = self.client.post("/api/graduation/photo/", {"photo": _png_big("chan dung.jpg")}, format="multipart")
         self.assertEqual(res.status_code, 200, res.content)
         self.m_hv.refresh_from_db()
         self.assertFalse(old.exists())
         self.assertTrue((Path(self.media) / self.m_hv.photo_storage_key).exists())
         self.assertTrue(self.m_hv.photo_storage_key.endswith(".png"))
+        self.assertEqual(self.m_hv.photo_original_filename, "MBAIU23031.png")
         self.assertTrue(self.m_hv.photo_storage_key.startswith("insurance_private/graduation/"))
 
     def test_remove_photo(self):
@@ -216,14 +218,13 @@ class GraduationTests(TestCase):
             grad.validate_photo(upload, self.m_sv)
         return str(ctx.exception)
 
-    def test_photo_name_rules(self):
-        self.assertIn("khoảng trắng", self._photo_error(_jpeg("ITITIU22001 .jpg")))
-        self.assertIn("khoảng trắng", self._photo_error(_jpeg("ITITIU22001.jpg ")))
-        self.assertIn("đúng mã số", self._photo_error(_jpeg("ITITIU22002.jpg")))
-        self.assertIn("JPG / JPEG / PNG", self._photo_error(_jpeg("ITITIU22001.heic")))
-        self.assertIn("JPG / JPEG / PNG", self._photo_error(_jpeg("ITITIU22001.jpg.png.exe")))
-        data, ext = grad.validate_photo(_jpeg("ititiu22001.JPG"), self.m_sv)
-        self.assertEqual(ext, "jpg")
+    def test_photo_any_filename_is_accepted_and_ext_follows_content(self):
+        # Bỏ luật tên file (05/11/2026): tên gì cũng nhận, kể cả khoảng trắng / sai mã / sai đuôi.
+        for name in ("ITITIU22001 .jpg", "anh cua toi.JPG", "IMG_2024.jpeg ", "ITITIU22002.jpg", "photo.png", "no-ext"):
+            data, ext = grad.validate_photo(_jpeg(name), self.m_sv)
+            self.assertEqual(ext, "jpg", name)               # ảnh JPEG thật ⇒ .jpg dù đuôi .png / không đuôi
+        self.assertEqual(grad.validate_photo(_png_big("x.jpg"), self.m_sv)[1], "png")
+        self.assertEqual(grad.stored_photo_name(self.m_sv, "png"), "ITITIU22001.png")
 
     def test_photo_size_and_content_rules(self):
         small = io.BytesIO()
@@ -233,7 +234,6 @@ class GraduationTests(TestCase):
             SimpleUploadedFile("ITITIU22001.jpg", b"\xff\xd8\xff" + b"0" * (5 * 1024 * 1024))))
         self.assertIn("không phải ảnh", self._photo_error(
             SimpleUploadedFile("ITITIU22001.jpg", b"%PDF-1.4" + b"0" * (2 * 1024 * 1024))))
-        self.assertIn("đuôi file là .png", self._photo_error(_jpeg("ITITIU22001.png")))
         # Đầu JPEG thật nhưng thân hỏng.
         self.assertIn("Không đọc được", self._photo_error(
             SimpleUploadedFile("ITITIU22001.jpg", b"\xff\xd8\xff\xe0" + os.urandom(2 * 1024 * 1024))))
