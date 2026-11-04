@@ -17,6 +17,7 @@ export const BASE = '/dashboard/mien-giam-hoc-phi';
 // đang xử lý ở trường = trung tính, chờ bước kế tiếp = info.
 export const STATUS_BADGE: Record<TuitionExemptionStatus, string> = {
   processing: badge.neutral,
+  awaiting_supplement: badge.warning,
   waiting_result: badge.info,
   done: badge.success,
   rejected: badge.danger,

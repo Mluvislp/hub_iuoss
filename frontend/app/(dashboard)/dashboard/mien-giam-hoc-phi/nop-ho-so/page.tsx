@@ -92,8 +92,14 @@ function ineligibleReasons(c: TuitionExemptionCategory, plan: TuitionExemptionPl
     if (plan.is_ethnic_minority === null) reasons.push('hồ sơ chưa có thông tin dân tộc (liên hệ Phòng CTSV để cập nhật)');
     else if (!plan.is_ethnic_minority) reasons.push(`không thuộc dân tộc thiểu số (hồ sơ ghi: ${plan.ethnicity || 'Kinh'})`);
   }
+  if (c.requires_special_area) {
+    const { in_list, ward } = plan.special_area;
+    if (in_list === null) reasons.push('hồ sơ chưa có xã/phường thường trú theo địa giới hành chính mới (liên hệ Phòng CTSV để cập nhật)');
+    else if (!in_list) {
+      reasons.push(`bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới${ward ? ` (thường trú theo hồ sơ: ${ward})` : ''}`);
+    }
+  }
   if (full && c.code === 'TSKK') {
-    if (!details.self_special_area) reasons.push('bản thân không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới');
     if (!details.father_special_area && !details.mother_special_area) {
       reasons.push('cả cha và mẹ đều không thường trú tại xã, thôn đặc biệt khó khăn hoặc xã biên giới');
     }
@@ -405,9 +411,9 @@ export default function TuitionWaiverSubmitPage() {
           </div>
         </section>
 
-        {p.source === 'previous_application' && (
+        {p.source !== 'profile' && (
           <p className="text-meta text-muted -mb-2">
-            Các ô dưới đây được điền sẵn từ đơn gần nhất của bạn — kiểm tra và sửa nếu có thay đổi.
+            Các ô dưới đây được điền sẵn từ {p.source === 'previous_application' ? 'đơn gần nhất của bạn' : 'hồ sơ miễn giảm Phòng Công tác Sinh viên đang lưu'} — kiểm tra và sửa nếu có thay đổi.
           </p>
         )}
         {FIELD_GROUPS.map((group) => (

@@ -828,7 +828,7 @@ export interface RequestAvailability {
 // Khớp `core/tuition_exemption.py` (build_state / build_plan / serialize_application).
 
 /** Cùng khuôn BHYT: Đang xử lý → Chờ kết quả → Hoàn thành; Từ chối kèm lý do. */
-export type TuitionExemptionStatus = 'processing' | 'waiting_result' | 'done' | 'rejected';
+export type TuitionExemptionStatus = 'processing' | 'awaiting_supplement' | 'waiting_result' | 'done' | 'rejected';
 
 export type TuitionCategoryReview = 'pending' | 'approved' | 'rejected';
 
@@ -852,6 +852,8 @@ export interface TuitionRequiredDocument {
   has_expiry: boolean;
   /** Phải nộp lại khi gia hạn (diện nộp lại mỗi kỳ/năm). */
   renewal_required?: boolean;
+  /** Lý do cán bộ đánh dấu Không hợp lệ (chỉ có ở khu nộp lại giấy). */
+  invalid_note?: string;
 }
 
 /** Ô thông tin riêng của một đối tượng (contract.CATEGORY_FIELDS) — gửi lên dạng `detail_<name>`. */
@@ -875,6 +877,8 @@ export interface TuitionExemptionCategory {
   fields: TuitionCategoryField[];
   /** Đối tượng chỉ dành cho người dân tộc thiểu số (theo hồ sơ). */
   requires_ethnic_minority: boolean;
+  /** Đối tượng vùng ĐBKK: hệ thống tra xã thường trú trong hồ sơ với danh sách xã ĐBKK. */
+  requires_special_area: boolean;
   mode: TuitionCategoryMode;
   mode_label: string;
   /** Kỳ gần nhất được xác nhận (chỉ có với diện đang hưởng). */
@@ -895,6 +899,8 @@ export interface TuitionExemptionPlan {
   ethnicity: string;
   /** null = hồ sơ chưa có thông tin dân tộc. */
   is_ethnic_minority: boolean | null;
+  /** Xã thường trú theo hồ sơ có thuộc danh sách xã ĐBKK không — in_list null = hồ sơ chưa có xã. */
+  special_area: { in_list: boolean | null; ward: string };
   inactive_history: { code: string; name: string }[];
 }
 
@@ -926,8 +932,10 @@ export interface TuitionExemptionApplication {
   documents?: { id: number; doc_type: string; doc_label: string; category_code: string;
                 original_filename: string; mime_type: string; expires_at: string | null }[];
   snapshot?: Record<string, string>;
-  /** Đơn Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
+  /** Đơn Chờ sinh viên bổ sung, hoặc Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
   can_supplement: boolean;
+  /** Giấy cán bộ đánh dấu Không hợp lệ (đơn Chờ sinh viên bổ sung) — phải nộp lại. */
+  invalid_documents: { category_code: string; doc_type: string; label: string; original_filename: string; note: string }[];
   /** Như trên nhưng đợt đã đóng. */
   supplement_overdue: boolean;
   /** Hạn bổ sung = giờ đóng đợt. */
@@ -949,7 +957,7 @@ export interface TuitionExemptionPrefill {
   /** Các ô SV sửa được — tên trùng tên trường gửi lên. */
   fields: Record<string, string>;
   /** previous_application = chép từ đơn gần nhất; profile = từ hồ sơ SV. */
-  source: 'previous_application' | 'profile';
+  source: 'previous_application' | 'beneficiary_import' | 'profile';
   /** Thông tin riêng đã khai ở đơn trước — chỉ điền lại khi SV chọn đúng đối tượng `code`. */
   category_details: { code: string; values: Record<string, string | boolean> } | null;
 }
@@ -971,6 +979,12 @@ export interface TuitionExemptionAward {
   decree_amount_vnd: number | null;
   school_support_vnd: number | null;
   received_vnd: number;
+  /** Học phí còn phải đóng sau miễn giảm (HP − được giảm); null khi không rõ học phí. */
+  payable_vnd: number | null;
+  /** Mức trần chưa căn cứ HP = 5 tháng × mức trần × % (đối tượng nhà nước chi trả). */
+  ceiling_vnd: number | null;
+  /** Được giảm thấp hơn HP × % vì chạm mức trần nhà nước hỗ trợ. */
+  capped_by_ceiling: boolean;
   payment_status: 'paid' | 'unpaid' | null;
   payment_label: string;
   note: string;

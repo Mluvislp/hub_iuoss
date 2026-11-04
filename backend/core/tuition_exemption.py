@@ -37,6 +37,8 @@ from students.models import (
     TuitionExemptionBeneficiary,
     TuitionExemptionCategory,
     TuitionExemptionRound,
+    TuitionSpecialAreaWard,
+    VnWard,
 )
 
 from . import address_service as addr
@@ -157,12 +159,32 @@ def _serialize_category(c, mode=None, last_key=None):
         # Giấy phải nộp THEO CHẾ ĐỘ: gia hạn có bổ sung chỉ còn giấy renewal_required;
         # chỉ xác nhận → rỗng (contract.documents_for_mode).
         "documents": contract.documents_for_mode(docs, mode) if mode else docs,
-        "fields": contract.CATEGORY_FIELDS.get(c.code, []),
+        "fields": contract.student_fields(c.code),
         "requires_ethnic_minority": c.code in contract.ETHNIC_MINORITY_CATEGORIES,
+        "requires_special_area": c.code in contract.SPECIAL_AREA_CATEGORIES,
         "mode": mode,
         "mode_label": contract.RENEWAL_MODES.get(mode, "") if mode else "",
         "last_verified": _term_label(last_key) if last_key else None,
     }
+
+
+def special_area_status(student):
+    """(có trong danh sách xã ĐBKK?, tên xã) theo xã thường trú trong hồ sơ — dòng
+    thường trú đang dùng của `address_service` (CURRENT_STD trước, CURRENT sau).
+    (None, …) khi hồ sơ chưa có xã thường trú, hoặc mã xã không có trong vn_wards (dòng
+    thường trú cũ chưa chuẩn hóa theo cơ cấu 2025) — báo SV liên hệ Phòng CTSV thay vì
+    kết luận sai là "không thường trú tại xã ĐBKK"."""
+    address = addr.get_permanent(student)
+    code = (getattr(address, "ward_code", None) or "").strip()
+    if not code:
+        return None, ""
+    ward = VnWard.objects.filter(code=code, is_active=True).first()
+    label = ward.name if ward else (address.ward or code)
+    if getattr(address, "province", None):
+        label = f"{label}, {address.province}"
+    if ward is None:
+        return None, label
+    return TuitionSpecialAreaWard.objects.filter(ward_code=code).exists(), label
 
 
 def build_plan(student, round_):
@@ -198,6 +220,8 @@ def build_plan(student, round_):
         "max_categories": contract.MAX_CATEGORIES_PER_APPLICATION,
         "ethnicity": contract.ethnicity_name(student.ethnicity),
         "is_ethnic_minority": contract.is_ethnic_minority(student.ethnicity),
+        # Xã thường trú theo hồ sơ có thuộc danh sách xã ĐBKK không (null = hồ sơ chưa có).
+        "special_area": dict(zip(("in_list", "ward"), special_area_status(student))),
         "inactive_history": [
             {"code": c.code, "name": c.name_vi}
             for c in TuitionExemptionCategory.objects.filter(pk__in=inactive)
@@ -242,6 +266,19 @@ def build_prefill(student):
                 # Thông tin riêng đã khai lần trước — form chỉ điền lại nếu SV chọn đúng đối tượng đó.
                 "category_details": ({"code": link.category.code, "values": previous.category_details}
                                      if link and previous.category_details else None)}
+
+    # SV hưởng từ trước khi có hệ thống: Phòng CTSV nạp đủ thông tin trong danh sách đang hưởng.
+    imported = (TuitionExemptionBeneficiary.objects.filter(student=student, status="active",
+                                                           application_data__isnull=False)
+                .select_related("category").order_by("-updated_at", "-id").first())
+    if imported is not None and (imported.application_data or {}).get("fields"):
+        data = imported.application_data
+        fields = {f: "" for f in SNAPSHOT_FIELDS}
+        fields.update({f: str(v or "") for f, v in data["fields"].items() if f in fields})
+        return {**base, "fields": fields, "source": "beneficiary_import",
+                "category_details": ({"code": data.get("category_code") or imported.category.code,
+                                      "values": data.get("category_details")}
+                                     if data.get("category_details") else None)}
 
     profile = pc.read_profile(student)
     cccd = profile.get("student.citizen_id", {}).get("value") or {}
@@ -291,10 +328,12 @@ def serialize_application(app, *, with_details=False):
         ],
     }
     # Có cả ở danh sách: trang tổng quan nhắc SV bổ sung mà không cần mở chi tiết.
-    fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
+    rejected_fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
+    fixable = rejected_fixable or app.status == "awaiting_supplement"
     open_ = round_is_open(app.round)
     data["can_supplement"] = contract.can_resubmit(app.status, app.rejection_reason_code, open_)
-    data["supplement_overdue"] = fixable and not open_
+    data["supplement_overdue"] = rejected_fixable and not open_
+    data["invalid_documents"] = invalid_documents(app) if app.status == "awaiting_supplement" else []
     data["supplement_closes_at"] = app.round.closes_at.isoformat()
     data["rejection_reason"] = contract.REASONS.get(app.rejection_reason_code or "", "")
     if with_details:
@@ -351,6 +390,12 @@ def awards(student):
     out = []
     for a in rows:
         term = a.academic_term
+        fee = a.base_fee_vnd if a.base_fee_vnd is not None else a.first_fee_vnd
+        payable = a.payable_vnd if a.payable_vnd is not None else (
+            max(fee - a.received_vnd, 0) if fee is not None else None)
+        # Đối tượng nhà nước chi trả bị giới hạn bởi mức trần: được giảm < HP × %.
+        capped = (a.ceiling_vnd is not None and fee is not None and a.percent is not None
+                  and a.received_vnd < round(fee * float(a.percent) / 100))
         out.append({
             "id": a.pk,
             "term_code": term.term_code,
@@ -364,6 +409,9 @@ def awards(student):
             "decree_amount_vnd": a.decree_amount_vnd,
             "school_support_vnd": a.school_support_vnd,
             "received_vnd": a.received_vnd,
+            "payable_vnd": payable,
+            "ceiling_vnd": a.ceiling_vnd,
+            "capped_by_ceiling": capped,
             "payment_status": a.payment_status,
             "payment_label": PAYMENT_LABELS.get(a.payment_status, ""),
             "note": a.note or "",
@@ -486,8 +534,10 @@ def submit(student, data, uploads, *, request_key):
     # ── Thông tin riêng + điều kiện của đối tượng (TSKK: DTTS + thường trú ĐBKK) ──
     details = None
     if codes:
+        special_area, ward_label = (special_area_status(student)
+                                    if codes[0] in contract.SPECIAL_AREA_CATEGORIES else (None, ""))
         details, detail_errors, ineligible = contract.clean_category_details(
-            codes[0], data.get("category_details"), student.ethnicity)
+            codes[0], data.get("category_details"), student.ethnicity, special_area, ward_label)
         if ineligible:
             message = contract.ineligible_message(codes[0], ineligible)
             raise TuitionExemptionError(message, code="ineligible", errors={"eligibility": [message]})
@@ -588,17 +638,53 @@ def submit(student, data, uploads, *, request_key):
         raise
 
 
+def _invalid_docs(app):
+    return list(app.documents.filter(is_superseded=False, verified_status="invalid")
+                .select_related("application_category__category").order_by("id"))
+
+
+def invalid_documents(app):
+    """Giấy cán bộ đánh dấu Không hợp lệ (chưa được thay) — để SV biết phải nộp lại gì."""
+    out = []
+    for d in _invalid_docs(app):
+        cat = d.application_category.category if d.application_category else None
+        labels = {x.get("doc_type"): x.get("label") for x in (cat.required_documents or [])} if cat else {}
+        out.append({"category_code": cat.code if cat else "", "doc_type": d.doc_type,
+                    "label": labels.get(d.doc_type) or "Giấy tờ chứng minh thuộc diện",
+                    "original_filename": d.original_filename, "note": d.verified_note or ""})
+    return out
+
+
 def supplement_targets(app):
-    """Đối tượng trong đơn kèm danh sách giấy tờ (như lúc nộp) — để SV bổ sung/thay giấy."""
-    links = app.categories.select_related("category").order_by("category__sort_order", "category__code")
-    return [{"link_id": l.pk, **_serialize_category(l.category), "review_note": l.review_note or ""}
-            for l in links]
+    """Đối tượng trong đơn kèm danh sách giấy tờ để SV bổ sung/thay giấy. Đơn Chờ sinh viên
+    bổ sung: CHỈ các giấy bị đánh dấu Không hợp lệ (kèm lý do của cán bộ)."""
+    invalid = {}
+    if app.status == "awaiting_supplement":
+        for d in invalid_documents(app):
+            invalid.setdefault(d["category_code"], {})[d["doc_type"]] = d["note"]
+    out = []
+    for l in app.categories.select_related("category").order_by("category__sort_order", "category__code"):
+        item = {"link_id": l.pk, **_serialize_category(l.category), "review_note": l.review_note or ""}
+        if app.status == "awaiting_supplement":
+            wanted = invalid.get(l.category.code, {})
+            if not wanted:
+                continue
+            item["documents"] = [{**d, "invalid_note": wanted[d["doc_type"]]}
+                                 for d in item["documents"] if d["doc_type"] in wanted]
+            known = {d["doc_type"] for d in item["documents"]}
+            item["documents"] += [{"doc_type": dt, "label": "Giấy tờ chứng minh thuộc diện", "required": True,
+                                   "has_expiry": False, "invalid_note": note}
+                                  for dt, note in wanted.items() if dt not in known]
+        out.append(item)
+    return out
 
 
 def supplement(student, application, data, uploads, *, request_key, row_version):
-    """SV bổ sung/thay giấy tờ khi đơn bị Từ chối vì lý do sửa được và đợt còn mở → Đang xử
-    lý kèm cờ "SV đã bổ sung" (như BHYT), event SUPPLEMENTED; file cũ cùng (diện, doc_type)
-    → is_superseded=True.
+    """SV bổ sung/thay giấy tờ → Đang xử lý kèm cờ "SV đã bổ sung" (như BHYT), event
+    SUPPLEMENTED; file cũ cùng (diện, doc_type) → is_superseded=True. Hai trường hợp:
+    - đơn Chờ sinh viên bổ sung (cán bộ đánh dấu giấy Không hợp lệ): nộp lại ĐỦ các giấy
+      bị đánh dấu, không phụ thuộc giờ đóng đợt;
+    - đơn Từ chối vì lý do sửa được: khi đợt còn mở.
 
     Bổ sung giấy ở ĐỢT MỚI (diện every_term/every_year) không đi đường này mà là đơn
     gia hạn — xem `submit`. Hub ghi status/cờ bổ sung/row_version ở đây là ngoại lệ đã
@@ -630,6 +716,12 @@ def supplement(student, application, data, uploads, *, request_key, row_version)
                 checked[(code, doc_type, i)] = (upload, inspect_document(upload))
             except contract.WorkflowError as exc:
                 errors.setdefault(field, []).append(f"{upload.name}: {exc}")
+    if application.status == "awaiting_supplement":
+        for code, target in targets.items():
+            for d in target["documents"]:
+                field = f"{FILE_FIELD_PREFIX}{code}{FILE_FIELD_SEP}{d['doc_type']}"
+                if (code, d["doc_type"]) not in grouped and field not in errors:
+                    errors[field] = ["Nộp lại giấy này — cán bộ đã đánh dấu không hợp lệ."]
     if errors:
         raise TuitionExemptionError("Giấy tờ chưa hợp lệ.", errors=errors)
     digest = contract.fingerprint({
@@ -654,16 +746,18 @@ def supplement(student, application, data, uploads, *, request_key, row_version)
             except (TypeError, ValueError):
                 raise TuitionExemptionError("Đơn vừa được cán bộ cập nhật. Hãy tải lại trang rồi gửi lại.",
                                             code="conflict")
-            if app.status != "rejected" or app.rejection_reason_code not in contract.RESUBMITTABLE_REASONS:
+            awaiting = app.status == "awaiting_supplement"
+            if not awaiting and (app.status != "rejected"
+                                 or app.rejection_reason_code not in contract.RESUBMITTABLE_REASONS):
                 raise TuitionExemptionError("Đơn hiện không bổ sung được. Liên hệ Phòng CTSV nếu cần.",
                                             code="conflict")
-            if not round_is_open(app.round):
+            if not awaiting and not round_is_open(app.round):
                 raise TuitionExemptionError("Đợt đã đóng nên không bổ sung được nữa. Liên hệ Phòng CTSV.",
                                             code="closed")
             contract.validate_transition(app.status, "processing")
             event = append_event(app, "SUPPLEMENTED", source="Hub", actor_id=student.pk,
-                                 old="rejected", new="processing", key=request_key,
-                                 reason_code=app.rejection_reason_code,
+                                 old=app.status, new="processing", key=request_key,
+                                 reason_code="INVALID_DOCUMENTS" if awaiting else app.rejection_reason_code,
                                  payload={"request_digest": digest, "files": len(checked),
                                           "categories": sorted({c for (c, _, _) in checked}),
                                           "previous_note": app.review_note or ""})
