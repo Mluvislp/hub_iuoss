@@ -11,6 +11,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.http import FileResponse, Http404
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -51,6 +52,10 @@ class _Verify(_Public):
         round_ = grad.current_round()
         if round_ is None:
             raise Http404
+        # Chưa mở đợt (chưa đặt hạn / chưa tới giờ mở) ⇒ không xác minh. Đã qua hạn vẫn cho — để người đã
+        # đăng ký xem lại mã QR.
+        if grad.not_open_yet(round_):
+            raise PermissionDenied("Chưa mở đợt đăng ký tham dự.")
         return round_
 
 

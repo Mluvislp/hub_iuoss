@@ -98,10 +98,12 @@ const AUDIENCES: Array<{ key: Audience; title: string; desc: string; icon: typeo
   { key: 'graduate', title: 'Học viên cao học', desc: 'Thạc sĩ, Tiến sĩ — xác minh bằng mã học viên và thông tin cá nhân.', icon: UserRound },
 ];
 
-export default function Verify({ msEnabled, onVerified, notice }: {
+export default function Verify({ msEnabled, onVerified, notice, lockedMessage }: {
   msEnabled: boolean;
   onVerified: (m: GradMember) => void;
   notice?: React.ReactNode;
+  /** Có giá trị ⇒ chưa mở đợt: khóa ô chọn đối tượng, hiện câu này. */
+  lockedMessage?: string;
 }) {
   const [audience, setAudience] = useState<Audience | null>(null);
 
@@ -114,15 +116,22 @@ export default function Verify({ msEnabled, onVerified, notice }: {
           <div>
             <h3 className="text-lg font-semibold text-ink">Đối tượng đăng ký</h3>
             <p className="text-sm text-muted mt-1 mb-5">Chọn đúng đối tượng để dùng cách xác minh phù hợp.</p>
-            <div className="grid gap-3">
+            {lockedMessage && (
+              <div role="status" className="mb-4 flex items-center gap-2 rounded-lg border border-[#ecd9a0] bg-[#fdf9ec] px-3.5 py-2.5 text-sm text-[#7a5d0f]">
+                <LockKeyhole size={15} className="shrink-0" /> {lockedMessage}
+              </div>
+            )}
+            <div className="grid gap-3" aria-disabled={lockedMessage ? true : undefined}>
               {AUDIENCES.map(({ key, title, desc, icon: Icon }) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setAudience(key)}
+                  disabled={!!lockedMessage}
                   className="group flex items-center gap-4 text-left rounded-lg border border-slate-200 bg-white px-4 py-4
                              hover:border-[#d4a72c] hover:bg-[#fffbf0] transition-colors
-                             focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d4a72c]/25"
+                             focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#d4a72c]/25
+                             disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-slate-200 disabled:hover:bg-white"
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ecd9a0] bg-[#fdf6e3] text-[#a07d1c]">
                     <Icon size={20} />
