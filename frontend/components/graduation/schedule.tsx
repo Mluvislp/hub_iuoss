@@ -36,7 +36,7 @@ export default function Schedule({ highlight }: { highlight?: string }) {
     <section id="lich" className="scroll-mt-6">
       <div className="text-center mb-8">
         <p className="text-[0.72rem] font-semibold tracking-[0.22em] uppercase text-[#a07d1c]">Thời gian tổ chức</p>
-        <h2 className="mt-2 font-display text-3xl sm:text-4xl text-[#0f2a5c]">Lịch Lễ Tốt nghiệp 2026</h2>
+        <h2 className="mt-2 font-display font-semibold text-4xl sm:text-5xl text-[#0f2a5c]">Lịch Lễ Tốt nghiệp 2026</h2>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 mb-4">

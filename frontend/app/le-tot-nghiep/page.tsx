@@ -11,6 +11,23 @@ import QrCard from '@/components/graduation/qr-card';
 import { RegisterForm, Registered } from '@/components/graduation/registration';
 import { GradError, clearGradToken, getGradToken, gradApi, type GradInfo, type GradMember } from '@/lib/graduation';
 
+/** Cuộn mượt tới một phần của trang (bỏ hiệu ứng nếu người dùng bật giảm chuyển động). */
+function scrollToSection(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const top = el.getBoundingClientRect().top + window.scrollY - 24;
+  window.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
+  history.replaceState(null, '', `#${id}`);
+}
+
+function anchor(id: string) {
+  return {
+    href: `#${id}`,
+    onClick: (e: React.MouseEvent) => { e.preventDefault(); scrollToSection(id); },
+  };
+}
+
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
@@ -39,22 +56,23 @@ function Hero({ fireworks }: { fireworks: React.RefObject<FireworksHandle> }) {
           <p className="inline-flex items-center gap-2 text-[0.72rem] sm:text-xs font-semibold tracking-[0.3em] uppercase text-[#f5d27a]">
             <Sparkles size={14} /> Lễ Tốt nghiệp 2026 <Sparkles size={14} />
           </p>
-          <h1 className="mt-5 font-display font-bold text-[2.6rem] leading-[1.08] sm:text-6xl md:text-7xl">
-            Chúc mừng <span className="text-[#f5d27a]">Tân khoa</span>
+          <h1 className="mt-5 font-display font-semibold text-[3.1rem] leading-[1.02] sm:text-7xl md:text-[5.75rem] tracking-[-0.01em]">
+            Chúc mừng
+            <span className="block italic font-medium text-[#f5d27a]">Tân khoa 2026</span>
           </h1>
           <div className="mx-auto mt-6 h-px w-24 bg-gradient-to-r from-transparent via-[#f5d27a] to-transparent" />
-          <p className="mx-auto mt-6 max-w-2xl text-base sm:text-lg text-white/85 leading-relaxed">
+          <p className="mx-auto mt-6 max-w-2xl text-[0.98rem] sm:text-lg text-white/85 leading-[1.75] font-light">
             Trường Đại học Quốc tế trân trọng chúc mừng các tân cử nhân, kỹ sư, thạc sĩ và tiến sĩ đã hoàn thành
             chương trình đào tạo. Mỗi tấm bằng là thành quả của những năm tháng bền bỉ — và là khởi đầu cho
             những hành trình mới phía trước.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="#dang-ky"
+            <a {...anchor('dang-ky')}
                className="inline-flex items-center justify-center gap-2 h-12 px-7 rounded-lg bg-[#f5d27a] hover:bg-[#f0c75c] text-[#0f2a5c] font-semibold transition-colors
                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f2a5c]">
               Đăng ký tham dự lễ
             </a>
-            <a href="#lich"
+            <a {...anchor('lich')}
                className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-lg border border-white/40 hover:bg-white/10 font-medium transition-colors">
               Xem lịch tổ chức
             </a>
@@ -65,7 +83,7 @@ function Hero({ fireworks }: { fireworks: React.RefObject<FireworksHandle> }) {
           </div>
         </div>
       </div>
-      <a href="#lich" aria-label="Cuộn xuống" className="mx-auto mb-6 text-white/60 hover:text-white motion-safe:animate-bounce">
+      <a {...anchor('lich')} aria-label="Cuộn xuống" className="mx-auto mb-6 text-white/60 hover:text-white motion-safe:animate-bounce">
         <ChevronDown size={26} />
       </a>
     </header>
@@ -135,13 +153,13 @@ export default function GraduationPage() {
   // Quay về từ Microsoft (#dang-ky) → cuộn xuống phần đăng ký khi đã tải xong.
   useEffect(() => {
     if (!loading && window.location.hash === '#dang-ky') {
-      document.getElementById('dang-ky')?.scrollIntoView({ behavior: 'smooth' });
+      scrollToSection('dang-ky');
     }
   }, [loading]);
 
   const onVerified = useCallback((m: GradMember) => {
     setMember(m);
-    requestAnimationFrame(() => document.getElementById('dang-ky')?.scrollIntoView({ behavior: 'smooth' }));
+    requestAnimationFrame(() => scrollToSection('dang-ky'));
   }, []);
 
   const onRegistered = useCallback((m: GradMember) => {
@@ -166,7 +184,7 @@ export default function GraduationPage() {
         <section id="dang-ky" className="scroll-mt-6">
           <div className="text-center mb-8">
             <p className="text-[0.72rem] font-semibold tracking-[0.22em] uppercase text-[#a07d1c]">Đăng ký tham dự</p>
-            <h2 className="mt-2 font-display text-3xl sm:text-4xl text-[#0f2a5c]">Xác nhận tham dự Lễ Tốt nghiệp</h2>
+            <h2 className="mt-2 font-display font-semibold text-4xl sm:text-5xl text-[#0f2a5c]">Xác nhận tham dự Lễ Tốt nghiệp</h2>
             {round && (round.registration_opens_at && round.registration_closes_at ? (
               <p className="mt-3 text-sm text-muted">
                 Thời gian đăng ký: {fmt(round.registration_opens_at)} — {fmt(round.registration_closes_at)}
@@ -176,7 +194,7 @@ export default function GraduationPage() {
             ))}
           </div>
 
-          <div className="mx-auto max-w-3xl">
+          <div className={cn('mx-auto', member ? 'max-w-3xl' : 'max-w-5xl')}>
             {loading ? (
               <div className={cn(ui.card, 'p-10 flex items-center justify-center gap-2 text-sm text-muted')}>
                 <Loader2 size={16} className="animate-spin" /> Đang tải…
@@ -186,19 +204,20 @@ export default function GraduationPage() {
             ) : !round ? (
               <div className={cn(ui.card, 'p-8 text-center text-sm text-muted')}>Chưa có đợt Lễ tốt nghiệp nào.</div>
             ) : !member ? (
-              <div className={cn(ui.card, 'p-6')}>
-                {!round.registration_open && (
-                  <div className={cn(notice.base, notice.neutral, 'mb-5')}>
+              <Verify
+                msEnabled={info?.microsoft_login ?? false}
+                onVerified={onVerified}
+                notice={!round.registration_open && (
+                  <div className={cn(notice.base, notice.neutral, 'mb-6')}>
                     <CalendarHeart size={16} className={noticeIcon.neutral} />
                     <p className="text-sm">
                       {round.registration_closes_at && new Date(round.registration_closes_at) < new Date()
                         ? 'Đã hết thời gian đăng ký tham dự. Sinh viên, học viên đã đăng ký vẫn xác minh được để xem lại mã QR.'
-                        : 'Chưa mở đăng ký tham dự. Sinh viên, học viên đã có tên trong danh sách vẫn xác minh được để xem buổi lễ của mình.'}
+                        : 'Chưa mở đăng ký tham dự. Sinh viên, học viên có tên trong danh sách vẫn xác minh được để xem buổi lễ của mình.'}
                     </p>
                   </div>
                 )}
-                <Verify msEnabled={info?.microsoft_login ?? false} onVerified={onVerified} />
-              </div>
+              />
             ) : (
               <div className="space-y-5">
                 <MemberSummary m={member} onLogout={logout} />
