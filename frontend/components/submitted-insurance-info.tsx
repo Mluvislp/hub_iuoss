@@ -36,7 +36,7 @@ export function ChangeList({changes, images, submitted = false, className}:{
   return <dl className={className}>
     {entries.map(([field,change]) => <div key={field} className="flex flex-wrap gap-x-1.5">
       <dt className="text-muted">{labels[field] || field}:</dt>
-      <dd className="min-w-0"><span className="text-slate-400 line-through">{changeText(change.before)}</span> → <span className="font-medium text-ink">{changeText(change.after)}</span></dd>
+      <dd className="min-w-0"><span className="text-muted line-through">{changeText(change.before)}</span> → <span className="font-medium text-ink">{changeText(change.after)}</span></dd>
     </div>)}
     {!!images?.length && <div className="flex flex-wrap gap-x-1.5">
       <dt className="text-muted">{submitted ? 'Ảnh đã tải lên' : 'Ảnh đã thay mới'}:</dt>
@@ -78,9 +78,9 @@ export function PrivateImage({url, label, caption = true}:{url:string; label:str
   }, [url]);
   return <figure className="min-w-0">
     {caption && <figcaption className="mb-1.5 text-xs font-medium text-muted">{label}</figcaption>}
-    {src ? <a href={src} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-slate-50">
+    {src ? <a href={src} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line bg-surface-subtle">
       <img src={src} alt={label} className="h-32 w-full object-contain" />
-    </a> : <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-line bg-slate-50 px-3 text-center text-xs text-muted">
+    </a> : <div className="flex h-32 items-center justify-center rounded-lg border border-dashed border-line bg-surface-subtle px-3 text-center text-xs text-muted">
       <FileImage size={16} className="mr-2 shrink-0" />{error || 'Đang tải ảnh đã nộp…'}
     </div>}
   </figure>;
@@ -130,7 +130,7 @@ export function SubmittedInsuranceInfo({data, external=false, hospitalChange=fal
 
       {!!Object.keys(data.legacy_changes || {}).length && <details className="rounded-lg border border-line p-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink">So sánh với hồ sơ tại lần lưu gần nhất</summary>
-        <div className="mt-2 space-y-1 text-slate-600">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
+        <div className="mt-2 space-y-1 text-ink-3">{Object.entries(data.legacy_changes || {}).map(([key,value]) => <p key={key}><span className="text-muted">{labels[key] || key}:</span> {changeText(value.from)} → <span className="font-medium text-ink">{changeText(value.to)}</span></p>)}</div>
       </details>}
       {!!data.images?.length && <div>
         <h4 className="mb-3 text-sm font-semibold text-ink">Ảnh đã nộp</h4>

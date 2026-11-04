@@ -53,7 +53,7 @@ function DefRow({ label, value }: { label: string; value: React.ReactNode }) {
     <div className={ui.dtRow}>
       <span className={ui.dtLabel}>{label}</span>
       <span className={ui.dtValue}>
-        {value ?? <span className="italic font-normal text-slate-400">Chưa cập nhật</span>}
+        {value ?? <span className="italic font-normal text-muted">Chưa cập nhật</span>}
       </span>
     </div>
   );
@@ -101,7 +101,7 @@ export default function DashboardPage() {
       <section>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-[1.35rem] font-semibold text-ink">
+            <h1 className="text-headline font-semibold text-ink">
               Xin chào, {session?.full_name ?? '—'}
             </h1>
             <p className="text-sm text-muted mt-1">
@@ -171,7 +171,7 @@ export default function DashboardPage() {
                 <dl>
                   <DefRow
                     label="Mã thẻ BHYT"
-                    value={<span className="font-mono text-[0.82rem]">{health_insurance.medical_insurance_code}</span>}
+                    value={<span className="font-mono text-meta">{health_insurance.medical_insurance_code}</span>}
                   />
                   {/* Ưu tiên tên cơ sở; mã lạ (không có trong danh mục) thì hiện mã. */}
                   <DefRow
@@ -182,7 +182,7 @@ export default function DashboardPage() {
                 </dl>
                 <Link
                   href="/dashboard/bao-hiem-y-te"
-                  className="mt-3 inline-flex items-center gap-1 text-[0.82rem] font-medium text-primary-text hover:underline"
+                  className="mt-3 inline-flex items-center gap-1 text-meta font-medium text-primary-text hover:underline"
                 >
                   Xem chi tiết
                   <ChevronRight size={14} />
@@ -262,7 +262,7 @@ export default function DashboardPage() {
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#f8fafc] text-[0.78rem] text-muted border-b border-line">
+                <tr className="bg-surface-subtle text-xs text-muted border-b border-line">
                   <th className="text-left font-medium px-5 py-2.5">Loại giấy</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden sm:table-cell">Mục đích</th>
                   <th className="text-left font-medium px-5 py-2.5 hidden md:table-cell">Ngày tạo</th>
@@ -275,15 +275,15 @@ export default function DashboardPage() {
                 {confirmation_requests.map((req) => (
                   <tr
                     key={req.id}
-                    className="border-b border-line2 last:border-0 hover:bg-[#f9fafb] transition-colors"
+                    className="border-b border-line2 last:border-0 hover:bg-surface-subtle transition-colors"
                   >
                     <td className="px-5 py-3.5 font-medium text-ink whitespace-nowrap align-top">
                       {TYPE_LABELS[req.request_type]}
                     </td>
-                    <td className="px-5 py-3.5 text-slate-600 hidden sm:table-cell max-w-[260px] align-top">
+                    <td className="px-5 py-3.5 text-ink-3 hidden sm:table-cell max-w-[260px] align-top">
                       <span className="line-clamp-2" title={req.purpose}>{req.purpose}</span>
                     </td>
-                    <td className="px-5 py-3.5 text-muted text-[0.82rem] hidden md:table-cell whitespace-nowrap align-top">
+                    <td className="px-5 py-3.5 text-muted text-meta hidden md:table-cell whitespace-nowrap align-top">
                       {formatDateTime(req.created_at)}
                     </td>
                     <td className="px-5 py-3.5 align-top">
@@ -291,20 +291,20 @@ export default function DashboardPage() {
                         {STATUS_LABELS[req.status]}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-600 hidden lg:table-cell align-top">
+                    <td className="px-5 py-3.5 text-ink-3 hidden lg:table-cell align-top">
                       {req.comment_count > 0 ? (
                         <span className={cn(badge.base, badge.neutral)}>
                           <MessageSquare size={12} />
                           {req.comment_count}
                         </span>
                       ) : (
-                        <span className="italic text-slate-400">—</span>
+                        <span className="italic text-muted">—</span>
                       )}
                     </td>
                     <td className="px-5 py-3.5 align-top whitespace-nowrap">
                       <Link
                         href={`/dashboard/requests/${req.id}`}
-                        className="text-[0.82rem] font-medium text-primary-text hover:underline"
+                        className="text-meta font-medium text-primary-text hover:underline"
                       >
                         Xem
                       </Link>

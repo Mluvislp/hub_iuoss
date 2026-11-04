@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm, Controller, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
@@ -34,7 +34,7 @@ import { PrivateImage, formatDateTime } from "@/components/submitted-insurance-i
 import { InsuranceStatus } from "@/components/insurance-status";
 import { RejectionNotice } from "@/components/rejection-notice";
 import { FreshmanWarningModal } from "@/components/freshman-warning-modal";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, newRequestKey } from "@/lib/api";
 import { badge, ui } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import type { Province, InsuranceFormMode, InsurancePeriodConfig, InsuranceRegistrationPrefill, SubmittedInsurance } from "@/lib/types";
@@ -215,7 +215,7 @@ function EditLink({ active, label = "Chỉnh sửa", onClick, disabled = false }
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); }
       }}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary hover:underline",
+        "touch-target inline-flex shrink-0 cursor-pointer select-none items-center gap-1 text-xs font-medium text-primary hover:underline",
         disabled && "pointer-events-none opacity-50",
       )}
     >
@@ -234,10 +234,23 @@ function socialInsuranceFromCard(raw: string): string {
   return body.replace(/\D/g, "").slice(0, 12);
 }
 
-function FieldError({ message }: { message?: unknown }) {
+function FieldError({ message, id }: { message?: unknown; id?: string }) {
   if (!message) return null;
-  return <p data-field-error className="mt-1 text-xs text-danger-text">{String(message)}</p>;
+  return <p id={id} data-field-error className="mt-1 text-xs text-danger-text">{String(message)}</p>;
 }
+
+/** id + trạng thái lỗi cho một ô của form — label trỏ vào `id`, lỗi gắn vào ô qua
+ *  aria-describedby để trình đọc màn hình đọc được ô nào sai, sai vì sao. Mỗi trang
+ *  chỉ có một form BHYT nên id tĩnh là đủ. */
+function fieldA11y(name: string, invalid: boolean) {
+  const id = `bhyt-${name}`;
+  return {
+    id,
+    "aria-invalid": invalid,
+    "aria-describedby": invalid ? `${id}-error` : undefined,
+  };
+}
+const errorId = (name: string) => `bhyt-${name}-error`;
 
 /**
  * Một ô ảnh hồ sơ. Đã có ảnh nộp trước → hiện chính ảnh đó; ô chọn file chỉ còn
@@ -257,9 +270,12 @@ function ImageField({
   error?: unknown;
   input?: UseFormRegisterReturn;
 }) {
+  const inputId = useId();
+  const errId = `${inputId}-error`;
+  const invalid = !!error;
   return (
     <div className="flex min-w-0 flex-col">
-      <label className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] flex-wrap items-baseline gap-1")}>
+      <label htmlFor={existingUrl ? undefined : inputId} className={cn(ui.fieldLabel, "mb-1.5 flex min-h-[1.25rem] flex-wrap items-baseline gap-1")}>
         <span>{label}</span>
         {!existingUrl && <span className="text-danger-text">*</span>}
         {hint && <span className="text-xs font-normal text-muted">{hint}</span>}
@@ -268,9 +284,10 @@ function ImageField({
         <>
           <PrivateImage url={existingUrl} label={label} caption={false} />
           {!disabled && input ? (
-            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs",
-              error ? "border-red-500 bg-red-50 text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
-              <input type="file" accept="image/*" {...input} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+            <label className={cn(ui.btnOutline, "relative mt-2 h-9 w-full cursor-pointer overflow-hidden px-3 text-xs focus-within:ring-2 focus-within:ring-primary/40",
+              error ? "border-danger bg-danger-soft text-danger-text" : file && "border-success-line bg-success-soft text-success-text")}>
+              <input type="file" accept="image/*" {...input} aria-invalid={invalid} aria-describedby={invalid ? errId : undefined}
+                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
               {file ? <CheckSquare size={14} className="shrink-0" /> : <Upload size={14} className="shrink-0" />}
               <span className="truncate">{file ? file.name : "Thay ảnh khác"}</span>
             </label>
@@ -279,13 +296,17 @@ function ImageField({
       ) : (
         <div
           className={cn(
-            "group relative flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors",
-            error ? "border-red-500 bg-red-50" : "border-slate-300",
-            disabled ? "bg-slate-50 opacity-70" : "cursor-pointer hover:bg-slate-50",
+            // input file trong suốt phủ cả ô → viền focus của nó vô hình; vẽ focus lên khung.
+            "group relative flex min-h-[8rem] items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors focus-within:ring-2 focus-within:ring-primary/40",
+            error ? "border-danger bg-danger-soft" : "border-line-strong",
+            disabled ? "bg-surface-subtle opacity-70" : "cursor-pointer hover:bg-surface-subtle",
           )}
         >
           {input && (
             <input
+              id={inputId}
+              aria-invalid={invalid}
+              aria-describedby={invalid ? errId : undefined}
               type="file"
               accept="image/*"
               {...input}
@@ -296,14 +317,14 @@ function ImageField({
             <div className={cn("flex h-10 w-10 items-center justify-center rounded-full transition-transform group-hover:scale-110", tone)}>
               {file ? <CheckSquare size={20} className="text-success-text" /> : <Icon size={20} />}
             </div>
-            <span className="max-w-full break-all text-sm font-medium text-slate-700">
+            <span className="max-w-full break-all text-sm font-medium text-ink-2">
               {file ? file.name : emptyText}
             </span>
-            <span className="text-xs text-slate-500">Tối đa 5MB</span>
+            <span className="text-xs text-muted">Tối đa 5MB</span>
           </div>
         </div>
       )}
-      <FieldError message={(error as { message?: string } | undefined)?.message} />
+      <FieldError id={errId} message={(error as { message?: string } | undefined)?.message} />
     </div>
   );
 }
@@ -541,9 +562,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
   const fieldCls = (locked: boolean, hasError?: boolean) =>
     cn(
       ui.input,
-      locked && "bg-slate-50 text-slate-500",
+      locked && "bg-surface-subtle text-muted",
       hasError &&
-        "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50/30",
+        "border-danger focus:border-danger focus:ring-danger bg-danger-soft/30",
     );
 
   const canSubmit = submitted?.id
@@ -675,7 +696,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
       if (!external && data.payment_receipt_image?.[0]) fd.append("payment_receipt_image", data.payment_receipt_image[0]);
       }
 
-      requestKey.current ??= crypto.randomUUID();
+      requestKey.current ??= newRequestKey();
       fd.set('request_key', requestKey.current);
       if (submitted?.id) {
         fd.set('action', resubmitting ? 'resubmit' : 'edit');
@@ -702,20 +723,29 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
         setSuccess(true);
       }
     } catch (err) {
-      let message = err instanceof ApiError ? err.message : "Đã có lỗi xảy ra";
+      console.error("Nộp đơn BHYT thất bại", err);
+      // Lỗi JS phía trình duyệt (vd. thiếu cấu hình đợt) vẫn mang thông điệp riêng — đừng nuốt mất.
+      let message = err instanceof Error && err.message ? err.message : "Đã có lỗi xảy ra";
       if (err instanceof ApiError && err.status === 400) {
         // Lỗi theo từng trường của DRF: gắn vào đúng ô để sinh viên thấy ngay chỗ sai.
         // Khai nơi khác bọc lỗi trong `errors`, đăng ký tại trường trả thẳng ở gốc.
         const fieldErrors = (err.data.errors && typeof err.data.errors === "object" ? err.data.errors : err.data) as Record<string, unknown>;
         let mapped = 0;
+        const unmapped: string[] = [];
         for (const [key, value] of Object.entries(fieldErrors)) {
           const field = BACKEND_FIELD[key] ?? (FORM_FIELDS.has(key) ? key : null);
           const text = Array.isArray(value) ? value[0] : value;
-          if (!field || typeof text !== "string") continue;
+          if (typeof text !== "string") continue;
+          if (!field) {
+            if (key !== "detail" && key !== "non_field_errors") unmapped.push(text);
+            continue;
+          }
           setFieldError(field as never, { type: "server", message: text });
           mapped++;
         }
-        if (mapped) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu đỏ.";
+        // Trường backend không có ô tương ứng trên form thì vẫn phải nói ra, không để "HTTP 400".
+        if (unmapped.length && message.startsWith("HTTP ")) message = unmapped.join(" ");
+        else if (mapped) message = "Thông tin chưa hợp lệ, vui lòng kiểm tra các ô được đánh dấu đỏ.";
       }
       setError(message);
       setScrollTick((t) => t + 1);
@@ -917,7 +947,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
         </section>
       ) : windowInfo ? (
         <div className="flex flex-col gap-2 rounded-lg border border-line bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p className="flex items-start gap-2 text-slate-600">
+          <p className="flex items-start gap-2 text-ink-3">
             <CalendarClock size={16} className="mt-0.5 shrink-0 text-primary" />
             <span>
               Bắt đầu: <strong className="font-medium text-ink">{formatDateTime(windowInfo.start_date)}</strong>
@@ -948,9 +978,9 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   ['valid_until', 'Giá trị sử dụng đến ngày', 'date'],
                 ] as const).map(([field, label, type]) => (
                   <div key={field} className="min-w-0">
-                    <label htmlFor={field} className={ui.fieldLabel}>{label} *</label>
-                    <input id={field} type={type} {...register(field)} className={fieldCls(editLocked, !!errors[field])} />
-                    <FieldError message={errors[field]?.message} />
+                    <label htmlFor={`bhyt-${field}`} className={ui.fieldLabel}>{label} *</label>
+                    <input {...fieldA11y(field, !!errors[field])} type={type} {...register(field)} className={fieldCls(editLocked, !!errors[field])} />
+                    <FieldError id={errorId(field)} message={errors[field]?.message} />
                   </div>
                 ))}
               </div>
@@ -991,26 +1021,29 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
             <div className="space-y-6 p-4 sm:p-5">
               <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Họ và tên</label>
+                  <label htmlFor="bhyt-full_name" className={ui.fieldLabel}>Họ và tên</label>
                   <input
+                    {...fieldA11y("full_name", !!errors.full_name)}
                     {...register("full_name")}
                     disabled={personalLocked(prefill?.full_name)}
                     className={fieldCls(personalLocked(prefill?.full_name), !!errors.full_name)}
                   />
-                  <FieldError message={errors.full_name?.message} />
+                  <FieldError id={errorId("full_name")} message={errors.full_name?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Mã số sinh viên</label>
+                  <label htmlFor="bhyt-student_code" className={ui.fieldLabel}>Mã số sinh viên</label>
                   <input
+                    {...fieldA11y("student_code", !!errors.student_code)}
                     {...register("student_code")}
                     readOnly={editingRecord || hospitalChange || (recorded(prefill?.student_code) && !infoEditable)}
                     className={fieldCls(editingRecord || personalLocked(prefill?.student_code), !!errors.student_code)}
                   />
-                  <FieldError message={errors.student_code?.message} />
+                  <FieldError id={errorId("student_code")} message={errors.student_code?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Giới tính</label>
+                  <label htmlFor="bhyt-gender" className={ui.fieldLabel}>Giới tính</label>
                   <select
+                    {...fieldA11y("gender", !!errors.gender)}
                     {...register("gender")}
                     disabled={personalLocked(prefill?.gender)}
                     className={fieldCls(personalLocked(prefill?.gender), !!errors.gender)}
@@ -1018,21 +1051,23 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                     <option value="Nam">Nam</option>
                     <option value="Nữ">Nữ</option>
                   </select>
-                  <FieldError message={errors.gender?.message} />
+                  <FieldError id={errorId("gender")} message={errors.gender?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Ngày sinh</label>
+                  <label htmlFor="bhyt-dob" className={ui.fieldLabel}>Ngày sinh</label>
                   <input
+                    {...fieldA11y("dob", !!errors.dob)}
                     type="date"
                     {...register("dob")}
                     disabled={personalLocked(prefill?.dob)}
                     className={fieldCls(personalLocked(prefill?.dob), !!errors.dob)}
                   />
-                  <FieldError message={errors.dob?.message} />
+                  <FieldError id={errorId("dob")} message={errors.dob?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Dân tộc</label>
+                  <label htmlFor="bhyt-ethnicity" className={ui.fieldLabel}>Dân tộc</label>
                   <select
+                    {...fieldA11y("ethnicity", !!errors.ethnicity)}
                     {...register("ethnicity")}
                     disabled={personalLocked(prefill?.ethnicity)}
                     className={fieldCls(personalLocked(prefill?.ethnicity), !!errors.ethnicity)}
@@ -1044,33 +1079,36 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                       </option>
                     ))}
                   </select>
-                  <FieldError message={errors.ethnicity?.message} />
+                  <FieldError id={errorId("ethnicity")} message={errors.ethnicity?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Số điện thoại</label>
+                  <label htmlFor="bhyt-phone_number" className={ui.fieldLabel}>Số điện thoại</label>
                   <input
+                    {...fieldA11y("phone_number", !!errors.phone_number)}
                     {...register("phone_number")}
                     inputMode="tel"
                     disabled={personalLocked(prefill?.phone_number)}
                     className={fieldCls(personalLocked(prefill?.phone_number), !!errors.phone_number)}
                   />
-                  <FieldError message={errors.phone_number?.message} />
+                  <FieldError id={errorId("phone_number")} message={errors.phone_number?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>Số CCCD</label>
+                  <label htmlFor="bhyt-citizen_id" className={ui.fieldLabel}>Số CCCD</label>
                   <input
+                    {...fieldA11y("citizen_id", !!errors.citizen_id)}
                     {...register("citizen_id")}
                     inputMode="numeric"
                     disabled={personalLocked(prefill?.citizen_id)}
                     className={fieldCls(personalLocked(prefill?.citizen_id), !!errors.citizen_id)}
                   />
-                  <FieldError message={errors.citizen_id?.message} />
+                  <FieldError id={errorId("citizen_id")} message={errors.citizen_id?.message} />
                 </div>
                 <div className="min-w-0">
-                  <label className={ui.fieldLabel}>
+                  <label htmlFor="bhyt-social_insurance_number" className={ui.fieldLabel}>
                     Số sổ BHXH (mã BHYT bỏ 5 ký tự đầu)
                   </label>
                   <input
+                    {...fieldA11y("social_insurance_number", !!errors.social_insurance_number)}
                     {...sinField}
                     inputMode="numeric"
                     autoComplete="off"
@@ -1088,7 +1126,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                       <p className="flex items-center gap-1.5 font-semibold">
                         <Info size={14} className="shrink-0 text-slate-500" /> Cách lấy số sổ BHXH
                       </p>
-                      <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-slate-700">
+                      <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-ink-2">
                         <li>
                           Mở{" "}
                           <a
@@ -1129,7 +1167,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                       className={cn(
                         "transition-opacity",
                         addressLocked && "opacity-70 pointer-events-none",
-                        errors.permanent && "p-3 -mx-3 rounded-lg border border-red-500 bg-red-50/40"
+                        errors.permanent && "p-3 -mx-3 rounded-lg border border-danger bg-danger-soft/40"
                       )}
                     >
                       <AddressFields
@@ -1228,7 +1266,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                 <label className={cn(ui.fieldLabel, (!hospitalProvince && errors.hospital_code) && "text-danger-text")} htmlFor="kcb-province">
                   Tỉnh thành bệnh viện
                 </label>
-                <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                <div className={cn((!hospitalProvince && errors.hospital_code) && "rounded-lg ring-1 ring-danger shadow-sm")}>
                   <SearchableSelect
                     id="kcb-province"
                     value={hospitalProvince}
@@ -1259,7 +1297,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                 <label className={cn(ui.fieldLabel, errors.hospital_code && "text-danger-text")} htmlFor="kcb-hospital">
                   Bệnh viện
                 </label>
-                <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-red-500 shadow-sm")}>
+                <div className={cn(errors.hospital_code && "rounded-lg ring-1 ring-danger shadow-sm")}>
                   <Controller
                     control={control}
                     name="hospital_code"
@@ -1369,7 +1407,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                   <h3 className="mb-2 font-semibold text-ink">
                     Thông tin chuyển khoản
                   </h3>
-                  <ul className="space-y-1.5 text-sm text-slate-600">
+                  <ul className="space-y-1.5 text-sm text-ink-3">
                     <li>
                       Ngân hàng:{" "}
                       <strong className="text-ink">
@@ -1464,12 +1502,13 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
           </section>
 
           {formEnabled && (
-            <div className={cn(ui.card, "p-4 sm:p-5 transition-colors", errors.confirm_declaration && "border-red-500 bg-red-50")}>
+            <div className={cn(ui.card, "p-4 sm:p-5 transition-colors", errors.confirm_declaration && "border-danger bg-danger-soft")}>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
+                  {...fieldA11y("confirm_declaration", !!errors.confirm_declaration)}
                   {...register("confirm_declaration")}
-                  className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-primary focus:ring-primary", errors.confirm_declaration && "border-red-500 outline-none ring-2 ring-red-500/20")}
+                  className={cn("mt-0.5 h-5 w-5 shrink-0 rounded border-line-strong text-primary focus:ring-primary", errors.confirm_declaration && "border-danger outline-none ring-2 ring-danger/20")}
                 />
                 <div>
                   <span className={cn("text-sm font-medium", errors.confirm_declaration ? "text-red-700" : "text-ink")}>
@@ -1481,7 +1520,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                         ? "Xác nhận đã khai đúng thông tin và đồng ý cung cấp thông tin cho nhà trường."
                         : "Xác nhận đã khai đúng thông tin, đã chuyển khoản và đồng ý cung cấp thông tin cho nhà trường."}
                   </span>
-                  <FieldError message={errors.confirm_declaration?.message} />
+                  <FieldError id={errorId("confirm_declaration")} message={errors.confirm_declaration?.message} />
                 </div>
               </label>
             </div>

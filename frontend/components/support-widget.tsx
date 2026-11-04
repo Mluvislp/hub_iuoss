@@ -39,8 +39,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       type="button"
       onClick={copy}
       aria-label={copied ? `Đã chép ${label}` : `Chép ${label}`}
-      className="flex-shrink-0 p-1.5 -mr-1 rounded-md text-slate-400 hover:text-ink
-                 hover:bg-slate-100 transition-colors"
+      className="touch-target flex-shrink-0 p-1.5 -mr-1 rounded-md text-muted hover:text-ink
+                 hover:bg-surface-muted transition-colors"
     >
       {copied ? <Check size={14} className="text-success-text" /> : <Copy size={14} />}
     </button>
@@ -65,10 +65,10 @@ function ContactRow({
         <Icon size={14} className="text-primary" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[0.72rem] text-muted">{label}</div>
+        <div className="text-xs text-muted">{label}</div>
         <a
           href={href}
-          className="block mt-0.5 text-[0.85rem] font-medium text-ink hover:text-primary-text
+          className="block mt-0.5 text-sm font-medium text-ink hover:text-primary-text
                      hover:underline break-all"
         >
           {value}
@@ -134,14 +134,14 @@ export default function SupportWidget() {
               type="button"
               onClick={() => { setOpen(false); buttonRef.current?.focus(); }}
               aria-label="Đóng"
-              className="p-1 -mr-1 rounded-md text-muted hover:text-ink hover:bg-slate-200/60 transition-colors"
+              className="touch-target p-1 -mr-1 rounded-md text-muted hover:text-ink hover:bg-line/60 transition-colors"
             >
               <X size={16} />
             </button>
           </div>
 
           <div className="px-4 py-3.5">
-            <p className="text-[0.82rem] text-muted leading-relaxed">
+            <p className="text-meta text-muted leading-relaxed">
               Mọi sự cố về kỹ thuật vui lòng liên hệ chuyên viên{' '}
               <span className="font-medium text-ink">{SUPPORT.name}</span>
             </p>
@@ -157,7 +157,7 @@ export default function SupportWidget() {
                     href={`https://zalo.me/${SUPPORT.phoneRaw}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-1 text-[0.75rem] font-medium text-primary-text hover:underline"
+                    className="inline-block mt-1 text-xs font-medium text-primary-text hover:underline"
                   >
                     Nhắn qua Zalo
                   </a>

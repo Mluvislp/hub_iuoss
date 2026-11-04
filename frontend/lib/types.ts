@@ -446,6 +446,7 @@ export interface FeatureFlags {
   document_requests: boolean;
   civic_activities: boolean;
   health_check: boolean;
+  tuition_waiver: boolean;
   support_tickets: boolean;
   personal_info: boolean;
   diploma: boolean;
@@ -509,7 +510,7 @@ export const REQUEST_STATUS_STYLES: Record<RequestStatus, string> = {
   processing: 'bg-primary-soft text-primary-text border-primary-line',
   // Cố ý KHÁC hẳn 'pending': đây là trạng thái việc đang nằm ở phía sinh viên,
   // phải nhìn ra ngay giữa một danh sách toàn màu vàng "chờ xử lý".
-  awaiting_info: 'bg-violet-50 text-violet-700 border-violet-200',
+  awaiting_info: 'bg-attention-soft text-attention-text border-attention-line',
   done:       'bg-success-soft text-success-text border-success-line',
   // Bước cuối (đã nhận giấy) — xanh ngọc, khác xanh lá "Hoàn thành"; cùng màu với Dashboard.
   returned:   'bg-teal-50 text-teal-700 border-teal-200',
@@ -821,6 +822,175 @@ export interface RequestAvailability {
   term: { key: string; label: string };
   contact_email: string;
   types: Record<string, QuotaTypeState>;
+}
+
+// ── Miễn giảm học phí (MGHP) ─────────────────────────────────────────────────
+// Khớp `core/tuition_exemption.py` (build_state / build_plan / serialize_application).
+
+/** Cùng khuôn BHYT: Đang xử lý → Chờ kết quả → Hoàn thành; Từ chối kèm lý do. */
+export type TuitionExemptionStatus = 'processing' | 'waiting_result' | 'done' | 'rejected';
+
+export type TuitionCategoryReview = 'pending' | 'approved' | 'rejected';
+
+/** Việc SV phải làm với một diện: xác nhận gia hạn / bổ sung giấy tờ / đăng ký mới. */
+export type TuitionCategoryMode = 'confirm' | 'supplement' | 'new';
+
+export interface TuitionExemptionRound {
+  id: number;
+  title: string;
+  description: string;
+  term_code: string;
+  term_label: string;
+  opens_at: string;
+  closes_at: string;
+}
+
+export interface TuitionRequiredDocument {
+  doc_type: string;
+  label: string;
+  required: boolean;
+  has_expiry: boolean;
+  /** Phải nộp lại khi gia hạn (diện nộp lại mỗi kỳ/năm). */
+  renewal_required?: boolean;
+}
+
+/** Ô thông tin riêng của một đối tượng (contract.CATEGORY_FIELDS) — gửi lên dạng `detail_<name>`. */
+export interface TuitionCategoryField {
+  name: string;
+  type: 'text' | 'textarea' | 'checkbox';
+  label: string;
+  required?: boolean;
+  max?: number;
+}
+
+export interface TuitionExemptionCategory {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  resubmit_policy: string;
+  resubmit_label: string;
+  /** Giấy phải nộp THEO CHẾ ĐỘ (gia hạn có bổ sung chỉ còn giấy phải nộp lại). */
+  documents: TuitionRequiredDocument[];
+  fields: TuitionCategoryField[];
+  /** Đối tượng chỉ dành cho người dân tộc thiểu số (theo hồ sơ). */
+  requires_ethnic_minority: boolean;
+  mode: TuitionCategoryMode;
+  mode_label: string;
+  /** Kỳ gần nhất được xác nhận (chỉ có với diện đang hưởng). */
+  last_verified: string | null;
+}
+
+export interface TuitionExemptionPlan {
+  submission_kind: 'first_time' | 'previously_reviewed';
+  submission_kind_label: string;
+  /** submit = chưa từng hưởng; confirm = chỉ xác nhận gia hạn; supplement = có diện phải bổ sung. */
+  action: 'submit' | 'confirm' | 'supplement';
+  action_label: string;
+  renewals: TuitionExemptionCategory[];
+  others: TuitionExemptionCategory[];
+  /** Luôn 1: SV tự chọn đúng một đối tượng, hệ thống không chọn sẵn. */
+  max_categories: number;
+  /** Dân tộc theo hồ sơ ("Kinh", "Mường"…), rỗng nếu chưa có. */
+  ethnicity: string;
+  /** null = hồ sơ chưa có thông tin dân tộc. */
+  is_ethnic_minority: boolean | null;
+  inactive_history: { code: string; name: string }[];
+}
+
+export interface TuitionExemptionApplication {
+  id: number;
+  round_id: number;
+  round_title: string;
+  /** Kỳ của đợt — khớp `TuitionExemptionAward.term_code`. */
+  term_code: string;
+  submission_kind: string;
+  submission_kind_label: string;
+  status: TuitionExemptionStatus;
+  status_label: string;
+  submitted_at: string;
+  review_note: string;
+  /** SV vừa bổ sung, cán bộ chưa xác nhận. */
+  supplement_pending: boolean;
+  row_version: number;
+  categories: {
+    code: string;
+    name: string;
+    review_status: TuitionCategoryReview;
+    review_note: string;
+    mode: TuitionCategoryMode | null;
+    mode_label: string;
+  }[];
+  /** Chỉ có ở API chi tiết. */
+  timeline?: { kind: string; label: string; at: string; note: string }[];
+  documents?: { id: number; doc_type: string; doc_label: string; category_code: string;
+                original_filename: string; mime_type: string; expires_at: string | null }[];
+  snapshot?: Record<string, string>;
+  /** Đơn Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
+  can_supplement: boolean;
+  /** Như trên nhưng đợt đã đóng. */
+  supplement_overdue: boolean;
+  /** Hạn bổ sung = giờ đóng đợt. */
+  supplement_closes_at: string;
+  /** Đối tượng trong đơn kèm danh sách giấy tờ để bổ sung. */
+  supplement_targets?: (TuitionExemptionCategory & { link_id: number; review_note: string })[];
+  rejection_reason: string;
+  /** Thông tin riêng theo đối tượng đã khai (nhãn + giá trị chữ). */
+  category_details?: { label: string; value: string }[];
+}
+
+export interface TuitionExemptionPrefill {
+  student_code: string;
+  full_name: string;
+  date_of_birth: string | null;
+  class_code: string;
+  department_code: string;
+  department_name: string;
+  /** Các ô SV sửa được — tên trùng tên trường gửi lên. */
+  fields: Record<string, string>;
+  /** previous_application = chép từ đơn gần nhất; profile = từ hồ sơ SV. */
+  source: 'previous_application' | 'profile';
+  /** Thông tin riêng đã khai ở đơn trước — chỉ điền lại khi SV chọn đúng đối tượng `code`. */
+  category_details: { code: string; values: Record<string, string | boolean> } | null;
+}
+
+/** Kết quả MGHP một kỳ — Phòng CTSV nạp từ danh sách kèm quyết định. Số tiền: VND. */
+export interface TuitionExemptionAward {
+  id: number;
+  term_code: string;
+  term_label: string;
+  /** Căn cứ suy từ mục trong danh sách, VD "Nghị định 238/2025/NĐ-CP"; rỗng nếu không rõ. */
+  basis: string;
+  category: string;
+  /** 0–100. */
+  percent: number | null;
+  first_fee_vnd: number | null;
+  retake_fee_vnd: number | null;
+  /** Học phí xét miễn giảm. */
+  base_fee_vnd: number | null;
+  decree_amount_vnd: number | null;
+  school_support_vnd: number | null;
+  received_vnd: number;
+  payment_status: 'paid' | 'unpaid' | null;
+  payment_label: string;
+  note: string;
+  /** Đã che, chỉ còn 4 số cuối. */
+  bank_account: string;
+  bank_name: string;
+  updated_at: string;
+}
+
+export interface TuitionExemptionState {
+  round: TuitionExemptionRound | null;
+  plan: TuitionExemptionPlan | null;
+  application: TuitionExemptionApplication | null;
+  history: TuitionExemptionApplication[];
+  /** Kết quả theo kỳ, kỳ mới nhất trước. */
+  awards: TuitionExemptionAward[];
+  prefill: TuitionExemptionPrefill;
+  limits: { max_files: number; max_pdf_mb: number; max_image_mb: number };
+  /** Chỉ có trong phản hồi POST nộp đơn. */
+  submitted_id?: number;
 }
 
 // ── Thông tin cá nhân (GET/POST /api/personal-info/) ─────────────────────────

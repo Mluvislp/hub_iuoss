@@ -196,7 +196,7 @@ export default function DefermentRequestPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
+          <h2 className="text-title font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
           <div className="mt-6"><Link href={isEdit ? `/dashboard/requests/${edit.id}` : '/dashboard'} className={ui.btnPrimary}>{isEdit ? 'Xem yêu cầu' : 'Về Bảng thông tin'}</Link></div>
         </div>
@@ -215,11 +215,11 @@ export default function DefermentRequestPage() {
 
   return (
     <div className="max-w-[760px] space-y-4">
-      <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+      <nav className="flex items-center gap-1.5 text-meta text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <Link href="/dashboard/requests/new" className="hover:text-ink">Yêu cầu giấy tờ</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Hoãn nghĩa vụ quân sự</span>
       </nav>
 
@@ -244,7 +244,7 @@ export default function DefermentRequestPage() {
 
           {/* Thông tin chỉ xem */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin sinh viên</h2>
+            <h2 className="text-meta font-semibold text-muted mb-2.5">Thông tin sinh viên</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <ReadonlyField label="Họ và tên" value={p.student_name} />
               <ReadonlyField label="Mã số sinh viên" value={p.student_id} />
@@ -258,7 +258,7 @@ export default function DefermentRequestPage() {
 
           {/* Thông tin có thể cập nhật */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
+            <h2 className="text-meta font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
             <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
               <EditableField
                 label="Ngày sinh"
@@ -276,7 +276,7 @@ export default function DefermentRequestPage() {
 
           {/* Địa chỉ thường trú — luôn sửa được, tách riêng 3 ô */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">
+            <h2 className="text-meta font-semibold text-muted mb-2.5">
               Địa chỉ thường trú
               {addressChanged && <ChangedTag />}
             </h2>
@@ -286,8 +286,11 @@ export default function DefermentRequestPage() {
               <>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
-                    <label className={ui.fieldLabel}>Tỉnh / Thành phố <span className="text-red-500">*</span></label>
+                    <label htmlFor="def-province" className={ui.fieldLabel}>Tỉnh / Thành phố <span className="text-danger-text">*</span></label>
                     <select
+                      id="def-province"
+                      aria-invalid={!!fieldErrors.province}
+                      aria-describedby={fieldErrors.province ? 'def-province-error' : undefined}
                       value={provinceCode}
                       onChange={(e) => { setProvinceCode(e.target.value); setFieldErrors((f) => ({ ...f, province: undefined, ward: undefined })); }}
                       className={cn(ui.input, 'bg-white', fieldErrors.province && 'border-danger-line')}
@@ -295,36 +298,42 @@ export default function DefermentRequestPage() {
                       <option value="">— Chọn tỉnh/thành —</option>
                       {provinces.map((pv) => <option key={pv.code} value={pv.code}>{pv.name}</option>)}
                     </select>
-                    {fieldErrors.province && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.province}</p>}
+                    {fieldErrors.province && <p id="def-province-error" className="mt-1 text-xs text-danger-text">{fieldErrors.province}</p>}
                   </div>
                   <div>
-                    <label className={ui.fieldLabel}>Phường / Xã <span className="text-red-500">*</span></label>
+                    <label htmlFor="def-ward" className={ui.fieldLabel}>Phường / Xã <span className="text-danger-text">*</span></label>
                     <select
+                      id="def-ward"
+                      aria-invalid={!!fieldErrors.ward}
+                      aria-describedby={fieldErrors.ward ? 'def-ward-error' : undefined}
                       value={wardCode}
                       disabled={!provinceCode || wardsLoading}
                       onChange={(e) => { setWardCode(e.target.value); setFieldErrors((f) => ({ ...f, ward: undefined })); }}
-                      className={cn(ui.input, 'bg-white disabled:bg-slate-50 disabled:text-slate-400', fieldErrors.ward && 'border-danger-line')}
+                      className={cn(ui.input, 'bg-white disabled:bg-surface-subtle disabled:text-faint', fieldErrors.ward && 'border-danger-line')}
                     >
                       <option value="">{!provinceCode ? '— Chọn tỉnh trước —' : wardsLoading ? 'Đang tải…' : '— Chọn phường/xã —'}</option>
                       {wards.map((w) => <option key={w.code} value={w.code}>{w.name}</option>)}
                     </select>
-                    {fieldErrors.ward && <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.ward}</p>}
+                    {fieldErrors.ward && <p id="def-ward-error" className="mt-1 text-xs text-danger-text">{fieldErrors.ward}</p>}
                   </div>
                 </div>
                 <div className="mt-3">
-                  <label className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-red-500">*</span></label>
+                  <label htmlFor="def-street" className={ui.fieldLabel}>Địa chỉ chi tiết <span className="text-danger-text">*</span></label>
                   <input
+                    id="def-street"
+                    aria-invalid={!!fieldErrors.street}
+                    aria-describedby={fieldErrors.street ? 'def-street-error' : undefined}
                     type="text" value={street} maxLength={255}
                     onChange={(e) => { setStreet(e.target.value); setFieldErrors((f) => ({ ...f, street: undefined })); }}
                     placeholder={STREET_PLACEHOLDER}
                     className={cn(ui.input, fieldErrors.street && 'border-danger-line')}
                   />
                   {fieldErrors.street
-                    ? <p className="mt-1 text-[0.75rem] text-danger-text">{fieldErrors.street}</p>
+                    ? <p id="def-street-error" className="mt-1 text-xs text-danger-text">{fieldErrors.street}</p>
                     : <StreetHint />}
                 </div>
                 {addressLockable && <CancelEditButton onClick={cancelAddress} />}
-                <p className="mt-2 text-[0.78rem] text-muted">
+                <p className="mt-2 text-xs text-muted">
                   {p.address_standardized
                     ? 'Địa chỉ mới được Phòng Công tác Sinh viên duyệt trước khi cập nhật vào hồ sơ.'
                     : 'Hồ sơ chưa có địa chỉ theo đơn vị hành chính hiện hành — vui lòng chọn lại. Địa chỉ chuẩn hóa sẽ được Phòng CTSV duyệt và cập nhật vào hồ sơ.'}
@@ -381,9 +390,9 @@ export default function DefermentRequestPage() {
         </form>
       </div>
 
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-line bg-surface-subtle">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-sm text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.
         </p>
       </div>

@@ -10,7 +10,7 @@ import { ui, notice, noticeIcon, subtle } from '@/lib/ui';
 import { SubmittedInsuranceInfo } from '@/components/submitted-insurance-info';
 import { InsuranceTimeline } from '@/components/insurance-timeline';
 import { InsuranceModal } from '@/components/insurance-modal';
-import { api } from '@/lib/api';
+import { api, newRequestKey } from '@/lib/api';
 import { buildVietQrPayload, findBank } from '@/lib/vietqr';
 import type { InsuranceDetail, InsuranceEvidence, Province } from '@/lib/types';
 
@@ -18,7 +18,7 @@ const money = (value: number) => value.toLocaleString('vi-VN') + ' VNĐ';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  return <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+  return <button type="button" className="touch-target inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
     onClick={async () => {
       try {
         await navigator.clipboard.writeText(text);
@@ -43,11 +43,11 @@ function EvidenceImage({ evidence }: { evidence: InsuranceEvidence }) {
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [evidence.url]);
   if (error) return <span className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger-text">Không tải được minh chứng.</span>;
-  if (!url) return <span className="animate-pulse rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">Đang tải ảnh…</span>;
+  if (!url) return <span className="animate-pulse rounded-lg bg-surface-muted px-3 py-2 text-xs text-muted">Đang tải ảnh…</span>;
   return <a href={url} target="_blank" rel="noreferrer" className="group block w-36 overflow-hidden rounded-lg border border-line bg-white transition-colors hover:border-primary-line">
     {/* eslint-disable-next-line @next/next/no-img-element */}
-    <img src={url} alt="Minh chứng thanh toán bổ sung" className="h-24 w-full bg-slate-50 object-contain" />
-    <span className="flex items-center gap-1.5 truncate border-t border-slate-100 px-2.5 py-2 text-xs text-slate-600"><ImageIcon className="h-3.5 w-3.5 shrink-0" />{evidence.filename}</span>
+    <img src={url} alt="Minh chứng thanh toán bổ sung" className="h-24 w-full bg-surface-subtle object-contain" />
+    <span className="flex items-center gap-1.5 truncate border-t border-line2 px-2.5 py-2 text-xs text-ink-3"><ImageIcon className="h-3.5 w-3.5 shrink-0" />{evidence.filename}</span>
   </a>;
 }
 
@@ -91,7 +91,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
     setBusy(true); setError('');
     if (!pending.current) {
       const body = new FormData();
-      body.set('request_key', crypto.randomUUID()); body.set('row_version', String(data.row_version));
+      body.set('request_key', newRequestKey()); body.set('row_version', String(data.row_version));
       if (data.reason_code === 'HOSPITAL_NOT_ACCEPTED') {
         body.set('hospital_code', hospital); body.set('province_code', province);
       } else files.forEach(file => body.append('evidences', file));
@@ -139,7 +139,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                   <button type="button" className={ui.btnPrimary + " w-full shrink-0 sm:w-auto"} onClick={() => setEditing(true)}>
                     {paymentReason ? 'Đóng tiền / gửi minh chứng' : 'Điều chỉnh bệnh viện'}</button>
                 </div>
-              : <p className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
+              : <p className="flex items-start gap-2 rounded-lg bg-surface-subtle p-3 text-sm text-ink-2"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />Liên hệ Phòng Công tác Sinh viên theo nội dung trên. Cán bộ sẽ tiếp nhận lại đơn sau khi vấn đề được xử lý.</p>}
           </RejectionNotice>}
           {rejected && editing && <section className="space-y-4 rounded-lg border border-line bg-white p-4 sm:p-5">
             {data.reason_code === 'HOSPITAL_NOT_ACCEPTED' ? <>
@@ -188,7 +188,7 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="mb-2 font-semibold text-ink">Thông tin chuyển khoản</h3>
-                      <ul className="space-y-1.5 text-sm text-slate-600">
+                      <ul className="space-y-1.5 text-sm text-ink-3">
                         <li>Ngân hàng: <strong className="text-ink">{data.payment.bank_name || '—'}</strong>{paymentBankBin && <span className="ml-1.5 text-xs text-muted">(BIN {paymentBankBin})</span>}</li>
                         <li className="flex flex-wrap items-center gap-x-2"><span>Số tài khoản: <strong className="font-mono text-ink">{data.payment.bank_account_number}</strong></span><CopyButton text={data.payment.bank_account_number} /></li>
                         <li>Chủ tài khoản: <strong className="text-ink">{data.payment.bank_account_name || '—'}</strong></li>
@@ -201,22 +201,22 @@ export function InsuranceSupplement({ id, onUpdated }: { id: number; onUpdated: 
               </> : <p className={notice.base + ' ' + notice.warning}><AlertTriangle className={noticeIcon.warning} />Chưa có đối soát tiền. Liên hệ Phòng CTSV để xác minh số tiền cần đóng.</p>}
 
               <div>
-                <label className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
-                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50">
-                  <input className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => {
+                <label htmlFor={'supplement-file-' + id} className={ui.fieldLabel}>Ảnh minh chứng bổ sung <span className="font-normal text-muted">(tối đa 1 ảnh, 5 MB)</span></label>
+                <div className="group relative flex min-h-[9rem] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-line-strong p-4 text-center transition-colors hover:bg-surface-subtle focus-within:ring-2 focus-within:ring-primary/40">
+                  <input id={'supplement-file-' + id} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => {
                     setFiles(e.target.files?.[0] ? [e.target.files[0]] : []); pending.current = null;
                   }} />
                   <div className="flex min-w-0 flex-col items-center gap-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-slate-500">
                       {files.length ? <CheckSquare size={20} /> : <Plus size={20} />}
                     </div>
-                    <span className="max-w-full break-all text-sm font-medium text-slate-700">{files.length ? 'Đã chọn 1 ảnh' : 'Tải lên minh chứng chuyển khoản'}</span>
-                    <span className="text-xs text-slate-500">JPEG, PNG hoặc WEBP · Tối đa 5MB</span>
+                    <span className="max-w-full break-all text-sm font-medium text-ink-2">{files.length ? 'Đã chọn 1 ảnh' : 'Tải lên minh chứng chuyển khoản'}</span>
+                    <span className="text-xs text-muted">JPEG, PNG hoặc WEBP · Tối đa 5MB</span>
                   </div>
                 </div>
                 {!!files.length && <div className="mt-2 flex flex-wrap gap-1.5">{files.map(file => <span key={file.name + file.lastModified} className="max-w-full truncate rounded-md border border-line bg-white px-2 py-1 text-xs text-muted">{file.name}</span>)}</div>}
               </div>
-              <p className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><CreditCard className="mt-0.5 h-4 w-4 shrink-0" />Ảnh gửi lên chưa đồng nghĩa tiền đã được xác nhận. Các ảnh cũ được giữ nguyên.</p>
+              <p className="flex items-start gap-2 rounded-lg bg-surface-subtle p-3 text-sm text-ink-3"><CreditCard className="mt-0.5 h-4 w-4 shrink-0" />Ảnh gửi lên chưa đồng nghĩa tiền đã được xác nhận. Các ảnh cũ được giữ nguyên.</p>
             </>}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" className={ui.btnGhost} disabled={busy} onClick={() => { setEditing(false); pending.current = null; }}>Hủy</button>

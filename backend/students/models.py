@@ -462,7 +462,12 @@ class StudentHighSchool(models.Model):
 
 
 class StudentBankAccount(models.Model):
-    """Tài khoản ngân hàng — Dashboard sở hữu, Hub CHỈ ĐỌC. `bank_name` là chữ tự do."""
+    """Tài khoản ngân hàng — Dashboard sở hữu, Hub CHỈ ĐỌC. `bank_name` là chữ tự do.
+
+    MGHP dùng để điền sẵn ô tài khoản hoàn tiền; SV sửa thì chỉ sửa ảnh chụp trong
+    đơn (`hub_tuition_exemption_applications`), KHÔNG ghi vào bảng này.
+    `is_current` = dòng đang dùng, không phải "còn hiệu lực".
+    """
 
     student = models.ForeignKey(
         Student, on_delete=models.DO_NOTHING,
@@ -528,3 +533,125 @@ class VnEthnicity(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# ── Miễn giảm học phí — các bảng Dashboard sở hữu, Hub CHỈ ĐỌC ───────────────
+# Bản đầy đủ (kèm ghi chú nghiệp vụ): dashboard_iuoss/tuition/models.py.
+# Schema: dashboard_iuoss/docs/sql/20260930_mghp_schema.sql.
+
+class TuitionExemptionCategory(models.Model):
+    """Đối tượng MGHP. Hub chỉ cho chọn dòng `is_active`."""
+
+    id = models.BigAutoField(primary_key=True)
+    code = models.CharField(max_length=32, unique=True)
+    name_vi = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    required_documents = models.JSONField(null=True, blank=True)
+    resubmit_policy = models.CharField(max_length=16)
+    sort_order = models.SmallIntegerField(default=0)
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        managed = False
+        db_table = "tuition_exemption_categories"
+        ordering = ["sort_order", "code"]
+
+    def __str__(self):
+        return f"{self.code} — {self.name_vi}"
+
+
+class TuitionExemptionCategoryRate(models.Model):
+    """Mức % theo kỳ hiệu lực. Hub đọc để hiện mức dự kiến trên trang chọn đối tượng."""
+
+    id = models.BigAutoField(primary_key=True)
+    category = models.ForeignKey(TuitionExemptionCategory, on_delete=models.DO_NOTHING,
+                                 related_name="rates")
+    effective_from_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING,
+                                            related_name="+")
+    percent = models.DecimalField(max_digits=5, decimal_places=2)
+
+    class Meta:
+        managed = False
+        db_table = "tuition_exemption_category_rates"
+
+
+class TuitionExemptionRound(models.Model):
+    """Đợt nhận hồ sơ. Hub nhận đơn khi `is_active` và opens_at <= now <= closes_at."""
+
+    id = models.BigAutoField(primary_key=True)
+    academic_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
+    round_no = models.PositiveSmallIntegerField(default=1)
+    title = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    opens_at = models.DateTimeField()
+    closes_at = models.DateTimeField()
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        managed = False
+        db_table = "tuition_exemption_rounds"
+        ordering = ["-opens_at"]
+
+
+class TuitionExemptionBeneficiary(models.Model):
+    """SV ĐANG HƯỞNG MGHP theo từng diện — nguồn "lịch sử tham gia" để Hub quyết định
+    nút Nộp hồ sơ / Xác nhận gia hạn / Bổ sung. Dashboard ghi (nạp Excel danh sách cũ,
+    duyệt đơn); Hub CHỈ ĐỌC. Schema: 20260930_mghp_beneficiaries.sql."""
+
+    id = models.BigAutoField(primary_key=True)
+    student = models.ForeignKey(Student, on_delete=models.DO_NOTHING,
+                                related_name="tuition_exemption_benefits")
+    category = models.ForeignKey(TuitionExemptionCategory, on_delete=models.DO_NOTHING,
+                                 related_name="+")
+    status = models.CharField(max_length=16)
+    source = models.CharField(max_length=16)
+    last_verified_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
+
+    class Meta:
+        managed = False
+        db_table = "tuition_exemption_beneficiaries"
+
+
+class StudentTuitionFee(models.Model):
+    """Học phí một SV một kỳ. Hub chỉ đọc dòng của chính SV đăng nhập."""
+
+    id = models.BigAutoField(primary_key=True)
+    student = models.ForeignKey(Student, on_delete=models.DO_NOTHING, related_name="tuition_fees")
+    academic_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
+    fee_amount_vnd = models.BigIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "student_tuition_fees"
+
+
+class TuitionExemptionAward(models.Model):
+    """Kết quả MGHP một SV một kỳ — Dashboard nạp từ Excel danh sách kèm quyết định
+    (`dashboard_iuoss/tuition/award_import_service.py`). Hub CHỈ đọc dòng của chính SV
+    đăng nhập. Cố ý không khai cột nội bộ (lô import, người sửa)."""
+
+    id = models.BigAutoField(primary_key=True)
+    student = models.ForeignKey(Student, on_delete=models.DO_NOTHING, related_name="tuition_exemption_awards")
+    academic_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
+    section_title = models.CharField(max_length=500, null=True)
+    category = models.ForeignKey(TuitionExemptionCategory, on_delete=models.DO_NOTHING, null=True,
+                                 related_name="+")
+    category_code = models.CharField(max_length=32, null=True)
+    category_label = models.CharField(max_length=255, null=True)
+    percent = models.DecimalField(max_digits=5, decimal_places=2, null=True)
+    first_fee_vnd = models.BigIntegerField(null=True)
+    retake_fee_vnd = models.BigIntegerField(null=True)
+    base_fee_vnd = models.BigIntegerField(null=True)
+    decree_amount_vnd = models.BigIntegerField(null=True)
+    school_support_vnd = models.BigIntegerField(null=True)
+    received_vnd = models.BigIntegerField()
+    payment_status = models.CharField(max_length=16, null=True)
+    note = models.CharField(max_length=500, null=True)
+    bank_account_number = models.CharField(max_length=64, null=True)
+    bank_account_holder = models.CharField(max_length=255, null=True)
+    bank_name = models.CharField(max_length=255, null=True)
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = "tuition_exemption_awards"

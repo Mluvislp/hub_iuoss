@@ -98,9 +98,9 @@ function Bubble({ c }: { c: RequestComment }) {
           {c.event && EVENT_LABELS[c.event] && (
             <span className={cn(badge.base, EVENT_STYLES[c.event] ?? badge.neutral, 'py-0')}>{EVENT_LABELS[c.event]}</span>
           )}
-          <span className="ml-auto text-[0.72rem] text-muted">{formatDateTime(c.created_at)}</span>
+          <span className="ml-auto text-xs text-muted">{formatDateTime(c.created_at)}</span>
         </div>
-        <p className="whitespace-pre-wrap break-words text-[0.87rem] leading-relaxed text-ink">
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
           {c.body}
         </p>
       </div>
@@ -351,7 +351,7 @@ export default function RequestDetailPage() {
                 }
               />
               {sendError && (
-                <p className="mt-1.5 text-[0.82rem] text-danger-text">{sendError}</p>
+                <p className="mt-1.5 text-meta text-danger-text">{sendError}</p>
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-3">
                 <button
@@ -363,11 +363,11 @@ export default function RequestDetailPage() {
                   {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                   Gửi trao đổi
                 </button>
-                <span className="text-[0.78rem] text-muted">{body.length}/2000 ký tự</span>
+                <span className="text-xs text-muted">{body.length}/2000 ký tự</span>
               </div>
             </>
           ) : (
-            <p className="flex items-start gap-2 text-[0.85rem] text-muted">
+            <p className="flex items-start gap-2 text-sm text-muted">
               <Lock size={14} className="mt-0.5 shrink-0" />
               Không gửi được trao đổi khi yêu cầu ở trạng thái “{REQUEST_STATUS_LABELS[data.status]}”.
               Liên hệ Phòng Công tác Sinh viên (O1.105) nếu cần hỗ trợ.

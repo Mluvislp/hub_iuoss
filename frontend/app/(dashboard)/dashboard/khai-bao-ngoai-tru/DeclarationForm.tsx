@@ -20,15 +20,15 @@ const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: ''
 export function ReadonlyField({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div>
-      <div className="text-[0.82rem] font-medium text-ink mb-1.5">{label}</div>
+      <div className="text-meta font-medium text-ink mb-1.5">{label}</div>
       <div className={cn(
-        'flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm',
-        value ? 'text-ink' : 'text-slate-400 italic',
+        'flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-surface-subtle text-sm',
+        value ? 'text-ink' : 'text-muted italic',
       )}>
-        <Lock size={13} className="text-slate-400 flex-shrink-0" />
+        <Lock size={13} className="text-faint flex-shrink-0" />
         {value || 'Chưa có thông tin'}
       </div>
-      {note && <p className="mt-1 text-[0.75rem] text-muted">{note}</p>}
+      {note && <p className="mt-1 text-xs text-muted">{note}</p>}
     </div>
   );
 }
@@ -48,12 +48,12 @@ export function ChoiceTile({
         'disabled:opacity-60 disabled:cursor-not-allowed',
         active
           ? 'border-primary bg-primary-soft ring-2 ring-primary-line'
-          : 'border-line bg-white hover:bg-slate-50',
+          : 'border-line bg-white hover:bg-surface-subtle',
       )}
     >
       <span className={cn(
         'mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center',
-        active ? 'border-primary' : 'border-slate-300',
+        active ? 'border-primary' : 'border-line-strong',
       )}>
         {active && <span className="w-2 h-2 rounded-full bg-primary" />}
       </span>
@@ -61,7 +61,7 @@ export function ChoiceTile({
         <span className={cn('block text-sm font-semibold', active ? 'text-primary-text' : 'text-ink')}>
           {title}
         </span>
-        <span className="block text-[0.78rem] text-muted mt-0.5">{desc}</span>
+        <span className="block text-xs text-muted mt-0.5">{desc}</span>
       </span>
     </button>
   );
@@ -199,10 +199,10 @@ export function DeclarationFields({
     <>
       {/* ── 1. Thông tin cá nhân ── */}
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-1">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-1">
           <User size={15} className={accentIcon.primary} /> Thông tin cá nhân
         </h2>
-        <p className="text-[0.78rem] text-muted mb-3">
+        <p className="text-xs text-muted mb-3">
           Thông tin lấy từ hồ sơ của trường. Cần sửa thì bấm <b>Yêu cầu chỉnh sửa</b> —
           thay đổi sẽ được phòng CTSV duyệt trước khi có hiệu lực.
         </p>
@@ -227,22 +227,24 @@ export function DeclarationFields({
             extra={
               <div className="grid sm:grid-cols-2 gap-2 mt-2">
                 <div>
-                  <label className="block text-[0.75rem] text-muted mb-1">Nơi cấp</label>
+                  <label htmlFor="cccd-issue-place" className="block text-xs text-muted mb-1">Nơi cấp</label>
                   <input
+                    id="cccd-issue-place"
                     type="text" value={cccdExtra.issue_place} maxLength={255}
                     placeholder="Cục Cảnh sát QLHC về TTXH"
                     onChange={(e) => setCccdExtra((s) => ({ ...s, issue_place: e.target.value }))}
-                    className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                    className={cn(ui.input, 'h-9 text-sm')}
                   />
                 </div>
                 <div>
-                  <label className="block text-[0.75rem] text-muted mb-1">Ngày cấp</label>
+                  <label htmlFor="cccd-issue-date" className="block text-xs text-muted mb-1">Ngày cấp</label>
                   <input
+                    id="cccd-issue-date"
                     type="date"
                     value={cccdExtra.issue_date}
                     max={todayInput()}
                     onChange={(e) => setCccdExtra((s) => ({ ...s, issue_date: e.target.value }))}
-                    className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                    className={cn(ui.input, 'h-9 text-sm')}
                   />
                 </div>
               </div>
@@ -274,10 +276,10 @@ export function DeclarationFields({
 
       {/* ── 2. Thường trú ── */}
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-1">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-1">
           <MapPin size={15} className={accentIcon.primary} /> Địa chỉ thường trú
         </h2>
-        <p className="text-[0.78rem] text-muted mb-3">Địa chỉ theo hộ khẩu / nơi ở lâu dài của gia đình.</p>
+        <p className="text-xs text-muted mb-3">Địa chỉ theo hộ khẩu / nơi ở lâu dài của gia đình.</p>
         <AddressFields
           idPrefix="perm"
           value={permanent}
@@ -297,12 +299,12 @@ export function DeclarationFields({
 
       {/* ── 3. Tạm trú ── */}
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-1">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-1">
           <Home size={15} className={accentIcon.primary} /> Nơi tạm trú hiện tại
         </h2>
-        <p className="text-[0.78rem] text-muted mb-3">
+        <p className="text-xs text-muted mb-3">
           Sinh viên hiện có đang tạm trú tại Thành phố Hồ Chí Minh hay không?
-          <span className="text-red-500"> *</span>
+          <span className="text-danger-text"> *</span>
         </p>
 
         <div className={cn('grid gap-3', permanentInHcmc ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
@@ -345,7 +347,7 @@ export function DeclarationFields({
           )}
         </div>
         {fieldErrors.temporary_in_hcmc && (
-          <p className="mt-1.5 text-[0.75rem] text-danger-text">{fieldErrors.temporary_in_hcmc}</p>
+          <p className="mt-1.5 text-xs text-danger-text">{fieldErrors.temporary_in_hcmc}</p>
         )}
 
         {!noTemp && inHcmc !== null && (
@@ -382,7 +384,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
   const row = (label: string, value: string) => (
     <div key={label} className="flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0">
       <span className="text-sm text-muted">{label}</span>
-      <span className={cn('text-sm text-right', value ? 'font-medium text-ink' : 'italic text-slate-400')}>
+      <span className={cn('text-sm text-right', value ? 'font-medium text-ink' : 'italic text-muted')}>
         {value || 'Chưa có'}
       </span>
     </div>
@@ -390,7 +392,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
   return (
     <>
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-2">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-2">
           <User size={15} className={accentIcon.primary} /> Thông tin cá nhân
         </h2>
         <div className="rounded-lg border border-line px-4 py-1">
@@ -412,7 +414,7 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
       </section>
 
       <section>
-        <h2 className="flex items-center gap-2 text-[0.88rem] font-semibold text-ink mb-2">
+        <h2 className="flex items-center gap-2 text-section font-semibold text-ink mb-2">
           <MapPin size={15} className={accentIcon.primary} /> Địa chỉ đã khai
         </h2>
         <div className="rounded-lg border border-line px-4 py-1">

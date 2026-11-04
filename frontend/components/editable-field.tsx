@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { Lock, PencilLine, RotateCcw } from 'lucide-react';
 import { cn, toDateInput, fromDateInput, todayInput, DATE_INPUT_MIN } from '@/lib/utils';
 import { ui } from '@/lib/ui';
@@ -9,7 +10,7 @@ export function ReadonlyField({ label, value }: { label: string; value: string }
   return (
     <div>
       <div className={ui.label}>{label}</div>
-      <div className="mt-1 rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center text-sm text-ink">
+      <div className="mt-1 rounded-lg border border-line bg-surface-subtle px-3 h-10 flex items-center text-sm text-ink">
         {value || '—'}
       </div>
     </div>
@@ -19,9 +20,9 @@ export function ReadonlyField({ label, value }: { label: string; value: string }
 /** Hộp hiển thị giá trị đang khóa — dùng cho cả ô đơn lẫn từng ô trong cụm địa chỉ. */
 export function LockedBox({ value }: { value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-slate-50 px-3 h-10 flex items-center justify-between gap-2 text-sm text-ink">
+    <div className="rounded-lg border border-line bg-surface-subtle px-3 h-10 flex items-center justify-between gap-2 text-sm text-ink">
       <span className="truncate">{value || '—'}</span>
-      <Lock size={13} className="flex-shrink-0 text-slate-400" />
+      <Lock size={13} className="flex-shrink-0 text-faint" />
     </div>
   );
 }
@@ -46,7 +47,7 @@ export function CancelEditButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-1.5 inline-flex items-center gap-1 text-[0.78rem] font-medium text-muted hover:text-ink transition-colors"
+      className="touch-target mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink transition-colors"
     >
       <RotateCcw size={12} /> Hủy chỉnh sửa
     </button>
@@ -56,7 +57,7 @@ export function CancelEditButton({ onClick }: { onClick: () => void }) {
 /** Nhãn "sẽ gửi duyệt" gắn cạnh tên ô khi giá trị khác hồ sơ. */
 export function ChangedTag() {
   return (
-    <span className="ml-1.5 inline-flex items-center gap-0.5 text-[0.75rem] font-normal text-warning-text">
+    <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs font-normal text-warning-text">
       <PencilLine size={11} /> sẽ gửi duyệt
     </span>
   );
@@ -93,14 +94,17 @@ export function EditableField({
   onCancel: () => void;
 }) {
   const changed = value.trim() !== original.trim();
+  const id = useId();
+  const msgId = `${id}-msg`;
+  const a11y = { id, 'aria-invalid': !!error, 'aria-describedby': error || hint ? msgId : undefined };
   const inputCls = cn(
     ui.input,
-    error ? 'border-danger-line focus:border-danger-line focus:ring-red-100' : changed && 'border-warning-line',
+    error ? ui.inputError : changed && 'border-warning-line',
   );
 
   return (
     <div>
-      <label className={ui.fieldLabel}>
+      <label htmlFor={open ? id : undefined} className={ui.fieldLabel}>
         {label}
         {changed && <ChangedTag />}
       </label>
@@ -109,6 +113,7 @@ export function EditableField({
         <>
           {kind === 'date' ? (
             <input
+              {...a11y}
               type="date"
               value={toDateInput(value)}
               min={DATE_INPUT_MIN}
@@ -129,6 +134,7 @@ export function EditableField({
             </select>
           ) : (
             <input
+              {...a11y}
               type="text"
               value={value}
               maxLength={maxLength}
@@ -140,8 +146,8 @@ export function EditableField({
             />
           )}
           {error
-            ? <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>
-            : hint && <p className="mt-1 text-[0.75rem] text-warning-text">{hint}</p>}
+            ? <p id={msgId} className="mt-1 text-xs text-danger-text">{error}</p>
+            : hint && <p id={msgId} className="mt-1 text-xs text-warning-text">{hint}</p>}
           {lockable && <CancelEditButton onClick={onCancel} />}
         </>
       ) : (

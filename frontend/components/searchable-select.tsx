@@ -134,28 +134,29 @@ export default function SearchableSelect({
         className={cn(
           ui.input,
           'flex items-center justify-between gap-2 text-left',
-          disabled && 'cursor-not-allowed bg-slate-50 text-slate-500',
-          !selected && !disabled && 'text-slate-400',
+          disabled && 'cursor-not-allowed bg-surface-subtle text-muted',
+          !selected && !disabled && 'text-muted',
         )}
       >
         <span className="truncate">
           {selected ? selected.label : placeholder}
           {selected?.hint && <span className="ml-1.5 text-xs text-muted">({selected.hint})</span>}
         </span>
-        <ChevronDown size={16} className="shrink-0 text-slate-400" />
+        <ChevronDown size={16} className="shrink-0 text-faint" />
       </button>
 
       {open && !disabled && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-line bg-white shadow-card">
           <div className="flex items-center gap-2 border-b border-line2 px-3">
-            <Search size={14} className="shrink-0 text-slate-400" />
+            <Search size={14} className="shrink-0 text-faint" />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => { setQuery(e.target.value); setActive(0); }}
               onKeyDown={onKeyDown}
               placeholder={searchPlaceholder}
-              className="h-10 w-full bg-transparent text-sm text-ink placeholder:text-slate-400 focus:outline-none"
+              aria-label={searchPlaceholder}
+              className="h-10 w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
             />
           </div>
 

@@ -60,7 +60,7 @@ export default function RequestHistoryPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-ink">Yêu cầu giấy tờ</h1>
+          <h1 className="text-title font-semibold text-ink">Yêu cầu giấy tờ</h1>
           <p className="mt-1 text-sm text-muted">
             Danh sách yêu cầu đã gửi, trạng thái xử lý và trao đổi với Phòng Công tác Sinh viên.
           </p>
@@ -98,7 +98,7 @@ export default function RequestHistoryPage() {
       {rows !== null && rows.length === 0 && (
         <section className={ui.card}>
           <div className="px-5 py-12 text-center">
-            <FileText size={22} className="mx-auto mb-2 text-slate-300" />
+            <FileText size={22} className="mx-auto mb-2 text-line-strong" aria-hidden="true" />
             <p className="text-sm text-muted">Chưa có yêu cầu giấy tờ nào.</p>
             <Link
               href="/dashboard/requests/new"
@@ -167,7 +167,7 @@ export default function RequestHistoryPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 line-clamp-1 text-[0.85rem] text-slate-600" title={req.purpose}>
+                    <p className="mt-1 line-clamp-1 text-sm text-ink-3" title={req.purpose}>
                       {req.purpose}
                     </p>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] text-muted">
@@ -181,7 +181,7 @@ export default function RequestHistoryPage() {
                       )}
                     </p>
                   </div>
-                  <ChevronRight size={16} className="mt-1 shrink-0 text-slate-400" />
+                  <ChevronRight size={16} className="mt-1 shrink-0 text-faint" />
                 </div>
               </Link>
             ))}

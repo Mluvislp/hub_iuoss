@@ -18,20 +18,63 @@
   }
 
   body {
-    background: #f6f8fb;
-    color: #111827;
+    background: theme('colors.canvas');
+    color: theme('colors.ink.DEFAULT');
   }
 
   /* Focus rõ cho accessibility (input/radio/button) */
   :focus-visible {
-    outline: 2px solid #1d4ed8;
+    outline: 2px solid theme('colors.primary.hover');
     outline-offset: 2px;
+  }
+}
+
+/* iOS Safari tự phóng to cả trang khi focus ô nhập có chữ < 16px, rồi không thu
+   lại — với form dài (BHYT, ngoại trú, MGHP) SV phải chụm tay thu nhỏ sau mỗi ô.
+   Ép 16px trên thiết bị cảm ứng; desktop (chuột) giữ cỡ chữ gọn của từng form.
+   Viết ngoài @layer + bọc :is() để thắng mọi class cỡ chữ (text-sm, text-meta…) trên ô. */
+@media (hover: none) and (pointer: coarse) {
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),
+    select,
+    textarea
+  ) {
+    font-size: 16px;
   }
 }
 
 @layer utilities {
   .sidebar-transition {
-    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Khi đóng: visibility đợi hết hiệu ứng trượt (delay 0.22s) rồi mới ẩn hẳn —
+       ra khỏi thứ tự Tab. Khi mở: hiện ngay (rule dưới), để effect trong sidebar.tsx
+       focus được nút đóng ngay lúc mở. */
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear 0.22s;
+  }
+  .sidebar-transition[data-open='true'] {
+    transition-delay: 0s;
+  }
+  /* Giảm chuyển động: drawer hiện/ẩn ngay, không trượt. Spinner (animate-spin)
+     giữ nguyên — đó là tín hiệu "đang tải", không phải trang trí. */
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-transition {
+      transition: none;
+    }
+  }
+  /* Mở rộng vùng bấm lên tối thiểu 44×44 mà không đổi hình thức — cho nút icon
+     nhỏ và link chữ. Không dùng cho nút xếp sát nhau (vùng mở rộng sẽ chồng lên
+     nút bên cạnh) — chỗ đó dùng `coarse:min-h-11`. */
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
   .line-clamp-2 {
     display: -webkit-box;
@@ -49,6 +92,6 @@
   background: transparent;
 }
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: theme('colors.line.DEFAULT');
   border-radius: 3px;
 }

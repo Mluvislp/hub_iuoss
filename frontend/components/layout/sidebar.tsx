@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -45,11 +46,13 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [{ href: '/dashboard', icon: LayoutDashboard, label: 'Bảng thông tin' }],
   },
   {
-    // Trang chỉ để XEM thông tin cá nhân — tách khỏi nhóm dịch vụ (nơi SV phải nộp gì đó).
+    // Hồ sơ gắn với chính sinh viên, theo dõi theo đợt (BHYT, MGHP) hoặc chỉ để xem
+    // (SHCD) — tách khỏi nhóm dịch vụ (yêu cầu, khai báo lẻ).
     label: 'Hồ sơ của tôi',
     items: [
       featureItem('personal_info'),
       { href: '/dashboard/bao-hiem-y-te', icon: ShieldCheck, label: 'Bảo hiểm y tế' },
+      featureItem('tuition_waiver'),
       featureItem('civic_activities'),
     ],
   },
@@ -99,6 +102,25 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
     .filter((href) => pathname === href || pathname.startsWith(href + '/'))
     .sort((a, b) => b.length - a.length)[0] ?? '';
   const router = useRouter();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  // layout truyền onClose là arrow mới mỗi lần render — giữ trong ref để effect
+  // dưới chỉ chạy khi `open` đổi, không giật focus mỗi lần layout render lại.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Drawer mobile: mở thì đưa focus vào nút đóng, Esc để đóng, đóng thì trả focus
+  // về chỗ cũ (nút mở menu). Ở desktop `open` luôn false nên effect không làm gì.
+  useEffect(() => {
+    if (!open) return;
+    const returnTo = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      returnTo?.focus();
+    };
+  }, [open]);
 
   function handleLogout() {
     clearAuth();
@@ -110,15 +132,20 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
     <>
       {/* Mobile overlay */}
       {open && (
-        <div className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 bg-scrim/40 z-40 lg:hidden" onClick={onClose} />
       )}
 
+      {/* Đóng ở mobile → `invisible`: chỉ dịch ra ngoài màn hình thì các link vẫn
+          nhận Tab và vẫn bị trình đọc màn hình đọc. visibility được transition
+          cùng transform (globals.css) nên hiệu ứng trượt ra vẫn chạy hết. */}
       <aside
+        aria-label="Menu chính"
+        data-open={open}
         className={cn(
           'fixed top-0 left-0 bottom-0 z-50 w-[260px]',
           'bg-sidebar border-r border-line flex flex-col',
           'sidebar-transition lg:translate-x-0',
-          open ? 'translate-x-0' : '-translate-x-full',
+          open ? 'translate-x-0' : '-translate-x-full max-lg:invisible',
         )}
       >
         {/* Dải accent thương hiệu */}
@@ -128,17 +155,18 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <div className="flex items-center justify-between h-[55px] px-5 bg-white border-b border-line">
           <Link href={bhytOnly ? BHYT_HOME : '/dashboard'} className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-md bg-primary text-white flex items-center justify-center
-                            text-[0.82rem] font-bold tracking-tight shadow-sm shadow-primary/25">
+                            text-meta font-bold tracking-tight shadow-sm shadow-primary/25">
               IU
             </div>
             <div className="leading-tight">
-              <div className="text-ink font-semibold text-[0.9rem]">IUOSS Hub</div>
-              <div className="text-muted text-[0.68rem]">Cổng dịch vụ sinh viên</div>
+              <div className="text-ink font-semibold text-section">IUOSS Hub</div>
+              <div className="text-muted text-xs">Cổng dịch vụ sinh viên</div>
             </div>
           </Link>
           <button
+            ref={closeRef}
             onClick={onClose}
-            className="lg:hidden p-1.5 -mr-1.5 text-muted hover:text-ink"
+            className="touch-target lg:hidden p-1.5 -mr-1.5 text-muted hover:text-ink"
             aria-label="Đóng menu"
           >
             <X size={18} />
@@ -149,7 +177,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
           {sections.map((section, i) => (
             <div key={section.label} className={cn('px-3', i > 0 && 'mt-5 pt-5 border-t border-line2')}>
-              <p className="px-2.5 mb-2 text-[0.68rem] font-semibold text-slate-400">
+              <p className="px-2.5 mb-2 text-xs font-semibold text-muted">
                 {section.label}
               </p>
               <div className="space-y-0.5">
@@ -162,11 +190,12 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
                       key={item.href}
                       href={item.href}
                       onClick={onClose}
+                      aria-current={isActive ? 'page' : undefined}
                       className={cn(
-                        'flex items-center gap-3 px-2.5 h-10 rounded-md text-sm transition-colors border-l-[3px]',
+                        'flex items-center gap-3 px-2.5 h-10 coarse:h-11 rounded-md text-sm transition-colors',
                         isActive
-                          ? 'bg-primary-soft border-primary text-primary-text font-semibold'
-                          : 'border-transparent text-slate-600 hover:text-ink hover:bg-slate-100',
+                          ? 'bg-primary-soft text-primary-text font-semibold'
+                          : 'text-ink-3 hover:text-ink hover:bg-surface-muted',
                       )}
                     >
                       <Icon size={17} className="flex-shrink-0" />
@@ -192,7 +221,7 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
         <div className="border-t border-line p-3">
           {session && (
             <div className="flex items-center gap-3 px-2 py-2">
-              <div className="w-8 h-8 rounded-md bg-slate-100 border border-line text-ink
+              <div className="w-8 h-8 rounded-md bg-surface-muted border border-line text-ink
                               flex items-center justify-center text-sm font-semibold flex-shrink-0">
                 {getInitials(session.full_name)}
               </div>
@@ -206,8 +235,8 @@ export default function Sidebar({ session, features, open, onClose }: SidebarPro
           )}
           <button
             onClick={handleLogout}
-            className="mt-1 w-full flex items-center gap-2.5 px-2.5 h-9 rounded-md text-sm
-                       text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="mt-1 w-full flex items-center gap-2.5 px-2.5 h-9 coarse:h-11 rounded-md text-sm
+                       text-ink-3 hover:text-danger-text hover:bg-danger-soft transition-colors"
           >
             <LogOut size={16} />
             Đăng xuất

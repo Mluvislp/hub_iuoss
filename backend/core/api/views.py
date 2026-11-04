@@ -80,6 +80,7 @@ def feature_flags() -> dict:
         "document_requests": settings.FEATURE_DOCUMENT_REQUESTS,
         "civic_activities": settings.FEATURE_CIVIC_ACTIVITIES,
         "health_check": settings.FEATURE_HEALTH_CHECK,
+        "tuition_waiver": settings.FEATURE_TUITION_WAIVER,
         "support_tickets": settings.FEATURE_SUPPORT_TICKETS,
         "personal_info": settings.FEATURE_PERSONAL_INFO,
         "diploma": settings.FEATURE_DIPLOMA,

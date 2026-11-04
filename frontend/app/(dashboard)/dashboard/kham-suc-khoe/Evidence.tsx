@@ -26,7 +26,7 @@ export function EvidenceGuide({ hcmc, year }: { hcmc: boolean; year: string }) {
   );
   return (
     <div className="space-y-2.5">
-      <div className="text-[0.82rem] font-semibold text-ink">Hướng dẫn chuẩn bị ảnh minh chứng</div>
+      <div className="text-meta font-semibold text-ink">Hướng dẫn chuẩn bị ảnh minh chứng</div>
 
       <div className={box(hcmc)}>
         <div className="font-semibold mb-1.5">
@@ -88,15 +88,15 @@ export function EvidencePicker({
     <div>
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
         {files.map((f, i) => (
-          <div key={previews[i]} className="relative rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
+          <div key={previews[i]} className="relative rounded-lg border border-line overflow-hidden bg-surface-subtle aspect-[3/4]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previews[i]} alt={f.name} className="w-full h-full object-cover" />
             <button type="button" aria-label="Bỏ ảnh"
                     onClick={() => onChange(files.filter((_, j) => j !== i))}
-                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md bg-white/95 border border-line flex items-center justify-center text-muted hover:text-danger-text">
+                    className="touch-target absolute top-1.5 right-1.5 w-7 h-7 coarse:w-9 coarse:h-9 rounded-md bg-white/95 border border-line flex items-center justify-center text-muted hover:text-danger-text">
               <X size={14} />
             </button>
-            <div className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-line px-2 py-1 text-[0.7rem] text-muted truncate">
+            <div className="absolute bottom-0 inset-x-0 bg-white/95 border-t border-line px-2 py-1 text-xs text-muted truncate">
               {f.name}
             </div>
           </div>
@@ -104,23 +104,23 @@ export function EvidencePicker({
         {files.length < max && (
           <button type="button" onClick={() => input.current?.click()}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed aspect-[3/4] text-muted hover:bg-slate-50 hover:text-ink transition-colors',
-                    error || localError ? 'border-danger-line' : 'border-slate-300',
+                    'flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed aspect-[3/4] text-muted hover:bg-surface-subtle hover:text-ink transition-colors',
+                    error || localError ? 'border-danger-line' : 'border-line-strong',
                   )}>
             <ImagePlus size={22} />
-            <span className="text-[0.8rem] font-medium">Thêm ảnh</span>
-            <span className="text-[0.7rem]">{files.length}/{max}</span>
+            <span className="text-meta font-medium">Thêm ảnh</span>
+            <span className="text-xs">{files.length}/{max}</span>
           </button>
         )}
       </div>
       <input ref={input} type="file" accept={ACCEPT} multiple className="hidden"
              onChange={(e) => add(e.target.files)} />
-      <p className="mt-2 text-[0.75rem] text-muted">
+      <p className="mt-2 text-xs text-muted">
         Ảnh chụp phiếu kết quả hoặc màn hình kết quả trên ứng dụng Công dân số. JPG, PNG, WebP
         hoặc HEIC; tối đa {max} ảnh, mỗi ảnh không quá 5 MB.
       </p>
       {(error || localError) && (
-        <p className="mt-1 text-[0.75rem] text-danger-text">{error || localError}</p>
+        <p className="mt-1 text-xs text-danger-text">{error || localError}</p>
       )}
     </div>
   );
@@ -145,12 +145,12 @@ export function EvidenceThumbs({ response }: { response: HealthCheckResponse }) 
     <div className="grid grid-cols-3 gap-3">
       {response.evidence.map((e, i) => (
         <a key={e.index} href={urls[i] || undefined} target="_blank" rel="noopener noreferrer"
-           className="block rounded-lg border border-line overflow-hidden bg-slate-50 aspect-[3/4]">
+           className="block rounded-lg border border-line overflow-hidden bg-surface-subtle aspect-[3/4]">
           {urls[i] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={urls[i]!} alt={e.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="flex h-full items-center justify-center text-slate-400">
+            <span className="flex h-full items-center justify-center text-faint">
               <FileImage size={20} />
             </span>
           )}

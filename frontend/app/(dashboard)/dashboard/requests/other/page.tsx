@@ -161,7 +161,7 @@ export default function OtherRequestPage() {
           <div className="w-11 h-11 rounded-full bg-success-soft border border-success-line flex items-center justify-center mx-auto mb-4">
             <Check size={22} className="text-success-text" />
           </div>
-          <h2 className="text-lg font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
+          <h2 className="text-title font-semibold text-ink">{isEdit ? 'Đã cập nhật yêu cầu' : 'Đã gửi yêu cầu'}</h2>
           <p className="text-sm text-muted mt-2">Phòng CTSV sẽ phản hồi trong thời gian sớm nhất.</p>
           <div className="mt-6"><Link href={isEdit ? `/dashboard/requests/${edit.id}` : '/dashboard'} className={ui.btnPrimary}>{isEdit ? 'Xem yêu cầu' : 'Về Bảng thông tin'}</Link></div>
         </div>
@@ -176,11 +176,11 @@ export default function OtherRequestPage() {
 
   return (
     <div className="max-w-[760px] space-y-4">
-      <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+      <nav className="flex items-center gap-1.5 text-meta text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <Link href="/dashboard/requests/new" className="hover:text-ink">Yêu cầu giấy tờ</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Lý do khác</span>
       </nav>
 
@@ -205,7 +205,7 @@ export default function OtherRequestPage() {
 
           {/* Thông tin chỉ xem */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin sinh viên</h2>
+            <h2 className="text-meta font-semibold text-muted mb-2.5">Thông tin sinh viên</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <ReadonlyField label="Họ và tên" value={p.student_name} />
               <ReadonlyField label="Mã số sinh viên" value={p.student_id} />
@@ -218,7 +218,7 @@ export default function OtherRequestPage() {
 
           {/* Thông tin có thể cập nhật */}
           <div>
-            <h2 className="text-[0.82rem] font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
+            <h2 className="text-meta font-semibold text-muted mb-2.5">Thông tin có thể cập nhật</h2>
             <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">
               <EditableField
                 label="Ngày sinh"
@@ -243,7 +243,7 @@ export default function OtherRequestPage() {
                 onCancel={() => cancelField('citizen_id', originals)}
               />
             </div>
-            <p className="mt-3 text-[0.78rem] text-muted leading-relaxed">
+            <p className="mt-3 text-xs text-muted leading-relaxed">
               Thông tin đã có trong hồ sơ được khóa sẵn — bấm{' '}
               <strong className="font-medium text-ink">Yêu cầu chỉnh sửa</strong> nếu cần sửa.
               Nội dung sửa sẽ được Phòng CTSV duyệt trước khi in lên giấy; riêng ngày sinh và CCCD
@@ -253,8 +253,9 @@ export default function OtherRequestPage() {
 
           {/* Mục đích */}
           <div>
-            <label className={ui.fieldLabel}>Mục đích làm giấy <span className="text-red-500">*</span></label>
+            <label htmlFor="other-purpose" className={ui.fieldLabel}>Mục đích làm giấy <span className="text-danger-text">*</span></label>
             <select
+              id="other-purpose"
               value={purposeCode}
               onChange={(e) => setPurposeCode(e.target.value)}
               className={cn(ui.input, 'appearance-none bg-white')}
@@ -270,14 +271,17 @@ export default function OtherRequestPage() {
 
             {isProgram && (
               <div className="mt-2.5">
-                <label className={ui.fieldLabel}>Tên chương trình <span className="text-red-500">*</span></label>
+                <label htmlFor="other-program" className={ui.fieldLabel}>Tên chương trình <span className="text-danger-text">*</span></label>
                 <input
+                  id="other-program"
+                  aria-invalid={!!fieldErrors.program_name}
+                  aria-describedby={fieldErrors.program_name ? 'other-program-error' : undefined}
                   type="text" value={programName} maxLength={200}
                   onChange={(e) => { setProgramName(e.target.value); setFieldErrors((f) => ({ ...f, program_name: undefined })); }}
                   placeholder="Nhập tên chương trình tham gia…"
-                  className={cn(ui.input, fieldErrors.program_name && 'border-red-400 focus:border-red-400 focus:ring-red-100')}
+                  className={cn(ui.input, fieldErrors.program_name && ui.inputError)}
                 />
-                {fieldErrors.program_name && <p className="mt-1 text-[0.75rem] text-red-600">{fieldErrors.program_name}</p>}
+                {fieldErrors.program_name && <p id="other-program-error" className="mt-1 text-xs text-danger-text">{fieldErrors.program_name}</p>}
               </div>
             )}
           </div>
@@ -312,9 +316,9 @@ export default function OtherRequestPage() {
         </form>
       </div>
 
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-line bg-surface-subtle">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-sm text-ink-3 leading-relaxed">
           Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.
         </p>
       </div>

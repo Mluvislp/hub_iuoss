@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { Lock, PencilLine } from 'lucide-react';
 import { ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
@@ -25,20 +26,23 @@ export default function PersonalField({
 }: Props) {
   const unlocked = draft !== undefined;
   const blank = !field.value;
+  const id = useId();
+  const msgId = `${id}-msg`;
+  const hasMsg = !!error || (!!hint && !unlocked);
 
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1.5">
-        <label className="text-[0.82rem] font-medium text-ink">{field.label}</label>
+        <label htmlFor={unlocked ? id : undefined} className="text-meta font-medium text-ink">{field.label}</label>
 
         {unlocked ? (
           <button type="button" onClick={onCancel}
-                  className="text-[0.75rem] font-medium text-muted hover:text-ink">
+                  className="touch-target text-xs font-medium text-muted hover:text-ink">
             Hủy sửa
           </button>
         ) : (
           <button type="button" onClick={onUnlock}
-                  className="inline-flex items-center gap-1 text-[0.75rem] font-medium text-primary-text hover:underline">
+                  className="touch-target inline-flex items-center gap-1 text-xs font-medium text-primary-text hover:underline">
             <PencilLine size={11} />
             {blank ? 'Bổ sung' : 'Yêu cầu chỉnh sửa'}
           </button>
@@ -48,6 +52,9 @@ export default function PersonalField({
       {unlocked ? (
         <>
           <input
+            id={id}
+            aria-invalid={!!error}
+            aria-describedby={hasMsg ? msgId : undefined}
             type="text"
             value={draft}
             placeholder={placeholder}
@@ -60,16 +67,16 @@ export default function PersonalField({
       ) : (
         <div className={cn(
           'flex items-center gap-2 h-10 px-3 rounded-lg border text-sm',
-          blank ? 'border-line bg-slate-50 text-slate-400 italic' : 'border-line bg-slate-50 text-ink',
+          blank ? 'border-line bg-surface-subtle text-muted italic' : 'border-line bg-surface-subtle text-ink',
         )}>
-          <Lock size={13} className="text-slate-400 flex-shrink-0" />
+          <Lock size={13} className="text-faint flex-shrink-0" />
           {field.value || 'Chưa có thông tin'}
         </div>
       )}
 
-      {error && <p className="mt-1 text-[0.75rem] text-danger-text">{error}</p>}
+      {error && <p id={msgId} className="mt-1 text-xs text-danger-text">{error}</p>}
       {hint && !error && !unlocked && (
-        <p className="mt-1 text-[0.75rem] text-muted">{hint}</p>
+        <p id={msgId} className="mt-1 text-xs text-muted">{hint}</p>
       )}
     </div>
   );

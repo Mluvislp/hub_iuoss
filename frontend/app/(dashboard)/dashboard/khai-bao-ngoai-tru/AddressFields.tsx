@@ -55,16 +55,18 @@ export default function AddressFields({
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className={ui.fieldLabel} htmlFor={`${idPrefix}-province`}>
-            Tỉnh / Thành phố <span className="text-red-500">*</span>
+            Tỉnh / Thành phố <span className="text-danger-text">*</span>
           </label>
           {lockedProvinceCode ? (
-            <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
-              <Lock size={13} className="text-slate-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-line bg-surface-subtle text-sm text-ink">
+              <Lock size={13} className="text-faint flex-shrink-0" />
               {lockedProvince?.name ?? 'Thành phố Hồ Chí Minh'}
             </div>
           ) : (
             <select
               id={`${idPrefix}-province`}
+              aria-invalid={!!errors.province}
+              aria-describedby={errors.province ? `${idPrefix}-province-error` : undefined}
               value={value.provinceCode}
               onChange={(e) => onChange({ ...value, provinceCode: e.target.value, wardCode: '' })}
               className={cn(ui.input, 'bg-white', errors.province && 'border-danger-line')}
@@ -76,22 +78,24 @@ export default function AddressFields({
             </select>
           )}
           {errors.province && (
-            <p className="mt-1 text-[0.75rem] text-danger-text">{errors.province}</p>
+            <p id={`${idPrefix}-province-error`} className="mt-1 text-xs text-danger-text">{errors.province}</p>
           )}
         </div>
 
         <div>
           <label className={ui.fieldLabel} htmlFor={`${idPrefix}-ward`}>
-            Phường / Xã <span className="text-red-500">*</span>
+            Phường / Xã <span className="text-danger-text">*</span>
           </label>
           <select
             id={`${idPrefix}-ward`}
+            aria-invalid={!!errors.ward}
+            aria-describedby={errors.ward ? `${idPrefix}-ward-error` : undefined}
             value={value.wardCode}
             disabled={!provinceCode || loading}
             onChange={(e) => onChange({ ...value, wardCode: e.target.value })}
             className={cn(
               ui.input,
-              'bg-white disabled:bg-slate-50 disabled:text-slate-400',
+              'bg-white disabled:bg-surface-subtle disabled:text-faint',
               errors.ward && 'border-danger-line',
             )}
           >
@@ -102,16 +106,18 @@ export default function AddressFields({
               <option key={w.code} value={w.code}>{w.name}</option>
             ))}
           </select>
-          {errors.ward && <p className="mt-1 text-[0.75rem] text-danger-text">{errors.ward}</p>}
+          {errors.ward && <p id={`${idPrefix}-ward-error`} className="mt-1 text-xs text-danger-text">{errors.ward}</p>}
         </div>
       </div>
 
       <div>
         <label className={ui.fieldLabel} htmlFor={`${idPrefix}-street`}>
-          Địa chỉ chi tiết <span className="text-red-500">*</span>
+          Địa chỉ chi tiết <span className="text-danger-text">*</span>
         </label>
         <input
           id={`${idPrefix}-street`}
+          aria-invalid={!!errors.street}
+          aria-describedby={errors.street ? `${idPrefix}-street-error` : undefined}
           type="text"
           value={value.street}
           maxLength={255}
@@ -120,7 +126,7 @@ export default function AddressFields({
           className={cn(ui.input, errors.street && 'border-danger-line')}
         />
         {errors.street ? (
-          <p className="mt-1 text-[0.75rem] text-danger-text">{errors.street}</p>
+          <p id={`${idPrefix}-street-error`} className="mt-1 text-xs text-danger-text">{errors.street}</p>
         ) : (
           <StreetHint />
         )}

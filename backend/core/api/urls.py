@@ -1,5 +1,5 @@
 from django.urls import path
-from . import diploma_views, health_check_views, submission_views, ticket_views, views
+from . import diploma_views, health_check_views, submission_views, ticket_views, tuition_exemption_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
@@ -79,6 +79,19 @@ urlpatterns = [
     # Nộp bằng tốt nghiệp THPT — core/diploma.py
     path("diploma/", diploma_views.DiplomaView.as_view(), name="api_diploma"),
     path("diploma/files/<str:field>/", diploma_views.DiplomaFileView.as_view(), name="api_diploma_file"),
+
+    # Miễn giảm học phí (FEATURE_TUITION_WAIVER)
+    path("tuition-exemption/", tuition_exemption_views.TuitionExemptionView.as_view(),
+         name="api_tuition_exemption"),
+    path("tuition-exemption/applications/<int:pk>/",
+         tuition_exemption_views.TuitionExemptionDetailView.as_view(),
+         name="api_tuition_exemption_detail"),
+    path("tuition-exemption/applications/<int:pk>/supplement/",
+         tuition_exemption_views.TuitionExemptionSupplementView.as_view(),
+         name="api_tuition_exemption_supplement"),
+    path("tuition-exemption/applications/<int:pk>/documents/<int:document_id>/",
+         tuition_exemption_views.TuitionExemptionDocumentView.as_view(),
+         name="api_tuition_exemption_document"),
 
     # Hỏi đáp (ticket) — core/tickets.py
     path("tickets/",                 ticket_views.TicketsView.as_view(),       name="api_tickets"),

@@ -18,6 +18,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/khai-bao-ngoai-tru': 'Khai báo ngoại trú',
   '/dashboard/kham-suc-khoe': 'Khám sức khỏe',
   '/dashboard/bang-tot-nghiep': 'Nộp bằng tốt nghiệp THPT',
+  '/dashboard/mien-giam-hoc-phi': 'Miễn giảm học phí',
+  '/dashboard/mien-giam-hoc-phi/nop-ho-so': 'Miễn giảm học phí',
   '/dashboard/requests/new': 'Yêu cầu giấy tờ',
   '/dashboard/requests/other': 'Yêu cầu giấy tờ',
   '/dashboard/requests/deferment': 'Yêu cầu giấy tờ',
@@ -28,11 +30,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/hoi-dap/new': 'Hỏi đáp',
 };
 
-/** Trang con có id động (/hoi-dap/123) không nằm trong bảng trên. */
+/** Trang con có id động (/hoi-dap/123, /mien-giam-hoc-phi/ho-so/12) không nằm trong bảng trên → tên tính năng. */
 function titleFor(pathname: string): string {
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  if (pathname.startsWith('/dashboard/hoi-dap/')) return 'Hỏi đáp';
-  return 'IUOSS Hub';
+  const feature = featureForRoute(pathname);
+  return feature ? FEATURE_META[feature].label : 'IUOSS Hub';
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

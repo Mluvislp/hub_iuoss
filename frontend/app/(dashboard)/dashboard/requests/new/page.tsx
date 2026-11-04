@@ -48,9 +48,9 @@ export default function NewRequestPage() {
     <div className="max-w-[720px] space-y-4">
 
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-[0.82rem] text-muted">
+      <nav className="flex items-center gap-1.5 text-meta text-muted">
         <Link href="/dashboard" className="hover:text-ink">Bảng thông tin</Link>
-        <ChevronRight size={14} className="text-slate-400" />
+        <ChevronRight size={14} className="text-faint" />
         <span className="text-ink font-medium">Yêu cầu giấy tờ</span>
       </nav>
 
@@ -70,10 +70,11 @@ export default function NewRequestPage() {
         <div className="px-6 py-5 space-y-6">
           {/* Loại giấy tờ — tiles */}
           <div>
-            <label className={ui.fieldLabel}>
-              Loại giấy tờ <span className="text-red-500">*</span>
-            </label>
-            <div className="grid sm:grid-cols-2 gap-2.5">
+            {/* Tiêu đề của một nhóm radio, không phải label của một ô → p + radiogroup. */}
+            <p id="request-type-label" className={ui.fieldLabel}>
+              Loại giấy tờ <span className="text-danger-text">*</span>
+            </p>
+            <div role="radiogroup" aria-labelledby="request-type-label" className="grid sm:grid-cols-2 gap-2.5">
               {REQUEST_TYPES.map(([value, label]) => {
                 const selected = requestType === value;
                 const lock = quota?.types[value];
@@ -85,7 +86,7 @@ export default function NewRequestPage() {
                     className={cn(
                       'flex items-start gap-3 p-3.5 rounded-lg border transition-colors',
                       blocked
-                        ? 'cursor-not-allowed border-line bg-slate-50'
+                        ? 'cursor-not-allowed border-line bg-surface-subtle'
                         : selected
                           ? 'cursor-pointer border-primary bg-white ring-1 ring-primary'
                           : 'cursor-pointer border-line hover:border-slate-300 hover:bg-slate-50',
@@ -104,7 +105,7 @@ export default function NewRequestPage() {
                       <span className={cn('block text-sm font-medium', blocked ? 'text-slate-400' : selected ? 'text-primary' : 'text-ink')}>
                         {label}
                       </span>
-                      <span className={cn('block text-[0.8rem] mt-0.5', blocked ? 'text-slate-400' : 'text-muted')}>
+                      <span className={cn('block text-meta mt-0.5', blocked ? 'text-faint' : 'text-muted')}>
                         {TYPE_HINTS[value]}
                       </span>
                       {blocked && (
@@ -137,7 +138,7 @@ export default function NewRequestPage() {
               </Link>
             </div>
           ) : (
-            <p className="text-[0.85rem] text-muted px-1">
+            <p className="text-sm text-muted px-1">
               Chọn một loại giấy tờ ở trên để tiếp tục.
             </p>
           )}
@@ -145,9 +146,9 @@ export default function NewRequestPage() {
       </div>
 
       {/* Alert note */}
-      <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-slate-50 border-l-2 border-primary">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-line bg-surface-subtle">
         <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
-        <p className="text-[0.85rem] text-slate-600 leading-relaxed">
+        <p className="text-sm text-ink-3 leading-relaxed">
           Sau khi gửi biểu mẫu, theo dõi trạng thái xử lý tại{' '}
           <Link href="/dashboard" className="font-medium text-primary hover:underline">Bảng thông tin</Link>.
           Thời gian xử lý: <strong className="text-ink font-medium">2–3 ngày làm việc</strong>.

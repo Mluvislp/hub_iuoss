@@ -199,6 +199,10 @@ server {
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $hub_forwarded_proto;
         proxy_read_timeout 60;
+        # Mặc định Nginx chỉ nhận body 1 MB. Form BHYT gửi tới 4 ảnh × 5 MB (CCCD 2 mặt,
+        # thẻ BHYT, biên lai) — thiếu dòng này thì nộp đơn kèm ảnh điện thoại sẽ bị cắt
+        # kết nối và sinh viên chỉ thấy lỗi chung chung.
+        client_max_body_size 25m;
     }
 
     # Next.js frontend — tất cả request còn lại

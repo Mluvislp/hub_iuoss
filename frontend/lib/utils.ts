@@ -1,5 +1,11 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// Cỡ chữ theo vai trò khai báo trong tailwind.config.ts. Không khai báo ở đây thì
+// tailwind-merge coi `text-meta` là MÀU chữ và xóa nó khi gặp `text-muted`.
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { 'font-size': [{ text: ['meta', 'section', 'title', 'headline'] }] } },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
