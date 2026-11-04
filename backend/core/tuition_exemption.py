@@ -315,10 +315,12 @@ def serialize_application(app, *, with_details=False):
         ],
     }
     # Có cả ở danh sách: trang tổng quan nhắc SV bổ sung mà không cần mở chi tiết.
-    fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
+    rejected_fixable = app.status == "rejected" and app.rejection_reason_code in contract.RESUBMITTABLE_REASONS
+    fixable = rejected_fixable or app.status == "awaiting_supplement"
     open_ = round_is_open(app.round)
     data["can_supplement"] = contract.can_resubmit(app.status, app.rejection_reason_code, open_)
-    data["supplement_overdue"] = fixable and not open_
+    data["supplement_overdue"] = rejected_fixable and not open_
+    data["invalid_documents"] = invalid_documents(app) if app.status == "awaiting_supplement" else []
     data["supplement_closes_at"] = app.round.closes_at.isoformat()
     data["rejection_reason"] = contract.REASONS.get(app.rejection_reason_code or "", "")
     if with_details:
@@ -615,17 +617,53 @@ def submit(student, data, uploads, *, request_key):
         raise
 
 
+def _invalid_docs(app):
+    return list(app.documents.filter(is_superseded=False, verified_status="invalid")
+                .select_related("application_category__category").order_by("id"))
+
+
+def invalid_documents(app):
+    """Giấy cán bộ đánh dấu Không hợp lệ (chưa được thay) — để SV biết phải nộp lại gì."""
+    out = []
+    for d in _invalid_docs(app):
+        cat = d.application_category.category if d.application_category else None
+        labels = {x.get("doc_type"): x.get("label") for x in (cat.required_documents or [])} if cat else {}
+        out.append({"category_code": cat.code if cat else "", "doc_type": d.doc_type,
+                    "label": labels.get(d.doc_type) or "Giấy tờ chứng minh thuộc diện",
+                    "original_filename": d.original_filename, "note": d.verified_note or ""})
+    return out
+
+
 def supplement_targets(app):
-    """Đối tượng trong đơn kèm danh sách giấy tờ (như lúc nộp) — để SV bổ sung/thay giấy."""
-    links = app.categories.select_related("category").order_by("category__sort_order", "category__code")
-    return [{"link_id": l.pk, **_serialize_category(l.category), "review_note": l.review_note or ""}
-            for l in links]
+    """Đối tượng trong đơn kèm danh sách giấy tờ để SV bổ sung/thay giấy. Đơn Chờ sinh viên
+    bổ sung: CHỈ các giấy bị đánh dấu Không hợp lệ (kèm lý do của cán bộ)."""
+    invalid = {}
+    if app.status == "awaiting_supplement":
+        for d in invalid_documents(app):
+            invalid.setdefault(d["category_code"], {})[d["doc_type"]] = d["note"]
+    out = []
+    for l in app.categories.select_related("category").order_by("category__sort_order", "category__code"):
+        item = {"link_id": l.pk, **_serialize_category(l.category), "review_note": l.review_note or ""}
+        if app.status == "awaiting_supplement":
+            wanted = invalid.get(l.category.code, {})
+            if not wanted:
+                continue
+            item["documents"] = [{**d, "invalid_note": wanted[d["doc_type"]]}
+                                 for d in item["documents"] if d["doc_type"] in wanted]
+            known = {d["doc_type"] for d in item["documents"]}
+            item["documents"] += [{"doc_type": dt, "label": "Giấy tờ chứng minh thuộc diện", "required": True,
+                                   "has_expiry": False, "invalid_note": note}
+                                  for dt, note in wanted.items() if dt not in known]
+        out.append(item)
+    return out
 
 
 def supplement(student, application, data, uploads, *, request_key, row_version):
-    """SV bổ sung/thay giấy tờ khi đơn bị Từ chối vì lý do sửa được và đợt còn mở → Đang xử
-    lý kèm cờ "SV đã bổ sung" (như BHYT), event SUPPLEMENTED; file cũ cùng (diện, doc_type)
-    → is_superseded=True.
+    """SV bổ sung/thay giấy tờ → Đang xử lý kèm cờ "SV đã bổ sung" (như BHYT), event
+    SUPPLEMENTED; file cũ cùng (diện, doc_type) → is_superseded=True. Hai trường hợp:
+    - đơn Chờ sinh viên bổ sung (cán bộ đánh dấu giấy Không hợp lệ): nộp lại ĐỦ các giấy
+      bị đánh dấu, không phụ thuộc giờ đóng đợt;
+    - đơn Từ chối vì lý do sửa được: khi đợt còn mở.
 
     Bổ sung giấy ở ĐỢT MỚI (diện every_term/every_year) không đi đường này mà là đơn
     gia hạn — xem `submit`. Hub ghi status/cờ bổ sung/row_version ở đây là ngoại lệ đã
@@ -657,6 +695,12 @@ def supplement(student, application, data, uploads, *, request_key, row_version)
                 checked[(code, doc_type, i)] = (upload, inspect_document(upload))
             except contract.WorkflowError as exc:
                 errors.setdefault(field, []).append(f"{upload.name}: {exc}")
+    if application.status == "awaiting_supplement":
+        for code, target in targets.items():
+            for d in target["documents"]:
+                field = f"{FILE_FIELD_PREFIX}{code}{FILE_FIELD_SEP}{d['doc_type']}"
+                if (code, d["doc_type"]) not in grouped and field not in errors:
+                    errors[field] = ["Nộp lại giấy này — cán bộ đã đánh dấu không hợp lệ."]
     if errors:
         raise TuitionExemptionError("Giấy tờ chưa hợp lệ.", errors=errors)
     digest = contract.fingerprint({
@@ -681,16 +725,18 @@ def supplement(student, application, data, uploads, *, request_key, row_version)
             except (TypeError, ValueError):
                 raise TuitionExemptionError("Đơn vừa được cán bộ cập nhật. Hãy tải lại trang rồi gửi lại.",
                                             code="conflict")
-            if app.status != "rejected" or app.rejection_reason_code not in contract.RESUBMITTABLE_REASONS:
+            awaiting = app.status == "awaiting_supplement"
+            if not awaiting and (app.status != "rejected"
+                                 or app.rejection_reason_code not in contract.RESUBMITTABLE_REASONS):
                 raise TuitionExemptionError("Đơn hiện không bổ sung được. Liên hệ Phòng CTSV nếu cần.",
                                             code="conflict")
-            if not round_is_open(app.round):
+            if not awaiting and not round_is_open(app.round):
                 raise TuitionExemptionError("Đợt đã đóng nên không bổ sung được nữa. Liên hệ Phòng CTSV.",
                                             code="closed")
             contract.validate_transition(app.status, "processing")
             event = append_event(app, "SUPPLEMENTED", source="Hub", actor_id=student.pk,
-                                 old="rejected", new="processing", key=request_key,
-                                 reason_code=app.rejection_reason_code,
+                                 old=app.status, new="processing", key=request_key,
+                                 reason_code="INVALID_DOCUMENTS" if awaiting else app.rejection_reason_code,
                                  payload={"request_digest": digest, "files": len(checked),
                                           "categories": sorted({c for (c, _, _) in checked}),
                                           "previous_note": app.review_note or ""})

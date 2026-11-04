@@ -85,7 +85,21 @@ function CurrentCard({ state, awardOf, onOpen }: {
             </div>
           </div>
 
-          {app.can_supplement && (
+          {app.status === 'awaiting_supplement' && (
+            <RejectionNotice className="mt-4" eyebrow="Chờ sinh viên bổ sung"
+                             title={`${app.invalid_documents.length} giấy tờ chưa hợp lệ — vui lòng nộp lại`}>
+              <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-primary-text">
+                  {app.invalid_documents.map((d) => d.label).join(', ')}
+                </p>
+                <button type="button" className={cn(ui.btnPrimary, 'w-full shrink-0 sm:w-auto')} onClick={() => onOpen(app.id)}>
+                  <FileUp size={16} /> Nộp lại giấy tờ
+                </button>
+              </div>
+            </RejectionNotice>
+          )}
+
+          {app.can_supplement && app.status === 'rejected' && (
             <RejectionNotice className="mt-4" eyebrow="Đơn bị từ chối" title={app.rejection_reason || 'Đơn bị từ chối'}
                              note={app.review_note}>
               <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">

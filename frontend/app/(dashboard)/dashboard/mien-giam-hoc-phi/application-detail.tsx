@@ -71,7 +71,10 @@ function SupplementForm({ app, saving, setSaving, onDone, onCancel }: {
             return (
               <div key={key} className="rounded-lg border border-line2 bg-surface-subtle px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-[160px] flex-1 text-meta text-ink">{d.label}</span>
+                  <span className="min-w-[160px] flex-1 text-meta text-ink">
+                    {d.label}
+                    {d.invalid_note && <span className="block text-xs text-warning-text">Lý do không hợp lệ: {d.invalid_note}</span>}
+                  </span>
                   <label className={cn(ui.btnOutline, 'h-9 cursor-pointer coarse:h-11')}>
                     <FileUp size={15} /> {list.length ? `${list.length} file` : 'Chọn file'}
                     <input type="file" multiple accept={ACCEPT} className="hidden"
@@ -97,7 +100,10 @@ function SupplementForm({ app, saving, setSaving, onDone, onCancel }: {
           })}
         </div>
       ))}
-      <p className="text-xs text-muted">File mới sẽ thay file cùng loại đã nộp trước đó. Gửi xong, đơn quay về “Đang xử lý”.</p>
+      <p className="text-xs text-muted">
+        File mới sẽ thay file cùng loại đã nộp trước đó. Gửi xong, đơn quay về “Đang xử lý”.
+        {app.status === 'awaiting_supplement' && ' Cần nộp lại đủ các giấy trên.'}
+      </p>
       {error && <ErrorBox text={error} />}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button type="button" className={cn(ui.btnGhost, 'w-full sm:w-auto')} disabled={saving} onClick={onCancel}>Hủy</button>
@@ -119,6 +125,7 @@ function ApplicationBody({ app, award, saving, setSaving, onUpdated, onError }: 
 }) {
   const [editing, setEditing] = useState(false);
   const rejected = app.status === 'rejected';
+  const awaiting = app.status === 'awaiting_supplement';
   const snapshotRows = app.snapshot ? SNAPSHOT_ROWS.filter(([k]) => app.snapshot![k]) : [];
 
   async function openDocument(documentId: number) {
@@ -143,7 +150,30 @@ function ApplicationBody({ app, award, saving, setSaving, onUpdated, onError }: 
         </p>
       )}
 
-      {rejected ? (
+      {awaiting ? (
+        <RejectionNotice eyebrow="Chờ sinh viên bổ sung" title="Giấy tờ chưa hợp lệ — vui lòng nộp lại">
+          <ul className="space-y-2">
+            {app.invalid_documents.map((d, i) => (
+              <li key={i} className="rounded-lg border border-line2 bg-surface-subtle px-3 py-2.5">
+                <div className="text-sm font-medium text-ink">{d.label}</div>
+                <div className="text-xs text-muted">File đã nộp: {d.original_filename}</div>
+                {d.note && <div className="mt-1 text-meta text-warning-text">Lý do: {d.note}</div>}
+              </li>
+            ))}
+          </ul>
+          {editing ? (
+            <SupplementForm key={app.row_version} app={app} saving={saving} setSaving={setSaving}
+                            onDone={(a) => { setEditing(false); onUpdated(a); }} onCancel={() => setEditing(false)} />
+          ) : (
+            <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-primary-text">Nộp lại các giấy trên để Phòng Công tác Sinh viên xử lý tiếp đơn.</p>
+              <button type="button" className={cn(ui.btnPrimary, 'w-full shrink-0 sm:w-auto')} onClick={() => setEditing(true)}>
+                <FileUp size={16} /> Nộp lại giấy tờ
+              </button>
+            </div>
+          )}
+        </RejectionNotice>
+      ) : rejected ? (
         <RejectionNotice eyebrow="Đơn bị từ chối" title={app.rejection_reason || 'Đơn bị từ chối'} note={app.review_note}>
           {app.supplement_overdue ? (
             <p className="text-sm text-danger-text">

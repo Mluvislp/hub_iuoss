@@ -17,13 +17,17 @@ import re
 # ── Trạng thái đơn — cùng khuôn BHYT (ĐHQT xử lý → Chờ BHXH → Phát hành / Từ chối) ──
 STATUS_LABELS = {
     'processing': 'Đang xử lý',
+    # Cán bộ đánh dấu một giấy tờ Không hợp lệ → đơn tự chuyển sang đây, thư báo SV; SV
+    # nộp lại giấy đó trên Hub → về Đang xử lý kèm cờ "SV đã bổ sung" (từ 05/11/2026).
+    'awaiting_supplement': 'Chờ sinh viên bổ sung',
     'waiting_result': 'Chờ kết quả',
     'done': 'Hoàn thành',
     'rejected': 'Từ chối',
 }
 TRANSITIONS = {
-    'processing': {'waiting_result', 'rejected'},
-    'waiting_result': {'done', 'rejected'},
+    'processing': {'waiting_result', 'rejected', 'awaiting_supplement'},
+    'awaiting_supplement': {'processing', 'rejected'},  # SV nộp lại / hết giấy không hợp lệ · từ chối
+    'waiting_result': {'done', 'rejected', 'awaiting_supplement'},
     'rejected': {'processing'},   # SV bổ sung (RESUBMITTED) hoặc cán bộ mở lại (REOPENED)
     'done': {'processing'},       # superuser mở lại, bắt buộc lý do
 }
@@ -429,6 +433,10 @@ def renewal_mode(policy, last_verified, current):
 
 
 def can_resubmit(status, reason_code, round_open):
-    """SV được bổ sung từ Hub: đơn Từ chối vì lý do sửa được và đợt của đơn còn mở —
-    hạn bổ sung chính là giờ đóng đợt (như BHYT), không có số ngày riêng."""
+    """SV được bổ sung từ Hub:
+    - đơn Chờ sinh viên bổ sung (có giấy Không hợp lệ): luôn được, kể cả khi đợt đã đóng —
+      giấy có thể bị phát hiện sai sau giờ đóng đợt;
+    - đơn Từ chối vì lý do sửa được: chỉ khi đợt còn mở (hạn = giờ đóng đợt, như BHYT)."""
+    if status == 'awaiting_supplement':
+        return True
     return status == 'rejected' and reason_code in RESUBMITTABLE_REASONS and bool(round_open)

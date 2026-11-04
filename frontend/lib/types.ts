@@ -827,7 +827,7 @@ export interface RequestAvailability {
 // Khớp `core/tuition_exemption.py` (build_state / build_plan / serialize_application).
 
 /** Cùng khuôn BHYT: Đang xử lý → Chờ kết quả → Hoàn thành; Từ chối kèm lý do. */
-export type TuitionExemptionStatus = 'processing' | 'waiting_result' | 'done' | 'rejected';
+export type TuitionExemptionStatus = 'processing' | 'awaiting_supplement' | 'waiting_result' | 'done' | 'rejected';
 
 export type TuitionCategoryReview = 'pending' | 'approved' | 'rejected';
 
@@ -851,6 +851,8 @@ export interface TuitionRequiredDocument {
   has_expiry: boolean;
   /** Phải nộp lại khi gia hạn (diện nộp lại mỗi kỳ/năm). */
   renewal_required?: boolean;
+  /** Lý do cán bộ đánh dấu Không hợp lệ (chỉ có ở khu nộp lại giấy). */
+  invalid_note?: string;
 }
 
 /** Ô thông tin riêng của một đối tượng (contract.CATEGORY_FIELDS) — gửi lên dạng `detail_<name>`. */
@@ -929,8 +931,10 @@ export interface TuitionExemptionApplication {
   documents?: { id: number; doc_type: string; doc_label: string; category_code: string;
                 original_filename: string; mime_type: string; expires_at: string | null }[];
   snapshot?: Record<string, string>;
-  /** Đơn Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
+  /** Đơn Chờ sinh viên bổ sung, hoặc Từ chối vì thiếu / sai / hết hạn giấy và đợt còn mở — hiện khu bổ sung. */
   can_supplement: boolean;
+  /** Giấy cán bộ đánh dấu Không hợp lệ (đơn Chờ sinh viên bổ sung) — phải nộp lại. */
+  invalid_documents: { category_code: string; doc_type: string; label: string; original_filename: string; note: string }[];
   /** Như trên nhưng đợt đã đóng. */
   supplement_overdue: boolean;
   /** Hạn bổ sung = giờ đóng đợt. */
