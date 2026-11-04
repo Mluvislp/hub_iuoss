@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, GraduationCap, Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { setToken } from '@/lib/auth';
+import { GRAD_PATH, MS_PURPOSE_KEY, gradApi } from '@/lib/graduation';
 
 // Trang Microsoft chuyển hướng về sau khi sinh viên đăng nhập. Nhiệm vụ duy nhất:
 // chuyển tiếp `code` + `state` cho backend đổi lấy phiên của Hub. Trang này KHÔNG
@@ -16,6 +17,7 @@ function CallbackHandler() {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState('');
+  const [fromGraduation, setFromGraduation] = useState(false);
   // React 18 StrictMode gọi effect hai lần khi dev. Authorization code chỉ đổi
   // được ĐÚNG MỘT LẦN — lần thứ hai Microsoft trả invalid_grant và sinh viên thấy
   // lỗi dù đăng nhập thành công. Chốt lại bằng ref.
@@ -39,6 +41,18 @@ function CallbackHandler() {
     const state = params.get('state');
     if (!code || !state) {
       setError('Thiếu thông tin trả về từ Microsoft. Vui lòng đăng nhập lại.');
+      return;
+    }
+
+    // Đi từ trang Lễ tốt nghiệp → đổi code lấy phiên TỐT NGHIỆP (không đăng nhập Hub).
+    if (sessionStorage.getItem(MS_PURPOSE_KEY) === 'graduation') {
+      sessionStorage.removeItem(MS_PURPOSE_KEY);
+      sessionStorage.removeItem('hub_ms_next');
+      setFromGraduation(true);
+      gradApi
+        .verifyMicrosoft(code, state)
+        .then(() => router.replace(GRAD_PATH + '#dang-ky'))
+        .catch((err) => setError(err?.message || 'Không kết nối được máy chủ. Vui lòng thử lại.'));
       return;
     }
 
@@ -79,12 +93,12 @@ function CallbackHandler() {
               <span>{error}</span>
             </div>
             <Link
-              href="/login"
+              href={fromGraduation ? GRAD_PATH : '/login'}
               className="inline-block mt-5 px-4 py-2.5 rounded-lg text-sm font-semibold
                          bg-white border border-slate-300 hover:border-slate-400
                          hover:bg-slate-50 text-slate-700 transition-colors"
             >
-              Quay lại trang đăng nhập
+              {fromGraduation ? 'Quay lại trang Lễ tốt nghiệp' : 'Quay lại trang đăng nhập'}
             </Link>
           </>
         ) : (

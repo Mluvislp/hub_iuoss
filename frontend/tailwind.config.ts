@@ -35,6 +35,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        // Chỉ trang Lễ tốt nghiệp nạp font này (app/le-tot-nghiep/layout.tsx); nơi khác lùi về serif hệ thống.
+        display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       boxShadow: {
         card: '0 1px 2px rgba(16,24,40,0.04)',

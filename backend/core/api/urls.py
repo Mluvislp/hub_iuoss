@@ -1,4 +1,5 @@
 from django.urls import path
+from . import graduation_views as gv
 from . import health_check_views, submission_views, ticket_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
@@ -62,6 +63,17 @@ urlpatterns = [
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
     path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
          name="api_offcampus_request_reopen"),
+
+    # Lễ tốt nghiệp (/le-tot-nghiep) — phiên riêng GraduationToken, xem core/api/graduation_auth.py
+    path("graduation/", gv.GraduationInfoView.as_view(), name="api_graduation"),
+    path("graduation/verify/ldap/", gv.GraduationVerifyLdapView.as_view(), name="api_graduation_verify_ldap"),
+    path("graduation/verify/microsoft/", gv.GraduationVerifyMicrosoftView.as_view(),
+         name="api_graduation_verify_microsoft"),
+    path("graduation/verify/info/", gv.GraduationVerifyInfoView.as_view(), name="api_graduation_verify_info"),
+    path("graduation/me/", gv.GraduationMeView.as_view(), name="api_graduation_me"),
+    path("graduation/register/", gv.GraduationRegisterView.as_view(), name="api_graduation_register"),
+    path("graduation/photo/", gv.GraduationPhotoView.as_view(), name="api_graduation_photo"),
+    path("graduation/cancel/", gv.GraduationCancelView.as_view(), name="api_graduation_cancel"),
 
     # Khám sức khỏe định kỳ
     path("health-check/", health_check_views.HealthCheckView.as_view(), name="api_health_check"),
