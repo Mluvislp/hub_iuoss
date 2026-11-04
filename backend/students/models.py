@@ -606,6 +606,9 @@ class TuitionExemptionBeneficiary(models.Model):
     status = models.CharField(max_length=16)
     source = models.CharField(max_length=16)
     last_verified_term = models.ForeignKey(AcademicTerm, on_delete=models.DO_NOTHING, related_name="+")
+    # Nạp Excel: {fields, category_code, category_details} — điền sẵn form khi SV chưa có đơn.
+    application_data = models.JSONField(null=True)
+    updated_at = models.DateTimeField()
 
     class Meta:
         managed = False

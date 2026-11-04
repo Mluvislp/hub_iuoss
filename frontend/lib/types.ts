@@ -956,7 +956,7 @@ export interface TuitionExemptionPrefill {
   /** Các ô SV sửa được — tên trùng tên trường gửi lên. */
   fields: Record<string, string>;
   /** previous_application = chép từ đơn gần nhất; profile = từ hồ sơ SV. */
-  source: 'previous_application' | 'profile';
+  source: 'previous_application' | 'beneficiary_import' | 'profile';
   /** Thông tin riêng đã khai ở đơn trước — chỉ điền lại khi SV chọn đúng đối tượng `code`. */
   category_details: { code: string; values: Record<string, string | boolean> } | null;
 }

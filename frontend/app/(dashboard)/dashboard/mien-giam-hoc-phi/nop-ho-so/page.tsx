@@ -411,9 +411,9 @@ export default function TuitionWaiverSubmitPage() {
           </div>
         </section>
 
-        {p.source === 'previous_application' && (
+        {p.source !== 'profile' && (
           <p className="text-meta text-muted -mb-2">
-            Các ô dưới đây được điền sẵn từ đơn gần nhất của bạn — kiểm tra và sửa nếu có thay đổi.
+            Các ô dưới đây được điền sẵn từ {p.source === 'previous_application' ? 'đơn gần nhất của bạn' : 'hồ sơ miễn giảm Phòng Công tác Sinh viên đang lưu'} — kiểm tra và sửa nếu có thay đổi.
           </p>
         )}
         {FIELD_GROUPS.map((group) => (

@@ -267,6 +267,19 @@ def build_prefill(student):
                 "category_details": ({"code": link.category.code, "values": previous.category_details}
                                      if link and previous.category_details else None)}
 
+    # SV hưởng từ trước khi có hệ thống: Phòng CTSV nạp đủ thông tin trong danh sách đang hưởng.
+    imported = (TuitionExemptionBeneficiary.objects.filter(student=student, status="active",
+                                                           application_data__isnull=False)
+                .select_related("category").order_by("-updated_at", "-id").first())
+    if imported is not None and (imported.application_data or {}).get("fields"):
+        data = imported.application_data
+        fields = {f: "" for f in SNAPSHOT_FIELDS}
+        fields.update({f: str(v or "") for f, v in data["fields"].items() if f in fields})
+        return {**base, "fields": fields, "source": "beneficiary_import",
+                "category_details": ({"code": data.get("category_code") or imported.category.code,
+                                      "values": data.get("category_details")}
+                                     if data.get("category_details") else None)}
+
     profile = pc.read_profile(student)
     cccd = profile.get("student.citizen_id", {}).get("value") or {}
     bank = (StudentBankAccount.objects.filter(student=student, is_current=True)
