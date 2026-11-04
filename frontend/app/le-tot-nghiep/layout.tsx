@@ -23,5 +23,5 @@ export const metadata: Metadata = {
 };
 
 export default function GraduationLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${display.variable} ${body.variable} font-grad`}>{children}</div>;
+  return <div className={`${display.variable} ${body.variable} font-grad [font-variant-numeric:lining-nums]`}>{children}</div>;
 }
