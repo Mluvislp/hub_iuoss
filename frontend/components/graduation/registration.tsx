@@ -208,9 +208,7 @@ export function RegisterForm({ member, onRegistered }: { member: GradMember; onR
           <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
           <Alert message={error} />
           <div className="rounded-xl bg-[#0f2a5c] p-4 sm:p-5 text-white flex flex-col gap-3.5">
-            <div className="text-sm text-white/80">
-              {file ? 'Ảnh sẽ được gửi cùng đăng ký.' : 'Chưa chọn ảnh — vẫn đăng ký được, có thể tải ảnh sau khi còn hạn.'}
-            </div>
+            {file && <div className="text-sm text-white/80">Ảnh sẽ được gửi cùng đăng ký.</div>}
             <button type="button" onClick={submit} disabled={busy}
                     className="inline-flex w-full items-center justify-center gap-2 h-12 px-6 rounded-lg bg-[#f5d27a] hover:bg-[#f0c75c]
                                text-[#0f2a5c] font-semibold transition-colors disabled:opacity-60 whitespace-nowrap
