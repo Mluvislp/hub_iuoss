@@ -7,7 +7,9 @@ const PUBLIC_PATHS = ['/login'];
 // - chưa có token (trường hợp thường) → chặn là đá về /login ngay trước bước đổi code
 // - đã có token cũ → vẫn phải chạy tiếp, vì sinh viên có thể đang cố đăng nhập
 //   bằng tài khoản khác; đá sang /dashboard sẽ giữ nguyên phiên cũ một cách khó hiểu
-const ALWAYS_ALLOW = ['/auth/microsoft/callback'];
+// Trang Lễ tốt nghiệp: công khai, có phiên xác minh RIÊNG (lib/graduation.ts) — không xét
+// hub_token, cũng không đá người đã đăng nhập Hub sang /dashboard.
+const ALWAYS_ALLOW = ['/auth/microsoft/callback', '/le-tot-nghiep'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

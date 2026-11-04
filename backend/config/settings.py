@@ -218,6 +218,8 @@ REST_FRAMEWORK = {
         # Ticket hỏi đáp: tạo mới chặt, nhắn trong ticket nới hơn (đang trò chuyện).
         "ticket_create": os.getenv("THROTTLE_TICKET_CREATE", "10/hour"),
         "ticket_message": os.getenv("THROTTLE_TICKET_MESSAGE", "120/hour"),
+        # Xác minh trang Lễ tốt nghiệp (theo IP): LDAP / Microsoft / thông tin học viên cao học.
+        "graduation_verify": os.getenv("THROTTLE_GRADUATION_VERIFY", "30/min"),
     },
 }
 

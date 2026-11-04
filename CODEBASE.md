@@ -57,6 +57,8 @@ backend/
   core/health_check_slots.py ← ngày + ca khám tại trường — bản song sinh GIỐNG HỆT dashboard healthcheck/slots.py
   core/diploma.py · diploma_models.py · api/diploma_views.py   ← nộp bằng tốt nghiệp THPT (PDF + CCCD từ kho ảnh)
   core/direct_submissions.py · submission_models.py · submission_code.py ← nạp giấy tờ trực tiếp (mã NG-…)
+  core/graduation.py · graduation_models.py · api/graduation_views.py · api/graduation_auth.py
+                            ← Lễ tốt nghiệp (/le-tot-nghiep): xác minh, ảnh trình chiếu, QR; phiên riêng
   core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách
   core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
@@ -146,6 +148,7 @@ frontend/
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
 | Nộp bằng tốt nghiệp THPT | `dashboard_iuoss/docs/DIPLOMA.md` |
 | Miễn giảm học phí | `dashboard_iuoss/docs/TUITION_EXEMPTION.md` |
+| Lễ tốt nghiệp (/le-tot-nghiep) | `dashboard_iuoss/docs/GRADUATION.md` |
 | Hỏi đáp (ticket), realtime | `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |

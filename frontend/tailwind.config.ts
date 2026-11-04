@@ -64,6 +64,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        // Chỉ trang Lễ tốt nghiệp nạp font này (app/le-tot-nghiep/layout.tsx); nơi khác lùi về serif hệ thống.
+        display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       // Thang cỡ chữ theo VAI TRÒ. Dùng cùng xs (12) / sm (14, nội dung) có sẵn;
       // không viết text-[0.82rem]… nữa. Thêm cỡ mới ở đây thì khai báo luôn trong
