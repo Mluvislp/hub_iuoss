@@ -98,34 +98,47 @@ function Hero({ fireworks, round, onElapsed }: {
 
 function MemberSummary({ m, onLogout }: { m: GradMember; onLogout: () => void }) {
   const s = m.student;
+  const facts = [
+    ['Ngành', s.major], ['Khoa', s.department], ['Tên bằng', s.award_title], ['Xếp loại', s.degree_class],
+    ['Ngày sinh', s.date_of_birth],
+  ].filter(([, v]) => v);
   return (
-    <div className={cn(ui.card, 'p-5')}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[0.72rem] font-semibold uppercase tracking-wider text-[#a07d1c]">{s.group_label}</div>
-          <div className="mt-0.5 text-xl font-bold text-ink">{s.full_name}</div>
-          <div className="font-mono text-sm font-semibold text-primary-text">{s.student_code}</div>
+    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-[0_10px_40px_-22px_rgba(15,42,92,0.35)]
+                    md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="relative overflow-hidden bg-[#0f2a5c] px-6 py-6 sm:px-8 text-white">
+        <div aria-hidden className="absolute -right-14 -bottom-14 h-44 w-44 rounded-full border border-white/10" />
+        <div aria-hidden className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full border border-[#f5d27a]/25" />
+        <p className="text-[0.7rem] font-semibold tracking-[0.22em] uppercase text-[#f5d27a]">{s.group_label}</p>
+        <h3 className="mt-2 font-display text-[2rem] sm:text-[2.3rem] font-semibold leading-[1.1]">{s.full_name}</h3>
+        <div className="mt-2 inline-flex items-center rounded-md border border-white/20 bg-white/[0.07] px-2.5 py-1 font-mono text-sm tracking-wide">
+          {s.student_code}
         </div>
-        <button type="button" onClick={onLogout} className={cn(ui.btnGhost, 'h-9')}>
-          <LogOut size={15} /> Thoát
+        <button type="button" onClick={onLogout}
+                className="mt-6 inline-flex items-center gap-1.5 text-sm text-white/70 hover:text-white">
+          <LogOut size={15} /> Thoát, xác minh người khác
         </button>
       </div>
-      <dl className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2 text-sm">
-        {s.major && <div><dt className="text-muted">Ngành</dt><dd className="font-medium text-ink">{s.major}</dd></div>}
-        {s.department && <div><dt className="text-muted">Khoa</dt><dd className="font-medium text-ink">{s.department}</dd></div>}
-        {s.award_title && <div><dt className="text-muted">Tên bằng</dt><dd className="font-medium text-ink">{s.award_title}</dd></div>}
-        {s.degree_class && <div><dt className="text-muted">Xếp loại</dt><dd className="font-medium text-ink">{s.degree_class}</dd></div>}
-        <div><dt className="text-muted">Ngày sinh</dt><dd className="font-medium text-ink">{s.date_of_birth || '—'}</dd></div>
-      </dl>
-      {s.session_label && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-[#e9cf86] bg-[#fdf9ec] px-4 py-3">
-          <MapPin size={18} className="text-[#a07d1c] shrink-0" />
-          <div className="text-sm">
-            <div className="text-[#7a5d0f]">Buổi lễ tham dự</div>
-            <div className="font-semibold text-ink">{s.session_label}</div>
+      <div className="px-6 py-6 sm:px-8">
+        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {facts.map(([k, v]) => (
+            <div key={k} className="min-w-0">
+              <dt className="text-xs font-medium uppercase tracking-wider text-slate-400">{k}</dt>
+              <dd className="mt-0.5 font-medium text-ink break-words">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        {s.session_label && (
+          <div className="mt-5 flex items-center gap-3.5 rounded-xl border border-[#e9cf86] bg-[#fdf9ec] px-4 py-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f5d27a] text-[#0f2a5c]">
+              <MapPin size={18} />
+            </span>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-[#a07d1c]">Buổi lễ tham dự</div>
+              <div className="font-display text-xl font-semibold text-[#0f2a5c]">{s.session_label}</div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -211,7 +224,7 @@ export default function GraduationPage() {
             ))}
           </div>
 
-          <div className={cn('mx-auto', member ? 'max-w-3xl' : 'max-w-5xl')}>
+          <div className="mx-auto max-w-5xl">
             {loading ? (
               <div className={cn(ui.card, 'p-10 flex items-center justify-center gap-2 text-sm text-muted')}>
                 <Loader2 size={16} className="animate-spin" /> Đang tải…
@@ -242,7 +255,7 @@ export default function GraduationPage() {
               <div className="space-y-5">
                 <MemberSummary m={member} onLogout={logout} />
                 {registered ? (
-                  <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_300px] items-start">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
                     <Registered member={member} onChange={setMember} />
                     <QrCard member={member} />
                   </div>
