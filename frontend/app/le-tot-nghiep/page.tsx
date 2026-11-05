@@ -49,7 +49,12 @@ function Hero({ fireworks, round, onElapsed }: {
       <Fireworks ref={fireworks} className="absolute inset-0 -z-10 h-full w-full pointer-events-none" />
 
       <div className="mx-auto w-full max-w-content px-5 pt-6 flex items-center gap-3 text-sm">
-        <span className="w-9 h-9 rounded-full border border-white/40 flex items-center justify-center font-display font-bold">IU</span>
+        <picture>
+          <source srcSet="/img/graduation/iu-logo.webp" type="image/webp" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/graduation/iu-logo.png" alt="Logo Trường Đại học Quốc tế" width={44} height={44}
+               className="h-11 w-11 rounded-full shadow-[0_0_0_2px_rgba(255,255,255,0.35)]" />
+        </picture>
         <div className="leading-tight">
           <div className="font-semibold">Trường Đại học Quốc tế</div>
           <div className="text-white/70 text-xs">Đại học Quốc gia TP. Hồ Chí Minh</div>
