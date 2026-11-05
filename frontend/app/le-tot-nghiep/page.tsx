@@ -263,11 +263,11 @@ export default function GraduationPage() {
                 <MemberSummary m={member} onLogout={logout} />
                 {registered ? (
                   <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-                    <Registered member={member} onChange={setMember} />
+                    <Registered member={member} banks={info?.banks ?? []} onChange={setMember} />
                     <QrCard member={member} />
                   </div>
                 ) : reg?.can_register ? (
-                  <RegisterForm member={member} onRegistered={onRegistered} />
+                  <RegisterForm member={member} banks={info?.banks ?? []} onRegistered={onRegistered} />
                 ) : (
                   <div className={cn(notice.base, notice.neutral)}>
                     <CalendarHeart size={16} className={noticeIcon.neutral} />

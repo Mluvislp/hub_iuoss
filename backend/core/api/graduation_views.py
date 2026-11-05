@@ -35,6 +35,10 @@ def _error(message, code=status.HTTP_400_BAD_REQUEST):
     return Response({"detail": message}, status=code)
 
 
+def _bank_info(data):
+    return (_get_str(data, "bank_id"), _get_str(data, "bank_account_number"), _get_str(data, "bank_account_holder"))
+
+
 def _session(member, via):
     token = GraduationToken.for_member(member, via)
     return Response({"token": str(token), **grad.member_payload(member)})
@@ -64,6 +68,7 @@ class GraduationInfoView(_Public):
         return Response({
             "round": grad.round_payload(grad.current_round()),
             "sessions": grad.SESSIONS,
+            "banks": grad.banks_payload(),
             # Chỉ hiện nút Outlook khi tên miền đang mở có địa chỉ quay về đã khai ở Azure.
             "microsoft_login": settings.MS_LOGIN_ENABLED
                                and microsoft_auth.redirect_uri_for_host(request.get_host()) is not None,
@@ -151,14 +156,14 @@ class _Member(APIView):
     permission_classes = [IsGraduationVerified]
 
     def member(self, request):
-        member = (Member.objects.select_related("round", "student", "student__current_department")
+        member = (Member.objects.select_related("round", "student", "student__current_department", "bank")
                   .filter(pk=request.user.member_id).first())
         if member is None:
             raise Http404
         return member
 
     def respond(self, member_id):
-        member = (Member.objects.select_related("round", "student", "student__current_department")
+        member = (Member.objects.select_related("round", "student", "student__current_department", "bank")
                   .get(pk=member_id))
         return Response(grad.member_payload(member))
 
@@ -174,7 +179,8 @@ class GraduationRegisterView(_Member):
     def post(self, request):
         member = self.member(request)
         try:
-            grad.register(member.pk, via=request.user.via, upload=request.FILES.get("photo"))
+            grad.register(member.pk, via=request.user.via, bank_info=_bank_info(request.data),
+                          upload=request.FILES.get("photo"))
         except grad.GraduationError as exc:
             return _error(str(exc))
         return self.respond(member.pk)
@@ -206,6 +212,16 @@ class GraduationPhotoView(_Member):
         member = self.member(request)
         try:
             grad.remove_photo(member.pk)
+        except grad.GraduationError as exc:
+            return _error(str(exc))
+        return self.respond(member.pk)
+
+
+class GraduationBankView(_Member):
+    def post(self, request):
+        member = self.member(request)
+        try:
+            grad.update_bank(member.pk, _bank_info(request.data))
         except grad.GraduationError as exc:
             return _error(str(exc))
         return self.respond(member.pk)

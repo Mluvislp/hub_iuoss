@@ -27,9 +27,22 @@ export interface GradRound {
   registration_open: boolean;
 }
 
+export interface GradBank {
+  id: number;
+  short_name: string;
+  full_name: string;
+}
+
+export interface BankInput {
+  bank_id: string;
+  bank_account_number: string;
+  bank_account_holder: string;
+}
+
 export interface GradInfo {
   round: GradRound | null;
   sessions: Record<string, string>;
+  banks: GradBank[];
   microsoft_login: boolean;
 }
 
@@ -65,6 +78,14 @@ export interface GradMember {
     can_edit: boolean;
     can_register: boolean;
   };
+  bank: {
+    bank_id: number;
+    bank_short_name: string;
+    bank_full_name: string;
+    account_number: string;
+    holder: string;
+  } | null;
+  bank_suggestion: { bank_id: number | null; account_number: string; holder: string } | null;
   round: GradRound;
 }
 
@@ -135,8 +156,9 @@ export const gradApi = {
     call<Session>('/graduation/verify/info/', { method: 'POST', body: JSON.stringify(body) }).then(keep),
   microsoftStart: () => call<{ authorize_url: string }>('/auth/microsoft/start/'),
   me: () => call<GradMember>('/graduation/me/', {}, true),
-  register: (photo: File | null) => {
+  register: (photo: File | null, bank: BankInput) => {
     const fd = new FormData();
+    Object.entries(bank).forEach(([k, v]) => fd.append(k, v));
     if (photo) fd.append('photo', photo, photo.name);
     return call<GradMember>('/graduation/register/', { method: 'POST', body: fd }, true);
   },
@@ -145,6 +167,8 @@ export const gradApi = {
     fd.append('photo', photo, photo.name);
     return call<GradMember>('/graduation/photo/', { method: 'POST', body: fd }, true);
   },
+  updateBank: (bank: BankInput) =>
+    call<GradMember>('/graduation/bank/', { method: 'POST', body: JSON.stringify(bank) }, true),
   removePhoto: () => call<GradMember>('/graduation/photo/', { method: 'DELETE' }, true),
   photoBlob: async (): Promise<Blob> => {
     const res = await fetch(`${API_BASE}/graduation/photo/`, {
@@ -165,6 +189,25 @@ export const PHOTO_MIN_SIDE = 600;
 /** Tên file máy chủ đặt khi lưu — giống `core/graduation.py::stored_photo_name`. */
 export function storedPhotoName(code: string, file: File): string {
   return `${code.toUpperCase()}.${/\.png$/i.test(file.name) || file.type === 'image/png' ? 'png' : 'jpg'}`;
+}
+
+/** Tên chủ tài khoản như ngân hàng in: IN HOA, không dấu — giống `core/graduation.py::normalize_holder`. */
+export function normalizeHolder(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Kiểm nhanh ở trình duyệt (máy chủ kiểm lại): trả câu lỗi hoặc ''. */
+export function checkBank(b: BankInput): string {
+  if (!b.bank_id) return 'Vui lòng chọn ngân hàng nhận hoàn tiền cọc.';
+  const number = b.bank_account_number.replace(/[\s.-]/g, '');
+  if (!number) return 'Vui lòng nhập số tài khoản ngân hàng.';
+  if (!/^\d+$/.test(number)) return 'Số tài khoản chỉ gồm chữ số.';
+  if (number.length < 6 || number.length > 20) return 'Số tài khoản phải có từ 6 đến 20 chữ số.';
+  const holder = normalizeHolder(b.bank_account_holder);
+  if (!holder) return 'Vui lòng nhập tên chủ tài khoản.';
+  if (!/^[A-Z ]+$/.test(holder)) return 'Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng.';
+  return '';
 }
 
 export function formatMB(bytes: number): string {

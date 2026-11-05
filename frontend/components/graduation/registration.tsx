@@ -6,7 +6,10 @@ import {
   Trash2, Upload, X, XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { GradError, checkPhoto, formatMB, gradApi, storedPhotoName, type GradMember } from '@/lib/graduation';
+import {
+  GradError, checkBank, checkPhoto, formatMB, gradApi, storedPhotoName, type BankInput, type GradBank, type GradMember,
+} from '@/lib/graduation';
+import { BANK_NOTE, BankCard, BankFields, emptyBank } from './bank';
 import { g } from './styles';
 
 const dt = (iso: string | null) =>
@@ -169,16 +172,25 @@ function PhotoPicker({ code, file, onFile, disabled }: {
 
 // ── Đăng ký mới ─────────────────────────────────────────────────────────────
 
-export function RegisterForm({ member, onRegistered }: { member: GradMember; onRegistered: (m: GradMember) => void }) {
+export function RegisterForm({ member, banks, onRegistered }: {
+  member: GradMember; banks: GradBank[]; onRegistered: (m: GradMember) => void;
+}) {
   const [file, setFile] = useState<File | null>(null);
+  const [bank, setBank] = useState<BankInput>(() => emptyBank(member));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const reg = member.registration;
   const code = member.student.student_code;
 
   async function submit() {
+    const problem = checkBank(bank);
+    if (problem) {
+      setError(problem);
+      document.getElementById('hoan-coc')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setBusy(true); setError('');
-    try { onRegistered(await gradApi.register(file)); } catch (err) {
+    try { onRegistered(await gradApi.register(file, bank)); } catch (err) {
       setError(err instanceof GradError ? err.message : 'Không đăng ký được. Vui lòng thử lại.');
     } finally { setBusy(false); }
   }
@@ -188,7 +200,7 @@ export function RegisterForm({ member, onRegistered }: { member: GradMember; onR
       <div className="border-b border-line px-6 py-5 sm:px-8">
         <p className={g.eyebrow}>Bước 3</p>
         <h3 className="mt-1 font-display text-[1.9rem] font-semibold leading-tight text-[#0f2a5c]">Đăng ký tham dự</h3>
-        <p className="mt-1 text-sm text-muted">Tải ảnh trình chiếu nếu có, rồi bấm xác nhận để nhận mã QR check-in.</p>
+        <p className="mt-1 text-sm text-muted">Tải ảnh trình chiếu nếu có, khai tài khoản nhận hoàn tiền cọc, rồi bấm xác nhận để nhận mã QR check-in.</p>
       </div>
 
       <div className="grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
@@ -206,6 +218,16 @@ export function RegisterForm({ member, onRegistered }: { member: GradMember; onR
             <div className="mt-3"><Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
           </div>
           <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
+
+          <div id="hoan-coc" className="scroll-mt-24 border-t border-line pt-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h4 className="font-semibold text-ink">Tài khoản nhận hoàn tiền cọc lễ phục</h4>
+              <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 whitespace-nowrap">Bắt buộc</span>
+            </div>
+            <p className="mt-1 mb-4 text-sm text-muted">{BANK_NOTE}</p>
+            <BankFields banks={banks} value={bank} onChange={setBank} disabled={busy} />
+          </div>
+
           <Alert message={error} />
           <div className="rounded-xl bg-[#0f2a5c] p-4 sm:p-5 text-white flex flex-col gap-3.5">
             {file && <div className="text-sm text-white/80">Ảnh sẽ được gửi cùng đăng ký.</div>}
@@ -401,7 +423,9 @@ function CancelBlock({ member, onChange }: { member: GradMember; onChange: (m: G
   );
 }
 
-export function Registered({ member, onChange }: { member: GradMember; onChange: (m: GradMember) => void }) {
+export function Registered({ member, banks, onChange }: {
+  member: GradMember; banks: GradBank[]; onChange: (m: GradMember) => void;
+}) {
   const reg = member.registration;
   const rejected = reg.status === 'registered' && reg.cancel_reviewed_at && reg.cancel_review_note;
   return (
@@ -414,6 +438,8 @@ export function Registered({ member, onChange }: { member: GradMember; onChange:
         <Callout tone="slate">Đã hết thời gian đăng ký — không đổi ảnh hay gửi yêu cầu hủy được nữa. Mã QR vẫn dùng bình thường.</Callout>
       )}
       <CurrentPhoto member={member} onChange={onChange} />
+      <BankCard key={member.bank ? `${member.bank.bank_id}-${member.bank.account_number}` : 'none'}
+                member={member} banks={banks} onChange={onChange} />
       <CancelBlock member={member} onChange={onChange} />
     </div>
   );

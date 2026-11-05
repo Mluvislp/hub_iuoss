@@ -27,9 +27,9 @@ from django.db import transaction
 from django.utils import timezone
 from PIL import Image, UnidentifiedImageError
 
-from students.models import Student, StudentCodeHistory
+from students.models import Student, StudentBankAccount, StudentCodeHistory
 
-from .graduation_models import GraduationRound, GraduationRoundStudent as Member
+from .graduation_models import Bank, GraduationRound, GraduationRoundStudent as Member
 from .insurance_contract import safe_path
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,8 @@ PHOTO_MAX_BYTES = 5 * 1024 * 1024      # dưới 5 MB
 PHOTO_MIN_SIDE = 600                   # cạnh ngắn tối thiểu (px)
 PHOTO_MAX_PIXELS = 80_000_000          # chặn ảnh "bom giải nén"
 CANCEL_REASON_MIN, CANCEL_REASON_MAX = 5, 500
+ACCOUNT_MIN, ACCOUNT_MAX = 6, 20          # số tài khoản ngân hàng VN: 6–20 chữ số
+HOLDER_MIN, HOLDER_MAX = 2, 100
 
 
 class GraduationError(Exception):
@@ -249,10 +251,69 @@ def _apply_photo(member, upload, written):
 PHOTO_FIELDS = ["photo_storage_key", "photo_original_filename", "photo_size_bytes", "photo_uploaded_at"]
 
 
+# ── Tài khoản hoàn tiền cọc lễ phục ─────────────────────────────────────────
+
+def banks_payload():
+    return [{"id": b.id, "short_name": b.short_name, "full_name": b.full_name}
+            for b in Bank.objects.filter(is_active=True).order_by("sort_order", "short_name")]
+
+
+def normalize_holder(text):
+    """Tên chủ tài khoản: IN HOA, KHÔNG dấu, gộp khoảng trắng — đúng cách ngân hàng in tên."""
+    text = unicodedata.normalize("NFD", text or "").replace("đ", "d").replace("Đ", "D")
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return " ".join(text.upper().split())
+
+
+def parse_bank(bank_id, account_number, holder):
+    """→ (Bank, số tài khoản, chủ tài khoản) đã chuẩn hoá. Ném GraduationError với câu cụ thể."""
+    raw_id = str(bank_id or "").strip()
+    bank = Bank.objects.filter(pk=int(raw_id), is_active=True).first() if raw_id.isdigit() else None
+    if bank is None:
+        raise GraduationError("Vui lòng chọn ngân hàng nhận hoàn tiền cọc.")
+    number = "".join(ch for ch in str(account_number or "") if ch not in " .-")
+    if not number:
+        raise GraduationError("Vui lòng nhập số tài khoản ngân hàng.")
+    if not number.isdigit():
+        raise GraduationError("Số tài khoản chỉ gồm chữ số.")
+    if not ACCOUNT_MIN <= len(number) <= ACCOUNT_MAX:
+        raise GraduationError(f"Số tài khoản phải có từ {ACCOUNT_MIN} đến {ACCOUNT_MAX} chữ số.")
+    name = normalize_holder(holder)
+    if not name:
+        raise GraduationError("Vui lòng nhập tên chủ tài khoản.")
+    if not all(ch.isalpha() or ch == " " for ch in name):
+        raise GraduationError("Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng.")
+    if not HOLDER_MIN <= len(name) <= HOLDER_MAX:
+        raise GraduationError("Tên chủ tài khoản không hợp lệ.")
+    return bank, number, name
+
+
+BANK_FIELDS = ["bank", "bank_account_number", "bank_account_holder"]
+
+
+def _apply_bank(member, bank_info):
+    member.bank, member.bank_account_number, member.bank_account_holder = parse_bank(*bank_info)
+
+
+def bank_suggestion(member):
+    """Gợi ý điền sẵn: tài khoản trong hồ sơ SV (nếu tên ngân hàng khớp danh mục) + tên chủ = họ tên SV."""
+    suggestion = {"bank_id": None, "account_number": "", "holder": normalize_holder(member.student.full_name)}
+    row = (StudentBankAccount.objects.filter(student_id=member.student_id, is_current=True)
+           .exclude(account_number="").order_by("-updated_at").first())
+    if row:
+        name = (row.bank_name or "").strip()
+        bank = (Bank.objects.filter(is_active=True, short_name__iexact=name).first()
+                or Bank.objects.filter(is_active=True, full_name__iexact=name).first())
+        if bank:
+            suggestion["bank_id"] = bank.id
+        suggestion["account_number"] = "".join(ch for ch in row.account_number if ch.isdigit())
+    return suggestion
+
+
 # ── Ghi ──────────────────────────────────────────────────────────────────────
 
 def _locked(member_id):
-    return (Member.objects.select_for_update().select_related("round", "student", "student__current_department")
+    return (Member.objects.select_for_update().select_related("round", "student", "student__current_department", "bank")
             .get(pk=member_id))
 
 
@@ -280,11 +341,12 @@ def _run(member_id, change):
         raise
 
 
-def register(member_id, *, via, upload=None):
+def register(member_id, *, via, bank_info, upload=None):
     def change(member, written):
         _require_open(member)
         if member.is_registered:
             raise GraduationError("Đã đăng ký tham dự rồi.")
+        _apply_bank(member, bank_info)          # bắt buộc — kiểm trước khi ghi ảnh
         stale = _apply_photo(member, upload, written) if upload is not None else None
         member.registration_status = Member.STATUS_REGISTERED
         member.registered_at = timezone.now()
@@ -294,7 +356,7 @@ def register(member_id, *, via, upload=None):
         member.cancel_reviewed_at = member.cancel_review_note = None
         fields = ["registration_status", "registered_at", "verified_via", "checkin_token", "cancel_reason",
                   "cancel_requested_at", "cancel_reviewed_at", "cancel_review_note", "updated_at"]
-        member.save(update_fields=fields + (PHOTO_FIELDS if upload is not None else []))
+        member.save(update_fields=fields + BANK_FIELDS + (PHOTO_FIELDS if upload is not None else []))
         logger.info("GRAD_REGISTER     | code=%-14s | via=%s | photo=%s", member.student_code, via,
                     "yes" if upload is not None else "no")
         return stale
@@ -329,6 +391,16 @@ def remove_photo(member_id):
             setattr(member, field, None)
         member.save(update_fields=PHOTO_FIELDS + ["updated_at"])
         return stale
+    return _run(member_id, change)
+
+
+def update_bank(member_id, bank_info):
+    def change(member, written):
+        _require_editable(member)
+        _apply_bank(member, bank_info)
+        member.save(update_fields=BANK_FIELDS + ["updated_at"])
+        logger.info("GRAD_BANK         | code=%-14s", member.student_code)
+        return None
     return _run(member_id, change)
 
 
@@ -393,5 +465,13 @@ def member_payload(member):
             "can_edit": can_edit,
             "can_register": round_.registration_open() and not member.is_registered,
         },
+        "bank": {
+            "bank_id": member.bank_id,
+            "bank_short_name": member.bank.short_name,
+            "bank_full_name": member.bank.full_name,
+            "account_number": member.bank_account_number or "",
+            "holder": member.bank_account_holder or "",
+        } if member.bank_id else None,
+        "bank_suggestion": None if member.bank_id else bank_suggestion(member),
         "round": round_payload(round_),
     }
