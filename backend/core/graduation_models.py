@@ -29,6 +29,24 @@ class GraduationRound(models.Model):
                     and self.registration_opens_at <= now <= self.registration_closes_at)
 
 
+class Bank(models.Model):
+    """Danh mục ngân hàng dùng chung (Dashboard quản lý — students/catalogs.py). Hub chỉ đọc."""
+
+    id = models.BigAutoField(primary_key=True)
+    short_name = models.CharField(max_length=64, unique=True)
+    full_name = models.CharField(max_length=255)
+    english_name = models.CharField(max_length=255, null=True, blank=True)
+    swift_code = models.CharField(max_length=11, null=True, blank=True)
+    bank_type = models.CharField(max_length=64, null=True, blank=True)
+    sort_order = models.SmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = False
+        db_table = "banks"
+        ordering = ["sort_order", "short_name"]
+
+
 class GraduationRoundStudent(models.Model):
     STATUS_REGISTERED = "registered"
     STATUS_CANCEL_REQUESTED = "cancel_requested"
@@ -54,6 +72,10 @@ class GraduationRoundStudent(models.Model):
     photo_original_filename = models.CharField(max_length=255, null=True, blank=True)
     photo_size_bytes = models.PositiveIntegerField(null=True, blank=True)
     photo_uploaded_at = models.DateTimeField(null=True, blank=True)
+    # Tài khoản nhận hoàn tiền cọc lễ phục — bắt buộc khi đăng ký (core/graduation.py::parse_bank).
+    bank = models.ForeignKey(Bank, on_delete=models.DO_NOTHING, null=True, blank=True, related_name="+")
+    bank_account_number = models.CharField(max_length=32, null=True, blank=True)
+    bank_account_holder = models.CharField(max_length=120, null=True, blank=True)
     cancel_reason = models.CharField(max_length=500, null=True, blank=True)
     cancel_requested_at = models.DateTimeField(null=True, blank=True)
     cancel_reviewed_at = models.DateTimeField(null=True, blank=True)
