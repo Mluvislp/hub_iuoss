@@ -608,8 +608,10 @@ def submit(student, data, uploads, *, request_key):
                 student=student, round=round_,
                 student_code=cleaned["student_code"], full_name=cleaned["full_name"],
                 date_of_birth=cleaned["date_of_birth"],
-                class_code=cleaned["class_code"] or None,
-                department_code=cleaned["department_code"] or None,
+                # Lớp/khoa lấy từ bảng students (SV không sửa trên form); hồ sơ trống mới dùng ô form.
+                class_code=(student.class_code or "").strip() or cleaned["class_code"] or None,
+                department_code=(student.current_department.code if student.current_department
+                                 else cleaned["department_code"] or None),
                 department_name=(student.current_department.name_vi
                                  if student.current_department else None),
                 submission_kind=plan["submission_kind"],
