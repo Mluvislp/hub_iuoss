@@ -28,25 +28,57 @@ function Row({ label, value, hint }: { label: string; value: React.ReactNode; hi
   );
 }
 
-/** Ô "Thực nhận" + bảng số liệu của MỘT kỳ — dùng ở trang tổng quan và pop-up đơn. */
+/** Số tiền được giảm kèm mức % bên phải — dùng ở thẻ kết quả, thẻ đơn và bảng lịch sử. */
+export function AmountWithPercent({ award, className }: { award: TuitionExemptionAward; className?: string }) {
+  return (
+    <span className={cn('inline-flex flex-wrap items-baseline gap-x-2', className)}>
+      <span>{fmtVnd(award.received_vnd)}</span>
+      {award.percent != null && (
+        <span className={cn(badge.base, badge.success, 'text-xs')}>{fmtPercent(award.percent)}</span>
+      )}
+    </span>
+  );
+}
+
+/** Kết quả của MỘT kỳ: diện, học phí kỳ này, được giảm (kèm %), còn phải đóng. */
 export function AwardDetails({ award }: { award: TuitionExemptionAward }) {
   const hasRetake = (award.retake_fee_vnd ?? 0) > 0;
+  const fee = award.base_fee_vnd ?? award.first_fee_vnd;
   return (
     <>
       <div className="rounded-lg border border-success-line bg-success-soft px-5 py-4">
-        <div className={ui.label}>Số tiền miễn giảm, hỗ trợ (thực nhận)</div>
-        <div className="mt-1.5 text-2xl font-semibold text-ink">{fmtVnd(award.received_vnd)}</div>
-        <div className="mt-2 text-meta text-muted">
+        <div className={ui.label}>Diện miễn giảm</div>
+        <div className="mt-1 text-section font-semibold text-ink">{award.category || '—'}</div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div>
+            <div className={ui.label}>Học phí kỳ này</div>
+            <div className="mt-1 text-lg font-semibold text-ink">{fmtVnd(fee)}</div>
+          </div>
+          <div>
+            <div className={ui.label}>Được giảm</div>
+            <AmountWithPercent award={award} className="mt-1 text-lg font-semibold text-success-text" />
+          </div>
+          <div>
+            <div className={ui.label}>Còn phải đóng</div>
+            <div className="mt-1 text-lg font-semibold text-ink">{fmtVnd(award.payable_vnd)}</div>
+          </div>
+        </div>
+        <div className="mt-3 text-meta text-muted">
           {award.term_label}{award.basis && <> · Căn cứ {award.basis}</>}
         </div>
+        {award.capped_by_ceiling && (
+          <p className="mt-2 text-meta text-ink-2">
+            Số tiền được giảm tối đa bằng mức Nhà nước hỗ trợ ({fmtVnd(award.ceiling_vnd)} = 5 tháng × mức trần học phí
+            × {fmtPercent(award.percent)}); phần còn lại sinh viên tự đóng.
+          </p>
+        )}
       </div>
       <dl className="mt-4">
-        <Row label="Đối tượng" value={award.category || '—'} />
-        <Row label="Mức miễn giảm" value={fmtPercent(award.percent)} />
-        <Row label="Học phí xét miễn giảm" value={fmtVnd(award.base_fee_vnd)}
-             hint={hasRetake ? `Không tính ${fmtVnd(award.retake_fee_vnd)} học cải thiện, học lại` : undefined} />
+        <Row label="Mức miễn giảm của diện" value={fmtPercent(award.percent)} />
+        <Row label="Học phí xét miễn giảm" value={fmtVnd(fee)}
+             hint={hasRetake ? `Không tính ${fmtVnd(award.retake_fee_vnd)} học cải thiện, học lại` : 'Học phí lần học đầu, không gồm học lại / học cải thiện'} />
         {award.decree_amount_vnd != null && award.decree_amount_vnd > 0 && (
-          <Row label="Giảm theo Nghị định 238" value={fmtVnd(award.decree_amount_vnd)} />
+          <Row label="Nhà nước chi trả (NĐ 238)" value={fmtVnd(award.decree_amount_vnd)} />
         )}
         {award.school_support_vnd != null && award.school_support_vnd > 0 && (
           <Row label="Trường hỗ trợ" value={fmtVnd(award.school_support_vnd)} />

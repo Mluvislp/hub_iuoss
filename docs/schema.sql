@@ -394,6 +394,9 @@ CREATE TABLE `health_check_responses` (
 -- _category_rates, _rounds, student_tuition_fees, tuition_exemption_awards) xem ở file
 -- nguồn — tuition_exemption_awards: dashboard_iuoss/docs/sql/20261024_mghp_awards.sql
 -- (Hub chỉ đọc dòng của chính SV; không đọc cột lô import / người sửa).
+-- 05/11/2026 — dashboard_iuoss/docs/sql/20261105_mghp_ceilings_special_wards.sql: Hub đọc
+-- thêm tuition_special_area_wards (xã ĐBKK, chặn SV chọn TSKK khi xã thường trú trong hồ
+-- sơ không thuộc danh sách) và cột tuition_exemption_awards.payable_vnd.
 -- Cột ghi [DASH] = Dashboard được ghi.
 
 CREATE TABLE `hub_tuition_exemption_applications` (

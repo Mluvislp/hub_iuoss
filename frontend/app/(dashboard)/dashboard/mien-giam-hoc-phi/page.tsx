@@ -10,7 +10,7 @@ import { accentIcon, badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { TuitionExemptionApplication, TuitionExemptionAward, TuitionExemptionState } from '@/lib/types';
 import { TuitionApplicationModal } from './application-detail';
-import { AwardCard, fmtVnd } from './award';
+import { AmountWithPercent, AwardCard } from './award';
 import { BASE, ErrorBox, fmtDateTime, MODE_BADGE, StatusBadge } from './shared';
 
 /**
@@ -26,13 +26,15 @@ const ACTION_ICON = { submit: FilePlus2, confirm: RefreshCw, supplement: FileUp 
 const TH = 'px-5 py-2.5 text-left text-xs font-medium text-muted';
 const THEAD_ROW = 'border-b border-line bg-surface-subtle';
 
+const fmtMoney = (n: number | null | undefined) => (n == null ? '' : `${n.toLocaleString('vi-VN')} đ`);
+
 const categoryNames = (app: TuitionExemptionApplication) => app.categories.map((c) => c.name).join(', ');
 
 type AwardOf = (app: TuitionExemptionApplication) => TuitionExemptionAward | undefined;
 
-/** Ô kết quả của một đơn: số thực nhận khi đã có danh sách; đơn Hoàn thành mà chưa có thì báo chờ. */
-function awardText(app: TuitionExemptionApplication, award: TuitionExemptionAward | undefined) {
-  if (award) return fmtVnd(award.received_vnd);
+/** Ô kết quả của một đơn: số được giảm (kèm %) khi đã có kết quả; đơn Hoàn thành mà chưa có thì báo chờ. */
+function awardText(app: TuitionExemptionApplication, award: TuitionExemptionAward | undefined): React.ReactNode {
+  if (award) return <AmountWithPercent award={award} />;
   return app.status === 'done' ? 'Chờ danh sách chính thức' : '';
 }
 
@@ -85,7 +87,21 @@ function CurrentCard({ state, awardOf, onOpen }: {
             </div>
           </div>
 
-          {app.can_supplement && (
+          {app.status === 'awaiting_supplement' && (
+            <RejectionNotice className="mt-4" eyebrow="Chờ sinh viên bổ sung"
+                             title={`${app.invalid_documents.length} giấy tờ chưa hợp lệ — vui lòng nộp lại`}>
+              <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-primary-text">
+                  {app.invalid_documents.map((d) => d.label).join(', ')}
+                </p>
+                <button type="button" className={cn(ui.btnPrimary, 'w-full shrink-0 sm:w-auto')} onClick={() => onOpen(app.id)}>
+                  <FileUp size={16} /> Nộp lại giấy tờ
+                </button>
+              </div>
+            </RejectionNotice>
+          )}
+
+          {app.can_supplement && app.status === 'rejected' && (
             <RejectionNotice className="mt-4" eyebrow="Đơn bị từ chối" title={app.rejection_reason || 'Đơn bị từ chối'}
                              note={app.review_note}>
               <div className="flex flex-col gap-2 rounded-lg bg-primary-soft p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -104,7 +120,11 @@ function CurrentCard({ state, awardOf, onOpen }: {
             {r && <DefRow label="Học kỳ" value={r.term_label} />}
             {r && <DefRow label="Hạn nộp hồ sơ" value={fmtDateTime(r.closes_at)} />}
             {(award || app.status === 'done') && (
-              <DefRow label="Số tiền thực nhận" value={awardText(app, award)} />
+              <>
+                {award && <DefRow label="Học phí kỳ này" value={fmtMoney(award.base_fee_vnd ?? award.first_fee_vnd)} />}
+                <DefRow label="Được giảm" value={awardText(app, award)} />
+                {award && <DefRow label="Còn phải đóng" value={fmtMoney(award.payable_vnd)} />}
+              </>
             )}
           </dl>
 
@@ -155,7 +175,7 @@ function HistoryCard({ history, awardOf, onOpen }: {
               <p className="text-xs text-ink-3"><span className="text-muted">Đối tượng: </span>{categoryNames(app)}</p>
             )}
             {awardText(app, awardOf(app)) && (
-              <p className="text-xs text-ink-3"><span className="text-muted">Thực nhận: </span>{awardText(app, awardOf(app))}</p>
+              <p className="text-xs text-ink-3"><span className="text-muted">Được giảm: </span>{awardText(app, awardOf(app))}</p>
             )}
             <div className="flex [&>button]:w-full">
               <DetailButton onClick={() => onOpen(app.id)} />
@@ -171,7 +191,7 @@ function HistoryCard({ history, awardOf, onOpen }: {
               <th className={cn(TH, 'px-3')}>Đối tượng</th>
               <th className={cn(TH, 'px-3')}>Ngày nộp</th>
               <th className={cn(TH, 'px-3')}>Trạng thái</th>
-              <th className={cn(TH, 'px-3 text-right')}>Thực nhận</th>
+              <th className={cn(TH, 'px-3 text-right')}>Được giảm</th>
               <th className={cn(TH, 'text-right')}>Thao tác</th>
             </tr>
           </thead>

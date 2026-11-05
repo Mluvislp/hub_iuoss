@@ -460,8 +460,8 @@ export default function HealthCheckPage() {
         {header}
         {isSwitching ? (
           <div className="px-6 py-5">
-            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
-              <Repeat size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line bg-white px-4 py-3.5">
+              <Repeat size={18} className="text-warning-text flex-shrink-0 mt-0.5" />
               <div className="text-sm text-ink">
                 <div className="font-semibold">Chuyển sang đăng ký khám sức khỏe tại trường</div>
                 <p className="mt-1">

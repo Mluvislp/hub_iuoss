@@ -252,7 +252,7 @@ export default function ExaminedWizard({
           <>
             <p className="text-meta text-muted -mt-1">{section.desc}</p>
             {section.note && (
-              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-2.5 text-meta text-ink">
+              <div className="rounded-lg border border-line bg-surface-subtle px-4 py-2.5 text-meta text-ink">
                 {section.note}
               </div>
             )}
