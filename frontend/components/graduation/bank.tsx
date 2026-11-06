@@ -121,7 +121,6 @@ export function emptyBank(m: GradMember): BankInput {
   };
 }
 
-export const BANK_NOTE = 'Dùng để hoàn tiền cọc thuê lễ phục sau lễ tốt nghiệp. Kiểm tra kỹ — chuyển khoản sai tài khoản sẽ không hoàn lại được.';
 
 /** Sau khi đã đăng ký: xem / sửa tài khoản (khi còn hạn). Chưa có tài khoản (đăng ký trước khi có mục này) ⇒ mở form ngay. */
 export function BankCard({ member, banks, onChange }: {
@@ -166,7 +165,6 @@ export function BankCard({ member, banks, onChange }: {
       )}
       {editing ? (
         <div className="mt-4 space-y-4">
-          <p className="text-sm text-muted">{BANK_NOTE}</p>
           <BankFields banks={banks} value={value} onChange={setValue} disabled={busy} />
           {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
           <div className="flex justify-end gap-2">
