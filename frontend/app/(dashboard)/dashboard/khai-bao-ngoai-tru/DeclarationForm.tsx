@@ -40,6 +40,22 @@ export function ReadonlyField({ label, value, note }: { label: string; value: st
   );
 }
 
+/** Ô phụ chỉ xem (nơi cấp, ngày cấp CCCD) — cùng kiểu ô khoá nhưng thấp hơn. */
+function LockedMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="block text-[0.75rem] text-muted mb-1">{label}</div>
+      <div className={cn(
+        'flex items-center gap-2 h-9 px-3 rounded-lg border border-line bg-slate-50 text-[0.85rem]',
+        value ? 'text-ink' : 'text-slate-400 italic',
+      )}>
+        <Lock size={12} className="text-slate-400 flex-shrink-0" />
+        <span className="truncate" title={value}>{value || 'Chưa có thông tin'}</span>
+      </div>
+    </div>
+  );
+}
+
 /** Tile chọn một phương án — theo khuôn option tile của DESIGN.md. */
 export function ChoiceTile({
   active, title, desc, onClick, disabled,
@@ -229,10 +245,16 @@ export function DeclarationFields({
             field={{ ...form.fields['student.citizen_id'], value: cccdCurrent.number }}
             draft={drafts['student.citizen_id']}
             placeholder="12 chữ số"
-            onUnlock={() => setDraft('student.citizen_id', cccdCurrent.number)}
+            onUnlock={() => setDraft('student.citizen_id', cccdCurrent.number || '')}
             onCancel={() => setDraft('student.citizen_id', undefined)}
             onChange={(v) => { setDraft('student.citizen_id', v); clearError('citizen_id'); }}
             error={fieldErrors.citizen_id}
+            lockedExtra={
+              <div className="grid sm:grid-cols-2 gap-2 mt-2">
+                <LockedMini label="Nơi cấp" value={cccdCurrent.issue_place || ''} />
+                <LockedMini label="Ngày cấp" value={cccdCurrent.issue_date || ''} />
+              </div>
+            }
             extra={
               <div className="grid sm:grid-cols-2 gap-2 mt-2">
                 <div>

@@ -17,12 +17,14 @@ interface Props {
   error?: string;
   placeholder?: string;
   hint?: string;
-  /** Ô phụ hiện thêm khi mở khóa (CCCD có nơi cấp + ngày hết hạn) */
+  /** Ô phụ hiện thêm khi mở khóa (CCCD có nơi cấp + ngày cấp) */
   extra?: React.ReactNode;
+  /** Bản chỉ xem của các ô phụ, hiện sẵn khi đang khóa — một nút sửa mở tất cả. */
+  lockedExtra?: React.ReactNode;
 }
 
 export default function PersonalField({
-  field, draft, onUnlock, onChange, onCancel, error, placeholder, hint, extra,
+  field, draft, onUnlock, onChange, onCancel, error, placeholder, hint, extra, lockedExtra,
 }: Props) {
   const unlocked = draft !== undefined;
   const blank = !field.value;
@@ -73,6 +75,7 @@ export default function PersonalField({
           {field.value || 'Chưa có thông tin'}
         </div>
       )}
+      {!unlocked && lockedExtra}
 
       {error && <p id={msgId} className="mt-1 text-xs text-danger-text">{error}</p>}
       {hint && !error && !unlocked && (
