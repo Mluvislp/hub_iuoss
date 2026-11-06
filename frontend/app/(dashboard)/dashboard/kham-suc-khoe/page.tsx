@@ -566,7 +566,7 @@ export default function HealthCheckPage() {
                         <p className="mt-1">
                           Địa chỉ đã khai không thuộc Thành phố Hồ Chí Minh. Cần cập nhật địa chỉ thì gửi
                           yêu cầu chỉnh sửa tại{' '}
-                          <Link href="/dashboard/khai-bao-ngoai-tru" className="font-semibold underline">Khai báo ngoại trú</Link>.
+                          <Link href="/dashboard/khai-bao-dia-chi" className="font-semibold underline">Khai báo địa chỉ</Link>.
                         </p>
                       ) : (
                         <p className="mt-1">Địa chỉ đang khai ở phần 1 không thuộc Thành phố Hồ Chí Minh.</p>

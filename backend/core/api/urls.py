@@ -63,6 +63,11 @@ urlpatterns = [
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
     path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
          name="api_offcampus_request_reopen"),
+    # Khai báo địa chỉ: thay ngoại trú. Vé xin mở lại dùng chung (cùng một khoá "đã khai").
+    path("address-declaration/", views.AddressDeclarationView.as_view(),
+         name="api_address_declaration"),
+    path("address-declaration/request-reopen/", views.OffCampusReopenRequestView.as_view(),
+         name="api_address_declaration_request_reopen"),
 
     # Lễ tốt nghiệp (/le-tot-nghiep) — phiên riêng GraduationToken, xem core/api/graduation_auth.py
     path("graduation/", gv.GraduationInfoView.as_view(), name="api_graduation"),

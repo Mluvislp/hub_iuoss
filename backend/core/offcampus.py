@@ -7,6 +7,15 @@ Sinh viên khai lại địa chỉ thường trú + tạm trú theo danh mục h
 Tất cả ghi thẳng, không qua duyệt — đó là mục đích của tính năng (SV tự sửa
 dữ liệu cho dễ). Mỗi lần sửa thông tin cá nhân ghi một dòng nhật ký `cũ → mới`
 vào hub_profile_change_requests.
+
+Hai biểu mẫu dùng chung module này, phân biệt bằng `mode`:
+    MODE_OFFCAMPUS — "Khai báo ngoại trú" (tạm đóng 11/2026, sau cờ FEATURE_OFFCAMPUS).
+                     Vẫn là đường khai của trang Khám sức khỏe.
+    MODE_ADDRESS   — "Khai báo địa chỉ" cho toàn trường: tạm trú có 3 lựa chọn
+                     (TP.HCM / ngoài TP.HCM / không có tạm trú), "không có tạm trú"
+                     chọn được với MỌI thường trú.
+Cả hai chung khoá "đã khai" (pc.TARGET_DECLARED) và vé mở lại — SV đã khai ngoại
+trú tính là đã khai địa chỉ. Khác nhau chỉ ở luật tạm trú và `source` ghi nhật ký.
 """
 
 from django.db import transaction
@@ -24,6 +33,13 @@ from .documents import _match_province, _match_ward, _ADMIN_KEYWORDS
 # liệu cũ, không xoá; `address_service.read_order()` ưu tiên bản chuẩn hoá khi đọc.
 PERMANENT = StudentAddress.TYPE_CURRENT_STD
 TEMPORARY = StudentAddress.TYPE_TEMPORARY_STD
+
+MODE_OFFCAMPUS = "offcampus"
+MODE_ADDRESS = "address"
+_SOURCES = {
+    MODE_OFFCAMPUS: ProfileChangeRequest.SOURCE_OFFCAMPUS,
+    MODE_ADDRESS: ProfileChangeRequest.SOURCE_ADDRESS,
+}
 
 
 def _suggest_from_legacy(address):
@@ -174,7 +190,7 @@ def request_reopen(student, reason=""):
 
 
 @transaction.atomic
-def submit(student, data):
+def submit(student, data, *, mode=MODE_OFFCAMPUS):
     """Ghi một lần khai báo. Trả về dict tóm tắt kết quả.
 
     Toàn bộ nằm trong một transaction: sai một ô là không ghi gì cả, tránh
@@ -189,6 +205,7 @@ def submit(student, data):
             "phòng CTSV để được mở lại."
         )
 
+    source = _SOURCES[mode]
     errors = {}
     group_key = pc.new_group_key()
     temp_warnings = []
@@ -221,7 +238,7 @@ def submit(student, data):
         try:
             request, applied = pc.submit_change(
                 student, target, raw,
-                source=ProfileChangeRequest.SOURCE_OFFCAMPUS,
+                source=source,
                 group_key=group_key,
             )
             if request is not None:
@@ -256,10 +273,11 @@ def submit(student, data):
     in_hcmc = data.get("temporary_in_hcmc")
     temporary_none = data.get("temporary_none") is True
     if temporary_none:
-        # "Không có tạm trú" chỉ hợp lệ khi thường trú ở TP.HCM — SV ở ngay tại
-        # nhà. Kiểm lại ở server, không tin client. Ghi một dòng rỗng có ngày khai
-        # (`declare_empty`) để phân biệt với "chưa khai bao giờ".
-        if permanent.get("province_code") != addr.HCMC_PROVINCE_CODE:
+        # Ghi một dòng rỗng có ngày khai (`declare_empty`) để phân biệt với "chưa
+        # khai bao giờ". Biểu mẫu ngoại trú chỉ cho chọn khi thường trú ở TP.HCM
+        # (SV ở ngay tại nhà) — kiểm lại ở server, không tin client. Khai báo địa
+        # chỉ toàn trường thì ai cũng chọn được.
+        if mode == MODE_OFFCAMPUS and permanent.get("province_code") != addr.HCMC_PROVINCE_CODE:
             errors["temporary_in_hcmc"] = (
                 "Chỉ chọn “Không có tạm trú” khi thường trú tại Thành phố Hồ Chí Minh."
             )
@@ -304,7 +322,7 @@ def submit(student, data):
     # Dấu mốc "đã khai": ghi SAU khi mọi ô đã ghi xong, trong cùng transaction.
     # Đây là thứ duy nhất quyết định form có khoá lại hay không — xem
     # pc.TARGET_DECLARED để biết vì sao không suy từ bảng địa chỉ.
-    pc.mark_declared(student, group_key=group_key)
+    pc.mark_declared(student, group_key=group_key, source=source)
 
     # Ghi xong mới tiêu vé — sai ở bất kỳ ô nào thì transaction rollback và vé
     # vẫn còn nguyên để SV nhập lại.

@@ -462,6 +462,8 @@ export interface FeatureFlags {
 export interface FeaturesResponse extends FeatureFlags {
   /** Backend đã cấu hình app registration Microsoft chưa (suy ra, không bật tay). */
   microsoft_login: boolean;
+  /** Khai báo ngoại trú — tạm đóng, thay bằng Khai báo địa chỉ. Không lên menu. */
+  offcampus: boolean;
 }
 
 export interface DashboardData {

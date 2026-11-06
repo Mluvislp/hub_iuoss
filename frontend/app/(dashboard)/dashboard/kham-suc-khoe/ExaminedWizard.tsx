@@ -239,7 +239,7 @@ export default function ExaminedWizard({
             ) : (
               <div className="rounded-lg border border-line bg-surface-subtle px-4 py-2.5 text-meta text-ink">
                 Bấm <b>Lưu và tiếp tục</b> là thông tin được ghi nhận ngay thành khai báo ngoại trú.
-                Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo ngoại trú.
+                Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo địa chỉ.
               </div>
             )}
             {locked && state.cccd_missing && <CccdForm onSaved={(next) => { onStateChange(next); setError(''); }} />}
