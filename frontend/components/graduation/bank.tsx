@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, ChevronDown, Landmark, Loader2, Pencil, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  GradError, checkBank, gradApi, normalizeHolder, type BankInput, type GradBank, type GradMember,
+  GradError, checkBank, gradApi, holderProblem, normalizeHolder, type BankInput, type GradBank, type GradMember,
 } from '@/lib/graduation';
 import { g } from './styles';
 
@@ -89,6 +89,7 @@ export function BankFields({ banks, value, onChange, disabled }: {
   banks: GradBank[]; value: BankInput; onChange: (v: BankInput) => void; disabled?: boolean;
 }) {
   const set = (k: keyof BankInput, v: string) => onChange({ ...value, [k]: v });
+  const holderError = holderProblem(value.bank_account_holder);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -103,10 +104,15 @@ export function BankFields({ banks, value, onChange, disabled }: {
       </div>
       <div>
         <label htmlFor="bank-holder" className={label}>Tên chủ tài khoản <span className="text-danger-text">*</span></label>
-        <input id="bank-holder" autoComplete="off" className={cn(field, 'uppercase placeholder:normal-case')}
-               value={value.bank_account_holder} disabled={disabled} placeholder="Đúng như trên app ngân hàng"
+        <input id="bank-holder" autoComplete="off" aria-invalid={!!holderError} aria-describedby="bank-holder-hint"
+               className={cn(field, 'uppercase placeholder:normal-case',
+                             holderError && 'border-danger-text focus:border-danger-text focus:ring-danger-text/10')}
+               value={value.bank_account_holder} disabled={disabled} placeholder="VD: NGUYEN VAN AN"
                onChange={(e) => set('bank_account_holder', e.target.value)}
                onBlur={(e) => set('bank_account_holder', normalizeHolder(e.target.value))} />
+        <p id="bank-holder-hint" className={cn('mt-1.5 text-xs', holderError ? 'text-danger-text' : 'text-muted')}>
+          {holderError || 'Nhập IN HOA, KHÔNG DẤU, đúng như tên trên thẻ / app ngân hàng.'}
+        </p>
       </div>
     </div>
   );

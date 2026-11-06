@@ -15,6 +15,7 @@ MSSV và Dashboard chỉ nhận token còn trong DB ⇒ QR tự chế / QR của
 Ảnh mới thay ảnh cũ ⇒ file cũ bị xóa sau khi giao dịch commit.
 """
 import io
+import re
 import logging
 import secrets
 import unicodedata
@@ -258,11 +259,12 @@ def banks_payload():
             for b in Bank.objects.filter(is_active=True).order_by("sort_order", "short_name")]
 
 
+HOLDER_RE = re.compile(r"^[A-Z ]+$")
+
+
 def normalize_holder(text):
-    """Tên chủ tài khoản: IN HOA, KHÔNG dấu, gộp khoảng trắng — đúng cách ngân hàng in tên."""
-    text = unicodedata.normalize("NFD", text or "").replace("đ", "d").replace("Đ", "D")
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
-    return " ".join(text.upper().split())
+    """Tên chủ tài khoản: IN HOA, gộp khoảng trắng. KHÔNG tự bỏ dấu — có dấu là lỗi (parse_bank)."""
+    return " ".join((text or "").upper().split())
 
 
 def parse_bank(bank_id, account_number, holder):
@@ -281,8 +283,10 @@ def parse_bank(bank_id, account_number, holder):
     name = normalize_holder(holder)
     if not name:
         raise GraduationError("Vui lòng nhập tên chủ tài khoản.")
-    if not all(ch.isalpha() or ch == " " for ch in name):
-        raise GraduationError("Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng.")
+    if not HOLDER_RE.match(name):
+        if any(ord(ch) > 127 for ch in name):
+            raise GraduationError("Tên chủ tài khoản phải nhập KHÔNG DẤU (VD: NGUYEN VAN AN).")
+        raise GraduationError("Tên chủ tài khoản chỉ gồm chữ cái không dấu và khoảng trắng.")
     if not HOLDER_MIN <= len(name) <= HOLDER_MAX:
         raise GraduationError("Tên chủ tài khoản không hợp lệ.")
     return bank, number, name
