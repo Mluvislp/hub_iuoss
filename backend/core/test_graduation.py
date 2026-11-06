@@ -263,7 +263,7 @@ class GraduationTests(TestCase):
         data = self._login_sv()
         self.assertIsNone(data["bank"])
         self.assertEqual(data["bank_suggestion"], {"bank_id": self.vcb.pk, "account_number": "0071000777",
-                                                   "holder": "NGUYEN VAN AN"})
+                                                   "holder": ""})
 
     def test_public_info_lists_only_active_banks(self):
         names = [b["short_name"] for b in self.client.get("/api/graduation/").json()["banks"]]

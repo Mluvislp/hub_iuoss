@@ -296,8 +296,9 @@ def _apply_bank(member, bank_info):
 
 
 def bank_suggestion(member):
-    """Gợi ý điền sẵn: tài khoản trong hồ sơ SV (nếu tên ngân hàng khớp danh mục) + tên chủ = họ tên SV."""
-    suggestion = {"bank_id": None, "account_number": "", "holder": normalize_holder(member.student.full_name)}
+    """Gợi ý điền sẵn ngân hàng + số tài khoản từ hồ sơ SV (nếu tên ngân hàng khớp danh mục).
+    Tên chủ tài khoản KHÔNG điền sẵn — SV tự nhập (Phòng CTSV chốt 06/11/2026)."""
+    suggestion = {"bank_id": None, "account_number": "", "holder": ""}
     row = (StudentBankAccount.objects.filter(student_id=member.student_id, is_current=True)
            .exclude(account_number="").order_by("-updated_at").first())
     if row:

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   GradError, checkBank, checkPhoto, formatMB, gradApi, storedPhotoName, type BankInput, type GradBank, type GradMember,
 } from '@/lib/graduation';
-import { BANK_NOTE, BankCard, BankFields, emptyBank } from './bank';
+import { BankCard, BankFields, emptyBank } from './bank';
 import { g } from './styles';
 
 const dt = (iso: string | null) =>
@@ -209,7 +209,6 @@ export function RegisterForm({ member, banks, onRegistered }: {
       <div className="border-b border-line px-6 py-5 sm:px-8">
         <p className={g.eyebrow}>Bước 3</p>
         <h3 className="mt-1 font-display text-[1.9rem] font-semibold leading-tight text-[#0f2a5c]">Đăng ký tham dự</h3>
-        <p className="mt-1 text-sm text-muted">Tải ảnh trình chiếu nếu có, khai tài khoản nhận hoàn tiền cọc, rồi bấm xác nhận để nhận mã QR check-in.</p>
       </div>
 
       <div className="grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
@@ -229,11 +228,10 @@ export function RegisterForm({ member, banks, onRegistered }: {
           <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
 
           <div id="hoan-coc" className="scroll-mt-24 border-t border-line pt-5">
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-baseline justify-between gap-3 mb-4">
               <h4 className="font-semibold text-ink">Tài khoản nhận hoàn tiền cọc lễ phục</h4>
               <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 whitespace-nowrap">Bắt buộc</span>
             </div>
-            <p className="mt-1 mb-4 text-sm text-muted">{BANK_NOTE}</p>
             <BankFields banks={banks} value={bank} onChange={setBank} disabled={busy} />
           </div>
 
