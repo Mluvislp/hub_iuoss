@@ -16,6 +16,7 @@ import { accentIcon, ui } from '@/lib/ui';
 import { cn, fromDateInput, toDateInput, todayInput } from '@/lib/utils';
 import type { CccdValue, OffCampusForm, OffCampusSubmit, Province } from '@/lib/types';
 import AddressFields, { AddressValue } from './AddressFields';
+import IssuePlaceSelect, { normalizeIssuePlace } from '@/components/issue-place-select';
 import PersonalField from './PersonalField';
 
 const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: '' };
@@ -104,7 +105,7 @@ export function useDeclarationDraft(form: OffCampusForm | null, variant: Declara
     setNoTemp(!!form.temporary_none);
     const cccd = (form.fields['student.citizen_id']?.value ?? {}) as CccdValue;
     setCccdExtra({
-      issue_place: cccd.issue_place || '',
+      issue_place: normalizeIssuePlace(cccd.issue_place || ''),
       issue_date: toDateInput(cccd.issue_date || ''),
     });
     // Trường đang trống thì mở sẵn ô nhập — không bắt bấm "Bổ sung" mới nhập được.
@@ -236,12 +237,11 @@ export function DeclarationFields({
               <div className="grid sm:grid-cols-2 gap-2 mt-2">
                 <div>
                   <label htmlFor="cccd-issue-place" className="block text-xs text-muted mb-1">Nơi cấp</label>
-                  <input
+                  <IssuePlaceSelect
                     id="cccd-issue-place"
-                    type="text" value={cccdExtra.issue_place} maxLength={255}
-                    placeholder="Cục Cảnh sát QLHC về TTXH"
-                    onChange={(e) => setCccdExtra((s) => ({ ...s, issue_place: e.target.value }))}
-                    className={cn(ui.input, 'h-9 text-sm')}
+                    value={cccdExtra.issue_place}
+                    onChange={(v) => setCccdExtra((s) => ({ ...s, issue_place: v }))}
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div>
