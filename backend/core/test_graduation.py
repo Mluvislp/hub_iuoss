@@ -64,7 +64,7 @@ class GraduationTests(TestCase):
 
     def bank_data(self, **over):
         data = {"bank_id": str(self.vcb.pk), "bank_account_number": "0071 0000 12345",
-                "bank_account_holder": "Nguyễn Văn An"}
+                "bank_account_holder": "nguyen  van an"}
         data.update(over)
         return data
 
@@ -231,7 +231,9 @@ class GraduationTests(TestCase):
                  ({"bank_account_number": "12AB5678"}, "chỉ gồm chữ số"),
                  ({"bank_account_number": "12345"}, "từ 6 đến 20"),
                  ({"bank_account_holder": "  "}, "tên chủ tài khoản"),
-                 ({"bank_account_holder": "Nguyen 123"}, "chữ cái")]
+                 ({"bank_account_holder": "Nguyen 123"}, "chữ cái"),
+                 ({"bank_account_holder": "Nguyễn Văn An"}, "KHÔNG DẤU"),
+                 ({"bank_account_holder": "DANG VAN Đ"}, "KHÔNG DẤU")]
         for over, msg in cases:
             res = self.client.post("/api/graduation/register/", self.bank_data(**over), format="multipart")
             self.assertEqual(res.status_code, 400, over)
@@ -250,7 +252,7 @@ class GraduationTests(TestCase):
         self._login_sv()
         self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
         res = self.client.post("/api/graduation/bank/", self.bank_data(bank_account_number="9999888877",
-                                                                       bank_account_holder="trần thị bình"),
+                                                                       bank_account_holder="tran thi binh"),
                                format="json")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["bank"]["holder"], "TRAN THI BINH")

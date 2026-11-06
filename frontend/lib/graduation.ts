@@ -191,10 +191,18 @@ export function storedPhotoName(code: string, file: File): string {
   return `${code.toUpperCase()}.${/\.png$/i.test(file.name) || file.type === 'image/png' ? 'png' : 'jpg'}`;
 }
 
-/** Tên chủ tài khoản như ngân hàng in: IN HOA, không dấu — giống `core/graduation.py::normalize_holder`. */
+/** Tên chủ tài khoản: IN HOA, gộp khoảng trắng — giống `core/graduation.py::normalize_holder`. KHÔNG tự bỏ dấu. */
 export function normalizeHolder(text: string): string {
-  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
-    .toUpperCase().replace(/\s+/g, ' ').trim();
+  return text.toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Câu lỗi của riêng ô tên chủ tài khoản ('' nếu hợp lệ hoặc còn trống). */
+export function holderProblem(text: string): string {
+  const holder = normalizeHolder(text);
+  if (!holder) return '';
+  if (/[^\x00-\x7F]/.test(holder)) return 'Tên chủ tài khoản phải nhập KHÔNG DẤU (VD: NGUYEN VAN AN).';
+  if (!/^[A-Z ]+$/.test(holder)) return 'Tên chủ tài khoản chỉ gồm chữ cái không dấu và khoảng trắng.';
+  return '';
 }
 
 /** Kiểm nhanh ở trình duyệt (máy chủ kiểm lại): trả câu lỗi hoặc ''. */
@@ -206,7 +214,8 @@ export function checkBank(b: BankInput): string {
   if (number.length < 6 || number.length > 20) return 'Số tài khoản phải có từ 6 đến 20 chữ số.';
   const holder = normalizeHolder(b.bank_account_holder);
   if (!holder) return 'Vui lòng nhập tên chủ tài khoản.';
-  if (!/^[A-Z ]+$/.test(holder)) return 'Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng.';
+  const bad = holderProblem(holder);
+  if (bad) return bad;
   return '';
 }
 
