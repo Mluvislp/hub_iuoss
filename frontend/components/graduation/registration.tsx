@@ -95,6 +95,14 @@ export function PhotoGuidelines() {
   );
 }
 
+// Quy cách bắt buộc — câu chữ của Phòng CTSV (06/11/2026), giữ nguyên.
+const GOWN_RULE = (
+  <Callout tone="amber" icon={AlertCircle}>
+    <b>Quy cách bắt buộc:</b> Nhà trường chỉ sử dụng ảnh mặc <b>đúng Lễ phục của trường Đại học Quốc tế</b>, đúng loại
+    lễ phục của ngành SV/HV tốt nghiệp để trình chiếu trên slide, SV/HV vui lòng up ảnh đúng quy cách.
+  </Callout>
+);
+
 const SCHOOL_PHOTO_NOTE = (
   <>Đã chụp ảnh tại các buổi chụp do nhà trường tổ chức thì <b>không cần tải lại</b>. Nếu tải lên ảnh khác, nhà
     trường sẽ dùng ảnh tải lên tại đây làm ảnh trình chiếu.</>
@@ -215,7 +223,7 @@ export function RegisterForm({ member, banks, onRegistered }: {
               <h4 className="font-semibold text-ink">Ảnh trình chiếu trên màn hình LED</h4>
               <span className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs font-medium text-muted whitespace-nowrap">Không bắt buộc</span>
             </div>
-            <div className="mt-3"><Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
+            <div className="mt-3 space-y-2.5">{GOWN_RULE}<Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
           </div>
           <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
 
@@ -345,6 +353,7 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
 
         {editing && (
           <div className="space-y-3">
+            {GOWN_RULE}
             <PhotoPicker code={member.student.student_code} file={file} onFile={setFile} disabled={busy} />
             <div className="flex items-center justify-end gap-2">
               {replacing && <button type="button" className={g.btnGhost} onClick={() => { setReplacing(false); setFile(null); }}>Thôi</button>}
@@ -359,7 +368,7 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
         <Alert message={error} />
         {showRules && (
           <div className="rounded-xl border border-line bg-[#fbfcfe] p-5">
-            <div className="mb-4"><Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
+            <div className="mb-4 space-y-2.5">{GOWN_RULE}<Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
             <PhotoGuidelines />
           </div>
         )}
