@@ -389,6 +389,7 @@ class ProfileChangeRequest(models.Model):
     STATUS_CANCELLED = "cancelled"
 
     SOURCE_OFFCAMPUS = "ngoai_tru"
+    SOURCE_ADDRESS = "dia_chi"              # Khai báo địa chỉ (toàn trường, thay ngoại trú từ 11/2026)
     SOURCE_HEALTH_CHECK = "kham_suc_khoe"   # bổ sung CCCD trong luồng khám sức khỏe
     SOURCE_PERSONAL_INFO = "thong_tin_ca_nhan"  # trang Thông tin cá nhân — luôn chờ duyệt
 

@@ -39,6 +39,9 @@ FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRO
 FEATURE_PERSONAL_INFO = env_bool("FEATURE_PERSONAL_INFO", default=not IS_PRODUCTION)
 # Nạp giấy tờ trực tiếp (core/direct_submissions.py) — production bật bằng FEATURE_DIRECT_SUBMISSIONS=1.
 FEATURE_DIRECT_SUBMISSIONS = env_bool("FEATURE_DIRECT_SUBMISSIONS", default=not IS_PRODUCTION)
+# Khai báo ngoại trú TẠM ĐÓNG (11/2026), thay bằng "Khai báo địa chỉ" (luôn mở). Mở lại
+# bằng FEATURE_OFFCAMPUS=1. Trang Khám sức khỏe vẫn khai theo luật ngoại trú, không phụ thuộc cờ.
+FEATURE_OFFCAMPUS = env_bool("FEATURE_OFFCAMPUS", default=False)
 
 # Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
 # Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.
