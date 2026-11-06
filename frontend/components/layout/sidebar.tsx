@@ -66,7 +66,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         feature: 'document_requests',
       },
       featureItem('direct_submissions'),
-      { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
+      // Khai báo ngoại trú tạm đóng (11/2026) — trang cũ tự chuyển sang đây.
+      { href: '/dashboard/khai-bao-dia-chi', icon: Home, label: 'Khai báo địa chỉ' },
       featureItem('health_check'),
       featureItem('support_tickets'),
     ],

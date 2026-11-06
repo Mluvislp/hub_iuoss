@@ -83,6 +83,7 @@ def feature_flags() -> dict:
         "support_tickets": settings.FEATURE_SUPPORT_TICKETS,
         "personal_info": settings.FEATURE_PERSONAL_INFO,
         "direct_submissions": settings.FEATURE_DIRECT_SUBMISSIONS,
+        "offcampus": settings.FEATURE_OFFCAMPUS,
         # Không phải cờ FEATURE_* bật/tắt bằng tay: tự suy ra từ việc đã cấu hình
         # app registration hay chưa, để không bao giờ hiện nút dẫn tới endpoint chết.
         "microsoft_login": settings.MS_LOGIN_ENABLED,
@@ -1703,9 +1704,19 @@ class OffCampusDeclarationView(APIView):
     """GET  — dữ liệu dựng form (thông tin cá nhân + 2 địa chỉ + gợi ý prefill)
     POST — ghi khai báo. Địa chỉ lẫn CCCD/email/SĐT đều ghi thẳng, không qua
            duyệt; mỗi thay đổi để lại một dòng nhật ký.
+
+    Tạm đóng sau cờ FEATURE_OFFCAMPUS — tắt thì 404 mọi method. Lớp con
+    `AddressDeclarationView` là biểu mẫu thay thế, không bị cờ chặn.
     """
 
     permission_classes = [IsHubAuthenticated]
+    mode = offcampus.MODE_OFFCAMPUS
+    log_tag = "OFFCAMPUS_DECLARED"
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if self.mode == offcampus.MODE_OFFCAMPUS and not settings.FEATURE_OFFCAMPUS:
+            raise NotFound("Khai báo ngoại trú đang tạm đóng.")
 
     def _student(self, request):
         if not request.user.student_id:
@@ -1736,7 +1747,7 @@ class OffCampusDeclarationView(APIView):
 
         data = request.data if isinstance(request.data, dict) else {}
         try:
-            result = offcampus.submit(student, data)
+            result = offcampus.submit(student, data, mode=self.mode)
         except offcampus.DeclarationLocked as exc:
             return Response({"detail": str(exc), "locked": True},
                             status=status.HTTP_409_CONFLICT)
@@ -1750,10 +1761,18 @@ class OffCampusDeclarationView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         logger.info(
-            "OFFCAMPUS_DECLARED | uid=%s | student_id=%s | fields=%s",
-            request.user.ldap_uid, student.pk, result.get("fields"),
+            "%s | uid=%s | student_id=%s | fields=%s",
+            self.log_tag, request.user.ldap_uid, student.pk, result.get("fields"),
         )
         return Response(result)
+
+
+class AddressDeclarationView(OffCampusDeclarationView):
+    """Khai báo địa chỉ toàn trường — cùng dữ liệu, cùng khoá với ngoại trú;
+    khác ở luật tạm trú (xem `offcampus.MODE_ADDRESS`)."""
+
+    mode = offcampus.MODE_ADDRESS
+    log_tag = "ADDRESS_DECLARED"
 
 
 class OffCampusReopenRequestView(APIView):

@@ -52,7 +52,7 @@ backend/
   core/login_policy.py      ← check_login() — ai được vào cổng
   core/models.py            ← HubStudent, ConfirmationRequest, ConfirmationRequestComment…
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
-  core/offcampus.py         ← khai báo ngoại trú (form + submit)
+  core/offcampus.py         ← khai báo địa chỉ / ngoại trú (form + submit, `mode` quyết luật tạm trú)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
   core/health_check_slots.py ← ngày + ca khám tại trường — bản song sinh GIỐNG HỆT dashboard healthcheck/slots.py
   core/direct_submissions.py · submission_models.py · submission_code.py ← nạp giấy tờ trực tiếp (mã NG-…)
@@ -106,7 +106,8 @@ frontend/
 | `/dashboard/bao-hiem-y-te/dang-ky` | đăng ký BHYT theo đợt (trang nặng nhất) |
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
 | `/dashboard/bao-hiem-y-te/doi-noi-kcb` | yêu cầu đổi nơi KCB ban đầu (form đăng ký, khóa trừ bệnh viện) |
-| `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
+| `/dashboard/khai-bao-dia-chi` | Khai báo địa chỉ toàn trường + sửa CCCD/email/SĐT (thân trang `khai-bao-ngoai-tru/DeclarationPage.tsx`, form `DeclarationForm.tsx` variant `address`) |
+| `/dashboard/khai-bao-ngoai-tru` | Khai báo ngoại trú — **tạm đóng** sau cờ `FEATURE_OFFCAMPUS`: gỡ khỏi menu, link cũ hiện thông báo + nút sang trang trên |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
@@ -187,6 +188,7 @@ LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDA
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
 FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
 FEATURE_HEALTH_CHECK         # mặc định BẬT mọi môi trường (mở 23/10/2026)
+FEATURE_OFFCAMPUS            # Khai báo ngoại trú — mặc định TẮT (tạm đóng 11/2026, thay bằng Khai báo địa chỉ)
 DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```

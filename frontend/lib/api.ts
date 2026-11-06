@@ -412,6 +412,21 @@ export const api = {
     },
   },
 
+  // Khai báo địa chỉ: cùng khuôn dữ liệu với ngoại trú, khác luật tạm trú.
+  addressDeclaration: {
+    form(): Promise<OffCampusForm> {
+      return request('/address-declaration/');
+    },
+    submit(data: OffCampusSubmit): Promise<OffCampusResult> {
+      return request('/address-declaration/', { method: 'POST', body: JSON.stringify(data) });
+    },
+    requestReopen(reason: string): Promise<{ ok: boolean; created: boolean; requested_at: string }> {
+      return request('/address-declaration/request-reopen/', {
+        method: 'POST', body: JSON.stringify({ reason }),
+      });
+    },
+  },
+
   healthCheck: {
     state(): Promise<import('./types').HealthCheckState> {
       return request('/health-check/');
