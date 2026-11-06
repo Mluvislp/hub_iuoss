@@ -59,11 +59,11 @@ const Yes = ({ children }: { children: React.ReactNode }) => (
   <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span>{children}</span></li>
 );
 
-// Quy cách bắt buộc — câu chữ của Phòng CTSV (06/11/2026), giữ nguyên.
+// Lưu ý lễ phục — câu chữ của Phòng CTSV (sửa 06/11/2026), giữ nguyên.
 const GOWN_RULE = (
   <Callout tone="amber" icon={AlertCircle}>
-    <b>Quy cách bắt buộc:</b> Nhà trường chỉ sử dụng ảnh mặc <b>đúng Lễ phục của trường Đại học Quốc tế</b>, đúng loại
-    lễ phục của ngành SV/HV tốt nghiệp để trình chiếu trên slide, SV/HV vui lòng up ảnh đúng quy cách.
+    Trong trường hợp SV/HV up ảnh với lễ phục, Nhà trường chỉ sử dụng ảnh mặc <b>đúng Lễ phục của trường Đại học
+    Quốc tế</b>, đúng loại lễ phục của ngành SV/HV tốt nghiệp để trình chiếu trên slide, SV/HV vui lòng up ảnh đúng quy cách.
   </Callout>
 );
 
