@@ -112,7 +112,7 @@ frontend/
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
 | `/dashboard/bao-hiem-y-te/doi-noi-kcb` | yêu cầu đổi nơi KCB ban đầu (form đăng ký, khóa trừ bệnh viện) |
 | `/dashboard/khai-bao-dia-chi` | Khai báo địa chỉ toàn trường + sửa CCCD/email/SĐT (thân trang `khai-bao-ngoai-tru/DeclarationPage.tsx`, form `DeclarationForm.tsx` variant `address`) |
-| `/dashboard/khai-bao-ngoai-tru` | Khai báo ngoại trú — **tạm đóng** sau cờ `FEATURE_OFFCAMPUS`, tự chuyển sang trang trên |
+| `/dashboard/khai-bao-ngoai-tru` | Khai báo ngoại trú — **tạm đóng** sau cờ `FEATURE_OFFCAMPUS`: gỡ khỏi menu, link cũ hiện thông báo + nút sang trang trên |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/bang-tot-nghiep` | nộp bằng tốt nghiệp THPT online, xem trạng thái + mã QR khi được hẹn nộp bản gốc |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
