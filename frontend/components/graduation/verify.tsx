@@ -200,7 +200,7 @@ function StudentVerify({ msEnabled, onVerified }: { msEnabled: boolean; onVerifi
   return (
     <div>
       <h3 className="text-lg font-semibold text-ink">Xác minh sinh viên</h3>
-      <p className="text-sm text-muted mt-1 mb-5">Dùng email sinh viên (Outlook) hoặc tài khoản mạng trường (LDAP).</p>
+      <p className="text-sm text-muted mt-1 mb-5">Dùng email sinh viên (Outlook) hoặc tài khoản LDAP.</p>
 
       {msEnabled && (
         <>
@@ -225,7 +225,7 @@ function StudentVerify({ msEnabled, onVerified }: { msEnabled: boolean; onVerifi
         <div>
           <label htmlFor="grad-pw" className={labelCls}>Mật khẩu</label>
           <input id="grad-pw" type="password" className={field} value={password}
-                 onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Mật khẩu tài khoản mạng trường" />
+                 onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Mật khẩu tài khoản LDAP" />
         </div>
         <ErrorBox message={error} />
         <button type="submit" disabled={busy || msBusy} className={btnPrimary}>
@@ -233,6 +233,13 @@ function StudentVerify({ msEnabled, onVerified }: { msEnabled: boolean; onVerifi
           Xác minh
         </button>
       </form>
+      <p className="mt-4 text-center text-sm text-slate-500">
+        Quên mật khẩu LDAP?{' '}
+        <a href="https://ldap.hcmiu.edu.vn/iupwd/?action=sendtoken" target="_blank" rel="noopener noreferrer"
+           className="font-medium text-[#a07d1c] hover:underline">
+          Đặt lại tại đây
+        </a>
+      </p>
     </div>
   );
 }
