@@ -413,10 +413,14 @@ export function DeclarationFields({
 
 /** Bản xem lại (form đã khóa): thông tin cá nhân + địa chỉ đã khai. */
 export function DeclarationSummary({ form }: { form: OffCampusForm }) {
+  // Điện thoại: nhãn TRÊN, giá trị DƯỚI (căn trái) — xếp ngang thì nhãn bị bóp gãy chữ và
+  // địa chỉ dài canh phải khó đọc. Từ sm trở lên mới xếp hai cột.
   const row = (label: string, value: string) => (
-    <div key={label} className="flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0">
-      <span className="text-sm text-muted">{label}</span>
-      <span className={cn('text-sm text-right', value ? 'font-medium text-ink' : 'italic text-muted')}>
+    <div key={label}
+         className="flex flex-col gap-0.5 py-2.5 border-b border-line2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <span className="text-sm text-muted sm:w-40 sm:shrink-0">{label}</span>
+      <span className={cn('min-w-0 text-sm [overflow-wrap:anywhere] sm:text-right',
+                          value ? 'font-medium text-ink' : 'italic text-muted')}>
         {value || 'Chưa có'}
       </span>
     </div>
@@ -432,16 +436,12 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
           {row('Mã số sinh viên', form.student.student_code)}
           {row('Giới tính', form.student.sex)}
           {row('Email trường cấp', form.student.university_email)}
-          {Object.entries(form.fields).map(([key, f]) => row(
-            f.label,
-            key === 'student.citizen_id'
-              ? [(f.value as CccdValue).number,
-                 (f.value as CccdValue).issue_place,
-                 (f.value as CccdValue).issue_date
-                   ? 'cấp ngày ' + (f.value as CccdValue).issue_date : '']
-                  .filter(Boolean).join(' · ')
-              : (f.value as string),
-          ))}
+          {Object.entries(form.fields).flatMap(([key, f]) => {
+            if (key !== 'student.citizen_id') return [row(f.label, f.value as string)];
+            // CCCD tách 3 dòng — gộp một dòng thì quá dài trên điện thoại.
+            const c = (f.value ?? {}) as CccdValue;
+            return [row(f.label, c.number), row('Nơi cấp', c.issue_place), row('Ngày cấp', c.issue_date)];
+          })}
         </div>
       </section>
 

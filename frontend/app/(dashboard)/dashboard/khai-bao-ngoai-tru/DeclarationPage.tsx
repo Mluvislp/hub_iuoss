@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle, Check, ChevronRight, Home, Loader2, PencilLine, ShieldCheck,
+  AlertCircle, Check, ChevronRight, Clock, Home, Loader2, PencilLine, ShieldCheck,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { ui, badge } from '@/lib/ui';
+import { ui, notice, noticeIcon } from '@/lib/ui';
 import { cn } from '@/lib/utils';
 import type { OffCampusForm, Province } from '@/lib/types';
 import { DeclarationFields, DeclarationSummary, useDeclarationDraft, type DeclarationVariant } from './DeclarationForm';
@@ -130,10 +130,15 @@ export default function DeclarationPage({ variant }: { variant: DeclarationVaria
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               {form.reopen_requested ? (
-                <span className={cn(badge.base, badge.warning)}>
-                  Đã gửi yêu cầu chỉnh sửa
-                  {form.reopen_requested_at ? ` ngày ${form.reopen_requested_at}` : ''} — chờ phòng CTSV xử lý
-                </span>
+                // Khối thông báo xuống dòng được — badge `whitespace-nowrap` tràn ngang trên điện thoại.
+                <div className={cn(notice.base, notice.warning, 'w-full sm:w-auto')}>
+                  <Clock className={noticeIcon.warning} />
+                  <span>
+                    Đã gửi yêu cầu chỉnh sửa
+                    {form.reopen_requested_at ? ` ngày ${form.reopen_requested_at}` : ''} — chờ Phòng
+                    Công tác Sinh viên xử lý.
+                  </span>
+                </div>
               ) : (
                 <button
                   type="button"
