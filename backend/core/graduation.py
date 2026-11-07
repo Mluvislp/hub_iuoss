@@ -238,18 +238,32 @@ def photo_path(member):
     return safe_path(settings.MEDIA_ROOT, member.photo_storage_key) if member.photo_storage_key else None
 
 
+PHOTO_PENDING, PHOTO_APPROVED, PHOTO_REJECTED = "pending", "approved", "rejected"
+
+
+def _clear_review(member):
+    """Ảnh mới / gỡ ảnh ⇒ bỏ kết quả duyệt cũ. Trả key ảnh đã crop (để xóa sau commit)."""
+    stale = member.photo_cropped_storage_key
+    member.photo_crop = member.photo_cropped_storage_key = None
+    member.photo_review_note = member.photo_reviewed_by_id = member.photo_reviewed_at = None
+    return stale
+
+
 def _apply_photo(member, upload, written):
-    """Ghi ảnh mới lên dòng (chưa save). Trả key ảnh CŨ để xóa sau commit."""
+    """Ghi ảnh mới lên dòng (chưa save) — về Chờ duyệt. Trả các key CŨ (gốc + đã crop) để xóa sau commit."""
     data, ext = validate_photo(upload, member)
-    old_key = member.photo_storage_key
+    stale = [member.photo_storage_key, _clear_review(member)]
     member.photo_storage_key = _write_photo(member, data, ext, written)
     member.photo_original_filename = stored_photo_name(member, ext)
     member.photo_size_bytes = len(data)
     member.photo_uploaded_at = timezone.now()
-    return old_key
+    member.photo_status = PHOTO_PENDING
+    return stale
 
 
-PHOTO_FIELDS = ["photo_storage_key", "photo_original_filename", "photo_size_bytes", "photo_uploaded_at"]
+PHOTO_FIELDS = ["photo_storage_key", "photo_original_filename", "photo_size_bytes", "photo_uploaded_at",
+                "photo_status", "photo_crop", "photo_cropped_storage_key", "photo_review_note",
+                "photo_reviewed_by_id", "photo_reviewed_at"]
 
 
 # ── Tài khoản hoàn tiền cọc lễ phục ─────────────────────────────────────────
@@ -334,8 +348,9 @@ def _run(member_id, change):
         with transaction.atomic():
             member = _locked(member_id)
             stale = change(member, written)
-            if stale:
-                transaction.on_commit(lambda: _delete_file(stale))
+            for key in (stale if isinstance(stale, (list, tuple)) else [stale]):
+                if key:
+                    transaction.on_commit(lambda key=key: _delete_file(key))
         return member
     except Exception:
         for path in written:
@@ -376,12 +391,21 @@ def _require_editable(member):
         raise GraduationError("Chưa đăng ký tham dự.")
 
 
+def can_replace_photo(member):
+    """Đổi ảnh: như mọi thay đổi khác (còn hạn, đang registered) — HOẶC ảnh vừa bị Phòng CTSV từ chối thì
+    được tải ảnh khác cả khi đã hết hạn (lỗi phát hiện sau khi duyệt, SV không có lỗi về thời hạn)."""
+    if member.photo_status == PHOTO_REJECTED and member.is_registered:
+        return True
+    return member.round.registration_open() and member.registration_status == Member.STATUS_REGISTERED
+
+
 def replace_photo(member_id, upload):
     def change(member, written):
-        _require_editable(member)
+        if not can_replace_photo(member):
+            _require_editable(member)                     # ném đúng câu lỗi
         stale = _apply_photo(member, upload, written)
         member.save(update_fields=PHOTO_FIELDS + ["updated_at"])
-        logger.info("GRAD_PHOTO        | code=%-14s | replaced=%s", member.student_code, bool(stale))
+        logger.info("GRAD_PHOTO        | code=%-14s | replaced=%s", member.student_code, bool(stale[0]))
         return stale
     return _run(member_id, change)
 
@@ -389,9 +413,9 @@ def replace_photo(member_id, upload):
 def remove_photo(member_id):
     def change(member, written):
         _require_editable(member)
-        stale = member.photo_storage_key
-        if not stale:
+        if not member.photo_storage_key:
             raise GraduationError("Chưa có ảnh nào để gỡ.")
+        stale = [member.photo_storage_key, member.photo_cropped_storage_key]
         for field in PHOTO_FIELDS:
             setattr(member, field, None)
         member.save(update_fields=PHOTO_FIELDS + ["updated_at"])
@@ -459,6 +483,9 @@ def member_payload(member):
             "registered_at": local(member.registered_at),
             "qr": f"{QR_PREFIX}{member.checkin_token}" if member.is_registered and member.checkin_token else None,
             "has_photo": bool(member.photo_storage_key),
+            "photo_status": member.photo_status,
+            "photo_review_note": member.photo_review_note or "",
+            "can_replace_photo": bool(member.photo_storage_key or member.is_registered) and can_replace_photo(member),
             "photo_name": member.photo_original_filename or "",
             "photo_size": member.photo_size_bytes,
             "photo_uploaded_at": local(member.photo_uploaded_at),

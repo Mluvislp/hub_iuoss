@@ -104,6 +104,12 @@ export function PhotoGuidelines() {
   );
 }
 
+const PHOTO_STATUS: Record<string, { label: string; cls: string }> = {
+  pending: { label: 'Chờ duyệt', cls: 'border-amber-200 bg-amber-50 text-amber-800' },
+  approved: { label: 'Đã duyệt', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+  rejected: { label: 'Chưa đạt', cls: 'border-rose-200 bg-rose-50 text-rose-700' },
+};
+
 const SCHOOL_PHOTO_NOTE = (
   <>Đã chụp ảnh tại các buổi chụp do nhà trường tổ chức thì <b>không cần tải lại</b>. Nếu tải lên ảnh khác, nhà
     trường sẽ dùng ảnh tải lên tại đây làm ảnh trình chiếu.</>
@@ -295,16 +301,23 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
     } finally { setBusy(false); }
   }
 
-  const editing = reg.can_edit && (replacing || !reg.has_photo);
+  const canReplace = reg.can_replace_photo;
+  const editing = canReplace && (replacing || !reg.has_photo);
+  const statusChip = reg.has_photo ? PHOTO_STATUS[reg.photo_status ?? 'pending'] : null;
 
   return (
     <div className={cn(g.card, 'p-6')}>
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <p className={g.eyebrow}>Ảnh trình chiếu</p>
-          <h4 className="mt-1 font-semibold text-ink">Màn hình LED tại lễ</h4>
+          <h4 className="mt-1 flex flex-wrap items-center gap-2 font-semibold text-ink">
+            Màn hình LED tại lễ
+            {statusChip && (
+              <span className={cn('rounded-full border px-2.5 py-0.5 text-xs font-semibold', statusChip.cls)}>{statusChip.label}</span>
+            )}
+          </h4>
         </div>
-        {reg.can_edit && (
+        {canReplace && (
           <button type="button" onClick={() => setShowRules((v) => !v)} className="text-sm font-medium text-[#a07d1c] hover:underline">
             {showRules ? 'Ẩn yêu cầu' : 'Xem yêu cầu về ảnh'}
           </button>
@@ -312,6 +325,12 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
       </div>
 
       <div className="mt-4 space-y-4">
+        {reg.has_photo && reg.photo_status === 'rejected' && (
+          <Callout tone="amber" icon={AlertCircle}>
+            <b>Ảnh chưa đạt yêu cầu</b>{reg.photo_review_note ? `: ${reg.photo_review_note}` : '.'} Vui lòng tải ảnh khác
+            {member.round.registration_open ? '.' : ' — vẫn tải được dù đã hết hạn đăng ký.'}
+          </Callout>
+        )}
         {reg.has_photo ? (
           <div className="flex flex-col sm:flex-row gap-5">
             {url
@@ -324,12 +343,12 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
                 {reg.photo_size ? <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted">Dung lượng</dt><dd className="text-ink">{formatMB(reg.photo_size)}</dd></div> : null}
                 <div className="flex gap-2"><dt className="w-20 shrink-0 text-muted">Tải lên</dt><dd className="text-ink">{dt(reg.photo_uploaded_at)}</dd></div>
               </dl>
-              {reg.can_edit && !replacing && (
+              {canReplace && !replacing && (
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <button type="button" className={g.btnOutline} onClick={() => setReplacing(true)} disabled={busy}>
                     <RefreshCw size={15} /> Thay ảnh khác
                   </button>
-                  {confirmRemove ? (
+                  {!reg.can_edit ? null : confirmRemove ? (
                     <span className="inline-flex items-center gap-2 text-sm">
                       Gỡ ảnh này?
                       <button type="button" className={cn(g.btnOutline, 'text-danger-text')} onClick={remove} disabled={busy}>
@@ -360,7 +379,7 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
                 {reg.has_photo ? 'Tải ảnh mới lên' : 'Tải ảnh lên'}
               </button>
             </div>
-            {reg.has_photo && <p className="text-xs text-muted text-right">Ảnh mới tải lên thành công sẽ thay ảnh cũ, ảnh cũ bị xóa khỏi hệ thống.</p>}
+            {reg.has_photo && <p className="text-xs text-muted text-right">Ảnh mới tải lên thành công sẽ thay ảnh cũ (ảnh cũ bị xóa) và chờ Phòng CTSV duyệt lại.</p>}
           </div>
         )}
         <Alert message={error} />
