@@ -72,6 +72,13 @@ class GraduationRoundStudent(models.Model):
     photo_original_filename = models.CharField(max_length=255, null=True, blank=True)
     photo_size_bytes = models.PositiveIntegerField(null=True, blank=True)
     photo_uploaded_at = models.DateTimeField(null=True, blank=True)
+    # Duyệt ảnh (Dashboard): pending | approved | rejected. Hub đặt về pending mỗi lần tải / thay ảnh.
+    photo_status = models.CharField(max_length=16, null=True, blank=True)
+    photo_crop = models.JSONField(null=True, blank=True)
+    photo_cropped_storage_key = models.CharField(max_length=500, null=True, blank=True)
+    photo_review_note = models.CharField(max_length=500, null=True, blank=True)
+    photo_reviewed_by_id = models.IntegerField(null=True, blank=True)
+    photo_reviewed_at = models.DateTimeField(null=True, blank=True)
     # Tài khoản nhận hoàn tiền cọc lễ phục — bắt buộc khi đăng ký (core/graduation.py::parse_bank).
     bank = models.ForeignKey(Bank, on_delete=models.DO_NOTHING, null=True, blank=True, related_name="+")
     bank_account_number = models.CharField(max_length=32, null=True, blank=True)

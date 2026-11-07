@@ -271,6 +271,43 @@ class GraduationTests(TestCase):
         names = [b["short_name"] for b in self.client.get("/api/graduation/").json()["banks"]]
         self.assertEqual(names, ["Vietcombank"])
 
+    # ── duyệt ảnh (trạng thái do Dashboard đặt) ──
+    def test_upload_sets_pending_and_replace_resets_review(self):
+        self._login_hv()
+        self.client.post("/api/graduation/register/", {**self.bank_data(), "photo": _jpeg("a.jpg")}, format="multipart")
+        self.m_hv.refresh_from_db()
+        self.assertEqual(self.m_hv.photo_status, "pending")
+        cropped = Path(self.media) / "insurance_private/graduation/1/cropped/MBAIU23031_x.jpg"
+        cropped.parent.mkdir(parents=True, exist_ok=True)
+        cropped.write_bytes(b"x")
+        Member.objects.filter(pk=self.m_hv.pk).update(
+            photo_status="approved", photo_crop={"x": 0, "y": 0, "w": 800, "h": 1000},
+            photo_cropped_storage_key="insurance_private/graduation/1/cropped/MBAIU23031_x.jpg")
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post("/api/graduation/photo/", {"photo": _jpeg("b.jpg")}, format="multipart")
+        self.assertEqual(res.json()["registration"]["photo_status"], "pending")
+        self.m_hv.refresh_from_db()
+        self.assertIsNone(self.m_hv.photo_crop)
+        self.assertIsNone(self.m_hv.photo_cropped_storage_key)
+        self.assertFalse(cropped.exists())
+
+    def test_rejected_photo_can_be_replaced_after_deadline(self):
+        self._login_hv()
+        self.client.post("/api/graduation/register/", {**self.bank_data(), "photo": _jpeg("a.jpg")}, format="multipart")
+        now = timezone.now()
+        GraduationRound.objects.filter(pk=self.round.pk).update(
+            registration_opens_at=now - timedelta(days=5), registration_closes_at=now - timedelta(days=1))
+        # Hết hạn, ảnh chưa bị từ chối ⇒ không đổi được.
+        self.assertEqual(self.client.post("/api/graduation/photo/", {"photo": _jpeg("b.jpg")}, format="multipart").status_code, 400)
+        Member.objects.filter(pk=self.m_hv.pk).update(photo_status="rejected", photo_review_note="Không mặc lễ phục")
+        me = self.client.get("/api/graduation/me/").json()["registration"]
+        self.assertTrue(me["can_replace_photo"])
+        self.assertEqual(me["photo_review_note"], "Không mặc lễ phục")
+        res = self.client.post("/api/graduation/photo/", {"photo": _jpeg("c.jpg")}, format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["registration"]["photo_status"], "pending")
+        self.assertEqual(self.client.delete("/api/graduation/photo/").status_code, 400)   # gỡ ảnh vẫn theo hạn
+
     # ── kiểm ảnh ──
     def _photo_error(self, upload):
         with self.assertRaises(grad.GraduationError) as ctx:

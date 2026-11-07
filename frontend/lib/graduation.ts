@@ -67,6 +67,9 @@ export interface GradMember {
     registered_at: string | null;
     qr: string | null;
     has_photo: boolean;
+    photo_status: null | 'pending' | 'approved' | 'rejected';
+    photo_review_note: string;
+    can_replace_photo: boolean;
     photo_name: string;
     photo_size: number | null;
     photo_uploaded_at: string | null;
