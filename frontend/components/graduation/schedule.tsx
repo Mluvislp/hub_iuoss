@@ -9,7 +9,7 @@ export const SCHEDULE: Array<{ key: string; day: string; part: string; items: st
     items: [
       'CTLK UWE: Khoa Công nghệ Sinh học, Công nghệ Thông tin, Khoa Ngôn ngữ, Khoa Quản trị Kinh doanh',
       'CTLK Đại học Andrews, Hoa Kỳ: Quản trị Kinh doanh',
-      'Sau đại học: Kỹ thuật Y Sinh, Công nghệ Sinh học, Điện – Điện tử, Công nghệ Thông tin, Kỹ thuật và Quản lý Công nghiệp, Quản lý Công',
+      'Sau đại học: Kỹ thuật Y Sinh, Công nghệ Sinh học, Điện – Điện tử, Công nghệ Thông tin, Kỹ thuật và Quản lý Công nghiệp, Quản lý Công, Quản trị Kinh doanh',
     ],
   },
   {
