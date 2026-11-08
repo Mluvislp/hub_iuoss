@@ -347,7 +347,12 @@ export function DeclarationFields({
             onClick={() => {
               setNoTemp(false);
               setInHcmc(true);
-              setTemporary((t) => ({ ...t, provinceCode: form.hcmc_province_code, wardCode: '' }));
+              // Giữ phường đã có (bản đã khai hoặc phường đoán từ dữ liệu cũ) nếu nó thuộc TP.HCM —
+              // xoá thẳng thì 2.152 SV có tạm trú cũ phải chọn lại phường dù hệ thống đã đoán đúng.
+              setTemporary((t) => ({
+                ...t, provinceCode: form.hcmc_province_code,
+                wardCode: t.provinceCode === form.hcmc_province_code ? t.wardCode : '',
+              }));
               ['temporary_in_hcmc', 'temporary_province', 'temporary_location']
                 .forEach(clearError);
             }}
@@ -359,7 +364,9 @@ export function DeclarationFields({
             onClick={() => {
               setNoTemp(false);
               setInHcmc(false);
-              setTemporary((t) => ({ ...t, provinceCode: '', wardCode: '' }));
+              // Tỉnh/phường đang có thuộc tỉnh khác thì giữ; đang là TP.HCM (hoặc trống) thì xoá để chọn lại.
+              setTemporary((t) => (t.provinceCode && t.provinceCode !== form.hcmc_province_code
+                ? t : { ...t, provinceCode: '', wardCode: '' }));
               ['temporary_in_hcmc', 'temporary_province', 'temporary_location']
                 .forEach(clearError);
             }}
