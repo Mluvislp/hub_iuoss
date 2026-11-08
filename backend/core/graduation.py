@@ -457,6 +457,15 @@ def request_cancel(member_id, reason):
 
 # ── Đọc ──────────────────────────────────────────────────────────────────────
 
+# Phần trong ngoặc của xếp loại UWE ("Second Class (Upper Division)") không hiện cho SV —
+# Phòng CTSV chốt 08/11/2026 chỉ nói tới "Second Class". DB giữ bản đầy đủ (Dashboard vẫn thấy).
+_DEGREE_DETAIL = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def degree_class_label(value):
+    return _DEGREE_DETAIL.sub("", (value or "").strip())
+
+
 def member_payload(member):
     s = member.student
     round_ = member.round
@@ -474,7 +483,7 @@ def member_payload(member):
             "major": member.major_name or "",
             "department": s.current_department.name_vi if s.current_department_id else "",
             "award_title": member.award_title or "",
-            "degree_class": member.degree_class or "",
+            "degree_class": degree_class_label(member.degree_class),
             "session": member.ceremony_session or "",
             "session_label": SESSIONS.get(member.ceremony_session or "", ""),
         },
