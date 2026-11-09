@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, ChevronDown, Landmark, Loader2, Pencil, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  GradError, checkBank, gradApi, holderProblem, normalizeHolder, type BankInput, type GradBank, type GradMember,
+  GradError, checkBank, gradApi, holderOf, holderProblem, normalizeHolder, type BankInput, type GradBank, type GradMember,
 } from '@/lib/graduation';
 import { g } from './styles';
 
@@ -85,11 +85,14 @@ function BankSelect({ banks, value, onChange, disabled }: {
 }
 
 /** 3 ô tài khoản hoàn tiền cọc — dùng cho form đăng ký và cho thẻ sửa sau khi đã đăng ký. */
-export function BankFields({ banks, value, onChange, disabled }: {
+export function BankFields({ banks, value, onChange, disabled, ownerName = '' }: {
   banks: GradBank[]; value: BankInput; onChange: (v: BankInput) => void; disabled?: boolean;
+  /** Họ tên người tốt nghiệp — tên chủ tài khoản phải trùng (chốt 09/11/2026). */
+  ownerName?: string;
 }) {
   const set = (k: keyof BankInput, v: string) => onChange({ ...value, [k]: v });
-  const holderError = holderProblem(value.bank_account_holder);
+  const holderError = holderProblem(value.bank_account_holder, ownerName);
+  const expected = holderOf(ownerName);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2">
@@ -111,7 +114,9 @@ export function BankFields({ banks, value, onChange, disabled }: {
                onChange={(e) => set('bank_account_holder', e.target.value)}
                onBlur={(e) => set('bank_account_holder', normalizeHolder(e.target.value))} />
         <p id="bank-holder-hint" className={cn('mt-1.5 text-xs', holderError ? 'text-danger-text' : 'text-muted')}>
-          {holderError || 'Nhập IN HOA, KHÔNG DẤU, đúng như tên trên thẻ / app ngân hàng.'}
+          {holderError || (expected
+            ? <>Tài khoản phải đứng tên chính người tốt nghiệp: nhập <b className="text-ink">{expected}</b>.</>
+            : 'Nhập IN HOA, KHÔNG DẤU, đúng như tên trên thẻ / app ngân hàng.')}
         </p>
       </div>
     </div>
@@ -142,7 +147,7 @@ export function BankCard({ member, banks, onChange }: {
   const [error, setError] = useState('');
 
   async function save() {
-    const problem = checkBank(value);
+    const problem = checkBank(value, member.student.full_name);
     if (problem) { setError(problem); return; }
     setBusy(true); setError('');
     try { onChange(await gradApi.updateBank(value)); setEditing(false); } catch (err) {
@@ -171,7 +176,8 @@ export function BankCard({ member, banks, onChange }: {
       )}
       {editing ? (
         <div className="mt-4 space-y-4">
-          <BankFields banks={banks} value={value} onChange={setValue} disabled={busy} />
+          <BankFields banks={banks} value={value} onChange={setValue} disabled={busy}
+                      ownerName={member.student.full_name} />
           {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
           <div className="flex justify-end gap-2">
             {bank && <button type="button" className={g.btnGhost} onClick={() => { setEditing(false); setError(''); }} disabled={busy}>Thôi</button>}

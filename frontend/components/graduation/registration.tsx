@@ -198,7 +198,7 @@ export function RegisterForm({ member, banks, onRegistered }: {
   const code = member.student.student_code;
 
   async function submit() {
-    const problem = checkBank(bank);
+    const problem = checkBank(bank, member.student.full_name);
     if (problem) {
       setError(problem);
       document.getElementById('hoan-coc')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -238,7 +238,8 @@ export function RegisterForm({ member, banks, onRegistered }: {
               <h4 className="font-semibold text-ink">Tài khoản nhận hoàn tiền cọc lễ phục</h4>
               <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 whitespace-nowrap">Bắt buộc</span>
             </div>
-            <BankFields banks={banks} value={bank} onChange={setBank} disabled={busy} />
+            <BankFields banks={banks} value={bank} onChange={setBank} disabled={busy}
+                        ownerName={member.student.full_name} />
           </div>
 
           <Alert message={error} />

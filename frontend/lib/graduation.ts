@@ -199,17 +199,30 @@ export function normalizeHolder(text: string): string {
   return text.toUpperCase().replace(/\s+/g, ' ').trim();
 }
 
-/** Câu lỗi của riêng ô tên chủ tài khoản ('' nếu hợp lệ hoặc còn trống). */
-export function holderProblem(text: string): string {
+/** Họ tên người tốt nghiệp → dạng chủ tài khoản: bỏ HẾT dấu, đ→D, IN HOA, gộp khoảng trắng.
+ *  Giống hệt `core/graduation.py::holder_of` (máy chủ kiểm lại đúng luật này). */
+export function holderOf(fullName: string): string {
+  return fullName.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .toUpperCase().replace(/[^A-Z]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+const otherOwner = (expected: string) =>
+  `Tên chủ tài khoản phải trùng họ tên người tốt nghiệp (${expected}). Chỉ nhận tài khoản ngân hàng đứng tên chính người tốt nghiệp.`;
+
+/** Câu lỗi của riêng ô tên chủ tài khoản ('' nếu hợp lệ hoặc còn trống). `ownerName` = họ tên người tốt
+ *  nghiệp: đang gõ dở (còn là phần đầu của tên đúng) thì chưa báo, lệch hẳn mới báo. */
+export function holderProblem(text: string, ownerName = ''): string {
   const holder = normalizeHolder(text);
   if (!holder) return '';
   if (/[^\x00-\x7F]/.test(holder)) return 'Tên chủ tài khoản phải nhập KHÔNG DẤU (VD: NGUYEN VAN AN).';
   if (!/^[A-Z ]+$/.test(holder)) return 'Tên chủ tài khoản chỉ gồm chữ cái không dấu và khoảng trắng.';
+  const expected = holderOf(ownerName);
+  if (expected && holder !== expected && !expected.startsWith(holder)) return otherOwner(expected);
   return '';
 }
 
 /** Kiểm nhanh ở trình duyệt (máy chủ kiểm lại): trả câu lỗi hoặc ''. */
-export function checkBank(b: BankInput): string {
+export function checkBank(b: BankInput, ownerName = ''): string {
   if (!b.bank_id) return 'Vui lòng chọn ngân hàng nhận hoàn tiền cọc.';
   const number = b.bank_account_number.replace(/[\s.-]/g, '');
   if (!number) return 'Vui lòng nhập số tài khoản ngân hàng.';
@@ -217,8 +230,10 @@ export function checkBank(b: BankInput): string {
   if (number.length < 6 || number.length > 20) return 'Số tài khoản phải có từ 6 đến 20 chữ số.';
   const holder = normalizeHolder(b.bank_account_holder);
   if (!holder) return 'Vui lòng nhập tên chủ tài khoản.';
-  const bad = holderProblem(holder);
+  const bad = holderProblem(holder, ownerName);
   if (bad) return bad;
+  const expected = holderOf(ownerName);
+  if (expected && holder !== expected) return otherOwner(expected);   // gõ thiếu (phần đầu tên) cũng chặn khi gửi
   return '';
 }
 
