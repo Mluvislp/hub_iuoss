@@ -408,3 +408,14 @@ class GraduationDomainTests(TestCase):
         GraduationRound.objects.create(title="Lễ tốt nghiệp 2026")
         self.assertTrue(APIClient().get("/api/graduation/", HTTP_HOST="graduation.iuoss.com").json()["microsoft_login"])
         self.assertFalse(APIClient().get("/api/graduation/", HTTP_HOST="graduation-sandbox.iuoss.com").json()["microsoft_login"])
+
+
+class DegreeClassLabelTests(TestCase):
+    """Xếp loại UWE chỉ hiện phần chính — bỏ "(Upper/Lower Division)" (chốt 08/11/2026)."""
+
+    def test_strips_division_detail(self):
+        from core.graduation import degree_class_label
+        self.assertEqual(degree_class_label("Second Class (Upper Division)"), "Second Class")
+        self.assertEqual(degree_class_label("Second Class (Lower Division)"), "Second Class")
+        self.assertEqual(degree_class_label("First Class"), "First Class")
+        self.assertEqual(degree_class_label(None), "")
