@@ -281,8 +281,21 @@ def normalize_holder(text):
     return " ".join((text or "").upper().split())
 
 
-def parse_bank(bank_id, account_number, holder):
-    """→ (Bank, số tài khoản, chủ tài khoản) đã chuẩn hoá. Ném GraduationError với câu cụ thể."""
+def holder_of(full_name):
+    """Họ tên người tốt nghiệp → dạng chủ tài khoản ngân hàng: bỏ HẾT dấu, đ→D, IN HOA, gộp khoảng trắng.
+    Bản đối ứng ở frontend `lib/graduation.ts::holderOf` — giữ giống hệt."""
+    text = unicodedata.normalize("NFD", full_name or "")
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    text = text.replace("đ", "d").replace("Đ", "D").upper()
+    return " ".join(re.sub(r"[^A-Z]", " ", text).split())
+
+
+def parse_bank(bank_id, account_number, holder, owner_name=None):
+    """→ (Bank, số tài khoản, chủ tài khoản) đã chuẩn hoá. Ném GraduationError với câu cụ thể.
+
+    `owner_name` (họ tên người tốt nghiệp): có thì tên chủ tài khoản phải TRÙNG ĐÚNG họ tên đó sau khi bỏ
+    dấu — chỉ nhận tài khoản đứng tên chính người tốt nghiệp (Phòng CTSV chốt 09/11/2026; rà live: 3 người
+    khai tài khoản người khác, 4 người gõ sai tên)."""
     raw_id = str(bank_id or "").strip()
     bank = Bank.objects.filter(pk=int(raw_id), is_active=True).first() if raw_id.isdigit() else None
     if bank is None:
@@ -303,6 +316,11 @@ def parse_bank(bank_id, account_number, holder):
         raise GraduationError("Tên chủ tài khoản chỉ gồm chữ cái không dấu và khoảng trắng.")
     if not HOLDER_MIN <= len(name) <= HOLDER_MAX:
         raise GraduationError("Tên chủ tài khoản không hợp lệ.")
+    expected = holder_of(owner_name) if owner_name else ""
+    if expected and name != expected:
+        raise GraduationError(
+            f"Tên chủ tài khoản phải trùng họ tên người tốt nghiệp ({expected}). "
+            "Chỉ nhận tài khoản ngân hàng đứng tên chính người tốt nghiệp.")
     return bank, number, name
 
 
@@ -310,7 +328,8 @@ BANK_FIELDS = ["bank", "bank_account_number", "bank_account_holder"]
 
 
 def _apply_bank(member, bank_info):
-    member.bank, member.bank_account_number, member.bank_account_holder = parse_bank(*bank_info)
+    member.bank, member.bank_account_number, member.bank_account_holder = parse_bank(
+        *bank_info, owner_name=member.student.full_name)
 
 
 def bank_suggestion(member):

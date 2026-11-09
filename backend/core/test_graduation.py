@@ -62,9 +62,12 @@ class GraduationTests(TestCase):
                                       sort_order=1)
         Bank.objects.create(short_name="OldBank", full_name="Ngân hàng đã ngừng", sort_order=99, is_active=False)
 
+    # Tên chủ tài khoản phải trùng họ tên người đang đăng nhập ⇒ mặc định theo người đó.
+    holder = "nguyen  van an"
+
     def bank_data(self, **over):
         data = {"bank_id": str(self.vcb.pk), "bank_account_number": "0071 0000 12345",
-                "bank_account_holder": "nguyen  van an"}
+                "bank_account_holder": self.holder}
         data.update(over)
         return data
 
@@ -84,6 +87,7 @@ class GraduationTests(TestCase):
         return self.client.post("/api/graduation/verify/info/", data, format="json")
 
     def _login_hv(self):
+        self.holder = "trinh thi thuy nhi"        # "Trịnh Thị Thuỳ Nhi" bỏ dấu
         res = self._verify_hv()
         self.assertEqual(res.status_code, 200, res.content)
         self.client.credentials(HTTP_AUTHORIZATION="Bearer " + res.json()["token"])
@@ -252,10 +256,15 @@ class GraduationTests(TestCase):
         self._login_sv()
         self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
         res = self.client.post("/api/graduation/bank/", self.bank_data(bank_account_number="9999888877",
-                                                                       bank_account_holder="tran thi binh"),
+                                                                       bank_account_holder="Nguyen Van  AN"),
                                format="json")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["bank"]["holder"], "TRAN THI BINH")
+        self.assertEqual(res.json()["bank"]["holder"], "NGUYEN VAN AN")
+        # Tài khoản đứng tên người khác: chặn, kể cả khi chỉ đổi tên chủ tài khoản.
+        res = self.client.post("/api/graduation/bank/", self.bank_data(bank_account_holder="tran thi binh"),
+                               format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("NGUYEN VAN AN", res.json()["detail"])
         self.client.post("/api/graduation/cancel/", {"reason": "Bận việc gia đình"}, format="json")
         res = self.client.post("/api/graduation/bank/", self.bank_data(), format="json")
         self.assertEqual(res.status_code, 400)
@@ -419,3 +428,22 @@ class DegreeClassLabelTests(TestCase):
         self.assertEqual(degree_class_label("Second Class (Lower Division)"), "Second Class")
         self.assertEqual(degree_class_label("First Class"), "First Class")
         self.assertEqual(degree_class_label(None), "")
+
+
+class HolderOfTests(TestCase):
+    """Tên chủ tài khoản phải trùng họ tên người tốt nghiệp sau khi bỏ dấu (chốt 09/11/2026)."""
+
+    def test_holder_of(self):
+        from core.graduation import holder_of
+        self.assertEqual(holder_of("Đỗ Tấn  Hoàng Phi"), "DO TAN HOANG PHI")
+        self.assertEqual(holder_of("Trịnh Thị Thuỳ Nhi"), "TRINH THI THUY NHI")
+        self.assertEqual(holder_of("Nguyễn Thị Thu-Hà"), "NGUYEN THI THU HA")
+
+    def test_register_rejects_other_persons_account(self):
+        from core.graduation import GraduationError, parse_bank
+        bank = Bank.objects.create(short_name="ACB", full_name="Ngân hàng Á Châu", sort_order=1)
+        self.assertEqual(parse_bank(bank.pk, "123456", "do tan hoang phi", owner_name="Đỗ Tấn Hoàng Phi")[2],
+                         "DO TAN HOANG PHI")
+        for wrong in ("DO TAN HOAN PHI", "NG SONG MINH HIEU", "PHAN THI NGOC TRAM"):
+            with self.assertRaises(GraduationError):
+                parse_bank(bank.pk, "123456", wrong, owner_name="Đỗ Tấn Hoàng Phi")
