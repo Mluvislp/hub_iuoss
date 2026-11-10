@@ -103,8 +103,10 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
 
 
 class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
-    """POST JSON {declaration?, consent, data_consent, exam_slot?, switch_from_examined?} — nhánh
-    "Chưa khám"; `switch_from_examined` = chuyển từ khai "đã khám" sang đăng ký."""
+    """POST JSON {declaration?, consent, data_consent, exam_slot?, switch_from_examined?,
+    cancel_previous_result?, reregister?} — nhánh "Chưa khám"; `switch_from_examined` (+ bắt buộc
+    `cancel_previous_result`) = hủy kết quả khám đã khai, chuyển sang đăng ký; `reregister` = đăng ký
+    đợt khám mới thay đăng ký đợt khám trước chưa khám."""
 
     permission_classes = [IsHubAuthenticated]
     parser_classes = [JSONParser]
@@ -122,6 +124,9 @@ class HealthCheckRegisterView(HealthCheckRequiredMixin, APIView):
                     request.user.ldap_uid, student.pk, resp.round_id,
                     (resp.residence or {}).get("declared_with_registration"),
                     bool(health_check.superseded_info(resp.evidence)))
+        if data.get("reregister") is True:
+            logger.info("HEALTH_CHECK_REREGISTER | uid=%s | student_id=%s | round=%s | history=%s",
+                        request.user.ldap_uid, student.pk, resp.round_id, len(health_check.history(resp.evidence)))
         return Response(health_check.build_state(student), status=status.HTTP_201_CREATED)
 
 

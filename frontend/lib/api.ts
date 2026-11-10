@@ -436,8 +436,12 @@ export const api = {
     },
     register(data: {
       declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string;
-      /** Chuyển từ khai "đã khám" (chờ xác nhận / từ chối) sang đăng ký khám tại trường. */
+      /** Chuyển từ khai "đã khám" / "đối tượng khác" (chờ xác nhận / từ chối) sang đăng ký khám tại trường. */
       switch_from_examined?: boolean;
+      /** Bắt buộc đi kèm `switch_from_examined`: SV xác nhận hủy kết quả khám đã khai. */
+      cancel_previous_result?: boolean;
+      /** Đăng ký đợt khám mới thay đăng ký đợt khám trước chưa được ghi nhận đã khám. */
+      reregister?: boolean;
     }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });

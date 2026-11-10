@@ -14,7 +14,7 @@ export default function SlotPicker({ options, value, onChange, error }: {
   return (
     <div>
       <div className="text-[0.82rem] font-medium text-ink mb-2">
-        Ngày và ca khám<span className="text-red-500"> *</span>
+        Ngày và ca khám{options.phase_label ? ` — ${options.phase_label}` : ''}<span className="text-red-500"> *</span>
       </div>
       <div className={cn('rounded-lg border divide-y divide-line2', error ? 'border-danger-line' : 'border-line')}>
         {options.days.map((day) => (
