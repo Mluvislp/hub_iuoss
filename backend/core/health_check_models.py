@@ -57,6 +57,9 @@ class HealthCheckResponse(models.Model):
     STATUS_REGISTERED = "registered"
     STATUS_ATTENDED = "attended"
     STATUS_ABSENT = "absent"
+    # Phản hồi đã hủy (Phòng CTSV duyệt yêu cầu hủy / xoá để trả lời lại) — dòng GIỮ LẠI, dữ liệu cũ
+    # cất trong evidence["history"]; coi như SV chưa trả lời đợt (10/11/2026).
+    STATUS_CANCELLED = "cancelled"
 
     STATUS_LABELS = {
         STATUS_PENDING: "Chờ xác nhận minh chứng",
@@ -65,6 +68,7 @@ class HealthCheckResponse(models.Model):
         STATUS_REGISTERED: "Đã đăng ký khám tại trường",
         STATUS_ATTENDED: "Đã khám tại trường",
         STATUS_ABSENT: "Vắng buổi khám",
+        STATUS_CANCELLED: "Đã hủy",
     }
 
     id = models.BigAutoField(primary_key=True)
