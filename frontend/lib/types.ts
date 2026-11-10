@@ -587,7 +587,8 @@ export interface HealthCheckResidence {
 
 export type HealthCheckStatus =
   | 'pending' | 'approved' | 'rejected'        // choice = examined
-  | 'registered' | 'attended' | 'absent';      // choice = register
+  | 'registered' | 'attended' | 'absent'       // choice = register
+  | 'cancelled';                               // đã hủy (Hub coi như chưa trả lời, không trả về)
 
 export interface HealthCheckResponse {
   id: number;
@@ -610,8 +611,20 @@ export interface HealthCheckResponse {
   exam_slot_label: string;
   /** Đã chuyển từ khai "đã khám" sang đăng ký: khai báo cũ được lưu lại, không dùng nữa. */
   superseded: { at: string | null; label: string; previous_status_label: string } | null;
-  /** Yêu cầu hủy đăng ký khám tại trường: chờ duyệt / bị từ chối. Duyệt ⇒ phản hồi bị xoá. */
+  /** Yêu cầu hủy đăng ký khám tại trường: chờ duyệt / bị từ chối. Duyệt ⇒ đăng ký bị hủy (lưu lịch sử). */
   cancel_request: HealthCheckCancelRequest | null;
+  /** Các đăng ký trước đó trong năm học (đợt khám trước chưa khám, đã hủy…), cũ trước. */
+  history: HealthCheckHistoryItem[];
+}
+
+export interface HealthCheckHistoryItem {
+  kind: 'reregister' | 'cancel' | 'reset' | 'supplement' | string;
+  label: string;
+  at: string | null;
+  choice: string;
+  status_label: string;
+  exam_slot_label: string;
+  exam_code: string;
 }
 
 export interface HealthCheckCancelRequest {
@@ -640,6 +653,8 @@ export interface HealthCheckSlotOption extends HealthCheckSlot {
 
 export interface HealthCheckSlotOptions {
   capacity: number | null;
+  /** "Đợt 2"… — rỗng khi năm học chỉ có một đợt khám. */
+  phase_label: string;
   days: { date: string; label: string; shifts: HealthCheckSlotOption[] }[];
 }
 
@@ -719,6 +734,8 @@ export interface HealthCheckState {
   can_submit_register: boolean;
   /** Đã khai "đã khám" (chờ xác nhận / từ chối), đợt còn mở → được chuyển sang đăng ký khám. */
   can_switch_to_register: boolean;
+  /** Đăng ký đợt khám trước chưa được ghi nhận đã khám, đang nhận đăng ký → đăng ký đợt khám mới. */
+  can_reregister: boolean;
   /** Đăng ký khám tại trường (kể cả đã khám), chưa có yêu cầu hủy đang chờ duyệt. */
   can_request_cancel: boolean;
   max_evidence_files: number;

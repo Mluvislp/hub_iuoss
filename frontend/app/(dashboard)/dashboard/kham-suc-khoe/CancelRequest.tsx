@@ -19,7 +19,7 @@ function fmt(iso: string | null) {
 
 /**
  * Yêu cầu hủy đăng ký khám tại trường (kể cả đã khám) — Phòng CTSV duyệt trên Dashboard.
- * Duyệt ⇒ đăng ký bị xoá, sinh viên trả lời lại đợt khám từ đầu.
+ * Duyệt ⇒ đăng ký bị hủy (Nhà trường lưu lại lịch sử), sinh viên trả lời lại đợt khám từ đầu.
  */
 export default function CancelRequest({ state, onChange }: {
   state: HealthCheckState;
@@ -101,7 +101,7 @@ export default function CancelRequest({ state, onChange }: {
           <div>
             <div className="text-sm font-semibold text-ink">Yêu cầu hủy đăng ký khám tại trường</div>
             <p className="text-[0.82rem] text-muted mt-1">
-              Khi được duyệt, đăng ký và phiếu khám hiện tại bị xoá; sinh viên trả lời lại đợt khám từ đầu.
+              Khi được duyệt, đăng ký và phiếu khám hiện tại bị hủy; sinh viên trả lời lại đợt khám từ đầu.
             </p>
           </div>
           <div>
