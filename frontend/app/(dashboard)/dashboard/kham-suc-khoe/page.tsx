@@ -258,10 +258,9 @@ export default function HealthCheckPage() {
   };
   const previousChoiceLabel = response?.choice === 'other' ? 'dành cho đối tượng khác' : 'đã khám';
   const phaseText = state.exam_slots?.phase_label ? ` ${state.exam_slots.phase_label.toLowerCase()}` : ' đợt mới';
-  // "Ca chiều thứ nhất (13:00–15:00), ngày 28/10/2026" — lịch khám đăng ký trước khi đăng ký lại.
+  // Ngày khám (dd/mm/yyyy) của đăng ký đang có — dùng cho câu nhắc khi đăng ký lại đợt khám mới.
   const oldSlot = response?.exam_slot;
   const oldSlotDate = oldSlot ? oldSlot.date.split('-').reverse().join('/') : '';
-  const oldSlotText = oldSlot ? `${oldSlot.label} (${oldSlot.start}–${oldSlot.end}), ngày ${oldSlotDate}` : '';
 
   // ── Nộp lại sau khi bị từ chối: đi lại toàn bộ các bước, nạp sẵn lần khai trước ──
   if (response && resubmitting && state.can_resubmit) {
@@ -534,9 +533,9 @@ export default function HealthCheckPage() {
               <CalendarClock size={18} className="text-primary flex-shrink-0 mt-0.5" />
               <div className="text-sm text-ink">
                 <div className="font-semibold">Đăng ký khám{phaseText}</div>
-                {oldSlotText && <p className="mt-1">Lịch khám đã đăng ký trước đây: {oldSlotText}.</p>}
                 <p className="mt-1">
-                  Sau khi đăng ký{phaseText}, lịch khám {oldSlotText ? 'này' : 'cũ'} và phiếu khám cũ không còn sử dụng.
+                  {oldSlotDate ? `Sinh viên chưa đến khám theo lịch ngày ${oldSlotDate}. ` : ''}
+                  Vui lòng chọn ngày và ca khám{phaseText} bên dưới.
                 </p>
                 <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
                   Quay lại
