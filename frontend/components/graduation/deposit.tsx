@@ -54,7 +54,7 @@ export function DepositInfo({ deposit }: { deposit: GradDeposit }) {
     ['Ngân hàng', deposit.bank_name],
     ['Số tài khoản', <span key="a" className="font-mono tracking-wide">{deposit.account_number}</span>, deposit.account_number],
     ['Chủ tài khoản', deposit.account_name],
-    ['Nội dung', <span key="r" className="break-all">{deposit.reference}</span>, deposit.reference],
+    ['Nội dung', <span key="r" className="break-words">{deposit.reference}</span>, deposit.reference],
   ];
   return (
     <div className="flex flex-col items-center gap-5 rounded-xl border border-line bg-[#fbfcfe] p-4 sm:p-5 md:flex-row md:items-start">
