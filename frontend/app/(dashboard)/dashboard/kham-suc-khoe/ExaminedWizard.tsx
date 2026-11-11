@@ -2,8 +2,9 @@
 
 /* Nhánh "Đã khám rồi": khai lại kết quả khám theo mẫu KSK, chia 5 bước.
      1. Thông tin cá nhân — form khai báo ngoại trú (đã khai thì chỉ xem). Bấm
-        "Lưu và tiếp tục" là GỬI khai báo ngay qua /api/offcampus/, không đợi
-        tới bước cuối — khai xong form ngoại trú khóa lại như khai ở trang riêng.
+        "Lưu và tiếp tục" là GỬI khai báo ngay qua /api/address-declaration/ (Khai báo địa
+        chỉ — /api/offcampus/ đã tạm đóng từ 06/11/2026, gọi vào là 404), không đợi tới
+        bước cuối — khai xong form khóa lại như khai ở trang riêng (chung khóa "đã khai").
      2–4. Lần khám · Khám lâm sàng · Cận lâm sàng — dựng từ result_schema
      5. Kết luận + ảnh minh chứng
    Chống nản: điền sẵn mọi giá trị mặc định được, xét nghiệm chi tiết gập lại và
@@ -130,7 +131,7 @@ export default function ExaminedWizard({
     if (!validateStep(0)) return;
     setSaving(true); setBusyLabel('Đang lưu thông tin khai báo…'); setError('');
     try {
-      await api.offcampus.submit(declaration.payload({ requireCccd: true }));
+      await api.addressDeclaration.submit(declaration.payload({ requireCccd: true }));
       onStateChange(await api.healthCheck.state());
       goTo(1);
     } catch (e) {
