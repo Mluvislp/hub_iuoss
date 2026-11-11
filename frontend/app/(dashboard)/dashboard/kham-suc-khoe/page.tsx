@@ -174,7 +174,9 @@ export default function HealthCheckPage() {
   // Làm lại phản hồi để đăng ký khám tại trường:
   //   switch     — đã khai "đã khám"/"đối tượng khác" (chưa được xác nhận) → HỦY kết quả đó rồi đăng ký;
   //   reregister — đăng ký đợt khám trước chưa được ghi nhận đã khám → đăng ký đợt khám mới.
-  const [redo, setRedo] = useState<'switch' | 'reregister' | null>(null);
+  //   result     — đăng ký đợt khám trước chưa khám → tự HỦY đăng ký đó rồi khai kết quả khám nơi khác.
+  const [redo, setRedo] = useState<'switch' | 'reregister' | 'result' | null>(null);
+  const [cancelRegistration, setCancelRegistration] = useState(false);
   const [cancelResult, setCancelResult] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
@@ -246,9 +248,11 @@ export default function HealthCheckPage() {
   // Chỉ coi là đang làm lại khi server vẫn cho phép (đang nhận đăng ký, phản hồi cũ còn đủ điều kiện).
   const isSwitching = redo === 'switch' && !!response && state.can_switch_to_register;
   const isReregistering = redo === 'reregister' && !!response && state.can_reregister;
-  const isRedo = isSwitching || isReregistering;
-  const startRedo = (mode: 'switch' | 'reregister') => {
-    setRedo(mode); setChoice('register'); setJustSubmitted(false); setCancelResult(false);
+  const isToResult = redo === 'result' && !!response && state.can_replace_with_result;
+  const isRedo = isSwitching || isReregistering || isToResult;
+  const startRedo = (mode: 'switch' | 'reregister' | 'result') => {
+    setRedo(mode); setChoice(mode === 'result' ? null : 'register'); setJustSubmitted(false);
+    setCancelResult(false); setCancelRegistration(false);
     setConsent(false); setDataConsent(false); setExamSlot(''); setSlotError(''); setError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -432,6 +436,17 @@ export default function HealthCheckPage() {
               </div>
             )}
 
+            {state.can_replace_with_result && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
+                <p className="text-[0.82rem] text-muted max-w-[520px]">
+                  Đã khám sức khỏe ở nơi khác? Sinh viên hủy đăng ký khám tại trường rồi khai kết quả khám.
+                </p>
+                <button type="button" className={ui.btnGhost} onClick={() => startRedo('result')}>
+                  <Repeat size={15} /> Hủy đăng ký, khai kết quả khám
+                </button>
+              </div>
+            )}
+
             {state.can_switch_to_register && (
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
                 <p className="text-[0.82rem] text-muted max-w-[520px]">
@@ -533,6 +548,41 @@ export default function HealthCheckPage() {
               </div>
             </div>
           </div>
+        ) : isToResult ? (
+          <div className="px-6 py-5 space-y-4">
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
+              <Repeat size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-ink">
+                <div className="font-semibold">Hủy đăng ký khám, khai kết quả khám nơi khác</div>
+                <p className="mt-1">
+                  Đăng ký khám tại trường{oldSlotDate ? ` ngày ${oldSlotDate}` : ''} sẽ bị hủy. Sau đó sinh viên khai
+                  kết quả khám và nộp ảnh minh chứng bên dưới.
+                </p>
+                <label className={cn(
+                  'flex items-start gap-2.5 mt-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors',
+                  cancelRegistration ? 'border-[#d97706] bg-[#fffbeb]' : 'border-line hover:bg-slate-50',
+                )}>
+                  <input type="checkbox" checked={cancelRegistration}
+                         onChange={(e) => { setCancelRegistration(e.target.checked); if (!e.target.checked) setChoice(null); }}
+                         className="mt-0.5 w-4 h-4 accent-[#d97706]" />
+                  <span className="font-medium">Xác nhận hủy đăng ký khám tại trường</span>
+                </label>
+                <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
+                  Giữ đăng ký khám
+                </button>
+              </div>
+            </div>
+            {cancelRegistration && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                            desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('examined'); setError(''); }} />
+                <OptionTile option={round.options.other} active={choice === 'other'} title="Dành cho đối tượng khác"
+                            desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('other'); setError(''); }} />
+              </div>
+            )}
+          </div>
         ) : isReregistering ? (
           <div className="px-6 py-5">
             <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-primary bg-white px-4 py-3.5">
@@ -569,6 +619,12 @@ export default function HealthCheckPage() {
           </div>
         )}
       </div>
+
+      {/* ── Hủy đăng ký đợt khám trước để khai kết quả khám nơi khác ── */}
+      {isToResult && cancelRegistration && (choice === 'examined' || choice === 'other') && (
+        <ExaminedWizard key={`replace-${choice}`} choice={choice} replaceRegistration state={state} provinces={provinces}
+                        onDone={(next) => { setRedo(null); done(next); }} onStateChange={setState} />
+      )}
 
       {/* ── Nhánh "Đã khám rồi" ── */}
       {choice === 'examined' && !isRedo && state.can_submit_examined && (

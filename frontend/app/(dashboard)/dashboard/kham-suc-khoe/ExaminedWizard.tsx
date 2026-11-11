@@ -32,6 +32,8 @@ interface Props {
   resubmit?: boolean;
   /** `other` = luồng "Dành cho đối tượng khác": cùng form, server kiểm SV ngoại tỉnh. */
   choice?: 'examined' | 'other';
+  /** Hủy đăng ký khám tại trường của đợt khám trước (chưa khám) rồi nộp kết quả này thay vào. */
+  replaceRegistration?: boolean;
   onDone: (next: HealthCheckState) => void;
   /** Cập nhật state trang mà không coi là đã nộp — dùng sau khi lưu khai báo ở bước 1. */
   onStateChange: (next: HealthCheckState) => void;
@@ -50,7 +52,7 @@ function readDraft(key: string): Draft | null {
 }
 
 export default function ExaminedWizard({
-  state, provinces, resubmit, choice = 'examined', onDone, onStateChange, onCancel,
+  state, provinces, resubmit, choice = 'examined', replaceRegistration, onDone, onStateChange, onCancel,
 }: Props) {
   const schema = state.result_schema;
   const locked = state.offcampus.locked;
@@ -166,6 +168,7 @@ export default function ExaminedWizard({
       fd.append('result', JSON.stringify(values));
       fd.append('data_consent', 'true');
       fd.append('choice', choice);
+      if (replaceRegistration) fd.append('replace_registration', 'true');
       if (!locked) fd.append('declaration', JSON.stringify(declaration.payload()));
       const next = await api.healthCheck.submitEvidence(fd);
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }

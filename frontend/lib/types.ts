@@ -740,6 +740,8 @@ export interface HealthCheckState {
   can_reregister: boolean;
   /** Đăng ký thuộc đợt khám trước, chưa khám — phiếu khám cũ không còn dùng (đã ẩn). */
   previous_phase_registration: boolean;
+  /** Đăng ký đợt khám trước chưa khám, lựa chọn khai kết quả đang mở → tự hủy đăng ký để khai kết quả khám nơi khác. */
+  can_replace_with_result: boolean;
   /** Đã khám ở đợt khám trước — phiếu khám cũ đã ẩn. */
   attended_previous_phase: boolean;
   /** Đăng ký khám tại trường (kể cả đã khám), chưa có yêu cầu hủy đang chờ duyệt. */
