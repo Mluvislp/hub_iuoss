@@ -407,6 +407,9 @@ class GraduationTests(TestCase):
                          {"UWE": 3300000, "AD": 3300000, "DOCTOR": 1500000})
         # Cao học: mã học viên trong danh sách, không phải MSSV đại học của hồ sơ dùng chung.
         self.assertEqual(grad.deposit_reference(self.m_hv), "MBAIU23031 - Trinh Thi Thuy Nhi - LPTN2026")
+        # Ký tự lạ (dấu nháy, Ð) ⇒ làm sạch như toAscii của bộ dựng QR — chữ hiển thị trùng nội dung trong QR.
+        self.sv.full_name = "H'Hen Niê Ðinh"
+        self.assertEqual(grad.deposit_reference(self.m_sv), "ITITIU22001 - H Hen Nie Dinh - LPTN2026")
 
     def test_register_stores_receipt_then_replace_with_pdf(self):
         self._login_sv()
