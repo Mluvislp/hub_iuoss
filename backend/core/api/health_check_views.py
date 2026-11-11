@@ -94,6 +94,7 @@ class HealthCheckEvidenceView(HealthCheckRequiredMixin, APIView):
                 declaration=_json_field(request.data.get("declaration")),
                 data_consent=request.data.get("data_consent"),
                 choice=(request.data.get("choice") or "examined").strip(),
+                replace_registration=request.data.get("replace_registration") in ("true", "1", True),
             )
         except health_check.HealthCheckError as exc:
             return _error(exc)

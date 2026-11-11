@@ -200,3 +200,71 @@ class Phase2Tests(TestCase):
         r.exam_code = "1-17/11/2099"
         r.save()
         self.assertTrue(hc.build_state(s)["exam_ticket"]["date_label"].endswith("(Ngày dự kiến)"))
+
+
+class ReplaceWithResultTests(Phase2Tests):
+    """SV đăng ký đợt khám trước chưa khám tự hủy đăng ký để khai kết quả khám nơi khác (11/11/2026)."""
+
+    def setUp(self):
+        import tempfile
+        from unittest import mock
+        from django.test import override_settings
+        self._media = override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+        self._media.enable()
+        self._clean = mock.patch.object(hc.result_spec, "clean", return_value=({"exam_place": "BV Quận 1"}, {}))
+        self._clean.start()
+        self.round.examined_closes_at = timezone.now() + timedelta(days=3)
+        self.round.save()
+
+    def tearDown(self):
+        self._clean.stop()
+        self._media.disable()
+
+    def _png(self):
+        from io import BytesIO
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+        buf = BytesIO()
+        Image.new("RGB", (40, 30), "white").save(buf, format="PNG")
+        return SimpleUploadedFile("kq.png", buf.getvalue(), content_type="image/png")
+
+    def submit(self, s, **kw):
+        return hc.submit_evidence(s, [self._png()], result_raw={}, data_consent=True, **kw)
+
+    def test_huy_dang_ky_dot_truoc_khai_ket_qua(self):
+        s = self.student()
+        r = self.resp(s, status=R.STATUS_REGISTERED)
+        st = hc.build_state(s)
+        self.assertTrue(st["can_replace_with_result"])
+        with self.assertRaises(hc.HealthCheckError):                     # thiếu cờ → như đã có phản hồi
+            self.submit(s)
+        self.submit(s, replace_registration=True)
+        r.refresh_from_db()
+        self.assertEqual((r.choice, r.status, r.exam_code), (R.CHOICE_EXAMINED, R.STATUS_PENDING, None))
+        self.assertEqual(hc.evidence_result(r.evidence)["exam_place"], "BV Quận 1")
+        old = hc.history(r.evidence)[-1]
+        self.assertEqual((old["kind"], old["status"], old["exam_code"], old["evidence"]["exam_slot"]),
+                         (hc.HISTORY_TO_RESULT, R.STATUS_REGISTERED, "7-28/10/2026", OLD_SLOT))
+        st = hc.build_state(s)
+        self.assertFalse(st["can_replace_with_result"])
+        self.assertTrue(st["can_switch_to_register"])                   # vẫn quay lại đăng ký được (có xác nhận)
+
+    def test_da_kham_hoac_dang_ky_dot_moi_khong_huy_duoc(self):
+        for slot, status in ((OLD_SLOT, R.STATUS_ATTENDED),
+                             ({**OLD_SLOT, "key": "2099-11-17 07:30", "date": "2099-11-17"}, R.STATUS_REGISTERED)):
+            with self.subTest(status=status, date=slot["date"]):
+                s = self.student()
+                self.resp(s, status=status, evidence={"exam_slot": slot})
+                self.assertFalse(hc.build_state(s)["can_replace_with_result"])
+                with self.assertRaises(hc.HealthCheckError):
+                    self.submit(s, replace_registration=True)
+
+    def test_het_han_khai_ket_qua(self):
+        self.round.examined_closes_at = timezone.now() - timedelta(minutes=1)
+        self.round.save()
+        s = self.student()
+        self.resp(s, status=R.STATUS_REGISTERED)
+        self.assertFalse(hc.build_state(s)["can_replace_with_result"])
+        with self.assertRaises(hc.HealthCheckError) as ctx:
+            self.submit(s, replace_registration=True)
+        self.assertEqual(ctx.exception.code, "closed")

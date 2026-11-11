@@ -435,6 +435,8 @@ def build_state(student):
         "can_switch_to_register": can_switch_now,
         # Đăng ký đợt khám trước nhưng chưa được ghi nhận đã khám → đăng ký đợt khám mới.
         "can_reregister": can_reregister_now,
+        # …hoặc tự hủy đăng ký đó để khai kết quả khám nơi khác (lựa chọn "đã khám" / "đối tượng khác" đang mở).
+        "can_replace_with_result": previous_phase and (examined_open or other_state(round_) == "open"),
         # Luồng "đối tượng khác" — chỉ hiện lựa chọn khi luồng đang mở (không hiện thời hạn).
         "can_submit_other": other_state(round_) == "open" and resp is None,
         "can_resubmit": _can_resubmit(resp, round_),
@@ -527,7 +529,7 @@ EVIDENCE_CHOICES = (Response_.CHOICE_EXAMINED, Response_.CHOICE_OTHER)
 
 
 def submit_evidence(student, uploads, result_raw=None, declaration=None, data_consent=None,
-                    choice=Response_.CHOICE_EXAMINED):
+                    choice=Response_.CHOICE_EXAMINED, replace_registration=False):
     """Nhánh "Đã khám rồi" (`examined`) và luồng "Dành cho đối tượng khác" (`other`):
     khai báo ngoại trú (nếu chưa) + kết quả khám theo mẫu + ảnh minh chứng, chờ chuyên
     viên xác nhận. Luồng `other` mở theo thời hạn/công tắc riêng và chỉ nhận SV KHÔNG có
@@ -536,6 +538,10 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
     Kiểm kết quả khám và định dạng ảnh TRƯỚC transaction (đọc file chậm), ghi file
     trong transaction; lỗi ở bất kỳ bước nào thì rollback cả khai báo ngoại trú và
     xóa sạch file đã ghi. Lỗi trả về theo từng ô: ô kết quả mang tiền tố `result.`.
+
+    `replace_registration=True`: SV đăng ký khám tại trường ở đợt khám TRƯỚC mà chưa khám tự hủy
+    đăng ký đó để khai kết quả khám nơi khác (11/11/2026) — không cần Phòng CTSV duyệt; đăng ký cũ
+    chụp vào evidence["history"] (kind `to_result`).
     """
     if choice not in EVIDENCE_CHOICES:
         raise HealthCheckError("Lựa chọn không hợp lệ.", code="choice")
@@ -569,6 +575,12 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                     .filter(round=round_, student_id=student.pk).first())
             # Dòng đã hủy: SV trả lời lại trên CHÍNH dòng đó, giữ nguyên lịch sử.
             cancelled, resp = (resp, None) if resp is not None and not live(resp) else (None, resp)
+            replacing = None
+            if resp is not None and replace_registration is True:
+                if not is_previous_phase_registration(resp, round_):
+                    raise HealthCheckError("Không hủy được đăng ký khám này để khai kết quả khám.",
+                                           code="exists")
+                replacing, resp = resp, None
             resubmit = bool(resp and resp.choice == choice
                             and resp.status == Response_.STATUS_REJECTED)
             if resp is not None and not resubmit:
@@ -615,7 +627,15 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
                 })
 
             now = timezone.now()
-            if resp is None and cancelled is not None:
+            if resp is None and replacing is not None:
+                # Đăng ký đợt khám trước (ca, mã phiếu, trạng thái…) chụp nguyên vào lịch sử.
+                resp = _overwrite(replacing, choice=choice, status=Response_.STATUS_PENDING,
+                                  evidence={"files": items, "result": result,
+                                            "data_consent": _data_consent(choice),
+                                            HISTORY_KEY: history(replacing.evidence)
+                                            + [history_entry(replacing, HISTORY_TO_RESULT, now)]},
+                                  residence=residence, consent_at=None, submitted_at=now)
+            elif resp is None and cancelled is not None:
                 resp = _overwrite(cancelled, choice=choice, status=Response_.STATUS_PENDING,
                                   evidence={"files": items, "result": result,
                                             "data_consent": _data_consent(choice)},
@@ -683,11 +703,13 @@ HISTORY_REREGISTER = "reregister"
 HISTORY_CANCEL = "cancel"
 HISTORY_RESET = "reset"
 HISTORY_SUPPLEMENT = "supplement"
+HISTORY_TO_RESULT = "to_result"     # SV hủy đăng ký đợt khám trước (chưa khám) để khai kết quả khám nơi khác
 HISTORY_LABELS = {
     HISTORY_REREGISTER: "Đã thay bằng đăng ký đợt khám mới",
     HISTORY_CANCEL: "Đã hủy theo yêu cầu",
     HISTORY_RESET: "Đã hủy để trả lời lại",
     HISTORY_SUPPLEMENT: "Đã thay bằng đăng ký bổ sung tại trường",
+    HISTORY_TO_RESULT: "Đã hủy để khai kết quả khám nơi khác",
 }
 # Khóa evidence đi theo dòng qua các lần thay: lịch sử + khai báo "đã khám" đã thay thế.
 KEPT_KEYS = (HISTORY_KEY, SUPERSEDED_KEY)
