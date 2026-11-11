@@ -258,6 +258,11 @@ export default function HealthCheckPage() {
   };
   const previousChoiceLabel = response?.choice === 'other' ? 'dành cho đối tượng khác' : 'đã khám';
   const phaseText = state.exam_slots?.phase_label ? ` ${state.exam_slots.phase_label.toLowerCase()}` : ' đợt mới';
+  // "Ca chiều thứ nhất (13:00–15:00), ngày 28/10/2026" — lịch khám đăng ký trước khi đăng ký lại.
+  const oldSlot = response?.exam_slot;
+  const oldSlotText = oldSlot
+    ? `${oldSlot.label} (${oldSlot.start}–${oldSlot.end}), ngày ${oldSlot.date.split('-').reverse().join('/')}`
+    : '';
 
   // ── Nộp lại sau khi bị từ chối: đi lại toàn bộ các bước, nạp sẵn lần khai trước ──
   if (response && resubmitting && state.can_resubmit) {
@@ -406,8 +411,7 @@ export default function HealthCheckPage() {
             {state.can_reregister && (
               <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
                 <p className="text-[0.82rem] text-muted max-w-[520px]">
-                  Chưa được ghi nhận đã khám ở ca đã đăng ký. Sinh viên đăng ký khám{phaseText} tại trường,
-                  không cần gửi yêu cầu hủy đăng ký trước.
+                  Sinh viên chưa đến khám theo lịch đã đăng ký có thể đăng ký khám{phaseText}.
                 </p>
                 <button type="button" className={ui.btnPrimary} onClick={() => startRedo('reregister')}>
                   <CalendarClock size={15} /> Đăng ký khám{phaseText}
@@ -521,10 +525,10 @@ export default function HealthCheckPage() {
             <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-primary bg-white px-4 py-3.5">
               <CalendarClock size={18} className="text-primary flex-shrink-0 mt-0.5" />
               <div className="text-sm text-ink">
-                <div className="font-semibold">Đăng ký khám sức khỏe tại trường{phaseText}</div>
+                <div className="font-semibold">Đăng ký khám{phaseText}</div>
+                {oldSlotText && <p className="mt-1">Lịch khám đã đăng ký trước đây: {oldSlotText}.</p>}
                 <p className="mt-1">
-                  Đăng ký trước ({response!.exam_slot_label || 'chưa chọn ca'}) chưa được ghi nhận đã khám.
-                  Đăng ký mới thay cho đăng ký trước; thông tin đăng ký trước vẫn được Nhà trường lưu lại.
+                  Sau khi đăng ký{phaseText}, lịch khám {oldSlotText ? 'này' : 'cũ'} và phiếu khám cũ không còn sử dụng.
                 </p>
                 <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
                   Quay lại
