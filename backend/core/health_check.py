@@ -370,11 +370,11 @@ def _serialize_history(item, cfg=None):
 
 
 def exam_ticket(student, resp, round_):
-    """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`. Đăng ký
-    thuộc đợt khám TRƯỚC mà chưa khám thì phiếu hết tác dụng ⇒ không trả (Hub hiện thông báo ngắn)."""
+    """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`. Ca thuộc
+    đợt khám TRƯỚC (đã khám hay chưa) thì phiếu hết tác dụng ⇒ không trả (Hub hiện một dòng thông báo)."""
     if resp is None or resp.choice != Response_.CHOICE_REGISTER or not resp.exam_code:
         return None
-    if is_previous_phase_registration(resp, round_):
+    if is_previous_phase_slot(resp, round_):
         return None
     from students.models import HealthInsuranceCard, StudentContactPoint
 
@@ -424,6 +424,9 @@ def build_state(student):
         "exam_ticket": exam_ticket(student, resp, round_),
         # Đăng ký đợt khám trước, chưa khám: phiếu cũ ẩn, Hub báo một dòng.
         "previous_phase_registration": previous_phase,
+        # Đã khám ở đợt khám trước: phiếu cũ cũng ẩn, Hub báo "đã khám ngày …".
+        "attended_previous_phase": bool(resp and resp.status == Response_.STATUS_ATTENDED
+                                        and is_previous_phase_slot(resp, round_)),
         "can_submit": (examined_open or register_open) and resp is None,
         "can_submit_examined": examined_open and resp is None,
         "can_submit_register": register_open and resp is None,
@@ -740,6 +743,16 @@ def _overwrite(resp, *, choice, status, evidence, residence, consent_at, submitt
         "submitted_at", "review_note", "reviewed_by_id", "reviewed_at", "updated_at",
     ])
     return resp
+
+
+def is_previous_phase_slot(resp, round_):
+    """Đăng ký khám tại trường có ca thuộc đợt khám TRƯỚC (không phải đợt khám mới nhất)."""
+    resp = live(resp)
+    if not (resp and resp.choice == Response_.CHOICE_REGISTER):
+        return False
+    phase = slots.current_phase(slots.config(round_))
+    slot = slots.chosen(resp.evidence)
+    return bool(phase and slot and slot["date"] not in phase["dates"])
 
 
 def is_previous_phase_registration(resp, round_):

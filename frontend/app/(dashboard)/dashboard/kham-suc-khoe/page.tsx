@@ -294,6 +294,12 @@ export default function HealthCheckPage() {
           </div>
         )}
         {state.exam_ticket && <ExamTicket ticket={state.exam_ticket} />}
+        {state.attended_previous_phase && (
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border border-success-line bg-success-soft text-sm text-success-text">
+            <Check size={16} className="flex-shrink-0 mt-0.5" />
+            <span>Sinh viên đã khám sức khỏe tại trường{oldSlotDate ? ` ngày ${oldSlotDate}` : ''}.</span>
+          </div>
+        )}
         {state.previous_phase_registration && (
           <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
             <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-slate-500" />
