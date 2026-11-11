@@ -247,7 +247,7 @@ def slot_options(round_, now=None):
                            "available": not started and not closed and remaining != 0,
                            "reason": ("Ca đã bắt đầu" if started else "Đã khóa" if closed
                                       else "Đã đủ chỗ" if remaining == 0 else "")})
-        days.append({"date": day, "label": slots.date_label(day), "shifts": shifts})
+        days.append({"date": day, "label": slots.day_label(cfg, day), "shifts": shifts})
     return {"capacity": phase["capacity"], "days": days,
             # Nhãn đợt khám chỉ có nghĩa khi năm học có từ hai đợt khám.
             "phase_label": phase["label"] if len(cfg["phases"]) > 1 else ""}
@@ -322,6 +322,7 @@ def _serialize_response(resp):
     if resp is None:
         return None
     local = timezone.localtime
+    cfg = slots.config(resp.round)
     return {
         "id": resp.pk,
         "choice": resp.choice,
@@ -341,7 +342,7 @@ def _serialize_response(resp):
         if isinstance(resp.evidence, dict) else None,
         "residence": resp.residence or None,
         "exam_slot": slots.chosen(resp.evidence),
-        "exam_slot_label": slots.describe(slots.chosen(resp.evidence)),
+        "exam_slot_label": slots.describe_in(cfg, slots.chosen(resp.evidence)),
         # Đã chuyển từ "Đã khám" sang đăng ký: chỉ báo lúc nào + trạng thái cũ.
         "superseded": (
             {"at": info.get("superseded_at"), "label": SUPERSEDED_LABEL,
@@ -351,11 +352,11 @@ def _serialize_response(resp):
         # Yêu cầu hủy đăng ký khám tại trường (chờ duyệt / bị từ chối); None nếu chưa gửi.
         "cancel_request": _serialize_cancel(resp.evidence),
         # Các đăng ký trước đó trong năm học (đợt khám trước chưa khám, đăng ký đã hủy…).
-        "history": [_serialize_history(item) for item in history(resp.evidence)],
+        "history": [_serialize_history(item, cfg) for item in history(resp.evidence)],
     }
 
 
-def _serialize_history(item):
+def _serialize_history(item, cfg=None):
     slot = slots.chosen(item.get("evidence"))
     return {
         "kind": item.get("kind", ""),
@@ -363,7 +364,7 @@ def _serialize_history(item):
         "at": item.get("at"),
         "choice": item.get("choice", ""),
         "status_label": Response_.STATUS_LABELS.get(item.get("status"), item.get("status") or ""),
-        "exam_slot_label": slots.describe(slot),
+        "exam_slot_label": slots.describe_in(cfg, slot),
         "exam_code": item.get("exam_code") or "",
     }
 
@@ -383,7 +384,7 @@ def exam_ticket(student, resp, round_):
     return {
         "code": code,
         "number": code.split("-", 1)[0],        # số phiếu = phần STT trước dấu "-"
-        "date_label": slots.date_label(slot["date"]) if slot else "",
+        "date_label": slots.day_label(slots.config(round_), slot["date"]) if slot else "",
         "slot_label": slot.get("label", "") if slot else "",
         "slot_time": f"{slot.get('start', '')}–{slot.get('end', '')}" if slot else "",
         "issued_at": timezone.localtime(resp.updated_at).isoformat() if resp.updated_at else None,

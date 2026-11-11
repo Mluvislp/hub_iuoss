@@ -181,3 +181,16 @@ class Phase2Tests(TestCase):
         self.resp(s, status=R.STATUS_CANCELLED, evidence={"exam_slot": {**OLD_SLOT, "key": "2099-11-17 07:30",
                                                                           "date": "2099-11-17"}})
         self.assertEqual(hc.slot_options(self.round)["days"][0]["shifts"][0]["remaining"], 2)
+
+    def test_ngay_du_kien(self):
+        self.round.exam_slots = {"phases": [EXAM_SLOTS["phases"][0], {**EXAM_SLOTS["phases"][1], "tentative": True}]}
+        self.round.save()
+        days = hc.slot_options(self.round)["days"]
+        self.assertTrue(all(d["label"].endswith("(Ngày dự kiến)") for d in days))
+        s = self.student()
+        hc.register(s, {**REG, "exam_slot": "2099-11-17 07:30"})
+        self.assertTrue(hc.build_state(s)["response"]["exam_slot_label"].endswith("(Ngày dự kiến)"))
+        r = R.objects.get(student_id=s.pk)
+        r.exam_code = "1-17/11/2099"
+        r.save()
+        self.assertTrue(hc.build_state(s)["exam_ticket"]["date_label"].endswith("(Ngày dự kiến)"))

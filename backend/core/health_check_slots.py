@@ -12,6 +12,7 @@ Dashboard. Từ 10/11/2026 lịch chia thành nhiều ĐỢT KHÁM, mỗi đợt
          "capacity": null | số chỗ tối đa MỖI ca,
          "closed_dates": ["2026-10-27", ...],        ← ngày NGỪNG nhận đăng ký
          "closed_slots": ["2026-10-28 07:30", ...],  ← từng CA ngừng nhận đăng ký
+         "tentative": true,                          ← ngày DỰ KIẾN: mọi nhãn ngày thêm "(Ngày dự kiến)"
          "registration": {"opens_at": ..., "closes_at": ...}},   ← chỉ để lưu vết, không xét
         {"label": "Đợt 2", ...}]}
 Dạng cũ (một khối `dates/shifts/...` không có `phases`) vẫn đọc được = một đợt khám.
@@ -69,6 +70,8 @@ def _phase(raw, taken_dates):
     closed_slots = sorted({str(k) for k in raw.get("closed_slots") or [] if str(k) in keys})
     phase = {"label": str(raw.get("label") or "").strip(), "dates": dates, "shifts": shifts,
              "capacity": capacity, "closed_dates": closed, "closed_slots": closed_slots}
+    if raw.get("tentative") is True:
+        phase["tentative"] = True
     if isinstance(raw.get("registration"), dict):
         phase["registration"] = raw["registration"]
     return phase
@@ -104,6 +107,8 @@ def dump(phases):
     out = []
     for p in phases:
         item = {k: p[k] for k in ("label", "dates", "shifts", "capacity", "closed_dates", "closed_slots")}
+        if p.get("tentative"):
+            item["tentative"] = True
         if p.get("registration"):
             item["registration"] = p["registration"]
         out.append(item)
@@ -136,6 +141,22 @@ def slot_key(day, start):
 def date_label(day):
     d = date.fromisoformat(day)
     return f"{WEEKDAYS[d.weekday()]}, {d:%d/%m/%Y}"
+
+
+TENTATIVE_NOTE = " (Ngày dự kiến)"
+
+
+def day_label(cfg, day):
+    """'Thứ Ba, 17/11/2026' + ' (Ngày dự kiến)' khi ngày thuộc đợt khám đánh dấu dự kiến."""
+    phase = phase_of(cfg, day)
+    return date_label(day) + (TENTATIVE_NOTE if phase and phase.get("tentative") else "")
+
+
+def describe_in(cfg, slot):
+    """Như `describe` nhưng kèm '(Ngày dự kiến)' theo cấu hình hiện tại của đợt."""
+    text = describe(slot)
+    phase = phase_of(cfg, slot.get("date")) if slot else None
+    return text + (TENTATIVE_NOTE if text and phase and phase.get("tentative") else "")
 
 
 def iter_slots(cfg, phase=None):
