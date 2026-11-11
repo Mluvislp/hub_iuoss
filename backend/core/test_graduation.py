@@ -32,6 +32,12 @@ def _jpeg(name, size=(1100, 1300)):
     return SimpleUploadedFile(name, buf.getvalue(), content_type="image/jpeg")
 
 
+def _receipt(name="bien-lai.png"):
+    buf = io.BytesIO()
+    Image.new("RGB", (400, 700), (240, 240, 240)).save(buf, format="PNG")
+    return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+
 def _png_big(name):
     image = Image.frombytes("RGB", (800, 700), os.urandom(800 * 700 * 3))
     buf = io.BytesIO()
@@ -70,6 +76,10 @@ class GraduationTests(TestCase):
                 "bank_account_holder": self.holder}
         data.update(over)
         return data
+
+    def reg_data(self, **over):
+        """Dữ liệu đăng ký: tài khoản hoàn cọc + minh chứng chuyển khoản (bắt buộc)."""
+        return {"receipt": _receipt(), **self.bank_data(**over)}
 
     def setUp(self):
         cache.clear()
@@ -163,14 +173,14 @@ class GraduationTests(TestCase):
     # ── đăng ký + QR ──
     def test_register_without_photo_issues_unique_qr(self):
         self._login_sv()
-        res = self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
         self.assertEqual(res.status_code, 200, res.content)
         qr = res.json()["registration"]["qr"]
         self.assertTrue(qr.startswith(grad.QR_PREFIX))
         self.assertEqual(len(qr) - len(grad.QR_PREFIX), 32)
         self.m_sv.refresh_from_db()
         self.assertEqual((self.m_sv.registration_status, self.m_sv.verified_via), ("registered", "ldap"))
-        self.assertEqual(self.client.post("/api/graduation/register/", self.bank_data(), format="multipart").status_code, 400)
+        self.assertEqual(self.client.post("/api/graduation/register/", self.reg_data(), format="multipart").status_code, 400)
 
     def test_verify_blocked_before_window_opens_but_allowed_after_close(self):
         now = timezone.now()
@@ -189,13 +199,13 @@ class GraduationTests(TestCase):
         now = timezone.now()
         GraduationRound.objects.filter(pk=self.round.pk).update(
             registration_opens_at=now - timedelta(days=3), registration_closes_at=now - timedelta(days=1))
-        res = self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
         self.assertEqual(res.status_code, 400)
         self.assertIn("Ngoài thời gian", res.json()["detail"])
 
     def test_register_with_photo_then_replace_deletes_old_file(self):
         self._login_hv()
-        res = self.client.post("/api/graduation/register/", {**self.bank_data(), "photo": _jpeg("IMG 0042 (1).JPG")}, format="multipart")
+        res = self.client.post("/api/graduation/register/", {**self.reg_data(), "photo": _jpeg("IMG 0042 (1).JPG")}, format="multipart")
         self.assertEqual(res.status_code, 200, res.content)
         self.m_hv.refresh_from_db()
         old = Path(self.media) / self.m_hv.photo_storage_key
@@ -216,7 +226,7 @@ class GraduationTests(TestCase):
 
     def test_remove_photo(self):
         self._login_hv()
-        self.client.post("/api/graduation/register/", {**self.bank_data(), "photo": _jpeg("MBAIU23031.jpeg")}, format="multipart")
+        self.client.post("/api/graduation/register/", {**self.reg_data(), "photo": _jpeg("MBAIU23031.jpeg")}, format="multipart")
         self.m_hv.refresh_from_db()
         path = Path(self.media) / self.m_hv.photo_storage_key
         with self.captureOnCommitCallbacks(execute=True):
@@ -239,7 +249,7 @@ class GraduationTests(TestCase):
                  ({"bank_account_holder": "Nguyễn Văn An"}, "KHÔNG DẤU"),
                  ({"bank_account_holder": "DANG VAN Đ"}, "KHÔNG DẤU")]
         for over, msg in cases:
-            res = self.client.post("/api/graduation/register/", self.bank_data(**over), format="multipart")
+            res = self.client.post("/api/graduation/register/", self.reg_data(**over), format="multipart")
             self.assertEqual(res.status_code, 400, over)
             self.assertIn(msg, res.json()["detail"], over)
         self.m_sv.refresh_from_db()
@@ -247,14 +257,14 @@ class GraduationTests(TestCase):
 
     def test_register_normalizes_bank(self):
         self._login_sv()
-        res = self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
         bank = res.json()["bank"]
         self.assertEqual((bank["bank_short_name"], bank["account_number"], bank["holder"]),
                          ("Vietcombank", "0071000012345", "NGUYEN VAN AN"))
 
     def test_update_bank_and_lock_after_cancel_request(self):
         self._login_sv()
-        self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
         res = self.client.post("/api/graduation/bank/", self.bank_data(bank_account_number="9999888877",
                                                                        bank_account_holder="Nguyen Van  AN"),
                                format="json")
@@ -283,7 +293,7 @@ class GraduationTests(TestCase):
     # ── duyệt ảnh (trạng thái do Dashboard đặt) ──
     def test_upload_sets_pending_and_replace_resets_review(self):
         self._login_hv()
-        self.client.post("/api/graduation/register/", {**self.bank_data(), "photo": _jpeg("a.jpg")}, format="multipart")
+        self.client.post("/api/graduation/register/", {**self.reg_data(), "photo": _jpeg("a.jpg")}, format="multipart")
         self.m_hv.refresh_from_db()
         self.assertEqual(self.m_hv.photo_status, "pending")
         cropped = Path(self.media) / "insurance_private/graduation/1/cropped/MBAIU23031_x.jpg"
@@ -302,7 +312,7 @@ class GraduationTests(TestCase):
 
     def test_rejected_photo_can_be_replaced_after_deadline(self):
         self._login_hv()
-        self.client.post("/api/graduation/register/", {**self.bank_data(), "photo": _jpeg("a.jpg")}, format="multipart")
+        self.client.post("/api/graduation/register/", {**self.reg_data(), "photo": _jpeg("a.jpg")}, format="multipart")
         now = timezone.now()
         GraduationRound.objects.filter(pk=self.round.pk).update(
             registration_opens_at=now - timedelta(days=5), registration_closes_at=now - timedelta(days=1))
@@ -351,7 +361,7 @@ class GraduationTests(TestCase):
     # ── xin hủy ──
     def test_cancel_request_locks_changes_but_keeps_qr(self):
         self._login_sv()
-        self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
         self.assertEqual(self.client.post("/api/graduation/cancel/", {"reason": ""}, format="json").status_code, 400)
         res = self.client.post("/api/graduation/cancel/", {"reason": "Trùng lịch công tác"}, format="json")
         self.assertEqual(res.status_code, 200)
@@ -364,13 +374,68 @@ class GraduationTests(TestCase):
 
     def test_reregister_after_cancel_gets_new_token(self):
         self._login_sv()
-        first = self.client.post("/api/graduation/register/", self.bank_data(), format="multipart").json()["registration"]["qr"]
+        first = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart").json()["registration"]["qr"]
         Member.objects.filter(pk=self.m_sv.pk).update(registration_status="cancelled", checkin_token=None,
                                                       cancel_reason="x", cancel_requested_at=timezone.now())
-        res = self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
         self.assertEqual(res.status_code, 200)
         self.assertNotEqual(res.json()["registration"]["qr"], first)
         self.assertEqual(res.json()["registration"]["cancel_reason"], "")
+
+    # ── Tiền thế chân lễ phục: số tiền theo nhóm, nội dung chuyển khoản, minh chứng bắt buộc ──
+
+    def test_register_requires_receipt(self):
+        self._login_sv()
+        res = self.client.post("/api/graduation/register/", self.bank_data(), format="multipart")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("minh chứng", res.json()["detail"])
+        self.m_sv.refresh_from_db()
+        self.assertIsNone(self.m_sv.registration_status)
+        res = self.client.post("/api/graduation/register/",
+                               {**self.bank_data(), "receipt": SimpleUploadedFile("x.png", b"not an image")},
+                               format="multipart")
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(any(Path(self.media).rglob("*.*")))          # file hỏng không để lại rác
+
+    def test_deposit_payload_amount_and_reference(self):
+        self._login_sv()
+        dep = self.client.get("/api/graduation/me/").json()["deposit"]
+        self.assertEqual((dep["amount"], dep["account_number"], dep["bank_bin"]), (800000, "3145559799", "970418"))
+        self.assertEqual(dep["reference"], "ITITIU22001 - Nguyen Van An - LPTN2026")
+        self.assertFalse(dep["has_receipt"])
+        self.assertEqual({g: grad.DEPOSIT_VND[g] for g in ("UWE", "AD", "DOCTOR")},
+                         {"UWE": 3300000, "AD": 3300000, "DOCTOR": 1500000})
+        # Cao học: mã học viên trong danh sách, không phải MSSV đại học của hồ sơ dùng chung.
+        self.assertEqual(grad.deposit_reference(self.m_hv), "MBAIU23031 - Trinh Thi Thuy Nhi - LPTN2026")
+
+    def test_register_stores_receipt_then_replace_with_pdf(self):
+        self._login_sv()
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(res.json()["deposit"]["has_receipt"])
+        self.m_sv.refresh_from_db()
+        first = grad.receipt_path(self.m_sv)
+        self.assertTrue(first.exists())
+        self.assertIn("/receipts/ITITIU22001_", self.m_sv.deposit_receipt_storage_key)
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post("/api/graduation/receipt/",
+                                   {"receipt": SimpleUploadedFile("uy-nhiem-chi.pdf", b"%PDF-1.4 test")},
+                                   format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(res.json()["deposit"]["receipt_is_pdf"])
+        self.assertFalse(first.exists())                                # file cũ đã xóa
+        got = self.client.get("/api/graduation/receipt/")
+        self.assertEqual((got.status_code, got["Content-Type"]), (200, "application/pdf"))
+
+    def test_receipt_upload_needs_registration_and_open_window(self):
+        self._login_sv()
+        res = self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart")
+        self.assertEqual(res.status_code, 400)                          # chưa đăng ký
+        self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=timezone.now() - timedelta(minutes=1))
+        res = self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart")
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(self.client.get("/api/graduation/me/").json()["deposit"]["can_upload"])
 
 
 def grad_views_limit():
@@ -383,6 +448,7 @@ def grad_views_limit():
                    MS_REDIRECT_URIS=["https://hub.iuoss.com/auth/microsoft/callback",
                                      "https://graduation.iuoss.com/auth/microsoft/callback"],
                    ALLOWED_HOSTS=["testserver", "hub.iuoss.com", "graduation.iuoss.com", "graduation-sandbox.iuoss.com"])
+
 class GraduationDomainTests(TestCase):
     """Tên miền riêng graduation.iuoss.com: Microsoft quay về đúng tên miền đã khai ở Azure."""
 

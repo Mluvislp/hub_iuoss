@@ -89,7 +89,24 @@ export interface GradMember {
     holder: string;
   } | null;
   bank_suggestion: { bank_id: number | null; account_number: string; holder: string } | null;
+  deposit: GradDeposit;
   round: GradRound;
+}
+
+/** Tiền thế chân lễ phục — máy chủ tính (core/graduation.py::deposit_payload). */
+export interface GradDeposit {
+  bank_name: string;
+  bank_bin: string;
+  account_number: string;
+  account_name: string;
+  amount: number | null;
+  reference: string;
+  deadline: string;              // YYYY-MM-DD, hết ngày
+  overdue: boolean;
+  has_receipt: boolean;
+  receipt_is_pdf: boolean;
+  receipt_uploaded_at: string | null;
+  can_upload: boolean;
 }
 
 export class GradError extends Error {
@@ -159,16 +176,29 @@ export const gradApi = {
     call<Session>('/graduation/verify/info/', { method: 'POST', body: JSON.stringify(body) }).then(keep),
   microsoftStart: () => call<{ authorize_url: string }>('/auth/microsoft/start/'),
   me: () => call<GradMember>('/graduation/me/', {}, true),
-  register: (photo: File | null, bank: BankInput) => {
+  register: (photo: File | null, bank: BankInput, receipt: File) => {
     const fd = new FormData();
     Object.entries(bank).forEach(([k, v]) => fd.append(k, v));
     if (photo) fd.append('photo', photo, photo.name);
+    fd.append('receipt', receipt, receipt.name);
     return call<GradMember>('/graduation/register/', { method: 'POST', body: fd }, true);
   },
   replacePhoto: (photo: File) => {
     const fd = new FormData();
     fd.append('photo', photo, photo.name);
     return call<GradMember>('/graduation/photo/', { method: 'POST', body: fd }, true);
+  },
+  replaceReceipt: (receipt: File) => {
+    const fd = new FormData();
+    fd.append('receipt', receipt, receipt.name);
+    return call<GradMember>('/graduation/receipt/', { method: 'POST', body: fd }, true);
+  },
+  receiptBlob: async (): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/graduation/receipt/`, {
+      headers: { Authorization: `Bearer ${getGradToken() ?? ''}` },
+    });
+    if (!res.ok) throw new GradError(res.status, 'Không tải được minh chứng.');
+    return res.blob();
   },
   updateBank: (bank: BankInput) =>
     call<GradMember>('/graduation/bank/', { method: 'POST', body: JSON.stringify(bank) }, true),
@@ -281,5 +311,19 @@ export async function checkPhoto(file: File): Promise<string | null> {
   } catch {
     return 'Không đọc được ảnh — file có thể bị hỏng. Vui lòng chọn ảnh khác.';
   }
+  return null;
+}
+
+// ── Minh chứng chuyển khoản — kiểm sớm ở trình duyệt; máy chủ kiểm lại (core/graduation.py::validate_receipt). ──
+export const RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
+
+export async function checkReceipt(file: File): Promise<string | null> {
+  if (!file.size) return 'File minh chứng trống.';
+  if (file.size > RECEIPT_MAX_BYTES) return `Minh chứng quá lớn (${formatMB(file.size)}) — dung lượng tối đa 10 MB.`;
+  const head = await readHead(file, 8);
+  const isPdf = [0x25, 0x50, 0x44, 0x46, 0x2d].every((b, i) => head[i] === b);
+  const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+  const isPng = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => head[i] === b);
+  if (!isPdf && !isJpeg && !isPng) return 'Minh chứng phải là ảnh JPG / PNG hoặc file PDF.';
   return null;
 }

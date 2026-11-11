@@ -10,6 +10,7 @@ import {
   GradError, checkBank, checkPhoto, formatMB, gradApi, storedPhotoName, type BankInput, type GradBank, type GradMember,
 } from '@/lib/graduation';
 import { BankCard, BankFields, emptyBank } from './bank';
+import { DepositCard, DepositInfo, ReceiptPicker } from './deposit';
 import { g } from './styles';
 
 const dt = (iso: string | null) =>
@@ -191,6 +192,7 @@ export function RegisterForm({ member, banks, onRegistered }: {
   member: GradMember; banks: GradBank[]; onRegistered: (m: GradMember) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [receipt, setReceipt] = useState<File | null>(null);
   const [bank, setBank] = useState<BankInput>(() => emptyBank(member));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -198,6 +200,11 @@ export function RegisterForm({ member, banks, onRegistered }: {
   const code = member.student.student_code;
 
   async function submit() {
+    if (!receipt) {
+      setError('Vui lòng tải lên minh chứng đã chuyển khoản tiền thế chân lễ phục.');
+      document.getElementById('the-chan')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     const problem = checkBank(bank, member.student.full_name);
     if (problem) {
       setError(problem);
@@ -205,7 +212,7 @@ export function RegisterForm({ member, banks, onRegistered }: {
       return;
     }
     setBusy(true); setError('');
-    try { onRegistered(await gradApi.register(file, bank)); } catch (err) {
+    try { onRegistered(await gradApi.register(file, bank, receipt)); } catch (err) {
       setError(err instanceof GradError ? err.message : 'Không đăng ký được. Vui lòng thử lại.');
     } finally { setBusy(false); }
   }
@@ -233,6 +240,18 @@ export function RegisterForm({ member, banks, onRegistered }: {
           </div>
           <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
 
+          <div id="the-chan" className="scroll-mt-24 border-t border-line pt-5 space-y-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h4 className="font-semibold text-ink">Tiền thế chân lễ phục</h4>
+              <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 whitespace-nowrap">Bắt buộc</span>
+            </div>
+            <DepositInfo deposit={member.deposit} />
+            <div>
+              <div className="mb-2 text-sm font-medium text-ink">Minh chứng đã chuyển khoản</div>
+              <ReceiptPicker file={receipt} onFile={setReceipt} disabled={busy} />
+            </div>
+          </div>
+
           <div id="hoan-coc" className="scroll-mt-24 border-t border-line pt-5">
             <div className="flex items-baseline justify-between gap-3 mb-4">
               <h4 className="font-semibold text-ink">Tài khoản nhận hoàn tiền cọc lễ phục</h4>
@@ -244,7 +263,12 @@ export function RegisterForm({ member, banks, onRegistered }: {
 
           <Alert message={error} />
           <div className="rounded-xl bg-[#0f2a5c] p-4 sm:p-5 text-white flex flex-col gap-3.5">
-            {file && <div className="text-sm text-white/80">Ảnh sẽ được gửi cùng đăng ký.</div>}
+            {(file || receipt) && (
+              <div className="text-sm text-white/80">
+                {[file && 'ảnh trình chiếu', receipt && 'minh chứng chuyển khoản'].filter(Boolean).join(' và ')
+                  .replace(/^./, (c) => c.toUpperCase())} sẽ được gửi cùng đăng ký.
+              </div>
+            )}
             <button type="button" onClick={submit} disabled={busy}
                     className="inline-flex w-full items-center justify-center gap-2 h-12 px-6 rounded-lg bg-[#f5d27a] hover:bg-[#f0c75c]
                                text-[#0f2a5c] font-semibold transition-colors disabled:opacity-60 whitespace-nowrap
@@ -461,6 +485,7 @@ export function Registered({ member, banks, onChange }: {
         <b>Đã đăng ký tham dự</b> lúc {dt(reg.registered_at)}{reg.checked_in ? ' · đã check-in tại lễ' : ''}.
       </Callout>
       {rejected && <Callout tone="slate">Yêu cầu hủy không được chấp thuận: {reg.cancel_review_note}</Callout>}
+      {reg.status === 'registered' && <DepositCard member={member} onChange={onChange} />}
       {!reg.can_edit && reg.status === 'registered' && !member.round.registration_open && (
         <Callout tone="slate">Đã hết thời gian đăng ký — không đổi ảnh hay gửi yêu cầu hủy được nữa. Mã QR vẫn dùng bình thường.</Callout>
       )}

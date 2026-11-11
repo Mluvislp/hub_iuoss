@@ -80,6 +80,7 @@ urlpatterns = [
     path("graduation/photo/", gv.GraduationPhotoView.as_view(), name="api_graduation_photo"),
     path("graduation/cancel/", gv.GraduationCancelView.as_view(), name="api_graduation_cancel"),
     path("graduation/bank/", gv.GraduationBankView.as_view(), name="api_graduation_bank"),
+    path("graduation/receipt/", gv.GraduationReceiptView.as_view(), name="api_graduation_receipt"),
 
     # Khám sức khỏe định kỳ
     path("health-check/", health_check_views.HealthCheckView.as_view(), name="api_health_check"),

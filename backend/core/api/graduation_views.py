@@ -180,7 +180,7 @@ class GraduationRegisterView(_Member):
         member = self.member(request)
         try:
             grad.register(member.pk, via=request.user.via, bank_info=_bank_info(request.data),
-                          upload=request.FILES.get("photo"))
+                          upload=request.FILES.get("photo"), receipt=request.FILES.get("receipt"))
         except grad.GraduationError as exc:
             return _error(str(exc))
         return self.respond(member.pk)
@@ -212,6 +212,29 @@ class GraduationPhotoView(_Member):
         member = self.member(request)
         try:
             grad.remove_photo(member.pk)
+        except grad.GraduationError as exc:
+            return _error(str(exc))
+        return self.respond(member.pk)
+
+
+class GraduationReceiptView(_Member):
+    """Minh chứng chuyển khoản tiền thế chân: GET xem lại file đã nộp · POST nộp / thay."""
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request):
+        member = self.member(request)
+        path = grad.receipt_path(member)
+        if path is None or not path.exists():
+            raise Http404
+        response = FileResponse(path.open("rb"), content_type=grad.receipt_mime(member))
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def post(self, request):
+        member = self.member(request)
+        try:
+            grad.replace_receipt(member.pk, request.FILES.get("receipt"))
         except grad.GraduationError as exc:
             return _error(str(exc))
         return self.respond(member.pk)

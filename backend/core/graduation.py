@@ -13,6 +13,10 @@ MSSV và Dashboard chỉ nhận token còn trong DB ⇒ QR tự chế / QR của
 Ảnh trình chiếu: lưu NGUYÊN bản (không nén lại — màn LED cần ảnh gốc) dưới
 `insurance_private/graduation/<round>/`, prefix đã bị chặn URL thô ở Django + Nginx.
 Ảnh mới thay ảnh cũ ⇒ file cũ bị xóa sau khi giao dịch commit.
+
+Tiền thế chân lễ phục: SV chuyển khoản vào tài khoản KHTC (`DEPOSIT_ACCOUNT`, số tiền theo nhóm `DEPOSIT_VND`,
+nội dung `deposit_reference`) rồi tải minh chứng (ảnh / PDF) — BẮT BUỘC khi đăng ký; người đăng ký trước khi có
+mục này nộp bổ sung. Minh chứng lưu cạnh ảnh trình chiếu, thư mục `receipts/`.
 """
 import io
 import re
@@ -266,6 +270,99 @@ PHOTO_FIELDS = ["photo_storage_key", "photo_original_filename", "photo_size_byte
                 "photo_reviewed_by_id", "photo_reviewed_at"]
 
 
+# ── Tiền thế chân lễ phục ────────────────────────────────────────────────────
+
+# Thông báo Phòng KHTC (11/11/2026). Andrews tính như UWE (Phòng CTSV chốt 11/11/2026).
+# Bản đối ứng ở Dashboard `graduation/models.py::DEPOSIT_VND` — giữ giống hệt.
+DEPOSIT_VND = {"IU": 800_000, "MASTER": 800_000, "UWE": 3_300_000, "AD": 3_300_000, "DOCTOR": 1_500_000}
+DEPOSIT_ACCOUNT = {
+    "bank_name": "BIDV - Chi nhánh Đông Sài Gòn", "bank_bin": "970418",
+    "account_number": "3145559799", "account_name": "Trường Đại học Quốc tế",
+}
+DEPOSIT_TAG = "LPTN2026"
+DEPOSIT_DEADLINE = date(2026, 11, 18)            # hết ngày (giờ VN) — mốc "Hạn cuối đóng tiền thế chân" trên timeline
+RECEIPT_MAX_BYTES = 10 * 1024 * 1024
+RECEIPT_EXT_MIME = {"jpg": "image/jpeg", "png": "image/png", "pdf": "application/pdf"}
+RECEIPT_FIELDS = ["deposit_receipt_storage_key", "deposit_receipt_uploaded_at"]
+
+
+def deposit_reference(member):
+    """Nội dung chuyển khoản theo cú pháp KHTC "MSSV – Họ tên – LPTN2026": mã ĐÚNG như danh sách (SĐH = mã học
+    viên), họ tên BỎ DẤU, gạch ngang thường — app ngân hàng hay làm hỏng ký tự có dấu / gạch dài."""
+    text = unicodedata.normalize("NFD", member.student.full_name or "")
+    name = "".join(ch for ch in text if unicodedata.category(ch) != "Mn").replace("đ", "d").replace("Đ", "D")
+    return f"{member.student_code.upper()} - {' '.join(name.split())} - {DEPOSIT_TAG}"
+
+
+def validate_receipt(upload):
+    """Minh chứng chuyển khoản: ảnh JPG / PNG hoặc PDF, tối đa 10 MB, kiểm theo NỘI DUNG → (bytes, ext)."""
+    if upload is None:
+        raise GraduationError("Vui lòng tải lên ảnh minh chứng đã chuyển khoản tiền thế chân lễ phục.")
+    data = upload.read(RECEIPT_MAX_BYTES + 1)
+    if len(data) > RECEIPT_MAX_BYTES:
+        raise GraduationError("Minh chứng quá lớn — dung lượng tối đa 10 MB.")
+    if not data:
+        raise GraduationError("File minh chứng trống.")
+    if data[:5] == b"%PDF-":
+        return data, "pdf"
+    is_png = data[:8] == b"\x89PNG\r\n\x1a\n"
+    if not (is_png or data[:3] == b"\xff\xd8\xff"):
+        raise GraduationError("Minh chứng phải là ảnh JPG / PNG hoặc file PDF.")
+    try:
+        Image.MAX_IMAGE_PIXELS = PHOTO_MAX_PIXELS
+        with Image.open(io.BytesIO(data)) as probe:
+            probe.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError):
+        raise GraduationError("Không đọc được ảnh minh chứng — file có thể bị hỏng. Vui lòng chọn ảnh khác.") from None
+    return data, ("png" if is_png else "jpg")
+
+
+def _apply_receipt(member, upload, written):
+    """Ghi minh chứng mới lên dòng (chưa save). Trả key CŨ để xóa sau commit."""
+    data, ext = validate_receipt(upload)
+    key = f"{PHOTO_PREFIX}/{member.round_id}/receipts/{member.student_code.upper()}_{uuid4().hex[:12]}.{ext}"
+    target = Path(settings.MEDIA_ROOT).resolve() / key
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:          # tên ngẫu nhiên + 'xb' — không bao giờ ghi đè
+        written.append(target)
+        stream.write(data)
+    stale = member.deposit_receipt_storage_key
+    member.deposit_receipt_storage_key = key
+    member.deposit_receipt_uploaded_at = timezone.now()
+    return stale
+
+
+def receipt_path(member):
+    key = member.deposit_receipt_storage_key
+    return safe_path(settings.MEDIA_ROOT, key) if key else None
+
+
+def receipt_mime(member):
+    ext = (member.deposit_receipt_storage_key or "").rsplit(".", 1)[-1].lower()
+    return RECEIPT_EXT_MIME.get(ext, "application/octet-stream")
+
+
+def can_upload_receipt(member):
+    """Nộp / thay minh chứng: đang đăng ký (registered) và còn hạn đăng ký — như đổi tài khoản hoàn cọc."""
+    return member.round.registration_open() and member.registration_status == Member.STATUS_REGISTERED
+
+
+def deposit_payload(member):
+    key = member.deposit_receipt_storage_key or ""
+    uploaded = member.deposit_receipt_uploaded_at
+    return {
+        **DEPOSIT_ACCOUNT,
+        "amount": DEPOSIT_VND.get(member.program_group),
+        "reference": deposit_reference(member),
+        "deadline": DEPOSIT_DEADLINE.isoformat(),
+        "overdue": timezone.localdate() > DEPOSIT_DEADLINE,
+        "has_receipt": bool(key),
+        "receipt_is_pdf": key.lower().endswith(".pdf"),
+        "receipt_uploaded_at": timezone.localtime(uploaded).isoformat() if uploaded else None,
+        "can_upload": can_upload_receipt(member),
+    }
+
+
 # ── Tài khoản hoàn tiền cọc lễ phục ─────────────────────────────────────────
 
 def banks_payload():
@@ -380,13 +477,14 @@ def _run(member_id, change):
         raise
 
 
-def register(member_id, *, via, bank_info, upload=None):
+def register(member_id, *, via, bank_info, upload=None, receipt=None):
     def change(member, written):
         _require_open(member)
         if member.is_registered:
             raise GraduationError("Đã đăng ký tham dự rồi.")
-        _apply_bank(member, bank_info)          # bắt buộc — kiểm trước khi ghi ảnh
-        stale = _apply_photo(member, upload, written) if upload is not None else None
+        _apply_bank(member, bank_info)          # bắt buộc — kiểm trước khi ghi file
+        stale = [_apply_receipt(member, receipt, written)]                      # bắt buộc
+        stale += _apply_photo(member, upload, written) if upload is not None else []
         member.registration_status = Member.STATUS_REGISTERED
         member.registered_at = timezone.now()
         member.verified_via = via
@@ -395,7 +493,8 @@ def register(member_id, *, via, bank_info, upload=None):
         member.cancel_reviewed_at = member.cancel_review_note = None
         fields = ["registration_status", "registered_at", "verified_via", "checkin_token", "cancel_reason",
                   "cancel_requested_at", "cancel_reviewed_at", "cancel_review_note", "updated_at"]
-        member.save(update_fields=fields + BANK_FIELDS + (PHOTO_FIELDS if upload is not None else []))
+        member.save(update_fields=fields + BANK_FIELDS + RECEIPT_FIELDS
+                    + (PHOTO_FIELDS if upload is not None else []))
         logger.info("GRAD_REGISTER     | code=%-14s | via=%s | photo=%s", member.student_code, via,
                     "yes" if upload is not None else "no")
         return stale
@@ -438,6 +537,17 @@ def remove_photo(member_id):
         for field in PHOTO_FIELDS:
             setattr(member, field, None)
         member.save(update_fields=PHOTO_FIELDS + ["updated_at"])
+        return stale
+    return _run(member_id, change)
+
+
+def replace_receipt(member_id, upload):
+    def change(member, written):
+        if not can_upload_receipt(member):
+            _require_editable(member)                     # ném đúng câu lỗi
+        stale = _apply_receipt(member, upload, written)
+        member.save(update_fields=RECEIPT_FIELDS + ["updated_at"])
+        logger.info("GRAD_RECEIPT      | code=%-14s | replaced=%s", member.student_code, bool(stale))
         return stale
     return _run(member_id, change)
 
@@ -533,5 +643,6 @@ def member_payload(member):
             "holder": member.bank_account_holder or "",
         } if member.bank_id else None,
         "bank_suggestion": None if member.bank_id else bank_suggestion(member),
+        "deposit": deposit_payload(member),
         "round": round_payload(round_),
     }

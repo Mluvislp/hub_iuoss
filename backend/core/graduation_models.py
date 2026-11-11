@@ -83,6 +83,9 @@ class GraduationRoundStudent(models.Model):
     bank = models.ForeignKey(Bank, on_delete=models.DO_NOTHING, null=True, blank=True, related_name="+")
     bank_account_number = models.CharField(max_length=32, null=True, blank=True)
     bank_account_holder = models.CharField(max_length=120, null=True, blank=True)
+    # Minh chứng chuyển khoản tiền thế chân lễ phục — bắt buộc khi đăng ký (core/graduation.py::DEPOSIT_VND).
+    deposit_receipt_storage_key = models.CharField(max_length=500, null=True, blank=True)
+    deposit_receipt_uploaded_at = models.DateTimeField(null=True, blank=True)
     cancel_reason = models.CharField(max_length=500, null=True, blank=True)
     cancel_requested_at = models.DateTimeField(null=True, blank=True)
     cancel_reviewed_at = models.DateTimeField(null=True, blank=True)
