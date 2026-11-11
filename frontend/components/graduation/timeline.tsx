@@ -6,7 +6,8 @@ import { cn } from '@/lib/utils';
 import type { GradRound } from '@/lib/graduation';
 
 // Các mốc Lễ tốt nghiệp 2026. Mở / hạn đăng ký đọc từ đợt (Phòng CTSV đặt ở Dashboard) — khớp đồng hồ đếm ngược;
-// các mốc còn lại do Phòng CTSV gửi (thế chân lễ phục 18/11 — gửi 11/11/2026). `end` = thời điểm mốc coi là đã qua.
+// hạn đăng ký cũng là hạn đóng tiền thế chân (core/graduation.py::deposit_payload). Hạn ảnh trình chiếu từ máy chủ
+// (`photo_closes_at`, hết 20/11/2026). Tổng dợt / lễ do Phòng CTSV gửi. `end` = thời điểm mốc coi là đã qua.
 
 type Step = { title: string; when: string; note?: string; end: number | null };
 
@@ -15,17 +16,24 @@ const at = (iso: string) => new Date(iso).getTime();
 const dmy = (iso: string) =>
   new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' });
 const hm = (iso: string) =>
-  new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+  new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' });
+/** "Hết ngày" khi mốc là 23:59, còn lại "Trước HH:MM". */
+const dayNote = (iso: string) => (hm(iso) === '23:59' ? 'Hết ngày' : `Trước ${hm(iso)}`);
 
 function steps(round: GradRound | null): Step[] {
   const opens = round?.registration_opens_at;
   const closes = round?.registration_closes_at;
+  const photo = round?.photo_closes_at;
   return [
     { title: 'Mở đăng ký tham dự', when: opens ? dmy(opens) : 'Sẽ thông báo', end: opens ? at(opens) : null },
-    { title: 'Hạn cuối đóng tiền thế chân lễ phục', when: '18/11/2026', end: at(`2026-11-18T23:59:59${VN}`) },
     {
-      title: 'Hạn đăng ký tham dự', when: closes ? dmy(closes) : '20/11/2026',
-      note: closes ? `Trước ${hm(closes)}` : undefined, end: closes ? at(closes) : at(`2026-11-20T23:59:59${VN}`),
+      title: 'Hạn cuối đăng ký tham dự & đóng tiền thế chân lễ phục', when: closes ? dmy(closes) : '18/11/2026',
+      note: closes ? dayNote(closes) : 'Hết ngày', end: closes ? at(closes) : at(`2026-11-18T23:59:59${VN}`),
+    },
+    {
+      title: 'Hạn cuối tải ảnh trình chiếu', when: photo ? dmy(photo) : '20/11/2026',
+      note: `${photo ? dayNote(photo) : 'Hết ngày'} · chỉ người đã đăng ký`,
+      end: photo ? at(photo) : at(`2026-11-20T23:59:59${VN}`),
     },
     { title: 'Tổng dợt', when: '27/11/2026', note: 'Chiều thứ Sáu', end: at(`2026-11-27T23:59:59${VN}`) },
     { title: 'Lễ Tốt nghiệp', when: '28 & 29/11/2026', note: 'Thứ Bảy & Chủ nhật', end: at(`2026-11-29T23:59:59${VN}`) },

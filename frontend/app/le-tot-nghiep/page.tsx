@@ -11,7 +11,7 @@ import Verify from '@/components/graduation/verify';
 import QrCard from '@/components/graduation/qr-card';
 import { RegisterForm, Registered } from '@/components/graduation/registration';
 import {
-  GradError, clearGradToken, getGradToken, gradApi, type GradInfo, type GradMember, type GradRound,
+  GradError, clearGradToken, deadlineText, getGradToken, gradApi, type GradInfo, type GradMember, type GradRound,
 } from '@/lib/graduation';
 
 /** Cuộn mượt tới một phần của trang (bỏ hiệu ứng nếu người dùng bật giảm chuyển động). */
@@ -253,7 +253,9 @@ export default function GraduationPage() {
                   <div className={cn(notice.base, notice.neutral, 'mb-6')}>
                     <CalendarHeart size={16} className={noticeIcon.neutral} />
                     <p className="text-sm">
-                      Đã hết thời gian đăng ký tham dự. Sinh viên, học viên đã đăng ký vẫn xác minh được để xem lại mã QR.
+                      Đã hết thời gian đăng ký tham dự. Sinh viên, học viên đã đăng ký vẫn xác minh được để xem lại mã QR
+                      {round.photo_closes_at && new Date(round.photo_closes_at) > new Date()
+                        ? ` và bổ sung ảnh trình chiếu (đến ${deadlineText(round.photo_closes_at)})` : ''}.
                     </p>
                   </div>
                 )}

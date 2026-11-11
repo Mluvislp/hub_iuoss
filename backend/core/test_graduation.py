@@ -315,8 +315,9 @@ class GraduationTests(TestCase):
         self.client.post("/api/graduation/register/", {**self.reg_data(), "photo": _jpeg("a.jpg")}, format="multipart")
         now = timezone.now()
         GraduationRound.objects.filter(pk=self.round.pk).update(
-            registration_opens_at=now - timedelta(days=5), registration_closes_at=now - timedelta(days=1))
-        # Hết hạn, ảnh chưa bị từ chối ⇒ không đổi được.
+            registration_opens_at=now - timedelta(days=5), registration_closes_at=now - timedelta(days=2))
+        self.enterContext(patch.object(grad, "PHOTO_CLOSES_AT", now - timedelta(days=1)))
+        # Hết hạn ảnh, ảnh chưa bị từ chối ⇒ không đổi được.
         self.assertEqual(self.client.post("/api/graduation/photo/", {"photo": _jpeg("b.jpg")}, format="multipart").status_code, 400)
         Member.objects.filter(pk=self.m_hv.pk).update(photo_status="rejected", photo_review_note="Không mặc lễ phục")
         me = self.client.get("/api/graduation/me/").json()["registration"]
@@ -439,6 +440,63 @@ class GraduationTests(TestCase):
         res = self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart")
         self.assertEqual(res.status_code, 400)
         self.assertFalse(self.client.get("/api/graduation/me/").json()["deposit"]["can_upload"])
+
+    # ── Mốc 18/11 (hạn đăng ký = hạn thế chân) và 20/11 (hạn ảnh) ──
+    def test_between_registration_and_photo_deadline_only_photo_is_editable(self):
+        self._login_sv()
+        self.assertEqual(self.client.post("/api/graduation/register/", self.reg_data(), format="multipart").status_code, 200)
+        now = timezone.now()
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=now - timedelta(minutes=1))
+        self.enterContext(patch.object(grad, "PHOTO_CLOSES_AT", now + timedelta(days=1)))
+
+        me = self.client.get("/api/graduation/me/").json()
+        dep = me["deposit"]
+        # Qua hạn thế chân: KHÔNG trả thông tin chuyển khoản, khóa minh chứng.
+        self.assertTrue(dep["overdue"])
+        self.assertEqual((dep["account_number"], dep["bank_bin"], dep["bank_name"], dep["account_name"], dep["reference"]),
+                         (None, None, None, None, None))
+        self.assertFalse(dep["can_upload"])
+        self.assertTrue(dep["has_receipt"])
+        self.assertEqual((me["registration"]["can_edit"], me["registration"]["can_replace_photo"]), (False, True))
+        self.assertIsNotNone(me["round"]["photo_closes_at"])
+
+        # Ảnh: bổ sung / thay / gỡ được.
+        res = self.client.post("/api/graduation/photo/", {"photo": _jpeg("a.jpg")}, format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(res.json()["registration"]["can_remove_photo"])
+        self.assertEqual(self.client.delete("/api/graduation/photo/").status_code, 200)
+        # Mọi thứ khác: khóa.
+        self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart").status_code, 400)
+        self.assertEqual(self.client.post("/api/graduation/bank/", self.bank_data(), format="json").status_code, 400)
+        self.assertEqual(self.client.post("/api/graduation/cancel/", {"reason": "Bận việc gia đình"}, format="json").status_code, 400)
+
+    def test_unregistered_cannot_register_or_upload_photo_after_registration_deadline(self):
+        self._login_hv()
+        now = timezone.now()
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=now - timedelta(minutes=1))
+        self.enterContext(patch.object(grad, "PHOTO_CLOSES_AT", now + timedelta(days=1)))
+        self.assertEqual(self.client.post("/api/graduation/register/", self.reg_data(), format="multipart").status_code, 400)
+        res = self.client.post("/api/graduation/photo/", {"photo": _jpeg("a.jpg")}, format="multipart")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Chưa đăng ký", res.json()["detail"])
+
+    def test_photo_locked_after_photo_deadline(self):
+        self._login_sv()
+        self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        now = timezone.now()
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=now - timedelta(days=2))
+        self.enterContext(patch.object(grad, "PHOTO_CLOSES_AT", now - timedelta(minutes=1)))
+        res = self.client.post("/api/graduation/photo/", {"photo": _jpeg("a.jpg")}, format="multipart")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("hết hạn tải ảnh", res.json()["detail"])
+        self.assertFalse(self.client.get("/api/graduation/me/").json()["registration"]["can_replace_photo"])
+
+    def test_photo_deadline_never_before_registration_deadline(self):
+        now = timezone.now()
+        with patch.object(grad, "PHOTO_CLOSES_AT", now - timedelta(days=3)):
+            self.round.refresh_from_db()                                    # đợt đang mở tới now + 5 ngày
+            self.assertEqual(grad.photo_closes_at(self.round), self.round.registration_closes_at)
+            self.assertTrue(grad.photo_window_open(self.round))
 
 
 def grad_views_limit():

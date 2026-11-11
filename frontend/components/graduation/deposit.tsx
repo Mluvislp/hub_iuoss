@@ -5,7 +5,9 @@ import QRCode from 'react-qr-code';
 import { AlertCircle, Check, CheckCircle2, Copy, Eye, FileText, Loader2, ReceiptText, RefreshCw, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildVietQrPayload } from '@/lib/vietqr';
-import { GradError, checkReceipt, formatMB, gradApi, type GradDeposit, type GradMember } from '@/lib/graduation';
+import {
+  GradError, checkReceipt, deadlineText, formatMB, gradApi, type GradDeposit, type GradMember,
+} from '@/lib/graduation';
 import { g } from './styles';
 
 // Tiền thế chân lễ phục: chuyển khoản vào tài khoản Phòng KHTC (số tiền theo nhóm, nội dung theo cú pháp KHTC —
@@ -13,7 +15,6 @@ import { g } from './styles';
 // ký trước khi có mục này nộp bổ sung ở DepositCard.
 
 const vnd = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
-const dmy = (iso: string) => iso.split('-').reverse().join('/');
 const dt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
@@ -36,14 +37,21 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/** QR VietQR + thông tin chuyển khoản. */
+/** QR VietQR + thông tin chuyển khoản. Quá hạn ⇒ không hiện (máy chủ cũng không gửi thông tin). */
 export function DepositInfo({ deposit }: { deposit: GradDeposit }) {
-  const qr = useMemo(() => deposit.amount
+  const qr = useMemo(() => deposit.amount && deposit.bank_bin && deposit.account_number && !deposit.overdue
     ? buildVietQrPayload({ bin: deposit.bank_bin, accountNumber: deposit.account_number, amount: deposit.amount,
-                           addInfo: deposit.reference })
+                           addInfo: deposit.reference ?? '' })
     : null, [deposit]);
 
-  if (!deposit.amount) {
+  if (deposit.overdue) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        Đã hết hạn đóng tiền thế chân lễ phục ({deadlineText(deposit.deadline)}).
+      </div>
+    );
+  }
+  if (!deposit.amount || !deposit.account_number) {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
         Chưa có mức tiền thế chân cho nhóm này — vui lòng liên hệ Phòng Công tác Sinh viên.
@@ -54,7 +62,7 @@ export function DepositInfo({ deposit }: { deposit: GradDeposit }) {
     ['Ngân hàng', deposit.bank_name],
     ['Số tài khoản', <span key="a" className="font-mono tracking-wide">{deposit.account_number}</span>, deposit.account_number],
     ['Chủ tài khoản', deposit.account_name],
-    ['Nội dung', <span key="r" className="break-words">{deposit.reference}</span>, deposit.reference],
+    ['Nội dung', <span key="r" className="break-words">{deposit.reference}</span>, deposit.reference ?? undefined],
   ];
   return (
     <div className="flex flex-col items-center gap-5 rounded-xl border border-line bg-[#fbfcfe] p-4 sm:p-5 md:flex-row md:items-start">
@@ -79,10 +87,9 @@ export function DepositInfo({ deposit }: { deposit: GradDeposit }) {
             </div>
           ))}
         </dl>
-        <p className={cn('mt-3 text-xs', deposit.overdue ? 'font-semibold text-rose-700' : 'text-muted')}>
-          {deposit.overdue
-            ? `Đã quá hạn đóng tiền thế chân (${dmy(deposit.deadline)}). Chưa chuyển khoản thì liên hệ Phòng Công tác Sinh viên.`
-            : `Hạn cuối: hết ngày ${dmy(deposit.deadline)}. Mã QR đã gồm sẵn số tài khoản, số tiền và nội dung — giữ nguyên nội dung để Phòng KHTC đối chiếu.`}
+        <p className="mt-3 text-xs text-muted">
+          {deposit.deadline ? `Hạn cuối: ${deadlineText(deposit.deadline)}. ` : ''}Mã QR đã gồm sẵn số tài khoản, số tiền và
+          nội dung — giữ nguyên nội dung để Phòng KHTC đối chiếu.
         </p>
       </div>
     </div>
@@ -212,9 +219,11 @@ export function DepositCard({ member, onChange }: { member: GradMember; onChange
       {!d.has_receipt && (
         <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
           <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-          <span>Minh chứng đã chuyển khoản tiền thế chân là <b>bắt buộc</b>. {d.can_upload
-            ? 'Chuyển khoản theo thông tin dưới đây rồi tải minh chứng lên.'
-            : 'Liên hệ Phòng Công tác Sinh viên.'}</span>
+          <span>{d.overdue
+            ? <>Đã hết hạn đóng tiền thế chân và nộp minh chứng ({deadlineText(d.deadline)}). Liên hệ Phòng Công tác Sinh viên.</>
+            : <>Minh chứng đã chuyển khoản tiền thế chân là <b>bắt buộc</b>. {d.can_upload
+              ? `Chuyển khoản theo thông tin dưới đây rồi tải minh chứng lên${d.deadline ? ` trước ${deadlineText(d.deadline)}` : ''}.`
+              : 'Liên hệ Phòng Công tác Sinh viên.'}</>}</span>
         </div>
       )}
 
@@ -234,12 +243,12 @@ export function DepositCard({ member, onChange }: { member: GradMember; onChange
         </div>
       )}
 
-      {d.has_receipt && !showInfo && (
+      {d.has_receipt && !showInfo && !d.overdue && (
         <button type="button" onClick={() => setShowInfo(true)} className="mt-3 text-sm font-medium text-[#a07d1c] hover:underline">
           Xem lại thông tin chuyển khoản
         </button>
       )}
-      {showInfo && <div className="mt-4"><DepositInfo deposit={d} /></div>}
+      {showInfo && !d.overdue && <div className="mt-4"><DepositInfo deposit={d} /></div>}
 
       {picking && (
         <div className="mt-4 space-y-3">
