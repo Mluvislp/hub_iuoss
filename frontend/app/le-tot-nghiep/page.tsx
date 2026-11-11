@@ -218,7 +218,7 @@ export default function GraduationPage() {
       <Hero fireworks={fireworks} round={info?.round ?? null} onElapsed={refresh} />
 
       <main className="mx-auto max-w-content px-5 py-16 space-y-20 pb-28">
-        <Schedule highlight={member?.student.session} />
+        <Schedule highlight={member?.student.session} round={round} />
 
         <section id="dang-ky" className="scroll-mt-6">
           <div className="text-center mb-8">
