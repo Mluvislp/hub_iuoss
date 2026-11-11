@@ -370,8 +370,11 @@ def _serialize_history(item, cfg=None):
 
 
 def exam_ticket(student, resp, round_):
-    """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`."""
+    """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`. Đăng ký
+    thuộc đợt khám TRƯỚC mà chưa khám thì phiếu hết tác dụng ⇒ không trả (Hub hiện thông báo ngắn)."""
     if resp is None or resp.choice != Response_.CHOICE_REGISTER or not resp.exam_code:
+        return None
+    if is_previous_phase_registration(resp, round_):
         return None
     from students.models import HealthInsuranceCard, StudentContactPoint
 
@@ -419,6 +422,8 @@ def build_state(student):
         "round": serialize_round(round_),
         "response": _serialize_response(resp),
         "exam_ticket": exam_ticket(student, resp, round_),
+        # Đăng ký đợt khám trước, chưa khám: phiếu cũ ẩn, Hub báo một dòng.
+        "previous_phase_registration": previous_phase,
         "can_submit": (examined_open or register_open) and resp is None,
         "can_submit_examined": examined_open and resp is None,
         "can_submit_register": register_open and resp is None,

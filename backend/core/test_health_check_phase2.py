@@ -98,6 +98,8 @@ class Phase2Tests(TestCase):
         state = hc.build_state(s)
         self.assertTrue(state["can_reregister"])
         self.assertFalse(state["can_request_cancel"])                  # không cần xin hủy
+        self.assertIsNone(state["exam_ticket"])                        # phiếu Đợt 1 hết tác dụng → ẩn
+        self.assertTrue(state["previous_phase_registration"])
         self.assertEqual(state["exam_slots"]["phase_label"], "Đợt 2")
         with self.assertRaises(hc.HealthCheckError):                   # thiếu cờ reregister → như đã có phản hồi
             hc.register(s, {**REG, "exam_slot": "2099-11-17 13:30"})
@@ -127,7 +129,10 @@ class Phase2Tests(TestCase):
     def test_da_kham_dot_1_khong_dang_ky_lai(self):
         s = self.student()
         self.resp(s, status=R.STATUS_ATTENDED)
-        self.assertFalse(hc.build_state(s)["can_reregister"])
+        st = hc.build_state(s)
+        self.assertFalse(st["can_reregister"])
+        self.assertTrue(st["exam_ticket"])                             # đã khám: phiếu vẫn hiện
+        self.assertFalse(st["previous_phase_registration"])
         with self.assertRaises(hc.HealthCheckError) as ctx:
             hc.register(s, {**REG, "exam_slot": "2099-11-19 07:30", "reregister": True})
         self.assertIn("đã được ghi nhận khám", str(ctx.exception))
