@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  GradError, checkBank, checkPhoto, formatMB, gradApi, storedPhotoName, type BankInput, type GradBank, type GradMember,
+  GradError, checkBank, checkPhoto, deadlineText, formatMB, gradApi, storedPhotoName, type BankInput, type GradBank,
+  type GradMember,
 } from '@/lib/graduation';
 import { BankCard, BankFields, emptyBank } from './bank';
 import { DepositCard, DepositInfo, ReceiptPicker } from './deposit';
@@ -373,7 +374,7 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
                   <button type="button" className={g.btnOutline} onClick={() => setReplacing(true)} disabled={busy}>
                     <RefreshCw size={15} /> Thay ảnh khác
                   </button>
-                  {!reg.can_edit ? null : confirmRemove ? (
+                  {!reg.can_remove_photo ? null : confirmRemove ? (
                     <span className="inline-flex items-center gap-2 text-sm">
                       Gỡ ảnh này?
                       <button type="button" className={cn(g.btnOutline, 'text-danger-text')} onClick={remove} disabled={busy}>
@@ -406,6 +407,9 @@ function CurrentPhoto({ member, onChange }: { member: GradMember; onChange: (m: 
             </div>
             {reg.has_photo && <p className="text-xs text-muted text-right">Ảnh mới tải lên thành công sẽ thay ảnh cũ (ảnh cũ bị xóa) và chờ Phòng CTSV duyệt lại.</p>}
           </div>
+        )}
+        {canReplace && member.round.photo_closes_at && reg.photo_status !== 'rejected' && (
+          <p className="text-xs text-muted">Hạn bổ sung / thay ảnh: {deadlineText(member.round.photo_closes_at)}.</p>
         )}
         <Alert message={error} />
         {showRules && (
@@ -487,7 +491,14 @@ export function Registered({ member, banks, onChange }: {
       {rejected && <Callout tone="slate">Yêu cầu hủy không được chấp thuận: {reg.cancel_review_note}</Callout>}
       {reg.status === 'registered' && <DepositCard member={member} onChange={onChange} />}
       {!reg.can_edit && reg.status === 'registered' && !member.round.registration_open && (
-        <Callout tone="slate">Đã hết thời gian đăng ký — không đổi ảnh hay gửi yêu cầu hủy được nữa. Mã QR vẫn dùng bình thường.</Callout>
+        reg.can_remove_photo || (reg.can_replace_photo && reg.photo_status !== 'rejected') ? (
+          <Callout tone="slate">
+            Đã hết hạn đăng ký tham dự. Đến {deadlineText(member.round.photo_closes_at)} vẫn bổ sung hoặc thay được ảnh trình
+            chiếu; minh chứng chuyển khoản, tài khoản hoàn cọc và yêu cầu hủy không thay đổi được nữa. Mã QR vẫn dùng bình thường.
+          </Callout>
+        ) : (
+          <Callout tone="slate">Đã hết thời gian đăng ký — không thay đổi được thông tin đăng ký nữa. Mã QR vẫn dùng bình thường.</Callout>
+        )
       )}
       <CurrentPhoto member={member} onChange={onChange} />
       <BankCard key={member.bank ? `${member.bank.bank_id}-${member.bank.account_number}` : 'none'}

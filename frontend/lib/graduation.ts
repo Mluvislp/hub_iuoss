@@ -25,6 +25,8 @@ export interface GradRound {
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   registration_open: boolean;
+  /** Hạn tải / thay ảnh trình chiếu (≥ hạn đăng ký). Sau hạn đăng ký chỉ người đã đăng ký đổi được ảnh. */
+  photo_closes_at: string | null;
 }
 
 export interface GradBank {
@@ -79,6 +81,7 @@ export interface GradMember {
     cancel_review_note: string;
     checked_in: boolean;
     can_edit: boolean;
+    can_remove_photo: boolean;
     can_register: boolean;
   };
   bank: {
@@ -93,15 +96,16 @@ export interface GradMember {
   round: GradRound;
 }
 
-/** Tiền thế chân lễ phục — máy chủ tính (core/graduation.py::deposit_payload). */
+/** Tiền thế chân lễ phục — máy chủ tính (core/graduation.py::deposit_payload).
+ *  Hạn = hạn đăng ký của đợt; quá hạn (`overdue`) thì máy chủ KHÔNG gửi thông tin chuyển khoản (các trường null). */
 export interface GradDeposit {
-  bank_name: string;
-  bank_bin: string;
-  account_number: string;
-  account_name: string;
+  bank_name: string | null;
+  bank_bin: string | null;
+  account_number: string | null;
+  account_name: string | null;
   amount: number | null;
-  reference: string;
-  deadline: string;              // YYYY-MM-DD, hết ngày
+  reference: string | null;
+  deadline: string | null;       // ISO, giờ VN — hạn đăng ký của đợt
   overdue: boolean;
   has_receipt: boolean;
   receipt_is_pdf: boolean;
@@ -326,4 +330,14 @@ export async function checkReceipt(file: File): Promise<string | null> {
   const isPng = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((b, i) => head[i] === b);
   if (!isPdf && !isJpeg && !isPng) return 'Minh chứng phải là ảnh JPG / PNG hoặc file PDF.';
   return null;
+}
+
+/** Mốc hạn để hiển thị: "hết ngày 18/11/2026" nếu là 23:59, còn lại "16:00 ngày 20/11/2026". */
+export function deadlineText(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const opt = { timeZone: 'Asia/Ho_Chi_Minh' } as const;
+  const day = d.toLocaleDateString('vi-VN', { ...opt, day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = d.toLocaleTimeString('vi-VN', { ...opt, hour: '2-digit', minute: '2-digit', hour12: false });
+  return time === '23:59' ? `hết ngày ${day}` : `${time} ngày ${day}`;
 }

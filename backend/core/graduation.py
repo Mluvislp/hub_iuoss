@@ -23,7 +23,8 @@ import re
 import logging
 import secrets
 import unicodedata
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from uuid import uuid4
 
@@ -84,6 +85,24 @@ def not_open_yet(round_, now=None):
     return now < round_.registration_opens_at
 
 
+# Hạn tải / thay ảnh trình chiếu (Phòng CTSV chốt 11/11/2026): hết ngày 20/11/2026. Sau hạn đăng ký (hết 18/11) tới
+# mốc này CHỈ người đã đăng ký được bổ sung / thay / gỡ ảnh — mọi thứ khác (minh chứng CK, tài khoản hoàn cọc,
+# xin hủy) đã khóa theo hạn đăng ký. Không bao giờ sớm hơn hạn đăng ký của đợt (`photo_closes_at`).
+PHOTO_CLOSES_AT = datetime(2026, 11, 20, 23, 59, 59, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
+
+
+def photo_closes_at(round_):
+    closes = round_.registration_closes_at
+    return max(closes, PHOTO_CLOSES_AT) if closes else None
+
+
+def photo_window_open(round_, now=None):
+    """Còn trong hạn ảnh: đã mở đợt và chưa qua hạn ảnh (hạn ảnh ≥ hạn đăng ký)."""
+    now = now or timezone.now()
+    closes = photo_closes_at(round_)
+    return bool(round_.registration_opens_at and closes and round_.registration_opens_at <= now <= closes)
+
+
 def round_payload(round_):
     if round_ is None:
         return None
@@ -94,6 +113,7 @@ def round_payload(round_):
         "registration_opens_at": local(round_.registration_opens_at),
         "registration_closes_at": local(round_.registration_closes_at),
         "registration_open": round_.registration_open(),
+        "photo_closes_at": local(photo_closes_at(round_)),
     }
 
 
@@ -280,7 +300,8 @@ DEPOSIT_ACCOUNT = {
     "account_number": "3145559799", "account_name": "Trường Đại học Quốc tế",
 }
 DEPOSIT_TAG = "LPTN2026"
-DEPOSIT_DEADLINE = date(2026, 11, 18)            # hết ngày (giờ VN) — mốc "Hạn cuối đóng tiền thế chân" trên timeline
+# Hạn đóng tiền thế chân = HẠN ĐĂNG KÝ của đợt (`registration_closes_at`, Phòng CTSV đặt ở Dashboard — hết ngày
+# 18/11/2026). Qua hạn: khóa nộp / thay minh chứng và KHÔNG trả thông tin chuyển khoản về trình duyệt nữa.
 RECEIPT_MAX_BYTES = 10 * 1024 * 1024
 RECEIPT_EXT_MIME = {"jpg": "image/jpeg", "png": "image/png", "pdf": "application/pdf"}
 RECEIPT_FIELDS = ["deposit_receipt_storage_key", "deposit_receipt_uploaded_at"]
@@ -354,12 +375,15 @@ def can_upload_receipt(member):
 def deposit_payload(member):
     key = member.deposit_receipt_storage_key or ""
     uploaded = member.deposit_receipt_uploaded_at
+    closes = member.round.registration_closes_at
+    overdue = bool(closes and timezone.now() > closes)
+    account = {k: None for k in DEPOSIT_ACCOUNT} if overdue else DEPOSIT_ACCOUNT
     return {
-        **DEPOSIT_ACCOUNT,
+        **account,
         "amount": DEPOSIT_VND.get(member.program_group),
-        "reference": deposit_reference(member),
-        "deadline": DEPOSIT_DEADLINE.isoformat(),
-        "overdue": timezone.localdate() > DEPOSIT_DEADLINE,
+        "reference": None if overdue else deposit_reference(member),
+        "deadline": timezone.localtime(closes).isoformat() if closes else None,
+        "overdue": overdue,
         "has_receipt": bool(key),
         "receipt_is_pdf": key.lower().endswith(".pdf"),
         "receipt_uploaded_at": timezone.localtime(uploaded).isoformat() if uploaded else None,
@@ -513,18 +537,34 @@ def _require_editable(member):
         raise GraduationError("Chưa đăng ký tham dự.")
 
 
+def can_edit_photo(member):
+    """Bổ sung / thay / gỡ ảnh: đang registered và còn hạn ảnh (hết 20/11 — sau hạn đăng ký vẫn được)."""
+    return photo_window_open(member.round) and member.registration_status == Member.STATUS_REGISTERED
+
+
+def _require_photo_editable(member):
+    if member.registration_status == Member.STATUS_CANCEL_REQUESTED:
+        raise GraduationError("Yêu cầu hủy đang chờ Phòng CTSV duyệt — tạm thời không thay đổi được.")
+    if member.registration_status != Member.STATUS_REGISTERED:
+        raise GraduationError("Chưa đăng ký tham dự.")
+    if not photo_window_open(member.round):
+        closes = photo_closes_at(member.round)
+        when = f" (hết {timezone.localtime(closes):%H:%M ngày %d/%m/%Y})" if closes else ""
+        raise GraduationError(f"Đã hết hạn tải ảnh trình chiếu{when}.")
+
+
 def can_replace_photo(member):
-    """Đổi ảnh: như mọi thay đổi khác (còn hạn, đang registered) — HOẶC ảnh vừa bị Phòng CTSV từ chối thì
-    được tải ảnh khác cả khi đã hết hạn (lỗi phát hiện sau khi duyệt, SV không có lỗi về thời hạn)."""
+    """Đổi ảnh: trong hạn ảnh (`can_edit_photo`) — HOẶC ảnh vừa bị Phòng CTSV từ chối thì được tải ảnh khác cả
+    khi đã hết hạn (lỗi phát hiện sau khi duyệt, SV không có lỗi về thời hạn)."""
     if member.photo_status == PHOTO_REJECTED and member.is_registered:
         return True
-    return member.round.registration_open() and member.registration_status == Member.STATUS_REGISTERED
+    return can_edit_photo(member)
 
 
 def replace_photo(member_id, upload):
     def change(member, written):
         if not can_replace_photo(member):
-            _require_editable(member)                     # ném đúng câu lỗi
+            _require_photo_editable(member)               # ném đúng câu lỗi
         stale = _apply_photo(member, upload, written)
         member.save(update_fields=PHOTO_FIELDS + ["updated_at"])
         logger.info("GRAD_PHOTO        | code=%-14s | replaced=%s", member.student_code, bool(stale[0]))
@@ -534,7 +574,7 @@ def replace_photo(member_id, upload):
 
 def remove_photo(member_id):
     def change(member, written):
-        _require_editable(member)
+        _require_photo_editable(member)
         if not member.photo_storage_key:
             raise GraduationError("Chưa có ảnh nào để gỡ.")
         stale = [member.photo_storage_key, member.photo_cropped_storage_key]
@@ -637,6 +677,7 @@ def member_payload(member):
             "cancel_review_note": member.cancel_review_note or "",
             "checked_in": bool(member.checked_in_at),
             "can_edit": can_edit,
+            "can_remove_photo": bool(member.photo_storage_key) and can_edit_photo(member),
             "can_register": round_.registration_open() and not member.is_registered,
         },
         "bank": {
