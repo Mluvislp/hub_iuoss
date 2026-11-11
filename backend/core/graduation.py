@@ -290,7 +290,11 @@ def deposit_reference(member):
     """Nội dung chuyển khoản theo cú pháp KHTC "MSSV – Họ tên – LPTN2026": mã ĐÚNG như danh sách (SĐH = mã học
     viên), họ tên BỎ DẤU, gạch ngang thường — app ngân hàng hay làm hỏng ký tự có dấu / gạch dài."""
     text = unicodedata.normalize("NFD", member.student.full_name or "")
-    name = "".join(ch for ch in text if unicodedata.category(ch) != "Mn").replace("đ", "d").replace("Đ", "D")
+    name = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    name = name.replace("đ", "d").replace("Đ", "D").replace("Ð", "D")
+    # Cùng luật `lib/vietqr.ts::toAscii` (ký tự khác chữ/số/khoảng trắng/.- thành khoảng trắng) ⇒ chữ hiển thị
+    # luôn TRÙNG nội dung nằm trong mã QR, kể cả tên có dấu nháy / ký tự lạ.
+    name = re.sub(r"[^A-Za-z0-9_\s.-]", " ", name)
     return f"{member.student_code.upper()} - {' '.join(name.split())} - {DEPOSIT_TAG}"
 
 
