@@ -260,9 +260,8 @@ export default function HealthCheckPage() {
   const phaseText = state.exam_slots?.phase_label ? ` ${state.exam_slots.phase_label.toLowerCase()}` : ' đợt mới';
   // "Ca chiều thứ nhất (13:00–15:00), ngày 28/10/2026" — lịch khám đăng ký trước khi đăng ký lại.
   const oldSlot = response?.exam_slot;
-  const oldSlotText = oldSlot
-    ? `${oldSlot.label} (${oldSlot.start}–${oldSlot.end}), ngày ${oldSlot.date.split('-').reverse().join('/')}`
-    : '';
+  const oldSlotDate = oldSlot ? oldSlot.date.split('-').reverse().join('/') : '';
+  const oldSlotText = oldSlot ? `${oldSlot.label} (${oldSlot.start}–${oldSlot.end}), ngày ${oldSlotDate}` : '';
 
   // ── Nộp lại sau khi bị từ chối: đi lại toàn bộ các bước, nạp sẵn lần khai trước ──
   if (response && resubmitting && state.can_resubmit) {
@@ -296,6 +295,15 @@ export default function HealthCheckPage() {
           </div>
         )}
         {state.exam_ticket && <ExamTicket ticket={state.exam_ticket} />}
+        {state.previous_phase_registration && (
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-slate-500" />
+            <span>
+              Lịch khám{oldSlotDate ? ` ngày ${oldSlotDate}` : ''} đã qua, phiếu khám cũ không còn sử dụng.
+              {state.can_reregister ? ` Đăng ký khám${phaseText} ở cuối trang.` : ''}
+            </span>
+          </div>
+        )}
         <div className={ui.card}>
           {header}
           <div className="px-6 py-5 space-y-5">
