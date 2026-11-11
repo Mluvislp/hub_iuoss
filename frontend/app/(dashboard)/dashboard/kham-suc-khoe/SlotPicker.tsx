@@ -13,8 +13,16 @@ export default function SlotPicker({ options, value, onChange, error }: {
 }) {
   return (
     <div>
-      <div className="text-[0.82rem] font-medium text-ink mb-2">
-        Ngày và ca khám{options.phase_label ? ` — ${options.phase_label}` : ''}<span className="text-red-500"> *</span>
+      <div className="flex flex-wrap items-center gap-2 mb-2.5">
+        <CalendarDays size={17} className="text-primary" />
+        <span className="text-[0.95rem] font-semibold text-ink">
+          Ngày và ca khám<span className="text-red-500"> *</span>
+        </span>
+        {options.phase_label && (
+          <span className="rounded-md border border-primary-line bg-primary-soft px-2 py-0.5 text-[0.8rem] font-semibold text-primary-text">
+            {options.phase_label}
+          </span>
+        )}
       </div>
       <div className={cn('rounded-lg border divide-y divide-line2', error ? 'border-danger-line' : 'border-line')}>
         {options.days.map((day) => (
