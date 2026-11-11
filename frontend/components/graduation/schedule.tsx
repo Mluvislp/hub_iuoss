@@ -1,5 +1,7 @@
-import { CalendarDays, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { GradRound } from '@/lib/graduation';
+import Timeline from './timeline';
 
 // Lịch Lễ tốt nghiệp 2026 — nội dung do Phòng CTSV gửi 04/11/2026. Mã buổi (SAT_AM…) khớp cột
 // graduation_round_students.ceremony_session; buổi của từng người được tô nổi.
@@ -31,7 +33,7 @@ export const SCHEDULE: Array<{ key: string; day: string; part: string; items: st
 
 export const EDUSOFT_URL = 'https://edusoftweb.hcmiu.edu.vn/';
 
-export default function Schedule({ highlight }: { highlight?: string }) {
+export default function Schedule({ highlight, round }: { highlight?: string; round: GradRound | null }) {
   return (
     <section id="lich" className="scroll-mt-6">
       <div className="text-center mb-8">
@@ -39,21 +41,8 @@ export default function Schedule({ highlight }: { highlight?: string }) {
         <h2 className="mt-2 font-display font-semibold text-4xl sm:text-5xl text-[#0f2a5c]">Lịch Lễ Tốt nghiệp 2026</h2>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 mb-4">
-        <div className="rounded-lg border border-line bg-white p-4 flex gap-3 items-start">
-          <CalendarDays size={18} className="text-[#a07d1c] mt-0.5 shrink-0" />
-          <div>
-            <div className="text-sm font-semibold text-ink">Tổng dợt</div>
-            <div className="text-sm text-muted">Chiều thứ Sáu, ngày 27 tháng 11 năm 2026</div>
-          </div>
-        </div>
-        <div className="rounded-lg border border-line bg-white p-4 flex gap-3 items-start">
-          <CalendarDays size={18} className="text-[#a07d1c] mt-0.5 shrink-0" />
-          <div>
-            <div className="text-sm font-semibold text-ink">Lễ Tốt nghiệp</div>
-            <div className="text-sm text-muted">Thứ Bảy &amp; Chủ nhật, ngày 28 &amp; 29 tháng 11 năm 2026</div>
-          </div>
-        </div>
+      <div className="mb-6 rounded-lg border border-line bg-white px-5 py-6 sm:px-6">
+        <Timeline round={round} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
