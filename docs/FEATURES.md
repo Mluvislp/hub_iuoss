@@ -20,7 +20,6 @@ Mặc định: **production → tắt (hiện trang chờ)**, **local/staging �
 | `FEATURE_DIPLOMA` | Route `/dashboard/bang-tot-nghiep` và `/api/diploma/*` (404 khi tắt). Trang quản lý `/diplomas/` bên Dashboard không bị cờ chặn — tạo đợt trước rồi mới bật |
 | `FEATURE_TUITION_WAIVER` | Route `/dashboard/mien-giam-hoc-phi/*` và toàn bộ `/api/tuition-exemption/*` (404 khi tắt). Trang quản lý bên Dashboard (`/tuition/`) KHÔNG bị cờ này chặn — phòng cấu hình đợt/danh mục trước được |
 | `FEATURE_DIRECT_SUBMISSIONS` | Route `/dashboard/nap-giay-to/*`, mục menu "Nạp giấy tờ trực tiếp" và toàn bộ `/api/submissions/*` (404 khi tắt) |
-| `FEATURE_DIPLOMA` | Route `/dashboard/bang-tot-nghiep` và `/api/diploma/*` (404 khi tắt). Trang quản lý `/diplomas/` bên Dashboard không bị cờ chặn — tạo đợt trước rồi mới bật |
 | `FEATURE_SUPPORT_TICKETS` | Route `/dashboard/hoi-dap/*`, badge tin mới ở sidebar và toàn bộ `/api/tickets/*` (404 khi tắt). Nghiệp vụ: `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 
 **Nguồn sự thật là backend** — `config/settings.py`, mặc định `not IS_PRODUCTION`
