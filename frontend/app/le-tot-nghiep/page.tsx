@@ -104,7 +104,7 @@ function Hero({ fireworks, round, onElapsed }: {
 function MemberSummary({ m, onLogout }: { m: GradMember; onLogout: () => void }) {
   const s = m.student;
   const facts = [
-    ['Ngành', s.major], ['Khoa', s.department], ['Tên bằng', s.award_title], ['Xếp loại', s.degree_class],
+    ['Ngành', s.major], ['Khoa/Bộ môn', s.department], ['Tên bằng', s.award_title], ['Xếp loại', s.degree_class],
     ['Ngày sinh', s.date_of_birth],
   ].filter(([, v]) => v);
   return (
