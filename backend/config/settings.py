@@ -37,6 +37,7 @@ FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_P
 FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=True)
 FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
 FEATURE_PERSONAL_INFO = env_bool("FEATURE_PERSONAL_INFO", default=not IS_PRODUCTION)
+FEATURE_DIPLOMA = env_bool("FEATURE_DIPLOMA", default=not IS_PRODUCTION)
 # Nạp giấy tờ trực tiếp (core/direct_submissions.py) — production bật bằng FEATURE_DIRECT_SUBMISSIONS=1.
 FEATURE_DIRECT_SUBMISSIONS = env_bool("FEATURE_DIRECT_SUBMISSIONS", default=not IS_PRODUCTION)
 # Khai báo ngoại trú TẠM ĐÓNG (11/2026), thay bằng "Khai báo địa chỉ" (luôn mở). Mở lại

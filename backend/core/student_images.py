@@ -40,6 +40,7 @@ KINDS = {
 SOURCE_BHYT_REGISTRATION = 'bhyt_registration'   # form đăng ký BHYT
 SOURCE_EXTERNAL_INSURANCE = 'external_insurance'  # khai BHYT nơi khác
 SOURCE_MGHP = 'mghp'                              # miễn giảm học phí
+SOURCE_DIPLOMA = 'diploma'                        # nộp bằng tốt nghiệp THPT
 SOURCE_BACKFILL = 'backfill'                      # nạp từ đơn cũ
 
 # Tên trường ảnh trên form/cột của 2 bảng BHYT (hub_insurance_registrations,
