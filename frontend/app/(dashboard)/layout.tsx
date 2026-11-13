@@ -18,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/khai-bao-ngoai-tru': 'Khai báo ngoại trú',
   '/dashboard/khai-bao-dia-chi': 'Khai báo địa chỉ',
   '/dashboard/kham-suc-khoe': 'Khám sức khỏe',
+  '/dashboard/bang-tot-nghiep': 'Nộp bằng tốt nghiệp THPT',
   '/dashboard/requests/new': 'Yêu cầu giấy tờ',
   '/dashboard/requests/other': 'Yêu cầu giấy tờ',
   '/dashboard/requests/deferment': 'Yêu cầu giấy tờ',

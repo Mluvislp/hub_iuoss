@@ -54,6 +54,7 @@ backend/
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
   core/offcampus.py         ← khai báo địa chỉ / ngoại trú (form + submit, `mode` quyết luật tạm trú)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
+  core/diploma.py · diploma_models.py · api/diploma_views.py   ← nộp bằng tốt nghiệp THPT (PDF + CCCD từ kho ảnh)
   core/health_check_slots.py ← ngày + ca khám tại trường — bản song sinh GIỐNG HỆT dashboard healthcheck/slots.py
   core/direct_submissions.py · submission_models.py · submission_code.py ← nạp giấy tờ trực tiếp (mã NG-…)
   core/graduation.py · graduation_models.py · api/graduation_views.py · api/graduation_auth.py
@@ -109,6 +110,7 @@ frontend/
 | `/dashboard/khai-bao-dia-chi` | Khai báo địa chỉ toàn trường + sửa CCCD/email/SĐT (thân trang `khai-bao-ngoai-tru/DeclarationPage.tsx`, form `DeclarationForm.tsx` variant `address`) |
 | `/dashboard/khai-bao-ngoai-tru` | Khai báo ngoại trú — **tạm đóng** sau cờ `FEATURE_OFFCAMPUS`: gỡ khỏi menu, link cũ hiện thông báo + nút sang trang trên |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
+| `/dashboard/bang-tot-nghiep` | nộp bằng tốt nghiệp THPT online, xem trạng thái + mã QR khi được hẹn nộp bản gốc |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
 | `/dashboard/sinh-hoat-cong-dan` | tra kết quả SHCD |
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
@@ -126,6 +128,7 @@ frontend/
 `health-check/` + `evidence/` + `evidence/<i>/` + `register/` ·
 `tickets/` + `topics/` + `unread/` + `<id>/` + `<id>/messages/` +
 `<id>/attachments/<id>/` · `student-images/` (GET) + `<id>/file/` ·
+`diploma/` + `diploma/files/<field>/` ·
 `locations/{provinces,wards,ethnicities}` · `hospitals/`
 
 ---
@@ -136,6 +139,7 @@ frontend/
 |---|---|
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
+| Nộp bằng tốt nghiệp THPT | `dashboard_iuoss/docs/DIPLOMA.md` |
 | Lễ tốt nghiệp (/le-tot-nghiep) | `dashboard_iuoss/docs/GRADUATION.md` |
 | Hỏi đáp (ticket), realtime | `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
@@ -186,7 +190,7 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_SUPPORT_TICKETS   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_SUPPORT_TICKETS · FEATURE_DIPLOMA   # mặc định TẮT ở production
 FEATURE_HEALTH_CHECK         # mặc định BẬT mọi môi trường (mở 23/10/2026)
 FEATURE_OFFCAMPUS            # Khai báo ngoại trú — mặc định TẮT (tạm đóng 11/2026, thay bằng Khai báo địa chỉ)
 DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com

@@ -82,6 +82,7 @@ def feature_flags() -> dict:
         "health_check": settings.FEATURE_HEALTH_CHECK,
         "support_tickets": settings.FEATURE_SUPPORT_TICKETS,
         "personal_info": settings.FEATURE_PERSONAL_INFO,
+        "diploma": settings.FEATURE_DIPLOMA,
         "direct_submissions": settings.FEATURE_DIRECT_SUBMISSIONS,
         "offcampus": settings.FEATURE_OFFCAMPUS,
         # Không phải cờ FEATURE_* bật/tắt bằng tay: tự suy ra từ việc đã cấu hình
