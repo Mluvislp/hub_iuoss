@@ -1,8 +1,12 @@
 'use client';
 
-/* Phần thân form "Khai báo ngoại trú" — dùng chung cho 2 trang:
-   - /dashboard/khai-bao-ngoai-tru  (khai báo độc lập)
-   - /dashboard/kham-suc-khoe       (phần 1 của đăng ký khám, gửi kèm đăng ký)
+/* Phần thân form khai báo — dùng chung cho 3 trang:
+   - /dashboard/khai-bao-dia-chi    (Khai báo địa chỉ toàn trường, variant 'address')
+   - /dashboard/khai-bao-ngoai-tru  (Khai báo ngoại trú — tạm đóng)
+   - /dashboard/kham-suc-khoe       (phần 1 của đăng ký khám, luật ngoại trú)
+   Hai variant chỉ khác phần tạm trú: 'address' luôn có 3 lựa chọn (TP.HCM / ngoài
+   TP.HCM / không có tạm trú); 'offcampus' chỉ mở "không có tạm trú" khi thường trú
+   ở TP.HCM. Server kiểm lại đúng luật đó (core/offcampus.py, `mode`).
    Trạng thái nằm trong hook `useDeclarationDraft`, trang nào cũng tự quyết khi
    nào gửi và gửi tới đâu; component chỉ vẽ 3 khối cá nhân / thường trú / tạm trú. */
 
@@ -12,9 +16,12 @@ import { accentIcon, ui } from '@/lib/ui';
 import { cn, fromDateInput, toDateInput, todayInput } from '@/lib/utils';
 import type { CccdValue, OffCampusForm, OffCampusSubmit, Province } from '@/lib/types';
 import AddressFields, { AddressValue } from './AddressFields';
+import IssuePlaceSelect, { normalizeIssuePlace } from '@/components/issue-place-select';
 import PersonalField from './PersonalField';
 
 const EMPTY_ADDRESS: AddressValue = { provinceCode: '', wardCode: '', street: '' };
+
+export type DeclarationVariant = 'offcampus' | 'address';
 
 /** Ô thông tin cá nhân chỉ xem, không có nút sửa (họ tên, email trường). */
 export function ReadonlyField({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -29,6 +36,22 @@ export function ReadonlyField({ label, value, note }: { label: string; value: st
         {value || 'Chưa có thông tin'}
       </div>
       {note && <p className="mt-1 text-[0.75rem] text-muted">{note}</p>}
+    </div>
+  );
+}
+
+/** Ô phụ chỉ xem (nơi cấp, ngày cấp CCCD) — cùng kiểu ô khoá nhưng thấp hơn. */
+function LockedMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="block text-[0.75rem] text-muted mb-1">{label}</div>
+      <div className={cn(
+        'flex items-center gap-2 h-9 px-3 rounded-lg border border-line bg-slate-50 text-[0.85rem]',
+        value ? 'text-ink' : 'text-slate-400 italic',
+      )}>
+        <Lock size={12} className="text-slate-400 flex-shrink-0" />
+        <span className="truncate" title={value}>{value || 'Chưa có thông tin'}</span>
+      </div>
     </div>
   );
 }
@@ -68,14 +91,14 @@ export function ChoiceTile({
 }
 
 /** Toàn bộ trạng thái đang nhập của form khai báo. */
-export function useDeclarationDraft(form: OffCampusForm | null) {
+export function useDeclarationDraft(form: OffCampusForm | null, variant: DeclarationVariant = 'offcampus') {
   const [drafts, setDrafts] = useState<Record<string, string | undefined>>({});
   // CCCD gồm 3 phần; `drafts['student.citizen_id']` giữ số thẻ, 2 phần còn lại ở đây.
   const [cccdExtra, setCccdExtra] = useState({ issue_place: '', issue_date: '' });
   const [permanent, setPermanent] = useState<AddressValue>(EMPTY_ADDRESS);
   const [temporary, setTemporary] = useState<AddressValue>(EMPTY_ADDRESS);
   const [inHcmc, setInHcmc] = useState<boolean | null>(null);
-  // "Không có tạm trú" — chỉ mở khi thường trú ở TP.HCM (SV ở ngay tại nhà).
+  // "Không có tạm trú" — biểu mẫu ngoại trú chỉ mở khi thường trú ở TP.HCM.
   const [noTemp, setNoTemp] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -98,7 +121,7 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
     setNoTemp(!!form.temporary_none);
     const cccd = (form.fields['student.citizen_id']?.value ?? {}) as CccdValue;
     setCccdExtra({
-      issue_place: cccd.issue_place || '',
+      issue_place: normalizeIssuePlace(cccd.issue_place || ''),
       issue_date: toDateInput(cccd.issue_date || ''),
     });
     // Trường đang trống thì mở sẵn ô nhập — không bắt bấm "Bổ sung" mới nhập được.
@@ -112,12 +135,13 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formKey]);
 
-  // Thường trú đổi khỏi TP.HCM thì lựa chọn "Không có tạm trú" hết hợp lệ —
+  // Ngoại trú: thường trú đổi khỏi TP.HCM thì "Không có tạm trú" hết hợp lệ —
   // bỏ chọn để SV phải trả lời lại câu hỏi tạm trú.
   const permanentInHcmc = !!form && permanent.provinceCode === form.hcmc_province_code;
+  const noTempAllowed = variant === 'address' || permanentInHcmc;
   useEffect(() => {
-    if (noTemp && !permanentInHcmc) setNoTemp(false);
-  }, [noTemp, permanentInHcmc]);
+    if (noTemp && !noTempAllowed) setNoTemp(false);
+  }, [noTemp, noTempAllowed]);
 
   const clearError = (key: string) =>
     setFieldErrors((f) => { const next = { ...f }; delete next[key]; return next; });
@@ -135,7 +159,7 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
     if (!permanent.wardCode) local.permanent_ward = 'Vui lòng chọn phường/xã.';
     if (!permanent.street.trim()) local.permanent_street = 'Vui lòng nhập địa chỉ chi tiết.';
     if (noTemp) {
-      if (!permanentInHcmc) local.temporary_in_hcmc = 'Chỉ chọn “Không có tạm trú” khi thường trú tại TP.HCM.';
+      if (!noTempAllowed) local.temporary_in_hcmc = 'Chỉ chọn “Không có tạm trú” khi thường trú tại TP.HCM.';
     } else if (inHcmc === null) local.temporary_in_hcmc = 'Vui lòng chọn một phương án.';
     else {
       if (!inHcmc && !temporary.provinceCode) local.temporary_province = 'Vui lòng chọn tỉnh/thành.';
@@ -175,7 +199,7 @@ export function useDeclarationDraft(form: OffCampusForm | null) {
   return {
     drafts, setDrafts, cccdExtra, setCccdExtra,
     permanent, setPermanent, temporary, setTemporary, inHcmc, setInHcmc,
-    noTemp, setNoTemp, permanentInHcmc,
+    noTemp, setNoTemp, noTempAllowed, variant,
     fieldErrors, setFieldErrors, clearError, validate, payload,
   };
 }
@@ -188,9 +212,10 @@ export function DeclarationFields({
 }: { form: OffCampusForm; draft: DeclarationDraft; provinces: Province[] }) {
   const {
     drafts, setDrafts, cccdExtra, setCccdExtra, permanent, setPermanent,
-    temporary, setTemporary, inHcmc, setInHcmc, noTemp, setNoTemp, permanentInHcmc,
+    temporary, setTemporary, inHcmc, setInHcmc, noTemp, setNoTemp, noTempAllowed, variant,
     fieldErrors, clearError,
   } = draft;
+  const isAddress = variant === 'address';
   const cccdCurrent = (form.fields['student.citizen_id']?.value ?? {}) as CccdValue;
   const setDraft = (key: string, value: string | undefined) =>
     setDrafts((d) => ({ ...d, [key]: value }));
@@ -220,19 +245,24 @@ export function DeclarationFields({
             field={{ ...form.fields['student.citizen_id'], value: cccdCurrent.number }}
             draft={drafts['student.citizen_id']}
             placeholder="12 chữ số"
-            onUnlock={() => setDraft('student.citizen_id', cccdCurrent.number)}
+            onUnlock={() => setDraft('student.citizen_id', cccdCurrent.number || '')}
             onCancel={() => setDraft('student.citizen_id', undefined)}
             onChange={(v) => { setDraft('student.citizen_id', v); clearError('citizen_id'); }}
             error={fieldErrors.citizen_id}
+            lockedExtra={
+              <div className="grid sm:grid-cols-2 gap-2 mt-2">
+                <LockedMini label="Nơi cấp" value={cccdCurrent.issue_place || ''} />
+                <LockedMini label="Ngày cấp" value={cccdCurrent.issue_date || ''} />
+              </div>
+            }
             extra={
               <div className="grid sm:grid-cols-2 gap-2 mt-2">
                 <div>
                   <label className="block text-[0.75rem] text-muted mb-1">Nơi cấp</label>
-                  <input
-                    type="text" value={cccdExtra.issue_place} maxLength={255}
-                    placeholder="Cục Cảnh sát QLHC về TTXH"
-                    onChange={(e) => setCccdExtra((s) => ({ ...s, issue_place: e.target.value }))}
-                    className={cn(ui.input, 'h-9 text-[0.85rem]')}
+                  <IssuePlaceSelect
+                    value={cccdExtra.issue_place}
+                    onChange={(v) => setCccdExtra((s) => ({ ...s, issue_place: v }))}
+                    className="h-9 text-[0.85rem]"
                   />
                 </div>
                 <div>
@@ -301,15 +331,17 @@ export function DeclarationFields({
           <Home size={15} className={accentIcon.primary} /> Nơi tạm trú hiện tại
         </h2>
         <p className="text-[0.78rem] text-muted mb-3">
-          Sinh viên hiện có đang tạm trú tại Thành phố Hồ Chí Minh hay không?
+          {isAddress
+            ? 'Nơi sinh viên đang tạm trú.'
+            : 'Sinh viên hiện có đang tạm trú tại Thành phố Hồ Chí Minh hay không?'}
           <span className="text-red-500"> *</span>
         </p>
 
-        <div className={cn('grid gap-3', permanentInHcmc ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+        <div className={cn('grid gap-3', noTempAllowed ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
           <ChoiceTile
             active={!noTemp && inHcmc === true}
-            title="Có"
-            desc="Đang tạm trú tại TP. Hồ Chí Minh"
+            title={isAddress ? 'Tạm trú tại TP. Hồ Chí Minh' : 'Có'}
+            desc={isAddress ? 'Địa chỉ tạm trú thuộc TP. Hồ Chí Minh' : 'Đang tạm trú tại TP. Hồ Chí Minh'}
             onClick={() => {
               setNoTemp(false);
               setInHcmc(true);
@@ -320,8 +352,8 @@ export function DeclarationFields({
           />
           <ChoiceTile
             active={!noTemp && inHcmc === false}
-            title="Không"
-            desc="Đang ở tỉnh/thành phố khác"
+            title={isAddress ? 'Tạm trú ngoài TP. Hồ Chí Minh' : 'Không'}
+            desc={isAddress ? 'Địa chỉ tạm trú thuộc tỉnh/thành phố khác' : 'Đang ở tỉnh/thành phố khác'}
             onClick={() => {
               setNoTemp(false);
               setInHcmc(false);
@@ -330,7 +362,7 @@ export function DeclarationFields({
                 .forEach(clearError);
             }}
           />
-          {permanentInHcmc && (
+          {noTempAllowed && (
             <ChoiceTile
               active={noTemp}
               title="Không có tạm trú"
@@ -358,7 +390,7 @@ export function DeclarationFields({
                 ['temporary_province', 'temporary_ward', 'temporary_street', 'temporary_location']
                   .forEach(clearError);
               }}
-              /* Nhánh "Không" không được phép chọn lại TP.HCM — để lại
+              /* Nhánh "Không" / "ngoài TP.HCM" không được phép chọn lại TP.HCM — để lại
                  trong danh sách là hai câu trả lời chọi nhau. */
               provinces={inHcmc
                 ? provinces
@@ -379,10 +411,14 @@ export function DeclarationFields({
 
 /** Bản xem lại (form đã khóa): thông tin cá nhân + địa chỉ đã khai. */
 export function DeclarationSummary({ form }: { form: OffCampusForm }) {
+  // Điện thoại: nhãn TRÊN, giá trị DƯỚI (căn trái) — xếp ngang thì nhãn bị bóp gãy chữ và
+  // địa chỉ dài canh phải khó đọc. Từ sm trở lên mới xếp hai cột.
   const row = (label: string, value: string) => (
-    <div key={label} className="flex items-start justify-between gap-4 py-2.5 border-b border-line2 last:border-0">
-      <span className="text-sm text-muted">{label}</span>
-      <span className={cn('text-sm text-right', value ? 'font-medium text-ink' : 'italic text-slate-400')}>
+    <div key={label}
+         className="flex flex-col gap-0.5 py-2.5 border-b border-line2 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <span className="text-sm text-muted sm:w-40 sm:shrink-0">{label}</span>
+      <span className={cn('min-w-0 text-sm [overflow-wrap:anywhere] sm:text-right',
+                          value ? 'font-medium text-ink' : 'italic text-slate-400')}>
         {value || 'Chưa có'}
       </span>
     </div>
@@ -398,16 +434,12 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
           {row('Mã số sinh viên', form.student.student_code)}
           {row('Giới tính', form.student.sex)}
           {row('Email trường cấp', form.student.university_email)}
-          {Object.entries(form.fields).map(([key, f]) => row(
-            f.label,
-            key === 'student.citizen_id'
-              ? [(f.value as CccdValue).number,
-                 (f.value as CccdValue).issue_place,
-                 (f.value as CccdValue).issue_date
-                   ? 'cấp ngày ' + (f.value as CccdValue).issue_date : '']
-                  .filter(Boolean).join(' · ')
-              : (f.value as string),
-          ))}
+          {Object.entries(form.fields).flatMap(([key, f]) => {
+            if (key !== 'student.citizen_id') return [row(f.label, f.value as string)];
+            // CCCD tách 3 dòng — gộp một dòng thì quá dài trên điện thoại.
+            const c = (f.value ?? {}) as CccdValue;
+            return [row(f.label, c.number), row('Nơi cấp', c.issue_place), row('Ngày cấp', c.issue_date)];
+          })}
         </div>
       </section>
 
@@ -418,7 +450,8 @@ export function DeclarationSummary({ form }: { form: OffCampusForm }) {
         <div className="rounded-lg border border-line px-4 py-1">
           {row('Thường trú', form.permanent.display)}
           {row('Tạm trú', form.temporary_none ? 'Không có tạm trú' : form.temporary.display)}
-          {!form.temporary_none && row('Tạm trú tại TP.HCM', form.temporary_in_hcmc ? 'Có' : 'Không')}
+          {!form.temporary_none && form.temporary_in_hcmc !== null
+            && row('Tạm trú tại TP.HCM', form.temporary_in_hcmc ? 'Có' : 'Không')}
         </div>
       </section>
     </>

@@ -2,8 +2,9 @@
 
 /* Nhánh "Đã khám rồi": khai lại kết quả khám theo mẫu KSK, chia 5 bước.
      1. Thông tin cá nhân — form khai báo ngoại trú (đã khai thì chỉ xem). Bấm
-        "Lưu và tiếp tục" là GỬI khai báo ngay qua /api/offcampus/, không đợi
-        tới bước cuối — khai xong form ngoại trú khóa lại như khai ở trang riêng.
+        "Lưu và tiếp tục" là GỬI khai báo ngay qua /api/address-declaration/ (Khai báo địa
+        chỉ — /api/offcampus/ đã tạm đóng từ 06/11/2026, gọi vào là 404), không đợi tới
+        bước cuối — khai xong form khóa lại như khai ở trang riêng (chung khóa "đã khai").
      2–4. Lần khám · Khám lâm sàng · Cận lâm sàng — dựng từ result_schema
      5. Kết luận + ảnh minh chứng
    Chống nản: điền sẵn mọi giá trị mặc định được, xét nghiệm chi tiết gập lại và
@@ -29,6 +30,10 @@ interface Props {
   provinces: Province[];
   /** Nộp lại sau khi bị từ chối: nạp kết quả đã khai lần trước. */
   resubmit?: boolean;
+  /** `other` = luồng "Dành cho đối tượng khác": cùng form, server kiểm SV ngoại tỉnh. */
+  choice?: 'examined' | 'other';
+  /** Hủy đăng ký khám tại trường của đợt khám trước (chưa khám) rồi nộp kết quả này thay vào. */
+  replaceRegistration?: boolean;
   onDone: (next: HealthCheckState) => void;
   /** Cập nhật state trang mà không coi là đã nộp — dùng sau khi lưu khai báo ở bước 1. */
   onStateChange: (next: HealthCheckState) => void;
@@ -47,7 +52,7 @@ function readDraft(key: string): Draft | null {
 }
 
 export default function ExaminedWizard({
-  state, provinces, resubmit, onDone, onStateChange, onCancel,
+  state, provinces, resubmit, choice = 'examined', replaceRegistration, onDone, onStateChange, onCancel,
 }: Props) {
   const schema = state.result_schema;
   const locked = state.offcampus.locked;
@@ -128,7 +133,7 @@ export default function ExaminedWizard({
     if (!validateStep(0)) return;
     setSaving(true); setBusyLabel('Đang lưu thông tin khai báo…'); setError('');
     try {
-      await api.offcampus.submit(declaration.payload({ requireCccd: true }));
+      await api.addressDeclaration.submit(declaration.payload({ requireCccd: true }));
       onStateChange(await api.healthCheck.state());
       goTo(1);
     } catch (e) {
@@ -162,6 +167,8 @@ export default function ExaminedWizard({
       files.forEach((f) => fd.append('files', f));
       fd.append('result', JSON.stringify(values));
       fd.append('data_consent', 'true');
+      fd.append('choice', choice);
+      if (replaceRegistration) fd.append('replace_registration', 'true');
       if (!locked) fd.append('declaration', JSON.stringify(declaration.payload()));
       const next = await api.healthCheck.submitEvidence(fd);
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
@@ -236,7 +243,7 @@ export default function ExaminedWizard({
             ) : (
               <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-2.5 text-[0.8rem] text-ink">
                 Bấm <b>Lưu và tiếp tục</b> là thông tin được ghi nhận ngay thành khai báo ngoại trú.
-                Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo ngoại trú.
+                Cần sửa sau đó thì gửi yêu cầu chỉnh sửa tại mục Khai báo địa chỉ.
               </div>
             )}
             {locked && state.cccd_missing && <CccdForm onSaved={(next) => { onStateChange(next); setError(''); }} />}
@@ -248,6 +255,11 @@ export default function ExaminedWizard({
         {section && (
           <>
             <p className="text-[0.8rem] text-muted -mt-1">{section.desc}</p>
+            {section.note && (
+              <div className="rounded-lg border border-line border-l-2 border-l-primary bg-slate-50 px-4 py-2.5 text-[0.8rem] text-ink">
+                {section.note}
+              </div>
+            )}
             <ResultSectionFields section={section} values={values} set={set} errors={errors} />
           </>
         )}
@@ -263,7 +275,7 @@ export default function ExaminedWizard({
         )}
 
         {last && (
-          <ConsentBox checked={dataConsent} text={state.data_consent_text.examined}
+          <ConsentBox checked={dataConsent} text={state.data_consent_text[choice]}
                       error={errors.data_consent}
                       onChange={(v) => { setDataConsent(v); setErrors(({ data_consent: _, ...rest }) => rest); }} />
         )}

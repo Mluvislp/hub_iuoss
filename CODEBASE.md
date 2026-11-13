@@ -52,9 +52,13 @@ backend/
   core/login_policy.py      ← check_login() — ai được vào cổng
   core/models.py            ← HubStudent, ConfirmationRequest, ConfirmationRequestComment…
   core/documents.py         ← dựng payload 5 loại yêu cầu giấy tờ
-  core/offcampus.py         ← khai báo ngoại trú (form + submit)
+  core/offcampus.py         ← khai báo địa chỉ / ngoại trú (form + submit, `mode` quyết luật tạm trú)
   core/health_check.py      ← khám sức khỏe định kỳ (dùng lại offcampus.submit cho phần khai báo)
   core/diploma.py · diploma_models.py · api/diploma_views.py   ← nộp bằng tốt nghiệp THPT (PDF + CCCD từ kho ảnh)
+  core/health_check_slots.py ← ngày + ca khám tại trường — bản song sinh GIỐNG HỆT dashboard healthcheck/slots.py
+  core/direct_submissions.py · submission_models.py · submission_code.py ← nạp giấy tờ trực tiếp (mã NG-…)
+  core/graduation.py · graduation_models.py · api/graduation_views.py · api/graduation_auth.py
+                            ← Lễ tốt nghiệp (/le-tot-nghiep): xác minh, ảnh trình chiếu, QR; phiên riêng
   core/tickets.py · ticket_models.py      ← hỏi đáp (ticket): tạo, nhắn thêm, xếp email người phụ trách
   core/templates/emails/ticket_staff.html ← thư báo ticket mới (Dashboard gửi hộ qua email_messages)
   core/profile_changes.py   ← SV sửa CCCD / email / SĐT
@@ -103,7 +107,8 @@ frontend/
 | `/dashboard/bao-hiem-y-te/dang-ky` | đăng ký BHYT theo đợt (trang nặng nhất) |
 | `/dashboard/bao-hiem-y-te/khai-noi-khac` | khai đã tham gia BHYT ở nơi khác |
 | `/dashboard/bao-hiem-y-te/doi-noi-kcb` | yêu cầu đổi nơi KCB ban đầu (form đăng ký, khóa trừ bệnh viện) |
-| `/dashboard/khai-bao-ngoai-tru` | khai địa chỉ + sửa CCCD/email/SĐT (thân form ở `DeclarationForm.tsx`, dùng chung) |
+| `/dashboard/khai-bao-dia-chi` | Khai báo địa chỉ toàn trường + sửa CCCD/email/SĐT (thân trang `khai-bao-ngoai-tru/DeclarationPage.tsx`, form `DeclarationForm.tsx` variant `address`) |
+| `/dashboard/khai-bao-ngoai-tru` | Khai báo ngoại trú — **tạm đóng** sau cờ `FEATURE_OFFCAMPUS`: gỡ khỏi menu, link cũ hiện thông báo + nút sang trang trên |
 | `/dashboard/kham-suc-khoe` | khám sức khỏe định kỳ — nộp minh chứng hoặc đăng ký khám tại trường |
 | `/dashboard/bang-tot-nghiep` | nộp bằng tốt nghiệp THPT online, xem trạng thái + mã QR khi được hẹn nộp bản gốc |
 | `/dashboard/hoi-dap` · `/new` · `/[id]` | hỏi đáp: đặt câu hỏi theo mảng, trao đổi tự cập nhật (polling 5 giây) |
@@ -111,6 +116,7 @@ frontend/
 | `/dashboard/requests` · `/requests/[id]` | danh sách + chi tiết & trao đổi |
 | `/dashboard/requests/new` | chọn loại giấy |
 | `/dashboard/requests/{other,deferment,thuong-binh,bank-loan,english}` | 5 biểu mẫu |
+| `/dashboard/nap-giay-to` · `/new` · `/[id]` | nạp giấy tờ trực tiếp: danh sách, form (tạo + `?edit=<id>`), chi tiết |
 
 ### 46 endpoint — `core/api/urls.py`
 
@@ -134,6 +140,7 @@ frontend/
 | Tính năng đã có, cờ "đang phát triển" | `docs/FEATURES.md` |
 | Khám sức khỏe định kỳ | `dashboard_iuoss/docs/HEALTH_CHECK.md` |
 | Nộp bằng tốt nghiệp THPT | `dashboard_iuoss/docs/DIPLOMA.md` |
+| Lễ tốt nghiệp (/le-tot-nghiep) | `dashboard_iuoss/docs/GRADUATION.md` |
 | Hỏi đáp (ticket), realtime | `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 | Đăng nhập LDAP + Microsoft, chính sách vào cổng | `docs/AUTH_FLOW.md` |
 | BHYT: workflow v2, khai ngoài trường, rollout | `docs/INSURANCE.md` |
@@ -183,7 +190,9 @@ SECRET_KEY · ALLOWED_HOSTS · FRONTEND_ORIGINS   # FRONTEND_ORIGINS lo cả COR
 DB_NAME=iuoss_student_data · DB_USER · DB_PASSWORD · DB_HOST · DB_PORT
 LDAP_SERVER_URI · LDAP_BIND_DN · LDAP_BIND_PASSWORD · LDAP_SEARCH_BASE · LDAP_USER_ATTR
 MS_TENANT_ID · MS_CLIENT_ID · MS_CLIENT_SECRET   # đủ cả ba thì MS_LOGIN_ENABLED bật
-FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_HEALTH_CHECK · FEATURE_SUPPORT_TICKETS · FEATURE_DIPLOMA   # mặc định TẮT ở production
+FEATURE_DOCUMENT_REQUESTS · FEATURE_CIVIC_ACTIVITIES · FEATURE_SUPPORT_TICKETS · FEATURE_DIPLOMA   # mặc định TẮT ở production
+FEATURE_HEALTH_CHECK         # mặc định BẬT mọi môi trường (mở 23/10/2026)
+FEATURE_OFFCAMPUS            # Khai báo ngoại trú — mặc định TẮT (tạm đóng 11/2026, thay bằng Khai báo địa chỉ)
 DASHBOARD_PUBLIC_URL         # link trong thư báo ticket; sandbox khai https://dashboard-sandbox.iuoss.com
 INSURANCE_WORKFLOW_V2 · INSURANCE_PRIORITY_TYPE_CODE   # xem docs/INSURANCE.md
 ```

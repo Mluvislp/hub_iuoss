@@ -95,9 +95,25 @@ function LoginForm() {
     <div className="min-h-screen flex">
 
       {/* ── Left panel: Branding ── */}
-      {/* Nền xanh thương hiệu đặc, không quầng sáng / lưới chấm (bỏ 16/10/2026 — trông "AI template"). */}
-      <div className="hidden lg:flex lg:w-[42%] relative flex-col justify-between p-10 overflow-hidden
+      {/* Ảnh bìa trường (19/10/2026) thay nền xanh đặc. Lớp phủ navy giữ màu thương hiệu và
+          là scrim cho chữ trắng: đậm ở đỉnh (logo) và đáy (lời giới thiệu), nhạt ở giữa để
+          thấy sân trong. Không quầng sáng / lưới chấm. */}
+      <div className="hidden lg:flex lg:w-[46%] relative flex-col justify-between p-10 overflow-hidden
                       bg-[#0f2a5c] border-r border-[#0b2149]">
+        <picture>
+          <source srcSet="/img/login-cover.webp" type="image/webp" />
+          <img
+            src="/img/login-cover.jpg"
+            alt=""
+            aria-hidden="true"
+            fetchPriority="high"
+            className="absolute inset-0 h-full w-full object-cover object-[center_40%]"
+          />
+        </picture>
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,42,92,.85)_0%,rgba(15,42,92,.55)_16%,rgba(15,42,92,.25)_34%,rgba(15,42,92,.35)_55%,rgba(15,42,92,.92)_100%)]"
+        />
 
         {/* Logo */}
         <div className="relative z-10">
@@ -112,8 +128,8 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* Main copy */}
-        <div className="relative z-10 space-y-6">
+        {/* Main copy — dồn xuống đáy, trên phần phủ đậm */}
+        <div className="relative z-10 mt-auto mb-8 space-y-6">
           <div>
             <h1 className="text-white text-3xl font-bold leading-tight tracking-tight">
               Cổng thông tin Sinh viên<br />
@@ -159,12 +175,27 @@ function LoginForm() {
       <div className="flex-1 flex items-center justify-center bg-slate-50 p-6 sm:p-12">
         <div className="w-full max-w-[400px]">
 
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-[#0f2a5c] flex items-center justify-center">
-              <GraduationCap size={16} className="text-white" />
+          {/* Mobile: dải ảnh bìa thay cho logo trần */}
+          <div className="relative mb-8 h-36 overflow-hidden rounded-lg border border-line lg:hidden">
+            <picture>
+              <source srcSet="/img/login-cover.webp" type="image/webp" />
+              <img
+                src="/img/login-cover.jpg"
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
+              />
+            </picture>
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,42,92,.15)_0%,rgba(15,42,92,.85)_100%)]"
+            />
+            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/25 flex items-center justify-center">
+                <GraduationCap size={16} className="text-white" />
+              </div>
+              <span className="font-bold text-white">IUOSS Hub</span>
             </div>
-            <span className="font-bold text-slate-900">IUOSS Hub</span>
           </div>
 
           <div className="mb-8">

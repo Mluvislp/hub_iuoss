@@ -63,3 +63,39 @@ export function ConsentGate({ checked, className, children }: {
 
 /** Thông báo lỗi chuẩn khi submit mà chưa tích cam đoan (chặn phím Enter). */
 export const CONSENT_REQUIRED_MSG = 'Vui lòng tích vào ô cam đoan trước khi gửi yêu cầu.';
+
+/**
+ * Cam đoan của "Nạp giấy tờ trực tiếp" — SV chịu trách nhiệm về thông tin khai trực tuyến VÀ
+ * nội dung trên giấy tờ bản giấy nộp cho Phòng CTSV (người dùng yêu cầu 19/10/2026).
+ */
+export function SubmissionConsent({ checked, onChange, editCount = 0, error }: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  editCount?: number;
+  error?: boolean;
+}) {
+  return (
+    <div className={`rounded-lg border px-4 py-3.5 ${error ? 'border-danger-line bg-danger-soft' : 'border-line bg-slate-50'}`}>
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 flex-shrink-0 cursor-pointer rounded border-line text-primary focus:ring-2 focus:ring-primary/30"
+        />
+        <span className="text-[0.85rem] leading-relaxed text-slate-700">
+          Tôi cam đoan các thông tin đã khai trên hệ thống và toàn bộ nội dung trên giấy tờ bản giấy
+          (bản gốc, ảnh chụp, bản scan) nộp cho Phòng Công tác Sinh viên là đúng sự thật, không tẩy xoá,
+          chỉnh sửa. Tôi hoàn toàn chịu trách nhiệm trước Nhà trường và trước pháp luật về tính chính xác
+          của các thông tin và giấy tờ này; nếu khai không đúng, tôi chấp nhận việc xác nhận đã cấp không
+          còn giá trị và chịu xử lý theo quy định của Nhà trường.
+        </span>
+      </label>
+      {editCount > 0 && (
+        <p className="mt-2 pl-[26px] text-[0.78rem] text-amber-700">
+          Đơn này có {editCount} thông tin được yêu cầu chỉnh sửa so với hồ sơ.
+        </p>
+      )}
+    </div>
+  );
+}

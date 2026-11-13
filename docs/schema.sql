@@ -332,9 +332,24 @@ CREATE TABLE `health_check_rounds` (
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `opens_at` datetime(6) NOT NULL,
   `closes_at` datetime(6) NOT NULL COMMENT 'Hạn chót; sau mốc này Hub khóa form',
+  -- 26/10/2026: dashboard_iuoss/docs/sql/20261026_health_check_open_mode.sql
+  `open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto' COMMENT 'Công tắc mở form, ưu tiên hơn thời hạn: auto | open | closed',
+  -- 26/10/2026: dashboard_iuoss/docs/sql/20261026_health_check_other_flow.sql — luồng "đối tượng khác"
+  `other_opens_at` datetime(6) DEFAULT NULL,
+  `other_closes_at` datetime(6) DEFAULT NULL,
+  `other_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
+  -- 26/10/2026: dashboard_iuoss/docs/sql/20261026_health_check_option_windows.sql — lịch + công tắc từng lựa chọn
+  `examined_opens_at` datetime(6) DEFAULT NULL,
+  `examined_closes_at` datetime(6) DEFAULT NULL,
+  `examined_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
+  `register_opens_at` datetime(6) DEFAULT NULL,
+  `register_closes_at` datetime(6) DEFAULT NULL,
+  `register_open_mode` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
   `package_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `package_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mỗi dòng một ý; dòng mở đầu bằng "+" là gạch đầu dòng',
   `schedule_note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Thời gian và địa điểm dự kiến',
+  -- 23/10/2026: dashboard_iuoss/docs/sql/20261023_health_check_slots.sql
+  `exam_slots` json DEFAULT NULL COMMENT 'Ngày + ca khám tại trường: {"dates": [...], "shifts": [{label,start,end}], "capacity": null|int}',
   `created_by_id` int DEFAULT NULL,
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -623,4 +638,56 @@ CREATE TABLE IF NOT EXISTS `diploma_submission_events` (
   UNIQUE KEY `uq_dse_key` (`submission_id`, `request_key`),
   KEY `idx_dse_submission` (`submission_id`, `id`),
   CONSTRAINT `fk_dse_submission` FOREIGN KEY (`submission_id`) REFERENCES `diploma_submissions` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════ Nạp giấy tờ trực tiếp — thêm 19/10/2026 (core/direct_submissions.py) ════════
+-- Bản gốc: dashboard_iuoss/docs/sql/20261019_direct_submissions.sql
+CREATE TABLE IF NOT EXISTS hub_direct_submissions (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  student_id     BIGINT        NOT NULL,
+  ldap_uid       VARCHAR(64)   NOT NULL,
+  document_name  VARCHAR(255)  NOT NULL,             -- tên loại giấy tờ SV cần xét
+  copies         SMALLINT      NOT NULL DEFAULT 1,   -- số bản giấy
+  contact_phone  VARCHAR(20)       NULL,             -- SĐT liên hệ (không ghi ngược hồ sơ)
+  note           TEXT              NULL,
+  payload        JSON              NULL,             -- snapshot + editable (ngày sinh, CCCD) + biên nhận
+  status         VARCHAR(16)   NOT NULL DEFAULT 'pending',
+  staff_note     TEXT              NULL,             -- ghi chú NỘI BỘ
+  return_code    VARCHAR(64)       NULL,             -- mã trả hồ sơ, nhập lúc Hoàn thành
+  consented_at   DATETIME(6)   NOT NULL,             -- lúc SV tích cam đoan
+  created_at     DATETIME(6)   NOT NULL,
+  updated_at     DATETIME(6)   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_hds_student (student_id),
+  KEY idx_hds_ldap_uid (ldap_uid),
+  KEY idx_hds_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_direct_submission_files (
+  id                BIGINT        NOT NULL AUTO_INCREMENT,
+  submission_id     BIGINT        NOT NULL,
+  storage_key       VARCHAR(255)  NOT NULL,          -- đường dẫn dưới MEDIA_ROOT của Hub
+  original_filename VARCHAR(255)  NOT NULL,
+  mime_type         VARCHAR(64)   NOT NULL,
+  file_size_bytes   INT UNSIGNED  NOT NULL,
+  sha256            CHAR(64)      NOT NULL,
+  is_removed        TINYINT(1)    NOT NULL DEFAULT 0, -- SV gỡ khi sửa yêu cầu (xoá MỀM, file còn trên đĩa)
+  created_at        DATETIME(6)   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_hdsf_submission (submission_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hub_direct_submission_comments (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  submission_id  BIGINT        NOT NULL,
+  author_role    VARCHAR(16)   NOT NULL,             -- 'student' | 'staff'
+  author_user_id BIGINT            NULL,
+  author_name    VARCHAR(255)  NOT NULL,
+  body           TEXT          NOT NULL,
+  is_internal    TINYINT(1)    NOT NULL DEFAULT 0,
+  is_removed     TINYINT(1)    NOT NULL DEFAULT 0,
+  event          VARCHAR(32)       NULL,             -- NULL = trao đổi thường
+  created_at     DATETIME(6)   NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_hdsc_submission (submission_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

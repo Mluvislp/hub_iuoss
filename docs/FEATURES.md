@@ -16,7 +16,8 @@ Mặc định: **production → tắt (hiện trang chờ)**, **local/staging �
 |---|---|
 | `FEATURE_DOCUMENT_REQUESTS` | Route `/dashboard/requests/*`, nút CTA ở hero + bảng "Yêu cầu giấy tờ gần đây" ở trang chủ, và toàn bộ `/api/requests/*` (404 khi tắt) |
 | `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
-| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được |
+| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được. **Đã mở 23/10/2026: mặc định BẬT cả trên production** |
+| `FEATURE_DIRECT_SUBMISSIONS` | Route `/dashboard/nap-giay-to/*`, mục menu "Nạp giấy tờ trực tiếp" và toàn bộ `/api/submissions/*` (404 khi tắt) |
 | `FEATURE_DIPLOMA` | Route `/dashboard/bang-tot-nghiep` và `/api/diploma/*` (404 khi tắt). Trang quản lý `/diplomas/` bên Dashboard không bị cờ chặn — tạo đợt trước rồi mới bật |
 | `FEATURE_SUPPORT_TICKETS` | Route `/dashboard/hoi-dap/*`, badge tin mới ở sidebar và toàn bộ `/api/tickets/*` (404 khi tắt). Nghiệp vụ: `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
 
@@ -236,7 +237,7 @@ Chi tiết luồng + DDL: `dashboard_iuoss/docs/DOCUMENT_REQUESTS.md`.
 |---|---|---|
 | `enrollment` | Xác nhận đang học | (legacy) |
 | `graduation` | Xác nhận tốt nghiệp | (legacy) |
-| `deferment` | Hoãn nghĩa vụ quân sự | (legacy) |
+| `deferment` | Hoãn nghĩa vụ quân sự | ✅ form riêng — giấy Phòng CTSV tự tạo trên Dashboard (`ldap_uid` `staff:…`) không tính lượt |
 | `other` | Xác nhận (lý do khác) | ✅ đã có (10 mục đích cố định) |
 
 > Loại `other` prefill từ hồ sơ (view-only) + cho sửa DOB/CCCD (staff duyệt). Chi
@@ -322,6 +323,17 @@ thời đề xuất sửa CCCD / email cá nhân / SĐT.
   một dòng lọc `VnWard` vì hai repo khai model khác nhau.
 - **Tài liệu đầy đủ (mô hình địa chỉ, rule validate, bẫy):**
   `dashboard_iuoss/docs/OFFCAMPUS.md` — đọc file đó trước khi sửa.
+
+---
+
+## 3d. Nạp giấy tờ trực tiếp — `/dashboard/nap-giay-to`
+
+Cờ `FEATURE_DIRECT_SUBMISSIONS`. SV khai thông tin (ngày sinh + CCCD xin sửa được), tên giấy tờ cần
+xét, số bản, SĐT, tải 1–10 ảnh/PDF, tích cam đoan → Phòng CTSV tiếp nhận / hoàn thành (mã trả hồ sơ) /
+trả giấy. Bảng riêng `hub_direct_submissions` (+ `_files`, `_comments`). API `GET/POST /api/submissions/`,
+`GET /api/submissions/form/`, `GET/PUT /api/submissions/<id>/` (PUT = sửa lúc "Chờ bổ sung", multipart,
+`remove_file_ids`), `POST …/comments/`, `GET …/files/<id>/`. Nghiệp vụ đầy đủ:
+`dashboard_iuoss/docs/DIRECT_SUBMISSIONS.md`.
 
 ---
 

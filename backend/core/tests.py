@@ -143,3 +143,13 @@ class GraduateEmailDomainTests(SimpleTestCase):
         code, lookup = self._extract("fafbiu24144@student.hcmiu.edu.vn")
         self.assertEqual(code, "FAFBIU24144")
         lookup.assert_not_called()
+
+
+class EnglishNameAccentTests(SimpleTestCase):
+    """Giấy tiếng Anh: tên bỏ dấu, kể cả chữ Đ/đ (NFD không tách được — 19/10/2026)."""
+
+    def test_bo_dau_ca_chu_d(self):
+        from core.documents import _strip_accents
+        self.assertEqual(_strip_accents("Trần Đức Thanh"), "Tran Duc Thanh")
+        self.assertEqual(_strip_accents("Đặng Thị Ngọc Đào"), "Dang Thi Ngoc Dao")
+        self.assertEqual(_strip_accents(""), "")

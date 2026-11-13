@@ -37,7 +37,20 @@ def _authority() -> str:
     return f"https://login.microsoftonline.com/{settings.MS_TENANT_ID}"
 
 
-def build_authorize_url() -> str:
+CALLBACK_PATH = "/auth/microsoft/callback"
+
+
+def redirect_uri_for_host(host: str) -> str | None:
+    """Địa chỉ quay về ứng với tên miền đang mở, CHỈ khi nó nằm trong MS_REDIRECT_URIS (đã khai ở Azure)."""
+    host = (host or "").split(":")[0].lower()
+    for uri in settings.MS_REDIRECT_URIS:
+        parsed = urllib.parse.urlsplit(uri)
+        if (parsed.hostname or "").lower() == host and parsed.path == CALLBACK_PATH:
+            return uri
+    return None
+
+
+def build_authorize_url(redirect_uri: str | None = None) -> str:
     """Dựng URL đẩy sinh viên sang trang đăng nhập Microsoft.
 
     `state` là một gói do chính mình ký (`django.core.signing`) chứa `code_verifier`
@@ -57,12 +70,15 @@ def build_authorize_url() -> str:
         .decode("ascii")
         .rstrip("=")
     )
-    state = signing.dumps({"v": code_verifier, "n": nonce}, salt=STATE_SALT)
+    if redirect_uri not in settings.MS_REDIRECT_URIS:
+        redirect_uri = settings.MS_REDIRECT_URI
+    # Địa chỉ quay về đi theo state (đã ký) — lúc đổi code phải gửi ĐÚNG địa chỉ đã dùng lúc xin.
+    state = signing.dumps({"v": code_verifier, "n": nonce, "r": redirect_uri}, salt=STATE_SALT)
 
     params = {
         "client_id": settings.MS_CLIENT_ID,
         "response_type": "code",
-        "redirect_uri": settings.MS_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "response_mode": "query",
         "scope": SCOPE,
         "state": state,
@@ -92,11 +108,15 @@ def exchange_code(code: str, state: str) -> dict:
             "Yêu cầu đăng nhập không hợp lệ. Vui lòng bấm đăng nhập lại."
         ) from None
 
+    redirect_uri = unpacked.get("r") or settings.MS_REDIRECT_URI
+    if redirect_uri not in settings.MS_REDIRECT_URIS:
+        raise MicrosoftAuthError("Yêu cầu đăng nhập không hợp lệ. Vui lòng bấm đăng nhập lại.")
+
     token_response = _post_token({
         "client_id": settings.MS_CLIENT_ID,
         "client_secret": settings.MS_CLIENT_SECRET,
         "code": code,
-        "redirect_uri": settings.MS_REDIRECT_URI,
+        "redirect_uri": redirect_uri,
         "grant_type": "authorization_code",
         "code_verifier": unpacked["v"],
         "scope": SCOPE,

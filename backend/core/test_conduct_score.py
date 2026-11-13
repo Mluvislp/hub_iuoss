@@ -144,6 +144,22 @@ class ConductPayloadTests(TestCase):
                                    citizen_id_issue_date="01/01/2099", class_code="ITIT20A1",
                                    fee_exemption="none", orphan="no")
 
+    def test_bankloan_issue_place(self):
+        # Hồ sơ không ghi nơi cấp ⇒ chụp cơ quan mặc định; SV chọn khác ⇒ chờ duyệt (04/11/2026).
+        from core import cccd_rules
+        from core.documents import build_bankloan_prefill
+        self.assertEqual(build_bankloan_prefill(self.student)["citizen_id_issue_place"],
+                         cccd_rules.ISSUE_PLACE_DEFAULT)
+        base = dict(dob="01/05/2002", citizen_id="079202000001", citizen_id_issue_date="10/04/2021",
+                    class_code="ITIT20A1", fee_exemption="none", orphan="no")
+        payload, _ = build_bankloan_payload(self.student, **base)
+        self.assertFalse(payload["editable"]["citizen_id_issue_place"]["changed"])
+        payload, _ = build_bankloan_payload(self.student, citizen_id_issue_place="Bộ Công an", **base)
+        place = payload["editable"]["citizen_id_issue_place"]
+        self.assertEqual((place["proposed"], place["review"]), ("Bộ Công an", "pending"))
+        with self.assertRaises(ValueError):
+            build_bankloan_payload(self.student, citizen_id_issue_place="Tỉnh Đồng Nai", **base)
+
     def test_delivery_saved_in_payload_and_snapshot(self):
         payload, _ = self._payload(delivery="paper")
         self.assertEqual(payload["delivery"], {"code": "paper", "label": "Bản cứng (giấy)"})
@@ -198,6 +214,15 @@ class ConductQuotaTests(TestCase):
         self.assertFalse(types["other"]["blocked"])
         self.assertEqual(set(types["other"]["purposes"]), {"visa"})
         self.assertIn("chương trình", types["english_form"]["purposes"]["program"]["reason"])
+
+    def test_staff_created_request_does_not_use_quota(self):
+        # Phòng CTSV tạo trên Dashboard (documents/staff_create.py) — SV vẫn tự xin được.
+        ConfirmationRequest.objects.create(
+            student_id=self.student.pk, ldap_uid="staff:ctsv", request_type="deferment",
+            purpose="Hoãn nghĩa vụ quân sự", status=ConfirmationRequest.STATUS_PROCESSING,
+            payload={"purpose": {"code": "deferment"}, "origin": {"kind": "staff"}},
+        )
+        self.assertIsNone(request_quota.check(self.student.pk, "deferment"))
 
     def test_rejected_purpose_can_be_requested_again(self):
         self._request("other", {"code": "visa", "label": "v"}, status=ConfirmationRequest.STATUS_REJECTED)

@@ -86,7 +86,7 @@ async function request<T>(
 async function requestMultipart<T>(
   path: string,
   formData: FormData,
-  opts: RequestOptions = {},
+  opts: RequestOptions & { method?: 'POST' | 'PUT' } = {},
 ): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
@@ -94,7 +94,7 @@ async function requestMultipart<T>(
   };
 
   const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
+    method: opts.method ?? 'POST',
     headers,
     body: formData,
   });
@@ -269,6 +269,7 @@ export const api = {
       dob: string;
       citizen_id: string;
       citizen_id_issue_date: string;
+      citizen_id_issue_place: string;
       class_code: string;
       fee_exemption: string;
       orphan: string;
@@ -312,6 +313,41 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ request_type: 'conduct_score', ...data }),
       });
+    },
+  },
+
+  /** Nạp giấy tờ trực tiếp — backend core/api/submission_views.py. */
+  submissions: {
+    list(): Promise<import('./types').SubmissionSummary[]> {
+      return request('/submissions/');
+    },
+    form(): Promise<import('./types').SubmissionFormData> {
+      return request('/submissions/form/');
+    },
+    detail(id: number): Promise<import('./types').SubmissionDetail> {
+      return request(`/submissions/${id}/`);
+    },
+    /** FormData: các ô form + `files` (nhiều lần) + `consent=1`. */
+    create(body: FormData): Promise<{ id: number; code: string }> {
+      return requestMultipart('/submissions/', body);
+    },
+    /** Sửa lúc "Chờ bổ sung": như create + `remove_file_ids` (nhiều lần). */
+    update(id: number, body: FormData): Promise<import('./types').SubmissionDetail> {
+      return requestMultipart(`/submissions/${id}/`, body, { method: 'PUT' });
+    },
+    addComment(id: number, body: string): Promise<{
+      comment: RequestComment; status: RequestStatus; status_label: string;
+      student_can_comment: boolean; student_can_edit: boolean;
+    }> {
+      return request(`/submissions/${id}/comments/`, { method: 'POST', body: JSON.stringify({ body }) });
+    },
+    /** File đã nạp — cần token nên tải qua fetch rồi dựng blob URL. */
+    async file(id: number, fileId: number): Promise<Blob> {
+      const res = await fetch(`${API_BASE}/submissions/${id}/files/${fileId}/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
     },
   },
 
@@ -376,6 +412,21 @@ export const api = {
     },
   },
 
+  // Khai báo địa chỉ: cùng khuôn dữ liệu với ngoại trú, khác luật tạm trú.
+  addressDeclaration: {
+    form(): Promise<OffCampusForm> {
+      return request('/address-declaration/');
+    },
+    submit(data: OffCampusSubmit): Promise<OffCampusResult> {
+      return request('/address-declaration/', { method: 'POST', body: JSON.stringify(data) });
+    },
+    requestReopen(reason: string): Promise<{ ok: boolean; created: boolean; requested_at: string }> {
+      return request('/address-declaration/request-reopen/', {
+        method: 'POST', body: JSON.stringify({ reason }),
+      });
+    },
+  },
+
   healthCheck: {
     state(): Promise<import('./types').HealthCheckState> {
       return request('/health-check/');
@@ -383,7 +434,15 @@ export const api = {
     submitEvidence(body: FormData): Promise<import('./types').HealthCheckState> {
       return requestMultipart('/health-check/evidence/', body);
     },
-    register(data: { declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean }):
+    register(data: {
+      declaration?: OffCampusSubmit; consent: boolean; data_consent: boolean; exam_slot?: string;
+      /** Chuyển từ khai "đã khám" / "đối tượng khác" (chờ xác nhận / từ chối) sang đăng ký khám tại trường. */
+      switch_from_examined?: boolean;
+      /** Bắt buộc đi kèm `switch_from_examined`: SV xác nhận hủy kết quả khám đã khai. */
+      cancel_previous_result?: boolean;
+      /** Đăng ký đợt khám mới thay đăng ký đợt khám trước chưa được ghi nhận đã khám. */
+      reregister?: boolean;
+    }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/register/', { method: 'POST', body: JSON.stringify(data) });
     },
@@ -391,6 +450,14 @@ export const api = {
     addCitizenId(data: { number: string; issue_place: string; issue_date: string }):
       Promise<import('./types').HealthCheckState> {
       return request('/health-check/citizen-id/', { method: 'POST', body: JSON.stringify(data) });
+    },
+    /** Gửi yêu cầu hủy đăng ký khám tại trường — Phòng CTSV duyệt. */
+    requestCancel(reason: string): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/cancel/', { method: 'POST', body: JSON.stringify({ reason }) });
+    },
+    /** Rút yêu cầu hủy đang chờ duyệt. */
+    withdrawCancel(): Promise<import('./types').HealthCheckState> {
+      return request('/health-check/cancel/', { method: 'DELETE' });
     },
     /** Ảnh minh chứng của chính SV — cần token nên phải tải qua fetch, không dùng <img src>. */
     async evidence(index: number): Promise<Blob> {

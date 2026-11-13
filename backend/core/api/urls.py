@@ -1,5 +1,7 @@
 from django.urls import path
-from . import diploma_views, health_check_views, ticket_views, views
+from . import diploma_views
+from . import graduation_views as gv
+from . import health_check_views, submission_views, ticket_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
 from .insurance_views import InsuranceDetailView, InsuranceEvidenceView, InsuranceImageView
 from .external_insurance_views import ExternalInsuranceView, ExternalInsuranceImageView
@@ -48,11 +50,38 @@ urlpatterns = [
     path("requests/english/form/",     views.EnglishRequestFormView.as_view(),     name="api_english_request_form"),
     path("requests/conduct-score/form/", views.ConductScoreRequestFormView.as_view(), name="api_conduct_request_form"),
 
+    # Nạp giấy tờ trực tiếp — core/direct_submissions.py
+    path("submissions/",            submission_views.SubmissionsView.as_view(),       name="api_submissions"),
+    path("submissions/form/",       submission_views.SubmissionFormView.as_view(),    name="api_submission_form"),
+    path("submissions/<int:pk>/",   submission_views.SubmissionDetailView.as_view(),  name="api_submission_detail"),
+    path("submissions/<int:pk>/comments/", submission_views.SubmissionCommentsView.as_view(),
+         name="api_submission_comments"),
+    path("submissions/<int:pk>/files/<int:file_id>/", submission_views.SubmissionFileView.as_view(),
+         name="api_submission_file"),
+
     # Khai báo thông tin ngoại trú
     path("personal-info/", PersonalInfoView.as_view(), name="api_personal_info"),
     path("offcampus/", views.OffCampusDeclarationView.as_view(), name="api_offcampus"),
     path("offcampus/request-reopen/", views.OffCampusReopenRequestView.as_view(),
          name="api_offcampus_request_reopen"),
+    # Khai báo địa chỉ: thay ngoại trú. Vé xin mở lại dùng chung (cùng một khoá "đã khai").
+    path("address-declaration/", views.AddressDeclarationView.as_view(),
+         name="api_address_declaration"),
+    path("address-declaration/request-reopen/", views.OffCampusReopenRequestView.as_view(),
+         name="api_address_declaration_request_reopen"),
+
+    # Lễ tốt nghiệp (/le-tot-nghiep) — phiên riêng GraduationToken, xem core/api/graduation_auth.py
+    path("graduation/", gv.GraduationInfoView.as_view(), name="api_graduation"),
+    path("graduation/verify/ldap/", gv.GraduationVerifyLdapView.as_view(), name="api_graduation_verify_ldap"),
+    path("graduation/verify/microsoft/", gv.GraduationVerifyMicrosoftView.as_view(),
+         name="api_graduation_verify_microsoft"),
+    path("graduation/verify/info/", gv.GraduationVerifyInfoView.as_view(), name="api_graduation_verify_info"),
+    path("graduation/me/", gv.GraduationMeView.as_view(), name="api_graduation_me"),
+    path("graduation/register/", gv.GraduationRegisterView.as_view(), name="api_graduation_register"),
+    path("graduation/photo/", gv.GraduationPhotoView.as_view(), name="api_graduation_photo"),
+    path("graduation/cancel/", gv.GraduationCancelView.as_view(), name="api_graduation_cancel"),
+    path("graduation/bank/", gv.GraduationBankView.as_view(), name="api_graduation_bank"),
+    path("graduation/receipt/", gv.GraduationReceiptView.as_view(), name="api_graduation_receipt"),
 
     # Khám sức khỏe định kỳ
     path("health-check/", health_check_views.HealthCheckView.as_view(), name="api_health_check"),
@@ -64,6 +93,8 @@ urlpatterns = [
          name="api_health_check_register"),
     path("health-check/citizen-id/", health_check_views.HealthCheckCitizenIdView.as_view(),
          name="api_health_check_citizen_id"),
+    path("health-check/cancel/", health_check_views.HealthCheckCancelView.as_view(),
+         name="api_health_check_cancel"),
 
     # Nộp bằng tốt nghiệp THPT — core/diploma.py
     path("diploma/", diploma_views.DiplomaView.as_view(), name="api_diploma"),

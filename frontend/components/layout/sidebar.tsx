@@ -45,10 +45,12 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [{ href: '/dashboard', icon: LayoutDashboard, label: 'Bảng thông tin' }],
   },
   {
-    // Trang chỉ để XEM thông tin cá nhân — tách khỏi nhóm dịch vụ (nơi SV phải nộp gì đó).
+    // Hồ sơ của chính SV (xem + tự khai địa chỉ) — tách khỏi nhóm dịch vụ (nơi SV nộp yêu cầu).
     label: 'Hồ sơ của tôi',
     items: [
       featureItem('personal_info'),
+      // Khai báo ngoại trú tạm đóng (11/2026) — link cũ hiện thông báo dẫn sang đây.
+      { href: '/dashboard/khai-bao-dia-chi', icon: Home, label: 'Khai báo địa chỉ' },
       { href: '/dashboard/bao-hiem-y-te', icon: ShieldCheck, label: 'Bảo hiểm y tế' },
       featureItem('civic_activities'),
     ],
@@ -65,7 +67,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
         label: 'Tạo yêu cầu mới',
         feature: 'document_requests',
       },
-      { href: '/dashboard/khai-bao-ngoai-tru', icon: Home, label: 'Khai báo ngoại trú' },
+      featureItem('direct_submissions'),
       featureItem('health_check'),
       featureItem('diploma'),
       featureItem('support_tickets'),

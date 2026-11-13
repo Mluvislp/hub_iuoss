@@ -12,9 +12,25 @@ class HealthCheckRound(models.Model):
     title = models.CharField(max_length=255)
     opens_at = models.DateTimeField()
     closes_at = models.DateTimeField()
+    # Công tắc mở form, ưu tiên HƠN thời hạn: auto | open | closed — xem health_check.round_state.
+    open_mode = models.CharField(max_length=10, default="auto")
+    # Luồng "Dành cho đối tượng khác" (SV ngoại tỉnh chưa tạm trú TP.HCM): thời hạn +
+    # công tắc RIÊNG, độc lập luồng Thành phố. Không đặt thời hạn = luồng ẩn.
+    other_opens_at = models.DateTimeField(null=True, blank=True)
+    other_closes_at = models.DateTimeField(null=True, blank=True)
+    other_open_mode = models.CharField(max_length=10, default="auto")
+    # Mỗi lựa chọn một thời hạn + công tắc riêng (26/10/2026). `open_mode` của đợt thôi dùng.
+    examined_opens_at = models.DateTimeField(null=True, blank=True)
+    examined_closes_at = models.DateTimeField(null=True, blank=True)
+    examined_open_mode = models.CharField(max_length=10, default="auto")
+    register_opens_at = models.DateTimeField(null=True, blank=True)
+    register_closes_at = models.DateTimeField(null=True, blank=True)
+    register_open_mode = models.CharField(max_length=10, default="auto")
     package_name = models.CharField(max_length=255)
     package_content = models.TextField()
     schedule_note = models.CharField(max_length=255, null=True, blank=True)
+    # Ngày + ca khám tại trường — xem core/health_check_slots.py.
+    exam_slots = models.JSONField(null=True, blank=True)
     created_by_id = models.IntegerField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -33,6 +49,7 @@ class HealthCheckResponse(models.Model):
 
     CHOICE_EXAMINED = "examined"
     CHOICE_REGISTER = "register"
+    CHOICE_OTHER = "other"        # đối tượng khác — cùng form + trạng thái như "examined"
 
     STATUS_PENDING = "pending"
     STATUS_APPROVED = "approved"
@@ -40,6 +57,9 @@ class HealthCheckResponse(models.Model):
     STATUS_REGISTERED = "registered"
     STATUS_ATTENDED = "attended"
     STATUS_ABSENT = "absent"
+    # Phản hồi đã hủy (Phòng CTSV duyệt yêu cầu hủy / xoá để trả lời lại) — dòng GIỮ LẠI, dữ liệu cũ
+    # cất trong evidence["history"]; coi như SV chưa trả lời đợt (10/11/2026).
+    STATUS_CANCELLED = "cancelled"
 
     STATUS_LABELS = {
         STATUS_PENDING: "Chờ xác nhận minh chứng",
@@ -48,6 +68,7 @@ class HealthCheckResponse(models.Model):
         STATUS_REGISTERED: "Đã đăng ký khám tại trường",
         STATUS_ATTENDED: "Đã khám tại trường",
         STATUS_ABSENT: "Vắng buổi khám",
+        STATUS_CANCELLED: "Đã hủy",
     }
 
     id = models.BigAutoField(primary_key=True)
@@ -56,6 +77,9 @@ class HealthCheckResponse(models.Model):
     choice = models.CharField(max_length=16)
     status = models.CharField(max_length=16)
     evidence = models.JSONField(null=True)
+    # Mã phiếu khám "STT-dd/mm/yyyy" — Phòng CTSV gán theo danh sách gửi PYT (26/10/2026);
+    # có mã = đã phát hành phiếu khám. ⚠️ Cột thêm bằng ALTER, phải có trước khi deploy.
+    exam_code = models.CharField(max_length=32, null=True, blank=True)
     residence = models.JSONField(null=True)
     consent_at = models.DateTimeField(null=True)
     submit_count = models.PositiveSmallIntegerField(default=1)

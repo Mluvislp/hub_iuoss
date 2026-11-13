@@ -33,10 +33,16 @@ ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
 # Backend là nguồn sự thật duy nhất; frontend đọc qua GET /api/features/.
 FEATURE_DOCUMENT_REQUESTS = env_bool("FEATURE_DOCUMENT_REQUESTS", default=not IS_PRODUCTION)
 FEATURE_CIVIC_ACTIVITIES = env_bool("FEATURE_CIVIC_ACTIVITIES", default=not IS_PRODUCTION)
-FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=not IS_PRODUCTION)
+# Khám sức khỏe đã mở cho sinh viên (23/10/2026) — bật ở mọi môi trường; tắt bằng FEATURE_HEALTH_CHECK=False.
+FEATURE_HEALTH_CHECK = env_bool("FEATURE_HEALTH_CHECK", default=True)
 FEATURE_SUPPORT_TICKETS = env_bool("FEATURE_SUPPORT_TICKETS", default=not IS_PRODUCTION)
 FEATURE_PERSONAL_INFO = env_bool("FEATURE_PERSONAL_INFO", default=not IS_PRODUCTION)
 FEATURE_DIPLOMA = env_bool("FEATURE_DIPLOMA", default=not IS_PRODUCTION)
+# Nạp giấy tờ trực tiếp (core/direct_submissions.py) — production bật bằng FEATURE_DIRECT_SUBMISSIONS=1.
+FEATURE_DIRECT_SUBMISSIONS = env_bool("FEATURE_DIRECT_SUBMISSIONS", default=not IS_PRODUCTION)
+# Khai báo ngoại trú TẠM ĐÓNG (11/2026), thay bằng "Khai báo địa chỉ" (luôn mở). Mở lại
+# bằng FEATURE_OFFCAMPUS=1. Trang Khám sức khỏe vẫn khai theo luật ngoại trú, không phụ thuộc cờ.
+FEATURE_OFFCAMPUS = env_bool("FEATURE_OFFCAMPUS", default=False)
 
 # Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
 # Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.
@@ -159,6 +165,11 @@ MS_ALLOWED_EMAIL_DOMAIN = os.getenv("MS_ALLOWED_EMAIL_DOMAIN", "student.hcmiu.ed
 # core/login_policy.py::find_graduate_code_by_email. Để trống = tắt đường này.
 MS_GRADUATE_EMAIL_DOMAIN = os.getenv("MS_GRADUATE_EMAIL_DOMAIN", "mp.hcmiu.edu.vn")
 MS_LOGIN_ENABLED = bool(MS_TENANT_ID and MS_CLIENT_ID and MS_CLIENT_SECRET)
+# Địa chỉ quay về THÊM (cách nhau dấu phẩy) cho tên miền khác cùng app — vd trang Lễ tốt nghiệp
+# graduation.iuoss.com. Mỗi địa chỉ PHẢI được khai ở Azure (App registration → Authentication → Web),
+# nếu không Microsoft từ chối (AADSTS50011). Tên miền chưa khai ⇒ nút Outlook trên tên miền đó tự ẩn.
+MS_EXTRA_REDIRECT_URIS = [u.strip() for u in os.getenv("MS_EXTRA_REDIRECT_URIS", "").split(",") if u.strip()]
+MS_REDIRECT_URIS = [MS_REDIRECT_URI, *MS_EXTRA_REDIRECT_URIS]
 
 # ── Bảo mật & Reverse proxy ──────────────────────────────────────────────────
 # Django chạy sau Nginx + Cloudflare Tunnel: SSL kết thúc ở tầng trên, Gunicorn
@@ -214,6 +225,8 @@ REST_FRAMEWORK = {
         # Ticket hỏi đáp: tạo mới chặt, nhắn trong ticket nới hơn (đang trò chuyện).
         "ticket_create": os.getenv("THROTTLE_TICKET_CREATE", "10/hour"),
         "ticket_message": os.getenv("THROTTLE_TICKET_MESSAGE", "120/hour"),
+        # Xác minh trang Lễ tốt nghiệp (theo IP): LDAP / Microsoft / thông tin học viên cao học.
+        "graduation_verify": os.getenv("THROTTLE_GRADUATION_VERIFY", "30/min"),
     },
 }
 

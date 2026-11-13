@@ -73,7 +73,7 @@ export function ChangedTag() {
  */
 export function EditableField({
   label, value, original, open, lockable, error, hint,
-  maxLength, placeholder, inputMode, kind = 'text', onChange, onOpen, onCancel,
+  maxLength, placeholder, inputMode, kind = 'text', options, onChange, onOpen, onCancel,
 }: {
   label: string;
   value: string;
@@ -85,7 +85,9 @@ export function EditableField({
   maxLength: number;
   placeholder?: string;
   inputMode?: 'numeric' | 'text';
-  kind?: 'text' | 'date';
+  /** 'select' ⇒ chọn trong `options` (vd. nơi cấp CCCD). */
+  kind?: 'text' | 'date' | 'select';
+  options?: string[];
   onChange: (v: string) => void;
   onOpen: () => void;
   onCancel: () => void;
@@ -115,6 +117,16 @@ export function EditableField({
               onChange={(e) => onChange(fromDateInput(e.target.value))}
               className={inputCls}
             />
+          ) : kind === 'select' ? (
+            <select
+              value={value}
+              autoFocus={lockable}
+              onChange={(e) => onChange(e.target.value)}
+              className={cn(inputCls, 'bg-white')}
+            >
+              {!value && <option value="">— Chọn —</option>}
+              {(options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
           ) : (
             <input
               type="text"

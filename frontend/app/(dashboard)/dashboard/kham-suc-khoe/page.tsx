@@ -5,12 +5,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, CalendarClock, Check, ChevronRight, ClipboardCheck,
-  HeartPulse, Loader2, Lock, MapPin, PencilLine, Stethoscope,
+  HeartPulse, Loader2, Lock, MapPin, PencilLine, Repeat, Stethoscope, Users,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { badge, ui } from '@/lib/ui';
 import { cn } from '@/lib/utils';
-import type { HealthCheckResponse, HealthCheckState, Province } from '@/lib/types';
+import type { HealthCheckOptionState, HealthCheckResponse, HealthCheckState, Province } from '@/lib/types';
 import {
   ChoiceTile, DeclarationFields, DeclarationSummary, useDeclarationDraft,
 } from '../khai-bao-ngoai-tru/DeclarationForm';
@@ -19,6 +19,9 @@ import { EvidenceThumbs } from './Evidence';
 import ExaminedWizard from './ExaminedWizard';
 import CccdForm from './CccdForm';
 import ConsentBox from './ConsentBox';
+import SlotPicker from './SlotPicker';
+import ExamTicket from './ExamTicket';
+import CancelRequest from './CancelRequest';
 
 const STATUS_BADGE: Record<string, string> = {
   pending: badge.warning,
@@ -33,10 +36,6 @@ function fmtDateTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' +
     d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function daysLeft(iso: string) {
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
 
 function Breadcrumb() {
@@ -92,6 +91,47 @@ function PackageInfo({ state }: { state: HealthCheckState }) {
   );
 }
 
+/** Đối tượng khám tập trung tại trường — câu chữ ở backend `health_check.EXAM_ELIGIBILITY`. */
+function EligibilityInfo({ state }: { state: HealthCheckState }) {
+  const e = state.exam_eligibility;
+  return (
+    <div className="rounded-lg border border-line px-4 py-3 text-[0.86rem]">
+      <div className="flex items-center gap-1.5 text-[0.75rem] font-medium text-muted mb-1">
+        <Users size={14} className="text-slate-500" /> Đối tượng khám
+      </div>
+      <p className="text-ink">{e.intro}</p>
+      <div className="space-y-1.5 text-ink leading-relaxed mt-1.5">
+        {e.items.map((item, i) => (
+          <div key={i} className="flex gap-2 pl-1">
+            <span className="mt-[0.55em] w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Ô lựa chọn: đang mở → bấm chọn được; không mở → làm mờ + nhãn ("Hết thời hạn đăng ký"…), không ẩn. */
+function OptionTile({ option, active, title, desc, onClick }: {
+  option: HealthCheckOptionState; active: boolean; title: string; desc: string; onClick: () => void;
+}) {
+  if (option.open) return <ChoiceTile active={active} title={title} desc={desc} onClick={onClick} />;
+  return (
+    <div aria-disabled="true"
+         className="flex items-start gap-3 w-full text-left px-4 py-3 rounded-lg border border-line bg-slate-50 opacity-75 cursor-not-allowed">
+      <span className="mt-0.5 w-4 h-4 rounded-full border-2 border-slate-300 flex-shrink-0" />
+      <span>
+        <span className="block text-sm font-semibold text-slate-500">{title}</span>
+        <span className="block text-[0.78rem] text-slate-400 mt-0.5">{desc}</span>
+        <span className="inline-flex items-center gap-1 mt-1.5 rounded border border-line bg-white px-1.5 py-0.5 text-[0.72rem] font-semibold text-slate-600">
+          <Lock size={11} /> {option.label}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /** Tóm tắt kết quả khám SV đã khai — các chỉ số chính, đủ để tự kiểm lại. */
 function ResultSummary({ response }: { response: HealthCheckResponse }) {
   const r = response.result || {};
@@ -124,11 +164,20 @@ export default function HealthCheckPage() {
   const [state, setState] = useState<HealthCheckState | null>(null);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [loadError, setLoadError] = useState('');
-  const [choice, setChoice] = useState<'examined' | 'register' | null>(null);
+  const [choice, setChoice] = useState<'examined' | 'register' | 'other' | null>(null);
   const [consent, setConsent] = useState(false);
   const [dataConsent, setDataConsent] = useState(false);
+  const [examSlot, setExamSlot] = useState('');
+  const [slotError, setSlotError] = useState('');
   const [error, setError] = useState('');
   const [resubmitting, setResubmitting] = useState(false);
+  // Làm lại phản hồi để đăng ký khám tại trường:
+  //   switch     — đã khai "đã khám"/"đối tượng khác" (chưa được xác nhận) → HỦY kết quả đó rồi đăng ký;
+  //   reregister — đăng ký đợt khám trước chưa được ghi nhận đã khám → đăng ký đợt khám mới.
+  //   result     — đăng ký đợt khám trước chưa khám → tự HỦY đăng ký đó rồi khai kết quả khám nơi khác.
+  const [redo, setRedo] = useState<'switch' | 'reregister' | 'result' | null>(null);
+  const [cancelRegistration, setCancelRegistration] = useState(false);
+  const [cancelResult, setCancelResult] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const draft = useDeclarationDraft(state?.offcampus ?? null);
@@ -170,17 +219,9 @@ export default function HealthCheckPage() {
             <HeartPulse size={17} className="text-slate-500" /> {round.title}
           </h1>
           <p className="text-sm text-muted mt-1">
-            Năm học {round.academic_year} · Thời hạn khai báo {fmtDateTime(round.opens_at)} – {fmtDateTime(round.closes_at)}
+            Năm học {round.academic_year}
           </p>
         </div>
-        {round.state === 'open' && (
-          <span className={cn(badge.base, daysLeft(round.closes_at) <= 3 ? badge.warning : badge.info)}>
-            <CalendarClock size={12} />
-            {daysLeft(round.closes_at) <= 1 ? 'Hết hạn trong hôm nay' : `Còn ${daysLeft(round.closes_at)} ngày`}
-          </span>
-        )}
-        {round.state === 'closed' && <span className={cn(badge.base, badge.neutral)}><Lock size={12} /> Đã kết thúc</span>}
-        {round.state === 'upcoming' && <span className={cn(badge.base, badge.neutral)}>Chưa mở</span>}
       </div>
     </div>
   );
@@ -204,6 +245,27 @@ export default function HealthCheckPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Chỉ coi là đang làm lại khi server vẫn cho phép (đang nhận đăng ký, phản hồi cũ còn đủ điều kiện).
+  const isSwitching = redo === 'switch' && !!response && state.can_switch_to_register;
+  const isReregistering = redo === 'reregister' && !!response && state.can_reregister;
+  const isToResult = redo === 'result' && !!response && state.can_replace_with_result;
+  const isRedo = isSwitching || isReregistering || isToResult;
+  const startRedo = (mode: 'switch' | 'reregister' | 'result') => {
+    setRedo(mode); setChoice(mode === 'result' ? null : 'register'); setJustSubmitted(false);
+    setCancelResult(false); setCancelRegistration(false);
+    setConsent(false); setDataConsent(false); setExamSlot(''); setSlotError(''); setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const cancelSwitch = () => {
+    setRedo(null); setChoice(null); setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const previousChoiceLabel = response?.choice === 'other' ? 'dành cho đối tượng khác' : 'đã khám';
+  const phaseText = state.exam_slots?.phase_label ? ` ${state.exam_slots.phase_label.toLowerCase()}` : ' đợt mới';
+  // Ngày khám (dd/mm/yyyy) của đăng ký đang có — dùng cho câu nhắc khi đăng ký lại đợt khám mới.
+  const oldSlot = response?.exam_slot;
+  const oldSlotDate = oldSlot ? oldSlot.date.split('-').reverse().join('/') : '';
+
   // ── Nộp lại sau khi bị từ chối: đi lại toàn bộ các bước, nạp sẵn lần khai trước ──
   if (response && resubmitting && state.can_resubmit) {
     return (
@@ -215,20 +277,40 @@ export default function HealthCheckPage() {
           </div>
         )}
         <ExaminedWizard state={state} provinces={provinces} resubmit onDone={done}
+                        choice={response.choice === 'other' ? 'other' : 'examined'}
                         onStateChange={setState} onCancel={() => setResubmitting(false)} />
       </div>
     );
   }
 
-  // ── Đã có phản hồi: xem lại (+ nộp lại nếu bị từ chối) ──
-  if (response) {
+  // ── Đã có phản hồi: xem lại (+ nộp lại nếu bị từ chối, + chuyển sang đăng ký) ──
+  if (response && !isRedo) {
     return (
       <div className="max-w-[860px] space-y-4">
         <Breadcrumb />
         {justSubmitted && (
           <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-success-soft border border-success-line text-success-text text-sm">
             <Check size={16} className="flex-shrink-0 mt-0.5" />
-            {response.choice === 'register' ? 'Đã ghi nhận đăng ký khám sức khỏe.' : 'Đã ghi nhận kết quả khám và minh chứng.'}
+            {response.choice === 'register'
+              ? (response.superseded ? 'Đã chuyển sang đăng ký khám sức khỏe tại trường.'
+                  : response.history.length ? 'Đã ghi nhận đăng ký khám sức khỏe đợt mới.' : 'Đã ghi nhận đăng ký khám sức khỏe.')
+              : 'Đã ghi nhận kết quả khám và minh chứng.'}
+          </div>
+        )}
+        {state.exam_ticket && <ExamTicket ticket={state.exam_ticket} />}
+        {state.attended_previous_phase && (
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border border-success-line bg-success-soft text-sm text-success-text">
+            <Check size={16} className="flex-shrink-0 mt-0.5" />
+            <span>Sinh viên đã khám sức khỏe tại trường{oldSlotDate ? ` ngày ${oldSlotDate}` : ''}.</span>
+          </div>
+        )}
+        {state.previous_phase_registration && (
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg border border-line bg-slate-50 text-sm text-ink">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-slate-500" />
+            <span>
+              Lịch khám{oldSlotDate ? ` ngày ${oldSlotDate}` : ''} đã qua, phiếu khám cũ không còn sử dụng.
+              {state.can_reregister ? ` Đăng ký khám${phaseText} ở cuối trang.` : ''}
+            </span>
           </div>
         )}
         <div className={ui.card}>
@@ -240,7 +322,9 @@ export default function HealthCheckPage() {
                 <div className="text-sm font-semibold text-ink mt-0.5">
                   {response.choice === 'register'
                     ? 'Chưa khám — đăng ký khám tập trung tại trường'
-                    : 'Đã khám theo chương trình của Thành phố'}
+                    : response.choice === 'other'
+                      ? 'Dành cho đối tượng khác — sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP.HCM'
+                      : 'Đã khám theo chương trình của Thành phố'}
                 </div>
               </div>
               <span className={cn(badge.base, STATUS_BADGE[response.status] ?? badge.neutral)}>
@@ -274,6 +358,31 @@ export default function HealthCheckPage() {
                   </div>
                 </>
               )}
+              {response.exam_slot && (
+                <div className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Ngày và ca khám</span>
+                  <span className={ui.dtValue}>{response.exam_slot_label}</span>
+                </div>
+              )}
+              {response.superseded && (
+                <div className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Khai báo đã khám trước đó</span>
+                  <span className={ui.dtValue}>
+                    {response.superseded.label}
+                    {response.superseded.at ? ` lúc ${fmtDateTime(response.superseded.at)}` : ''}
+                  </span>
+                </div>
+              )}
+              {response.history.filter((h) => h.choice === 'register').map((h, i) => (
+                <div key={i} className={ui.dtRow}>
+                  <span className={ui.dtLabel}>Đăng ký trước đó</span>
+                  <span className={ui.dtValue}>
+                    {h.exam_slot_label || 'Đăng ký khám tại trường'} — {h.status_label.toLowerCase()}
+                    {h.label ? ` · ${h.label.toLowerCase()}` : ''}
+                    {h.at ? ` lúc ${fmtDateTime(h.at)}` : ''}
+                  </span>
+                </div>
+              ))}
               {response.data_consent_at && (
                 <div className={ui.dtRow}>
                   <span className={ui.dtLabel}>Cam kết, đồng ý cung cấp thông tin</span>
@@ -297,9 +406,9 @@ export default function HealthCheckPage() {
 
             {response.choice === 'register' && <PackageInfo state={state} />}
 
-            {response.choice === 'examined' && <ResultSummary response={response} />}
+            {response.choice !== 'register' && <ResultSummary response={response} />}
 
-            {response.choice === 'examined' && (
+            {response.choice !== 'register' && (
               <div>
                 <div className="text-[0.82rem] font-medium text-ink mb-2">Minh chứng đã nộp</div>
                 <EvidenceThumbs response={response} />
@@ -313,23 +422,42 @@ export default function HealthCheckPage() {
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  // ── Chưa trả lời mà đợt không mở ──
-  if (!state.can_submit) {
-    return (
-      <div className="max-w-[860px] space-y-4">
-        <Breadcrumb />
-        <div className={ui.card}>
-          {header}
-          <div className="px-6 py-6 text-sm text-muted">
-            {round.state === 'upcoming'
-              ? `Đợt khai báo mở lúc ${fmtDateTime(round.opens_at)}.`
-              : `Đợt khai báo đã kết thúc lúc ${fmtDateTime(round.closes_at)}. Không ghi nhận phản hồi cho đợt này.`}
+            <CancelRequest state={state} onChange={(next) => { setState(next); setJustSubmitted(false); }} />
+
+            {state.can_reregister && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
+                <p className="text-[0.82rem] text-muted max-w-[520px]">
+                  Sinh viên chưa đến khám theo lịch đã đăng ký có thể đăng ký khám{phaseText}.
+                </p>
+                <button type="button" className={ui.btnPrimary} onClick={() => startRedo('reregister')}>
+                  <CalendarClock size={15} /> Đăng ký khám{phaseText}
+                </button>
+              </div>
+            )}
+
+            {state.can_replace_with_result && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
+                <p className="text-[0.82rem] text-muted max-w-[520px]">
+                  Đã khám sức khỏe ở nơi khác? Sinh viên hủy đăng ký khám tại trường rồi khai kết quả khám.
+                </p>
+                <button type="button" className={ui.btnGhost} onClick={() => startRedo('result')}>
+                  <Repeat size={15} /> Hủy đăng ký, khai kết quả khám
+                </button>
+              </div>
+            )}
+
+            {state.can_switch_to_register && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-line2">
+                <p className="text-[0.82rem] text-muted max-w-[520px]">
+                  Chưa khám theo chương trình của Thành phố? Sinh viên có thể hủy kết quả khám đã khai và
+                  đăng ký khám sức khỏe tập trung tại trường.
+                </p>
+                <button type="button" className={ui.btnGhost} onClick={() => startRedo('switch')}>
+                  <Repeat size={15} /> Hủy kết quả đã khai, đăng ký khám tại trường
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -339,7 +467,7 @@ export default function HealthCheckPage() {
   // ── Đợt đang mở, chưa trả lời ──
   async function submitRegister(e: React.FormEvent) {
     e.preventDefault();
-    setError(''); draft.setFieldErrors({});
+    setError(''); setSlotError(''); draft.setFieldErrors({});
     if (declarationLocked && state?.cccd_missing) {
       setError('Bổ sung số CCCD ở phần 1 trước khi gửi đăng ký.');
       return;
@@ -353,20 +481,37 @@ export default function HealthCheckPage() {
       }
     }
     if (!eligible) { setError('Phần đăng ký khám chưa được mở.'); return; }
+    if (state?.exam_slots && !examSlot) {
+      setSlotError('Chưa chọn ca khám.');
+      setError('Vui lòng chọn ngày và ca khám.');
+      return;
+    }
     if (!consent) { setError('Vui lòng tích xác nhận đồng ý tham gia khám sức khỏe tập trung.'); return; }
     if (!dataConsent) { setError('Vui lòng tích xác nhận cam kết và đồng ý cung cấp thông tin.'); return; }
+    if (isSwitching && !cancelResult) { setError('Vui lòng tích xác nhận hủy kết quả khám đã khai.'); return; }
     setSaving(true);
     try {
       setState(await api.healthCheck.register({
         declaration: declarationLocked ? undefined : draft.payload({ requireCccd: true }),
         consent: true,
         data_consent: true,
+        exam_slot: state?.exam_slots ? examSlot : undefined,
+        switch_from_examined: isSwitching || undefined,
+        cancel_previous_result: isSwitching ? cancelResult : undefined,
+        reregister: isReregistering || undefined,
       }));
+      setRedo(null);
       setJustSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       if (err instanceof ApiError && err.data?.errors) {
         draft.setFieldErrors(err.data.errors as Record<string, string>);
+        const slotMsg = (err.data.errors as Record<string, string>).exam_slot;
+        if (slotMsg) {
+          // Ca vừa đầy / vừa qua giờ: tải lại lịch để SV thấy tình trạng mới rồi chọn ca khác.
+          setSlotError(slotMsg); setExamSlot('');
+          api.healthCheck.state().then(setState).catch(() => {});
+        }
       }
       setError(err instanceof ApiError ? err.message : 'Không gửi được đăng ký.');
     } finally { setSaving(false); }
@@ -378,29 +523,122 @@ export default function HealthCheckPage() {
 
       <div className={ui.card}>
         {header}
-        <div className="px-6 py-5">
-          <p className="text-[0.9rem] font-semibold text-ink mb-3">
-            Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
-            Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
-          </p>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <ChoiceTile active={choice === 'examined'} title="Đã tham khám sức khoẻ"
-                        desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
-                        onClick={() => { setChoice('examined'); setError(''); }} />
-            <ChoiceTile active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
-                        desc="Đăng ký khám sức khỏe tập trung tại trường"
-                        onClick={() => { setChoice('register'); setError(''); }} />
+        {isSwitching ? (
+          <div className="px-6 py-5">
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
+              <Repeat size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-ink">
+                <div className="font-semibold">Hủy kết quả khám đã khai, đăng ký khám sức khỏe tại trường</div>
+                <p className="mt-1">
+                  Khai báo {previousChoiceLabel} gửi lúc {fmtDateTime(response!.submitted_at)} sẽ <b>bị hủy, không còn
+                  được dùng</b>. Thông tin đã khai vẫn được Nhà trường lưu lại. Sau khi đăng ký, sinh viên không quay
+                  lại khai báo kết quả khám được nữa.
+                </p>
+                <label className={cn(
+                  'flex items-start gap-2.5 mt-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors',
+                  cancelResult ? 'border-[#d97706] bg-[#fffbeb]' : 'border-line hover:bg-slate-50',
+                )}>
+                  <input type="checkbox" checked={cancelResult} onChange={(e) => setCancelResult(e.target.checked)}
+                         className="mt-0.5 w-4 h-4 accent-[#d97706]" />
+                  <span className="font-medium">Xác nhận hủy kết quả khám đã khai</span>
+                </label>
+                <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
+                  Giữ kết quả khám đã khai
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : isToResult ? (
+          <div className="px-6 py-5 space-y-4">
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
+              <Repeat size={18} className="text-[#d97706] flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-ink">
+                <div className="font-semibold">Hủy đăng ký khám, khai kết quả khám nơi khác</div>
+                <p className="mt-1">
+                  Đăng ký khám tại trường{oldSlotDate ? ` ngày ${oldSlotDate}` : ''} sẽ bị hủy. Sau đó sinh viên khai
+                  kết quả khám và nộp ảnh minh chứng bên dưới.
+                </p>
+                <label className={cn(
+                  'flex items-start gap-2.5 mt-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors',
+                  cancelRegistration ? 'border-[#d97706] bg-[#fffbeb]' : 'border-line hover:bg-slate-50',
+                )}>
+                  <input type="checkbox" checked={cancelRegistration}
+                         onChange={(e) => { setCancelRegistration(e.target.checked); if (!e.target.checked) setChoice(null); }}
+                         className="mt-0.5 w-4 h-4 accent-[#d97706]" />
+                  <span className="font-medium">Xác nhận hủy đăng ký khám tại trường</span>
+                </label>
+                <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
+                  Giữ đăng ký khám
+                </button>
+              </div>
+            </div>
+            {cancelRegistration && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                            desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('examined'); setError(''); }} />
+                <OptionTile option={round.options.other} active={choice === 'other'} title="Dành cho đối tượng khác"
+                            desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('other'); setError(''); }} />
+              </div>
+            )}
+          </div>
+        ) : isReregistering ? (
+          <div className="px-6 py-5">
+            <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-primary bg-white px-4 py-3.5">
+              <CalendarClock size={18} className="text-primary flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-ink">
+                <div className="font-semibold">Đăng ký khám{phaseText}</div>
+                <p className="mt-1">
+                  {oldSlotDate ? `Sinh viên chưa đến khám theo lịch ngày ${oldSlotDate}. ` : ''}
+                  Vui lòng chọn ngày và ca khám{phaseText} bên dưới.
+                </p>
+                <button type="button" className={cn(ui.btnGhost, 'mt-2')} onClick={cancelSwitch}>
+                  Quay lại
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-6 py-5">
+            <p className="text-[0.9rem] font-semibold text-ink mb-3">
+              Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
+              Hồ Chí Minh hay chưa?<span className="text-red-500"> *</span>
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                          desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                          onClick={() => { setChoice('examined'); setError(''); }} />
+              <OptionTile option={round.options.register} active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
+                          desc="Đăng ký khám sức khỏe tập trung tại trường"
+                          onClick={() => { setChoice('register'); setError(''); }} />
+              <OptionTile option={round.options.other} active={choice === 'other'} title="Dành cho đối tượng khác"
+                          desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
+                          onClick={() => { setChoice('other'); setError(''); }} />
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* ── Hủy đăng ký đợt khám trước để khai kết quả khám nơi khác ── */}
+      {isToResult && cancelRegistration && (choice === 'examined' || choice === 'other') && (
+        <ExaminedWizard key={`replace-${choice}`} choice={choice} replaceRegistration state={state} provinces={provinces}
+                        onDone={(next) => { setRedo(null); done(next); }} onStateChange={setState} />
+      )}
+
       {/* ── Nhánh "Đã khám rồi" ── */}
-      {choice === 'examined' && (
-        <ExaminedWizard state={state} provinces={provinces} onDone={done} onStateChange={setState} />
+      {choice === 'examined' && !isRedo && state.can_submit_examined && (
+        <ExaminedWizard key="examined" state={state} provinces={provinces} onDone={done} onStateChange={setState} />
+      )}
+
+      {/* ── Luồng "Dành cho đối tượng khác": cùng form 5 bước, thời hạn/công tắc riêng ── */}
+      {choice === 'other' && !isRedo && state.can_submit_other && (
+        <ExaminedWizard key="other" choice="other" state={state} provinces={provinces}
+                        onDone={done} onStateChange={setState} />
       )}
 
       {/* ── Nhánh "Chưa khám": phần 1 khai báo + phần 2 đăng ký ── */}
-      {choice === 'register' && (
+      {choice === 'register' && (state.can_submit_register || isRedo) && (
         <form onSubmit={submitRegister} className="space-y-4">
           <FormBusy busy={saving} label="Đang gửi đăng ký…" className="space-y-4">
             {error && <ErrorBox text={error} />}
@@ -439,6 +677,11 @@ export default function HealthCheckPage() {
                 </h2>
               </div>
 
+              {/* Hiện cả khi phần 2 đang khóa — SV ngoài TP.HCM biết vì sao không đăng ký được. */}
+              <div className="px-6 pt-5">
+                <EligibilityInfo state={state} />
+              </div>
+
               {!eligible ? (
                 <div className="px-6 py-5">
                   <div role="alert" className="flex items-start gap-3 rounded-lg border border-line border-l-[3px] border-l-[#d97706] bg-white px-4 py-3.5">
@@ -453,7 +696,7 @@ export default function HealthCheckPage() {
                         <p className="mt-1">
                           Địa chỉ đã khai không thuộc Thành phố Hồ Chí Minh. Cần cập nhật địa chỉ thì gửi
                           yêu cầu chỉnh sửa tại{' '}
-                          <Link href="/dashboard/khai-bao-ngoai-tru" className="font-semibold underline">Khai báo ngoại trú</Link>.
+                          <Link href="/dashboard/khai-bao-dia-chi" className="font-semibold underline">Khai báo địa chỉ</Link>.
                         </p>
                       ) : (
                         <p className="mt-1">Địa chỉ đang khai ở phần 1 không thuộc Thành phố Hồ Chí Minh.</p>
@@ -473,6 +716,10 @@ export default function HealthCheckPage() {
                         : 'Tạm trú tại Thành phố Hồ Chí Minh'}
                   </div>
                   <PackageInfo state={state} />
+                  {state.exam_slots && (
+                    <SlotPicker options={state.exam_slots} value={examSlot} error={slotError}
+                                onChange={(key) => { setExamSlot(key); setSlotError(''); }} />
+                  )}
                   <label className={cn(
                     'flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors',
                     consent ? 'border-primary bg-primary-soft' : 'border-line hover:bg-slate-50',
@@ -489,10 +736,12 @@ export default function HealthCheckPage() {
               )}
 
               <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-line2">
-                <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>
-                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent} className={ui.btnPrimary}>
+                {isRedo
+                  ? <button type="button" className={ui.btnGhost} onClick={cancelSwitch}>Hủy</button>
+                  : <Link href="/dashboard" className={ui.btnGhost}>Hủy</Link>}
+                <button type="submit" disabled={saving || !eligible || !consent || !dataConsent || (!!state.exam_slots && !examSlot) || (isSwitching && !cancelResult)} className={ui.btnPrimary}>
                   {saving ? <><Loader2 size={15} className="animate-spin" /> Đang gửi…</>
-                          : <><ClipboardCheck size={15} /> Gửi đăng ký khám</>}
+                          : <><ClipboardCheck size={15} /> {isSwitching ? 'Hủy kết quả cũ và đăng ký khám' : 'Gửi đăng ký khám'}</>}
                 </button>
               </div>
             </div>

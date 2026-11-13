@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import SupportWidget from '@/components/support-widget';
+import GoogleAnalytics from '@/components/google-analytics';
 import './globals.css';
 
 const inter = Inter({
@@ -25,6 +26,7 @@ export default function RootLayout({
         {children}
         {/* Đặt ở root layout → có mặt trên MỌI trang, gồm cả màn hình đăng nhập. */}
         <SupportWidget />
+        <GoogleAnalytics />
       </body>
     </html>
   );

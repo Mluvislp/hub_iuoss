@@ -277,12 +277,16 @@ export interface BankLoanPrefill {
   cccd_valid: boolean;
   citizen_id: string;
   citizen_id_issue_date: string;
+  /** Nơi cấp CCCD đã chuẩn hoá về 1 trong `issue_place_choices` — đúng chuỗi in trên giấy. */
+  citizen_id_issue_place: string;
   /** Mã lớp hồ sơ; rỗng ⇒ ô mở sẵn, bắt buộc nhập. SV sửa thì chuyên viên duyệt. */
   class_code: string;
 }
 
 export interface BankLoanFormData {
   prefill: BankLoanPrefill;
+  /** 3 cơ quan cấp thẻ căn cước (backend core/cccd_rules.py::ISSUE_PLACES). */
+  issue_place_choices: string[];
   /** "Thuộc diện" (miễn / giảm học phí) — SV chọn, Phòng CTSV duyệt hoặc sửa. */
   fee_exemption_choices: PurposeChoice[];
   /** "Thuộc đối tượng" (mồ côi). */
@@ -445,6 +449,7 @@ export interface FeatureFlags {
   support_tickets: boolean;
   personal_info: boolean;
   diploma: boolean;
+  direct_submissions: boolean;
 }
 
 /**
@@ -456,6 +461,8 @@ export interface FeatureFlags {
 export interface FeaturesResponse extends FeatureFlags {
   /** Backend đã cấu hình app registration Microsoft chưa (suy ra, không bật tay). */
   microsoft_login: boolean;
+  /** Khai báo ngoại trú — tạm đóng, thay bằng Khai báo địa chỉ. Không lên menu. */
+  offcampus: boolean;
 }
 
 export interface DashboardData {
@@ -555,10 +562,19 @@ export interface HealthCheckRound {
   opens_at: string;
   closes_at: string;
   state: HealthCheckRoundState;
+  /** Từng lựa chọn có thời hạn + công tắc riêng; không mở thì ô làm mờ kèm `label`. */
+  options: Record<'examined' | 'register' | 'other', HealthCheckOptionState>;
   package_name: string;
   /** Dòng `bullet` là gạch đầu dòng con của dòng thường đứng trước nó. */
   package_lines: { bullet: boolean; text: string }[];
   schedule_note: string;
+}
+
+export interface HealthCheckOptionState {
+  open: boolean;
+  status: 'open' | 'upcoming' | 'disabled' | 'expired' | 'paused';
+  /** "Hết thời hạn đăng ký" · "Chưa mở đăng ký" · "Tạm đóng đăng ký" — rỗng khi đang mở. */
+  label: string;
 }
 
 export interface HealthCheckResidence {
@@ -572,11 +588,12 @@ export interface HealthCheckResidence {
 
 export type HealthCheckStatus =
   | 'pending' | 'approved' | 'rejected'        // choice = examined
-  | 'registered' | 'attended' | 'absent';      // choice = register
+  | 'registered' | 'attended' | 'absent'       // choice = register
+  | 'cancelled';                               // đã hủy (Hub coi như chưa trả lời, không trả về)
 
 export interface HealthCheckResponse {
   id: number;
-  choice: 'examined' | 'register';
+  choice: 'examined' | 'register' | 'other';
   status: HealthCheckStatus;
   status_label: string;
   submitted_at: string;
@@ -590,6 +607,56 @@ export interface HealthCheckResponse {
   /** Thời điểm tích cam kết + đồng ý cung cấp thông tin. */
   data_consent_at: string | null;
   residence: HealthCheckResidence | null;
+  /** Ca khám tại trường đã chọn (nhánh "Chưa khám", đợt có chia ca). */
+  exam_slot: HealthCheckSlot | null;
+  exam_slot_label: string;
+  /** Đã chuyển từ khai "đã khám" sang đăng ký: khai báo cũ được lưu lại, không dùng nữa. */
+  superseded: { at: string | null; label: string; previous_status_label: string } | null;
+  /** Yêu cầu hủy đăng ký khám tại trường: chờ duyệt / bị từ chối. Duyệt ⇒ đăng ký bị hủy (lưu lịch sử). */
+  cancel_request: HealthCheckCancelRequest | null;
+  /** Các đăng ký trước đó trong năm học (đợt khám trước chưa khám, đã hủy…), cũ trước. */
+  history: HealthCheckHistoryItem[];
+}
+
+export interface HealthCheckHistoryItem {
+  kind: 'reregister' | 'cancel' | 'reset' | 'supplement' | string;
+  label: string;
+  at: string | null;
+  choice: string;
+  status_label: string;
+  exam_slot_label: string;
+  exam_code: string;
+}
+
+export interface HealthCheckCancelRequest {
+  status: 'pending' | 'rejected';
+  reason: string;
+  requested_at: string | null;
+  review_note: string;
+  reviewed_at: string | null;
+}
+
+/** Một ca khám = ngày + giờ; `key` dạng "2026-10-27 07:30". */
+export interface HealthCheckSlot {
+  key: string;
+  date: string;
+  start: string;
+  end: string;
+  label: string;
+}
+
+export interface HealthCheckSlotOption extends HealthCheckSlot {
+  /** null = đợt không giới hạn chỗ. */
+  remaining: number | null;
+  available: boolean;
+  reason: string;
+}
+
+export interface HealthCheckSlotOptions {
+  capacity: number | null;
+  /** "Đợt 2"… — rỗng khi năm học chỉ có một đợt khám. */
+  phase_label: string;
+  days: { date: string; label: string; shifts: HealthCheckSlotOption[] }[];
 }
 
 /** Danh mục trường kết quả khám — backend `core/health_check_result.py` là nguồn duy nhất. */
@@ -629,14 +696,55 @@ export interface ResultSection {
   key: string;
   title: string;
   desc: string;
+  /** Thông báo nhỏ hiển thị đầu bước (nếu có). */
+  note?: string;
   groups: ResultGroup[];
+}
+
+/** Phiếu khám — backend `health_check.exam_ticket`; null khi chưa được gán mã. */
+export interface HealthCheckTicket {
+  code: string;
+  /** Số phiếu — phần STT trước dấu "-" của mã. */
+  number: string;
+  date_label: string;
+  slot_label: string;
+  slot_time: string;
+  issued_at: string | null;
+  student: {
+    full_name: string;
+    student_code: string;
+    date_of_birth: string;
+    sex: string;
+    citizen_id: string;
+    class_code: string;
+    department: string;
+    phone: string;
+    health_insurance_code: string;
+  };
 }
 
 export interface HealthCheckState {
   round: HealthCheckRound | null;
   response: HealthCheckResponse | null;
+  exam_ticket: HealthCheckTicket | null;
   can_submit: boolean;
   can_resubmit: boolean;
+  /** Luồng "Dành cho đối tượng khác" đang mở (thời hạn/công tắc riêng) và SV chưa trả lời. */
+  can_submit_other: boolean;
+  can_submit_examined: boolean;
+  can_submit_register: boolean;
+  /** Đã khai "đã khám" (chờ xác nhận / từ chối), đợt còn mở → được chuyển sang đăng ký khám. */
+  can_switch_to_register: boolean;
+  /** Đăng ký đợt khám trước chưa được ghi nhận đã khám, đang nhận đăng ký → đăng ký đợt khám mới. */
+  can_reregister: boolean;
+  /** Đăng ký thuộc đợt khám trước, chưa khám — phiếu khám cũ không còn dùng (đã ẩn). */
+  previous_phase_registration: boolean;
+  /** Đăng ký đợt khám trước chưa khám, lựa chọn khai kết quả đang mở → tự hủy đăng ký để khai kết quả khám nơi khác. */
+  can_replace_with_result: boolean;
+  /** Đã khám ở đợt khám trước — phiếu khám cũ đã ẩn. */
+  attended_previous_phase: boolean;
+  /** Đăng ký khám tại trường (kể cả đã khám), chưa có yêu cầu hủy đang chờ duyệt. */
+  can_request_cancel: boolean;
   max_evidence_files: number;
   result_schema: ResultSection[];
   result_defaults: Record<string, string>;
@@ -644,9 +752,13 @@ export interface HealthCheckState {
   /** Hồ sơ chưa có CCCD 12 số — luồng khám sức khỏe bắt buộc bổ sung. */
   cccd_missing: boolean;
   /** Câu cam kết + đồng ý cung cấp thông tin ở cuối form, theo từng lựa chọn. */
-  data_consent_text: { examined: string; register: string };
+  data_consent_text: { examined: string; register: string; other: string };
+  /** Đối tượng khám tập trung tại trường (nhánh "Chưa khám"). */
+  exam_eligibility: { intro: string; items: string[] };
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
+  /** Ngày + ca khám tại trường; null khi đợt không chia ca (hoặc không còn nhận đăng ký). */
+  exam_slots: HealthCheckSlotOptions | null;
 }
 
 // ── Hỏi đáp (ticket) ─────────────────────────────────────────────────────────
@@ -838,4 +950,75 @@ export interface DiplomaState {
   can_edit: boolean;
   consent_text: string;
   blocked_message: string;
+}
+
+// ── Nạp giấy tờ trực tiếp (backend core/direct_submissions.py) ─────────────────
+
+export interface SubmissionPrefill {
+  student_name: string;
+  student_id: string;
+  department: string;
+  major: string;
+  class_code: string;
+  cur_status_group: string;
+  cur_status_vi: string;
+  dob: string;
+  phone: string;
+  email: string;
+  cccd_valid: boolean;
+  citizen_id: string;
+  citizen_id_issue_date: string;
+}
+
+export interface SubmissionLimits {
+  max_files: number;
+  image_max_bytes: number;
+  pdf_max_bytes: number;
+  total_max_bytes: number;
+  document_name_max: number;
+  note_max: number;
+  copies_max: number;
+}
+
+export interface SubmissionFormData {
+  prefill: SubmissionPrefill;
+  limits: SubmissionLimits;
+}
+
+export interface SubmissionSummary {
+  id: number;
+  code: string;
+  document_name: string;
+  copies: number;
+  status: RequestStatus;
+  status_label: string;
+  return_code: string | null;
+  created_at: string;
+  updated_at: string;
+  file_count: number;
+  comment_count: number;
+}
+
+export interface SubmissionFile {
+  id: number;
+  name: string;
+  size: number;
+  mime_type: string;
+  is_pdf: boolean;
+  created_at: string;
+}
+
+export interface SubmissionDetail extends SubmissionSummary {
+  contact_phone: string | null;
+  note: string | null;
+  consented_at: string;
+  payload: {
+    snapshot?: Partial<SubmissionPrefill>;
+    editable?: Record<string, { original: string; proposed: string; changed: boolean; review: string | null }>;
+  };
+  files: SubmissionFile[];
+  comments: RequestComment[];
+  student_can_comment: boolean;
+  student_can_edit: boolean;
+  returned_at: string | null;
 }
