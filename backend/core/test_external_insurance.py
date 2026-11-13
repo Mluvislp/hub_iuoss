@@ -7,7 +7,8 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from core.api.authentication import StudentPrincipal
-from core.models import ExternalInsuranceDeclaration, HealthInsuranceRegistration, HealthInsuranceConfig
+from core.models import (ExternalInsuranceConfig, ExternalInsuranceDeclaration, HealthInsuranceRegistration,
+                         HealthInsuranceConfig)
 from core.test_insurance_workflow import picture
 from students.models import Student, Hospital, VnProvince, VnWard, VnEthnicity, HealthInsuranceCard
 
@@ -25,6 +26,9 @@ class ExternalInsuranceTests(TestCase):
         self.cfg = HealthInsuranceConfig.objects.create(registration_period='MAIN', registration_year=2027,
             registration_opens_at=timezone.now()-timedelta(days=1), registration_closes_at=timezone.now()+timedelta(days=1),
             is_active=True, insurance_fee=100, bank_name='', bank_account_number='', bank_account_name='')
+        # Đợt khai nơi khác là cấu hình riêng, không phụ thuộc đợt đăng ký BHYT ở trên.
+        self.ext_cfg = ExternalInsuranceConfig.objects.create(external_period='MAIN', external_year=2027,
+            opens_at=timezone.now()-timedelta(days=1), closes_at=timezone.now()+timedelta(days=1), is_active=True)
         self.client = APIClient()
         self.client.force_authenticate(StudentPrincipal({'ldap_uid': 'TEST001', 'student_id': self.student.pk}))
         VnProvince.objects.create(code='01', name='Hà Nội', unit_type='Thành phố')
@@ -74,6 +78,30 @@ class ExternalInsuranceTests(TestCase):
         self.assertEqual(detail['display']['permanent_ward'], 'Ward')
         self.assertEqual(detail['display']['hospital_code'], 'Hospital')
 
+    def test_declaration_open_after_registration_period_closed(self):
+        HealthInsuranceConfig.objects.update(registration_closes_at=timezone.now()-timedelta(hours=1))
+        self.assertEqual(self.client.get(self.url).data['config']['status'], 'open')
+        response = self.post()
+        self.assertEqual(response.status_code, 201, response.data)
+        row = ExternalInsuranceDeclaration.objects.get()
+        self.assertEqual((row.intake_year, row.intake_period), (2027, 'MAIN'))
+
+    def test_declaration_closed_when_external_period_closed_even_if_registration_open(self):
+        ExternalInsuranceConfig.objects.update(is_active=False)
+        response = self.post()
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertFalse(ExternalInsuranceDeclaration.objects.exists())
+        self.assertEqual(self.client.get(self.url).data['config']['status'], 'upcoming')
+
+    def test_graduate_deadline_for_external_period(self):
+        from core.api.external_insurance_views import closes_at
+        later = timezone.now() + timedelta(days=5)
+        ExternalInsuranceConfig.objects.update(graduate_closes_at=later)
+        with patch('core.login_policy.is_graduate', return_value=True):
+            self.assertEqual(closes_at(ExternalInsuranceConfig.objects.get(), self.student), later)
+        with patch('core.login_policy.is_graduate', return_value=False):
+            self.assertEqual(closes_at(ExternalInsuranceConfig.objects.get(), self.student), self.ext_cfg.closes_at)
+
     def test_hospital_lookup_url_comes_from_config(self):
         self.assertEqual(self.client.get('/api/health-insurance/').data['periods'][0]['hospital_lookup_url'], '')
         self.cfg.hospital_lookup_url = 'https://example.com/benh-vien'
@@ -88,8 +116,6 @@ class ExternalInsuranceTests(TestCase):
         self.student.save(update_fields=['academic_entry_year'])
         response = self.client.get('/api/health-insurance/')
         self.assertEqual(response.data['periods'][0]['freshman_warning'], self.cfg.freshman_warning)
-        response = self.client.get(self.url)
-        self.assertEqual(response.data['config']['freshman_warning'], self.cfg.freshman_warning)
 
         self.student.academic_entry_year -= 1
         self.student.save(update_fields=['academic_entry_year'])
