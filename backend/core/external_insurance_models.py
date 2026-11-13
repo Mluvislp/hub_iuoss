@@ -2,6 +2,29 @@
 from django.db import models
 
 
+class ExternalInsuranceConfig(models.Model):
+    """Một trong bốn slot MAIN/Q2/Q3/Q4 nhận bản khai BHYT nơi khác, tách riêng với đợt đăng ký
+    BHYT (HealthInsuranceConfig) để hết đợt đăng ký tại trường sinh viên vẫn khai được."""
+    PERIOD_CHOICES = [("MAIN", "Đợt 1"), ("Q2", "Đợt 2"), ("Q3", "Đợt 3"), ("Q4", "Đợt 4")]
+
+    external_period = models.CharField(max_length=32, choices=PERIOD_CHOICES, unique=True)
+    external_year = models.IntegerField()
+    opens_at = models.DateTimeField()
+    closes_at = models.DateTimeField()
+    # Hạn riêng cho học viên cao học; NULL thì dùng chung closes_at.
+    graduate_closes_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=False)
+    description = models.TextField(null=True, blank=True)
+    hospital_lookup_url = models.CharField(max_length=500, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'hub_insurance_external_configs'
+        ordering = ['external_period']
+
+
 class ExternalInsuranceDeclaration(models.Model):
     STATUS_PENDING = 'pending'
     STATUS_CONFIRMED = 'confirmed'

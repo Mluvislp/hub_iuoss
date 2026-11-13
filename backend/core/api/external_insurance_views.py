@@ -49,23 +49,71 @@ class ExternalInsuranceSerializer(InsuranceRegistrationSerializer):
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from core.models import HealthInsuranceConfig
-from core.external_insurance_models import ExternalInsuranceEvent
-from core.insurance_editing import closes_at, window
+from core.external_insurance_models import ExternalInsuranceConfig, ExternalInsuranceEvent
+from core.insurance_editing import snapshot_datetime
 from core.insurance_history import check_version, readable_payloads, require_active
 from core.insurance_contract import safe_path
-from .views import _insurance_config_payload
+from .views import hospital_lookup_url
 
 EXTERNAL_IMAGES = ('cccd_image', 'cccd_image_back', 'bhyt_image')
+
+
+PERIOD_NUMBER = {'MAIN': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4}
+
+
+def closes_at(cfg, student=None):
+    """Hạn đóng của đợt với người này: học viên cao học dùng `graduate_closes_at` nếu staff đã
+    cấu hình, còn lại dùng `closes_at`."""
+    from core.login_policy import is_graduate
+    if cfg.graduate_closes_at and student is not None and is_graduate(student):
+        return cfg.graduate_closes_at
+    return cfg.closes_at
+
+
+def config_status(cfg, now=None, student=None):
+    now = now or timezone.now()
+    if now > closes_at(cfg, student):
+        return 'expired'
+    if now < cfg.opens_at:
+        return 'upcoming'
+    return 'open' if cfg.is_active else 'upcoming'
+
+
+def config_payload(cfg, student=None):
+    """Cùng hình dạng `InsurancePeriodConfig` của frontend để form dùng chung. Đợt khai nơi khác
+    độc lập với đợt đăng ký BHYT nên không có thời hạn sử dụng thẻ, lệ phí hay tài khoản nộp tiền."""
+    return {
+        'id': cfg.external_period.lower(),
+        'registration_period': cfg.external_period,
+        'registration_year': cfg.external_year,
+        'name': f'Đợt {PERIOD_NUMBER.get(cfg.external_period, cfg.external_period)} năm {cfg.external_year}',
+        'description': cfg.description or '',
+        'start_date': cfg.opens_at.isoformat(),
+        'end_date': closes_at(cfg, student).isoformat(),
+        'status': config_status(cfg, student=student),
+        'is_active': cfg.is_active,
+        'hospital_lookup_url': hospital_lookup_url(cfg.hospital_lookup_url),
+    }
 
 
 def active_config(student=None):
     # Hạn đóng tùy người (học viên cao học có hạn riêng) nên lọc giờ đóng bằng Python;
     # tối đa 4 dòng config.
     now = timezone.now()
-    rows = [cfg for cfg in HealthInsuranceConfig.objects.select_related('bank_account').filter(
-        is_active=True, registration_opens_at__lte=now) if closes_at(cfg, student) >= now]
+    rows = [cfg for cfg in ExternalInsuranceConfig.objects.filter(is_active=True, opens_at__lte=now)
+            if closes_at(cfg, student) >= now]
     return rows[0] if len(rows) == 1 else None
+
+
+def window(year, period, snapshot=None, student=None):
+    """Thời gian sửa bản khai theo đúng đợt khai nơi khác của bản khai (không phải đợt đăng ký BHYT)."""
+    cfg = ExternalInsuranceConfig.objects.filter(external_year=year, external_period=period).first() if year and period else None
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    start = cfg.opens_at if cfg else snapshot_datetime(snapshot.get('start_date'))
+    end = closes_at(cfg, student) if cfg else snapshot_datetime(snapshot.get('end_date'))
+    now = timezone.now()
+    opened = bool(start and end and (cfg.is_active if cfg else False) and start <= now <= end)
+    return {'start_date': start, 'end_date': end, 'status': 'open' if opened else 'closed', 'can_edit': opened}
 
 
 def readable_history(events):
@@ -112,11 +160,10 @@ class ExternalInsuranceView(InsuranceRegistrationView):
             raise Http404
         cfg = active_config(student)
         if cfg is None:
-            cfg = (HealthInsuranceConfig.objects.select_related('bank_account')
-                   .order_by('-is_active', '-registration_opens_at', '-id').first())
+            cfg = ExternalInsuranceConfig.objects.order_by('-is_active', '-opens_at', '-id').first()
         # Reuse the submitted record in the current intake, including rejections.
         previous = ExternalInsuranceDeclaration.objects.filter(student=student,
-            intake_year=cfg.registration_year, intake_period=cfg.registration_period).order_by('-id').first() if cfg else None
+            intake_year=cfg.external_year, intake_period=cfg.external_period).order_by('-id').first() if cfg else None
         if previous:
             return Response(external_detail(previous))
         prefill = self._snapshot(student)
@@ -127,7 +174,7 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                 valid_from=str(card.valid_from or ''), valid_until=str(card.valid_until or ''),
                 hospital_code=card.hospital_code or '', hospital_province=hospital.province_code if hospital else '')
         return Response({'prefill': prefill,
-                         'config': _insurance_config_payload(cfg, include_payment=False, student=student) if cfg else None})
+                         'config': config_payload(cfg, student) if cfg else None})
 
     def post(self, request, pk=None):
         written = []
@@ -167,8 +214,8 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                 else:
                     if not cfg:
                         raise Conflict('Hiện không trong thời gian tiếp nhận khai báo.')
-                    if ExternalInsuranceDeclaration.objects.filter(student=student, intake_year=cfg.registration_year,
-                            intake_period=cfg.registration_period).exists():
+                    if ExternalInsuranceDeclaration.objects.filter(student=student, intake_year=cfg.external_year,
+                            intake_period=cfg.external_period).exists():
                         raise Conflict('Đã có bản khai trong thời gian này. Hãy mở bản khai để chỉnh sửa.')
                 serializer = ExternalInsuranceSerializer(data=request.data)
                 if row:
@@ -215,8 +262,8 @@ class ExternalInsuranceView(InsuranceRegistrationView):
                 else:
                     row = ExternalInsuranceDeclaration.objects.create(student=student,
                         student_code=student.current_student_code, registration_year=data['valid_from'].year,
-                        intake_year=cfg.registration_year, intake_period=cfg.registration_period,
-                        intake_snapshot=_insurance_config_payload(cfg, include_payment=False, student=student),
+                        intake_year=cfg.external_year, intake_period=cfg.external_period,
+                        intake_snapshot=config_payload(cfg, student),
                         snapshot=snapshot, images=images, request_key=key, request_digest=digest, **values)
                     kind = 'SUBMITTED'
                     changes = {k: {'before': None, 'after': v} for k, v in snapshot.items()}

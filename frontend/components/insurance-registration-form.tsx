@@ -820,7 +820,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
             Thông tin được lấy nguyên từ thẻ BHYT mua tại trường của bạn (đơn đăng ký đã phát hành, hoặc hồ sơ sinh viên khi không có đơn) và không chỉnh sửa được.
             Bấm <strong>Đổi nơi khám chữa bệnh ban đầu</strong> để chọn bệnh viện mới rồi gửi yêu cầu.
           </p>
-        ) : external ? (
+        ) : external && !config?.description ? (
           <p className="mt-2 text-sm">Dành cho tất cả sinh viên đã tham gia BHYT tại nơi khác. Vui lòng khai đầy đủ thông tin và đính kèm 3 ảnh để nhà trường ghi nhận.</p>
         ) : config?.description ? (
           <div

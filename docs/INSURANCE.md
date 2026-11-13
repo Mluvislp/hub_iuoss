@@ -32,7 +32,7 @@ cùng SV/năm/đợt**, kể cả khi đơn cũ đang `rejected`.
 **Xem minh chứng:** xác thực JWT + kiểm tra sở hữu. Frontend tải blob qua header
 `Authorization`, **không** đưa token vào URL.
 
-**Khai BHYT nơi khác:** tạo mới và sửa trong cùng thời gian đợt đăng ký BHYT.
+**Khai BHYT nơi khác:** tạo mới và sửa trong thời gian của **đợt khai nơi khác** — bảng riêng `hub_insurance_external_configs` (4 slot, Staff quản lý trên Dashboard), độc lập với đợt đăng ký BHYT nên hết đợt đăng ký SV vẫn khai được.
 Năm/đợt tiếp nhận lưu riêng với năm thẻ. Chỉnh sửa và gửi lại sau từ chối cập nhật
 chính bản khai cũ; không tạo snapshot thay thế. Chi tiết triển khai/backfill ở tài liệu trên.
 
@@ -71,7 +71,7 @@ hiện hạn cuối.
 chung `registration_closes_at`), staff nhập trên trang quản lý đợt của Dashboard. Với người
 `is_graduate` (MASTER/DOCTOR), mọi chỗ xét hạn đều dùng hạn riêng này qua
 `core/insurance_editing.py::closes_at` — mở form, nộp đơn, `status`/`end_date` trả về
-frontend, cửa sổ sửa đơn (`window`) và khai BHYT nơi khác (`active_config`). Hết hạn riêng là
+frontend và cửa sổ sửa đơn (`window`). Đợt khai BHYT nơi khác có cột `graduate_closes_at` riêng trong `hub_insurance_external_configs` (`api/external_insurance_views.py::closes_at`). Hết hạn riêng là
 học viên không nộp và **không sửa đơn** được nữa. Giờ mở, cờ bật, phí, tài khoản và thời hạn
 thẻ vẫn dùng chung với sinh viên đại học.
 
@@ -126,6 +126,7 @@ Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod 
 | `external_insurance_upgrade.sql` | tạo bảng khai ngoài trường |
 | `external_insurance_review_upgrade.sql` | dùng **thay** file tạo bảng nếu bảng đã có từ bản trước |
 | `external_insurance_validity_fix.sql` | sửa thời hạn |
+| `insurance_external_config_upgrade.sql` | bảng đợt khai nơi khác riêng + seed từ `hub_insurance_configs` (chạy trước deploy) |
 | `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
 | `insurance_hospital_change_status_upgrade.sql` | đổi trạng thái yêu cầu đổi nơi KCB `pending`→`iu_processing`, `confirmed`→`issued` (3 giai đoạn như đơn đăng ký) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
 | `insurance_hospital_change_card_source_upgrade.sql` | cho `registration_id` của yêu cầu đổi nơi KCB được NULL — nguồn là thẻ diện ĐHQT còn hạn không có đơn (`card_id`) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
