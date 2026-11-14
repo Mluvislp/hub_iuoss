@@ -97,7 +97,7 @@ class Phase2Tests(TestCase):
         s = self.student(hcm=False)
         state = hc.build_state(s)
         self.assertFalse(state["register_requires_hcm"])
-        self.assertEqual(state["exam_eligibility"]["items"][0], "Đủ 18 tuổi trở lên;")
+        self.assertEqual(state["exam_eligibility"], hc.EXAM_ELIGIBILITY_ANY_RESIDENCE)
         r = hc.register(s, {**REG, "exam_slot": "2099-11-18 13:30"})
         self.assertEqual((r.status, r.residence["eligible"], r.residence["permanent_hcm"]),
                          (R.STATUS_REGISTERED, False, False))

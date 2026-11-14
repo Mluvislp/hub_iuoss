@@ -76,12 +76,24 @@ EXAM_ELIGIBILITY = {
 }
 
 
+# Đợt khám mở rộng — nhận SV mọi nơi cư trú (`any_residence`). Câu chữ do Phòng CTSV đưa (15/11/2026).
+EXAM_ELIGIBILITY_ANY_RESIDENCE = {
+    "intro": "Toàn thể sinh viên đang học tập tại Trường Đại học Quốc tế, ĐHQG-HCM đáp ứng đủ các yêu cầu:",
+    "items": [
+        "Chưa tham gia khám sức khỏe định kỳ đợt 1_2026 do Nhà trường tổ chức;",
+        "Chưa được khám sức khỏe định kỳ miễn phí theo Chương trình khám sức khỏe toàn dân của TP.HCM trong năm;",
+        "Không phải là người lao động đã được đơn vị sử dụng lao động tổ chức khám sức khỏe định kỳ;",
+        "Không thuộc đối tượng do Bộ Quốc phòng, Bộ Công an tổ chức khám sức khỏe.",
+    ],
+}
+
+
 def exam_eligibility(round_):
-    """Khối "Đối tượng khám". Đợt khám nhận SV mọi nơi cư trú (`any_residence`) thì bỏ vế TP.HCM."""
+    """Khối "Đối tượng khám" theo đợt khám đang nhận đăng ký: chỉ nhận SV TP.HCM → câu chữ gốc;
+    nhận SV mọi nơi cư trú (`any_residence`) → câu chữ đợt mở rộng."""
     if slots.residence_required(slots.config(round_)):
         return EXAM_ELIGIBILITY
-    return {**EXAM_ELIGIBILITY,
-            "items": ["Đủ 18 tuổi trở lên;", *EXAM_ELIGIBILITY["items"][1:]]}
+    return EXAM_ELIGIBILITY_ANY_RESIDENCE
 
 
 # Diện được đăng ký khám tại trường theo tình trạng học vụ (Phòng CTSV, 10/11/2026).
