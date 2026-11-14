@@ -197,9 +197,11 @@ export default function HealthCheckPage() {
   // Điều kiện mở phần 2 tính TRỰC TIẾP từ ô đang nhập ở phần 1: SV chọn TP.HCM
   // để mở phần 2 rồi quay lên đổi địa chỉ khác → phần 2 khóa lại ngay và bỏ tích
   // đồng ý. Server vẫn tính lại từ địa chỉ đã ghi lúc nộp, không tin giá trị này.
-  const eligible = declarationLocked
+  const inHcm = declarationLocked
     ? !!state?.residence.eligible
     : draft.permanent.provinceCode === hcm || draft.inHcmc === true;
+  // Đợt khám mở cho SV mọi nơi cư trú: không khóa phần 2 theo địa chỉ, chỉ ghi nhận.
+  const eligible = state?.register_requires_hcm === false || inHcm;
   useEffect(() => { if (!eligible) setConsent(false); }, [eligible]);
 
   if (loadError) return <div className="max-w-[860px]"><ErrorBox text={loadError} /></div>;
@@ -709,9 +711,10 @@ export default function HealthCheckPage() {
                 </div>
               ) : (
                 <div className="px-6 py-5 space-y-4">
-                  <div className="flex items-center gap-2 text-meta text-success-text">
+                  <div className={cn('flex items-center gap-2 text-meta', inHcm ? 'text-success-text' : 'text-muted')}>
                     <MapPin size={14} />
-                    {(declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
+                    {!inHcm ? 'Thường trú, tạm trú không thuộc Thành phố Hồ Chí Minh'
+                    : (declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
                       && (declarationLocked ? state.residence.temporary_hcm : draft.inHcmc === true)
                       ? 'Thường trú và tạm trú tại Thành phố Hồ Chí Minh'
                       : (declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)

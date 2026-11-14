@@ -758,6 +758,8 @@ export interface HealthCheckState {
   data_consent_text: { examined: string; register: string; other: string };
   /** Đối tượng khám tập trung tại trường (nhánh "Chưa khám"). */
   exam_eligibility: { intro: string; items: string[] };
+  /** false: đợt khám nhận SV mọi nơi cư trú — phần 2 không khóa theo địa chỉ TP.HCM. */
+  register_requires_hcm: boolean;
   offcampus: OffCampusForm;
   residence: HealthCheckResidence;
   /** Ngày + ca khám tại trường; null khi đợt không chia ca (hoặc không còn nhận đăng ký). */
