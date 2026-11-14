@@ -23,15 +23,19 @@ nói phần Hub làm.
   bấm "Đã kiểm tra bổ sung".
 - Cả 4 ảnh (kể cả CCCD 2 mặt) thay được khi sửa và gửi lại. Không tải ảnh mới ⇒ giữ ảnh cũ; ảnh cũ không xoá (đường
   dẫn còn trong diff event). Lỗi validate ⇒ cuộn tới ô lỗi đầu tiên (`permanent_*` → `permanent.*`).
-- **Khai nơi khác**: sửa / gửi lại cập nhật chính bản khai (không snapshot thay thế); `intake_year`/`intake_period` lưu
-  riêng với năm thẻ — **không suy từ hạn thẻ**. Có bảng event riêng `hub_external_insurance_events`.
+- **Khai nơi khác**: mở theo **đợt khai nơi khác** — bảng riêng `hub_insurance_external_configs` (4 slot, Dashboard quản
+  lý), độc lập với đợt đăng ký nên hết đợt đăng ký SV vẫn khai được. Sửa / gửi lại cập nhật chính bản khai (không
+  snapshot thay thế); `intake_year`/`intake_period` lưu riêng với năm thẻ — **không suy từ hạn thẻ**. Có bảng event riêng
+  `hub_external_insurance_events`.
 - **Đổi nơi KCB** (`core/api/hospital_change_views.py`): form đăng ký ở `mode="hospital-change"`, chỉ mở chọn BV; POST
   chỉ nhận `hospital_code`, server tự chép phần còn lại.
 - **Cột `note`** (≤ 1.000 ký tự, ô cuối thẻ Thông tin cá nhân của form đăng ký): sửa được như trường khác
   (`insurance_editing.FIELDS`).
 - **`freshman_warning`**: SV có `academic_entry_year` = năm hiện tại thấy popup (`components/freshman-warning-modal.tsx`)
   khi mở form, phải bấm xác nhận.
-- **Học viên cao học** (`is_graduate`): mọi chỗ xét hạn dùng `graduate_closes_at` qua `insurance_editing.closes_at`.
+- **Học viên cao học** (`is_graduate`): đăng ký tại trường xét hạn bằng `graduate_closes_at` qua
+  `insurance_editing.closes_at` (mở form, nộp, `status`/`end_date`, cửa sổ sửa); đợt khai nơi khác có cột
+  `graduate_closes_at` riêng (`api/external_insurance_views.py::closes_at`).
 - Xem minh chứng / ảnh: JWT + kiểm sở hữu, frontend tải blob qua header `Authorization` (không đưa token vào URL).
 - Detail API trả `config` hiện hành của đúng năm + đợt; slot đã chuyển năm thì trả `config_snapshot`.
 
@@ -67,12 +71,13 @@ Chạy **thủ công, trước khi deploy code**; DB dùng chung nên chạy **m
 | `insurance_workflow_{preflight,upgrade,production,verify}.sql` | schema workflow v2 (preflight/verify chỉ đọc) |
 | `insurance_status_hotfix.sql` | vá trạng thái |
 | `external_insurance_upgrade.sql` · `_review_upgrade.sql` · `_validity_fix.sql` | bảng khai nơi khác (review dùng **thay** file tạo nếu bảng đã có) |
+| `insurance_external_config_upgrade.sql` | bảng đợt khai nơi khác riêng + seed từ `hub_insurance_configs` |
 | `insurance_edit_{preflight,upgrade,verify}.sql` | sửa tại chỗ + hàng đợi bổ sung + cột `intake_*` (backfill chỉ ánh xạ khi khớp **đúng một** cấu hình) |
 | `insurance_freshman_warning_upgrade.sql` · `insurance_graduate_deadline_upgrade.sql` · `insurance_hospital_lookup_url_upgrade.sql` | cột cấu hình đợt |
 | `insurance_hospital_change_upgrade.sql` (+ `_status_`, `_card_source_`) · `insurance_doi_noi_kcb_production.sql` (gộp cả nhánh) | đổi nơi KCB |
 
 `.gitignore` chặn `*.sql` và **whitelist từng file** — thêm SQL mới phải thêm `!docs/<tên>.sql`. `schema.sql` cho cài
-mới, không thay SQL upgrade. SQL đợt khai nơi khác riêng (13/11/2026) ở `dashboard_iuoss/docs/sql/`.
+mới, không thay SQL upgrade. Cùng nội dung bảng đợt khai nơi khác còn có bản `dashboard_iuoss/docs/sql/20261113_external_insurance_config.sql`.
 
 ## 6. Backfill đơn cũ
 
