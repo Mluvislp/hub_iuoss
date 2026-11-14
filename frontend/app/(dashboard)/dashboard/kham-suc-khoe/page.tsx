@@ -30,6 +30,7 @@ const STATUS_BADGE: Record<string, string> = {
   registered: badge.info,
   attended: badge.success,
   absent: badge.neutral,
+  not_examined: badge.danger,
 };
 
 function fmtDateTime(iso: string) {

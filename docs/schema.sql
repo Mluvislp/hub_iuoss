@@ -362,7 +362,7 @@ CREATE TABLE `health_check_rounds` (
 -- giá trị status KHÔNG trùng giữa hai nhánh nên đọc một cột là biết đủ:
 --   choice='examined' (đã khám, nộp minh chứng): pending → approved | rejected
 --                                                 rejected → pending (SV nộp lại)
---   choice='register' (chưa khám, đăng ký khám tại trường): registered → attended | absent
+--   choice='register' (chưa khám, đăng ký khám tại trường): registered → attended | absent | not_examined
 CREATE TABLE `health_check_responses` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `round_id` bigint NOT NULL,

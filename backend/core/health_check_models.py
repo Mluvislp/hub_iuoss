@@ -57,6 +57,8 @@ class HealthCheckResponse(models.Model):
     STATUS_REGISTERED = "registered"
     STATUS_ATTENDED = "attended"
     STATUS_ABSENT = "absent"
+    # Bàn tiếp nhận ghi "đã khám" nhưng danh sách bệnh viện gửi về KHÔNG có SV (14/11/2026) — tính như vắng.
+    STATUS_NOT_EXAMINED = "not_examined"
     # Phản hồi đã hủy (Phòng CTSV duyệt yêu cầu hủy / xoá để trả lời lại) — dòng GIỮ LẠI, dữ liệu cũ
     # cất trong evidence["history"]; coi như SV chưa trả lời đợt (10/11/2026).
     STATUS_CANCELLED = "cancelled"
@@ -68,6 +70,7 @@ class HealthCheckResponse(models.Model):
         STATUS_REGISTERED: "Đã đăng ký khám tại trường",
         STATUS_ATTENDED: "Đã khám tại trường",
         STATUS_ABSENT: "Vắng buổi khám",
+        STATUS_NOT_EXAMINED: "Bệnh viện ghi nhận chưa khám",
         STATUS_CANCELLED: "Đã hủy",
     }
 
