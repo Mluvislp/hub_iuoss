@@ -782,7 +782,8 @@ def is_previous_phase_registration(resp, round_):
     ghi nhận đã khám — SV được đăng ký đợt khám mới, không cần xin hủy."""
     resp = live(resp)
     if not (resp and resp.choice == Response_.CHOICE_REGISTER
-            and resp.status in (Response_.STATUS_REGISTERED, Response_.STATUS_ABSENT)):
+            and resp.status in (Response_.STATUS_REGISTERED, Response_.STATUS_ABSENT,
+                                Response_.STATUS_NOT_EXAMINED)):
         return False
     phase = slots.current_phase(slots.config(round_))
     if phase is None:
