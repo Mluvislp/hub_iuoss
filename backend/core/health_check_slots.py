@@ -14,6 +14,7 @@ Dashboard. Từ 10/11/2026 lịch chia thành nhiều ĐỢT KHÁM, mỗi đợt
          "closed_dates": ["2026-10-27", ...],        ← ngày NGỪNG nhận đăng ký
          "closed_slots": ["2026-10-28 07:30", ...],  ← từng CA ngừng nhận đăng ký
          "tentative": true,                          ← ngày DỰ KIẾN: mọi nhãn ngày thêm "(Ngày dự kiến)"
+         "any_residence": true,                      ← nhận SV mọi nơi cư trú (không bắt buộc TP.HCM), chỉ ghi nhận địa chỉ
          "registration": {"opens_at": ..., "closes_at": ...}},   ← chỉ để lưu vết, không xét
         {"label": "Đợt 2", ...}]}
 Dạng cũ (một khối `dates/shifts/...` không có `phases`) vẫn đọc được = một đợt khám.
@@ -78,6 +79,8 @@ def _phase(raw, taken_dates):
              "capacity": capacity, "closed_dates": closed, "closed_slots": closed_slots}
     if raw.get("tentative") is True:
         phase["tentative"] = True
+    if raw.get("any_residence") is True:
+        phase["any_residence"] = True
     if isinstance(raw.get("registration"), dict):
         phase["registration"] = raw["registration"]
     return phase
@@ -115,6 +118,8 @@ def dump(phases):
         item = {k: p[k] for k in ("label", "dates", "shifts", "capacity", "closed_dates", "closed_slots")}
         if p.get("tentative"):
             item["tentative"] = True
+        if p.get("any_residence"):
+            item["any_residence"] = True
         if p.get("registration"):
             item["registration"] = p["registration"]
         out.append(item)
@@ -131,6 +136,13 @@ def phase_of(cfg, day):
 def current_phase(cfg):
     """Đợt khám đang nhận đăng ký = đợt có ngày muộn nhất."""
     return cfg["phases"][-1] if cfg else None
+
+
+def residence_required(cfg):
+    """Đăng ký khám tại trường có bắt buộc thường trú/tạm trú TP.HCM không — theo đợt khám đang nhận
+    đăng ký. Đợt không chia ca (cfg None) giữ luật gốc: bắt buộc."""
+    phase = current_phase(cfg)
+    return not (phase and phase.get("any_residence"))
 
 
 def is_closed(cfg, slot):

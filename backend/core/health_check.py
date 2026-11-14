@@ -76,6 +76,14 @@ EXAM_ELIGIBILITY = {
 }
 
 
+def exam_eligibility(round_):
+    """Khối "Đối tượng khám". Đợt khám nhận SV mọi nơi cư trú (`any_residence`) thì bỏ vế TP.HCM."""
+    if slots.residence_required(slots.config(round_)):
+        return EXAM_ELIGIBILITY
+    return {**EXAM_ELIGIBILITY,
+            "items": ["Đủ 18 tuổi trở lên;", *EXAM_ELIGIBILITY["items"][1:]]}
+
+
 # Diện được đăng ký khám tại trường theo tình trạng học vụ (Phòng CTSV, 10/11/2026).
 REGISTER_STATUS_GROUPS = ("ACTIVE", "SUSPENDED")
 
@@ -448,7 +456,9 @@ def build_state(student):
         "result_defaults": result_spec.defaults(female=is_female(student)),
         "female": is_female(student),
         "data_consent_text": DATA_CONSENT_TEXT,
-        "exam_eligibility": EXAM_ELIGIBILITY,
+        "exam_eligibility": exam_eligibility(round_),
+        # False khi đợt khám đang nhận đăng ký mở cho SV mọi nơi cư trú (chỉ ghi nhận địa chỉ).
+        "register_requires_hcm": slots.residence_required(slots.config(round_)),
         # Luồng khám sức khỏe BẮT BUỘC có CCCD (cột C file gửi PYT).
         "cccd_missing": pc.cccd_missing(student),
         # Phần 1 của nhánh "Chưa khám" dựng lại đúng form ngoại trú.
@@ -884,9 +894,10 @@ def register(student, data):
                 declared_now = True
             _require_cccd(student)
 
-            # Tính lại từ địa chỉ vừa ghi (hoặc đã có) — không tin client.
+            # Tính lại từ địa chỉ vừa ghi (hoặc đã có) — không tin client. Đợt khám nhận SV mọi nơi cư
+            # trú (`any_residence`, 14/11/2026) thì chỉ ghi nhận địa chỉ, không chặn.
             residence = residence_snapshot(student)
-            if not residence["eligible"]:
+            if not residence["eligible"] and slots.residence_required(slots.config(round_)):
                 # Exception → rollback cả phần khai báo vừa ghi ở trên.
                 raise HealthCheckError(
                     "Chỉ sinh viên có địa chỉ thường trú hoặc tạm trú tại Thành phố "

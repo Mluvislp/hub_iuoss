@@ -90,6 +90,19 @@ class Phase2Tests(TestCase):
             hc.register(self.student(hcm=False), {**REG, "exam_slot": "2099-11-18 13:30"})
         self.assertEqual(ctx.exception.code, "not_eligible")
 
+    def test_dot_kham_nhan_sv_ngoai_tp_hcm(self):
+        """Đợt khám bật `any_residence`: SV ngoài TP.HCM đăng ký được, chỉ ghi nhận địa chỉ (14/11/2026)."""
+        cfg = {"phases": [EXAM_SLOTS["phases"][0], {**EXAM_SLOTS["phases"][1], "any_residence": True}]}
+        HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=cfg)
+        s = self.student(hcm=False)
+        state = hc.build_state(s)
+        self.assertFalse(state["register_requires_hcm"])
+        self.assertEqual(state["exam_eligibility"]["items"][0], "Đủ 18 tuổi trở lên;")
+        r = hc.register(s, {**REG, "exam_slot": "2099-11-18 13:30"})
+        self.assertEqual((r.status, r.residence["eligible"], r.residence["permanent_hcm"]),
+                         (R.STATUS_REGISTERED, False, False))
+        HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=EXAM_SLOTS)
+
     # ── Đăng ký lại đợt khám mới ──
     def test_dang_ky_dot_truoc_chua_kham_dang_ky_lai(self):
         s = self.student()
