@@ -590,6 +590,7 @@ export type HealthCheckStatus =
   | 'pending' | 'approved' | 'rejected'        // choice = examined
   | 'registered' | 'attended' | 'absent'       // choice = register
   | 'not_examined'                             // register: bệnh viện ghi nhận chưa khám
+  | 'outside_exam' | 'enterprise'             // register: theo DS lỗi bệnh viện (khám ngoài / diện DN)
   | 'cancelled';                               // đã hủy (Hub coi như chưa trả lời, không trả về)
 
 export interface HealthCheckResponse {

@@ -59,6 +59,9 @@ class HealthCheckResponse(models.Model):
     STATUS_ABSENT = "absent"
     # Bàn tiếp nhận ghi "đã khám" nhưng danh sách bệnh viện gửi về KHÔNG có SV (14/11/2026) — tính như vắng.
     STATUS_NOT_EXAMINED = "not_examined"
+    # Theo DS lỗi bệnh viện (12/11/2026) — KHÔNG được đăng ký lại đợt khám sau.
+    STATUS_OUTSIDE_EXAM = "outside_exam"    # đã khám nơi khác trong năm
+    STATUS_ENTERPRISE = "enterprise"        # thẻ BHYT mã DN — khám theo diện doanh nghiệp
     # Phản hồi đã hủy (Phòng CTSV duyệt yêu cầu hủy / xoá để trả lời lại) — dòng GIỮ LẠI, dữ liệu cũ
     # cất trong evidence["history"]; coi như SV chưa trả lời đợt (10/11/2026).
     STATUS_CANCELLED = "cancelled"
@@ -71,6 +74,8 @@ class HealthCheckResponse(models.Model):
         STATUS_ATTENDED: "Đã khám tại trường",
         STATUS_ABSENT: "Vắng buổi khám",
         STATUS_NOT_EXAMINED: "Bệnh viện ghi nhận chưa khám",
+        STATUS_OUTSIDE_EXAM: "Đã khám ở ngoài",
+        STATUS_ENTERPRISE: "Khám theo diện doanh nghiệp",
         STATUS_CANCELLED: "Đã hủy",
     }
 
