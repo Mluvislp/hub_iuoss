@@ -712,16 +712,18 @@ export default function HealthCheckPage() {
                 </div>
               ) : (
                 <div className="px-6 py-5 space-y-4">
-                  <div className={cn('flex items-center gap-2 text-meta', inHcm ? 'text-success-text' : 'text-muted')}>
-                    <MapPin size={14} />
-                    {!inHcm ? 'Thường trú, tạm trú không thuộc Thành phố Hồ Chí Minh'
-                    : (declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
-                      && (declarationLocked ? state.residence.temporary_hcm : draft.inHcmc === true)
-                      ? 'Thường trú và tạm trú tại Thành phố Hồ Chí Minh'
-                      : (declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
-                        ? 'Thường trú tại Thành phố Hồ Chí Minh'
-                        : 'Tạm trú tại Thành phố Hồ Chí Minh'}
-                  </div>
+                  {/* SV ngoài TP.HCM (đợt khám nhận mọi nơi cư trú): không hiện dòng địa chỉ. */}
+                  {inHcm && (
+                    <div className="flex items-center gap-2 text-meta text-success-text">
+                      <MapPin size={14} />
+                      {(declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
+                        && (declarationLocked ? state.residence.temporary_hcm : draft.inHcmc === true)
+                        ? 'Thường trú và tạm trú tại Thành phố Hồ Chí Minh'
+                        : (declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
+                          ? 'Thường trú tại Thành phố Hồ Chí Minh'
+                          : 'Tạm trú tại Thành phố Hồ Chí Minh'}
+                    </div>
+                  )}
                   <PackageInfo state={state} />
                   {state.exam_slots && (
                     <SlotPicker options={state.exam_slots} value={examSlot} error={slotError}
