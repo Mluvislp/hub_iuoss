@@ -3,7 +3,7 @@
 /* Phần thân form khai báo — dùng chung cho 3 trang:
    - /dashboard/khai-bao-dia-chi    (Khai báo địa chỉ toàn trường, variant 'address')
    - /dashboard/khai-bao-ngoai-tru  (Khai báo ngoại trú — tạm đóng)
-   - /dashboard/kham-suc-khoe       (phần 1 của đăng ký khám, luật ngoại trú)
+   - /dashboard/kham-suc-khoe       (phần 1 của đăng ký khám, variant 'address' từ 15/11/2026)
    Hai variant chỉ khác phần tạm trú: 'address' luôn có 3 lựa chọn (TP.HCM / ngoài
    TP.HCM / không có tạm trú); 'offcampus' chỉ mở "không có tạm trú" khi thường trú
    ở TP.HCM. Server kiểm lại đúng luật đó (core/offcampus.py, `mode`).

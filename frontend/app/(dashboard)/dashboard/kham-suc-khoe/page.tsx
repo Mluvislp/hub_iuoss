@@ -183,7 +183,7 @@ export default function HealthCheckPage() {
   const [cancelResult, setCancelResult] = useState(false);
   const [saving, setSaving] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
-  const draft = useDeclarationDraft(state?.offcampus ?? null);
+  const draft = useDeclarationDraft(state?.offcampus ?? null, 'address');
 
   useEffect(() => {
     api.healthCheck.state()
@@ -199,7 +199,7 @@ export default function HealthCheckPage() {
   // đồng ý. Server vẫn tính lại từ địa chỉ đã ghi lúc nộp, không tin giá trị này.
   const inHcm = declarationLocked
     ? !!state?.residence.eligible
-    : draft.permanent.provinceCode === hcm || draft.inHcmc === true;
+    : draft.permanent.provinceCode === hcm || (!draft.noTemp && draft.inHcmc === true);
   // Đợt khám mở cho SV mọi nơi cư trú: không khóa phần 2 theo địa chỉ, chỉ ghi nhận.
   const eligible = state?.register_requires_hcm === false || inHcm;
   useEffect(() => { if (!eligible) setConsent(false); }, [eligible]);
@@ -717,7 +717,7 @@ export default function HealthCheckPage() {
                     <div className="flex items-center gap-2 text-[0.8rem] text-success-text">
                       <MapPin size={14} />
                       {(declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
-                        && (declarationLocked ? state.residence.temporary_hcm : draft.inHcmc === true)
+                        && (declarationLocked ? state.residence.temporary_hcm : !draft.noTemp && draft.inHcmc === true)
                         ? 'Thường trú và tạm trú tại Thành phố Hồ Chí Minh'
                         : (declarationLocked ? state.residence.permanent_hcm : draft.permanent.provinceCode === hcm)
                           ? 'Thường trú tại Thành phố Hồ Chí Minh'

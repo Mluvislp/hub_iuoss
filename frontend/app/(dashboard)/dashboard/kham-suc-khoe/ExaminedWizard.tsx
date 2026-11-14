@@ -64,7 +64,7 @@ export default function ExaminedWizard({
     ...schema.map((s) => ({ key: s.key, title: s.title })),
   ], [schema]);
 
-  const declaration = useDeclarationDraft(state.offcampus);
+  const declaration = useDeclarationDraft(state.offcampus, 'address');   // gửi qua /api/address-declaration/
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const [values, setValues] = useState<ResultValues>(() => {

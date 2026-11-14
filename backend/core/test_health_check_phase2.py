@@ -103,6 +103,43 @@ class Phase2Tests(TestCase):
                          (R.STATUS_REGISTERED, False, False))
         HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=EXAM_SLOTS)
 
+    def _undeclared_outside_hcm(self):
+        """SV CHƯA khai địa chỉ, gửi kèm khai báo: thường trú Đà Nẵng, không có tạm trú."""
+        from students.models import VnProvince, VnWard
+        VnProvince.objects.get_or_create(code="48", defaults={"name": "Thành phố Đà Nẵng", "unit_type": "Thành phố"})
+        VnWard.objects.get_or_create(code="20194", defaults={"name": "Phường Hải Châu", "unit_type": "Phường",
+                                                             "province_code": "48"})
+        Phase2Tests.n += 1
+        s = Student.objects.create(current_student_code=f"T{self.n:04d}", full_name=f"SV {self.n}",
+                                   date_of_birth=date(2006, 1, 2), current_status=self.active)
+        StudentIdentityDocument.objects.create(student=s, document_type=StudentIdentityDocument.TYPE_CCCD,
+                                               document_number=f"0792060{self.n:05d}", is_current=True)
+        declaration = {"permanent": {"province_code": "48", "ward_code": "20194", "street": "12 đường Lê Lợi"},
+                       "temporary_none": True, "temporary_in_hcmc": None}
+        return s, {**REG, "exam_slot": "2099-11-18 13:30", "declaration": declaration}
+
+    def test_ngoai_tinh_khong_tam_tru_dang_ky_duoc_khi_dot_mo_rong(self):
+        """Luật "Khai báo địa chỉ": "Không có tạm trú" chọn được với thường trú ngoại tỉnh (15/11/2026)."""
+        cfg = {"phases": [EXAM_SLOTS["phases"][0], {**EXAM_SLOTS["phases"][1], "any_residence": True}]}
+        HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=cfg)
+        try:
+            s, data = self._undeclared_outside_hcm()
+            r = hc.register(s, data)
+            self.assertEqual(r.status, R.STATUS_REGISTERED)
+            self.assertTrue(r.residence["temporary_none"])
+            self.assertTrue(r.residence["declared_with_registration"])
+            self.assertIsNotNone(pc.declared_on(s))
+        finally:
+            HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=EXAM_SLOTS)
+
+    def test_ngoai_tinh_khong_tam_tru_dot_chi_nhan_tp_hcm_rollback_ca_khai_bao(self):
+        s, data = self._undeclared_outside_hcm()
+        with self.assertRaises(hc.HealthCheckError) as ctx:
+            hc.register(s, data)
+        self.assertEqual(ctx.exception.code, "not_eligible")         # không phải lỗi khai báo
+        self.assertIsNone(pc.declared_on(s))                         # khai báo bị rollback cùng
+        self.assertFalse(R.objects.filter(student_id=s.pk).exists())
+
     # ── Đăng ký lại đợt khám mới ──
     def test_dang_ky_dot_truoc_chua_kham_dang_ky_lai(self):
         s = self.student()
