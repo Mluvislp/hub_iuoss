@@ -48,6 +48,7 @@ thẳng là hỏng secure cookie / redirect loop. Bắt buộc dùng `map`:
 map $http_x_forwarded_proto $hub_forwarded_proto { default $http_x_forwarded_proto; "" https; }
 server {
     listen 80; server_name hub.iuoss.com;
+    client_max_body_size 64m;   # mặc định 1 MB làm hỏng form nhiều ảnh (đúng server 14/11/2026)
     location /static/ { alias /var/www/apps/hub_iuoss/backend/staticfiles/; expires 7d; }
     location /api/ { proxy_pass http://127.0.0.1:8002; proxy_set_header Host $host;
                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
