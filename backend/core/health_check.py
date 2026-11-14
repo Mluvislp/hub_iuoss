@@ -612,12 +612,12 @@ def submit_evidence(student, uploads, result_raw=None, declaration=None, data_co
             if resubmit and not _can_resubmit(resp, round_):
                 raise HealthCheckError(_closed_message(round_, choice), code="closed")
 
-            # Như nhánh đăng ký khám: chưa khai ngoại trú thì khai luôn ở đây.
+            # Như nhánh đăng ký khám: chưa khai địa chỉ thì khai luôn ở đây (luật "Khai báo địa chỉ").
             locked, _ = offcampus.lock_state(student)
             declared_now = False
             if not locked:
                 try:
-                    offcampus.submit(student, declaration or {})
+                    offcampus.submit(student, declaration or {}, mode=offcampus.MODE_ADDRESS)
                 except offcampus.DeclarationError as exc:
                     raise HealthCheckError("Vui lòng kiểm tra lại phần khai báo thông tin.",
                                            errors=exc.errors) from exc
@@ -898,8 +898,11 @@ def register(student, data):
             declared_now = False
             if not locked:
                 try:
+                    # Luật "Khai báo địa chỉ" (15/11/2026): "Không có tạm trú" chọn được với mọi thường
+                    # trú — điều kiện TP.HCM (nếu đợt khám đòi) xét riêng ở dưới từ địa chỉ vừa ghi.
                     offcampus.submit(student, {**(data.get("declaration") or {}),
-                                               "require_citizen_id": True})
+                                               "require_citizen_id": True},
+                                     mode=offcampus.MODE_ADDRESS)
                 except offcampus.DeclarationError as exc:
                     raise HealthCheckError("Vui lòng kiểm tra lại phần khai báo thông tin.",
                                            errors=exc.errors) from exc
