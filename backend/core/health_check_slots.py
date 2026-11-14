@@ -8,8 +8,9 @@ Dashboard. Từ 10/11/2026 lịch chia thành nhiều ĐỢT KHÁM, mỗi đợt
     {"phases": [
         {"label": "Đợt 1",
          "dates": ["2026-10-27", ...],
-         "shifts": [{"label": "Ca sáng thứ nhất", "start": "07:30", "end": "09:30"}, ...],
-         "capacity": null | số chỗ tối đa MỖI ca,
+         "shifts": [{"label": "Ca sáng thứ nhất", "start": "07:30", "end": "09:30"},
+                    {"label": "Ca chiều", "start": "13:30", "end": "16:30", "capacity": 400}, ...],
+         "capacity": null | số chỗ tối đa MỖI ca (ca có "capacity" riêng thì dùng số của ca),
          "closed_dates": ["2026-10-27", ...],        ← ngày NGỪNG nhận đăng ký
          "closed_slots": ["2026-10-28 07:30", ...],  ← từng CA ngừng nhận đăng ký
          "tentative": true,                          ← ngày DỰ KIẾN: mọi nhãn ngày thêm "(Ngày dự kiến)"
@@ -50,6 +51,11 @@ def _valid_shift(shift):
             and _TIME.match(str(shift.get("end") or "")) and shift["start"] < shift["end"])
 
 
+def _cap(value):
+    """Số chỗ hợp lệ (số nguyên dương) hoặc None = không giới hạn."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
+
+
 def _phase(raw, taken_dates):
     """Một đợt khám đã chuẩn hoá; None khi thiếu ngày hoặc ca. Ngày đã thuộc đợt trước thì bỏ."""
     if not isinstance(raw, dict):
@@ -57,14 +63,14 @@ def _phase(raw, taken_dates):
     dates = sorted({str(d) for d in raw.get("dates") or [] if _valid_date(d)} - taken_dates)
     shifts = sorted(
         ({"label": str(s.get("label") or "").strip() or f"Ca {s['start']}",
-          "start": s["start"], "end": s["end"]}
+          "start": s["start"], "end": s["end"],
+          **({"capacity": _cap(s.get("capacity"))} if _cap(s.get("capacity")) else {})}
          for s in raw.get("shifts") or [] if _valid_shift(s)),
         key=lambda s: s["start"],
     )
     if not dates or not shifts:
         return None
-    capacity = raw.get("capacity")
-    capacity = capacity if isinstance(capacity, int) and not isinstance(capacity, bool) and capacity > 0 else None
+    capacity = _cap(raw.get("capacity"))
     closed = sorted({str(d) for d in raw.get("closed_dates") or [] if str(d) in dates})
     keys = {slot_key(d, s["start"]) for d in dates for s in shifts}
     closed_slots = sorted({str(k) for k in raw.get("closed_slots") or [] if str(k) in keys})
@@ -160,12 +166,13 @@ def describe_in(cfg, slot):
 
 
 def iter_slots(cfg, phase=None):
-    """Mọi ca (của một đợt khám nếu truyền `phase`), kèm `capacity` + `phase` (index) của đợt."""
+    """Mọi ca (của một đợt khám nếu truyền `phase`), kèm `phase` (index) của đợt và `capacity` = số chỗ
+    riêng của ca nếu có, không thì số chỗ chung của đợt."""
     for p in ([phase] if phase else cfg["phases"]):
         for day in p["dates"]:
             for shift in p["shifts"]:
                 yield {"key": slot_key(day, shift["start"]), "date": day, **shift,
-                       "capacity": p["capacity"], "phase": p["index"]}
+                       "capacity": shift.get("capacity") or p["capacity"], "phase": p["index"]}
 
 
 def find(cfg, key):
