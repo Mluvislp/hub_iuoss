@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-from .external_insurance_models import ExternalInsuranceDeclaration  # noqa: F401
+from .external_insurance_models import ExternalInsuranceConfig, ExternalInsuranceDeclaration  # noqa: F401
 from .health_check_models import HealthCheckResponse, HealthCheckRound  # noqa: F401
 from .tuition_exemption_models import (  # noqa: F401
     TuitionExemptionApplication, TuitionExemptionApplicationCategory,

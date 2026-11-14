@@ -1,179 +1,107 @@
 # BHYT — phía Hub
 
-> **Trạng thái: đã chạy thật trên production** (205 đơn / 205 event, đo 23/09/2026).
-> Tài liệu này từng là ba file bàn giao viết ở thì "chưa deploy"
-> (`INSURANCE_WORKFLOW_V2.md`, `INSURANCE_WORKFLOW_FILES.md`, `external_insurance.md`);
-> gộp và cập nhật theo hiện trạng ngày 23/09/2026.
->
-> **Luật nghiệp vụ, trạng thái, event, bảng, thư từ chối** mô tả một lần ở
-> `dashboard_iuoss/docs/HEALTH_INSURANCE.md`. File này chỉ nói phần Hub làm.
-
-> Cập nhật 25/09/2026: [Chỉnh sửa tại chỗ, hạn khai báo và hàng đợi bổ sung](INSURANCE_EDIT_ROLLOUT.md).
-> SQL trong tài liệu mới chưa chạy trên production; cần nâng cấp trước deploy.
+Luật nghiệp vụ, trạng thái, event, bảng, thư từ chối, đợt: `dashboard_iuoss/docs/HEALTH_INSURANCE.md`. File này chỉ
+nói phần Hub làm.
 
 ## 1. Sinh viên làm được gì
 
 | Trang | API |
 |---|---|
-| `/dashboard/bao-hiem-y-te` — xem thẻ + lịch sử thẻ | `GET /api/health-insurance/` |
-| `/dashboard/bao-hiem-y-te/dang-ky` — đăng ký theo đợt | `POST /api/health-insurance/registrations/` |
-| chi tiết đơn + timeline + bổ sung | `GET`/`POST /api/health-insurance/registrations/<id>/` |
-| xem minh chứng đã nộp | `GET …/<id>/evidence/<evidence-id>/` |
-| `/dashboard/bao-hiem-y-te/khai-noi-khac` — khai BHYT nơi khác | `GET/POST /api/health-insurance/external/` |
-| `/dashboard/bao-hiem-y-te/doi-noi-kcb` — yêu cầu đổi nơi KCB ban đầu | `GET/POST /api/health-insurance/hospital-change/` + `<id>/` + `<id>/images/<field>/` |
+| `/dashboard/bao-hiem-y-te` — thẻ + lịch sử | `GET /api/health-insurance/` |
+| `…/dang-ky` — đăng ký theo đợt | `POST /api/health-insurance/registrations/` |
+| chi tiết đơn, timeline, sửa, bổ sung | `GET/POST …/registrations/<id>/` · ảnh `…/<id>/images/<field>/` · minh chứng `…/<id>/evidence/<eid>/` |
+| `…/khai-noi-khac` | `GET/POST /api/health-insurance/external/` + `<id>/` + `<id>/images/<field>/` |
+| `…/doi-noi-kcb` | `GET/POST /api/health-insurance/hospital-change/` + `<id>/` + `<id>/images/<field>/` |
 
-**Nộp đơn mới:** `request_key` bắt buộc; backend khóa sinh viên và **chặn tạo thêm đơn
-cùng SV/năm/đợt**, kể cả khi đơn cũ đang `rejected`.
+- **Nộp mới**: `request_key` bắt buộc; khoá SV và **chặn thêm đơn cùng SV/năm/đợt**, kể cả khi đơn cũ `rejected`.
+- **Sửa** (`action=edit`, `request_key`, `row_version`) cập nhật **chính dòng đó** (ID, chủ, năm, đợt, `created_at`,
+  trạng thái giữ nguyên). **Mỗi hồ sơ sửa thông thường một lần** trong đợt mở (mốc từ event `STUDENT_UPDATED`); không
+  có diff ⇒ từ chối "Sinh viên không có chỉnh sửa". Sửa không đổi trạng thái. Hạn kiểm ở backend
+  (`core/insurance_editing.py`), chỉ dùng cấu hình hiện hành nếu khớp **cả năm lẫn đợt**.
+- **Bổ sung / gửi lại sau từ chối** (`action=resubmit`, multipart): một transaction, ghi `supplement_pending=1` +
+  `supplemented_at` cùng event `RESUBMITTED` ⇒ Dashboard có tab "SV đã bổ sung"; cờ chỉ xoá khi staff xử lý tiếp hoặc
+  bấm "Đã kiểm tra bổ sung".
+- Cả 4 ảnh (kể cả CCCD 2 mặt) thay được khi sửa và gửi lại. Không tải ảnh mới ⇒ giữ ảnh cũ; ảnh cũ không xoá (đường
+  dẫn còn trong diff event). Lỗi validate ⇒ cuộn tới ô lỗi đầu tiên (`permanent_*` → `permanent.*`).
+- **Khai nơi khác**: mở theo **đợt khai nơi khác** — bảng riêng `hub_insurance_external_configs` (4 slot, Dashboard quản
+  lý), độc lập với đợt đăng ký nên hết đợt đăng ký SV vẫn khai được. Sửa / gửi lại cập nhật chính bản khai (không
+  snapshot thay thế); `intake_year`/`intake_period` lưu riêng với năm thẻ — **không suy từ hạn thẻ**. Có bảng event riêng
+  `hub_external_insurance_events`.
+- **Đổi nơi KCB** (`core/api/hospital_change_views.py`): form đăng ký ở `mode="hospital-change"`, chỉ mở chọn BV; POST
+  chỉ nhận `hospital_code`, server tự chép phần còn lại.
+- **Cột `note`** (≤ 1.000 ký tự, ô cuối thẻ Thông tin cá nhân của form đăng ký): sửa được như trường khác
+  (`insurance_editing.FIELDS`).
+- **`freshman_warning`**: SV có `academic_entry_year` = năm hiện tại thấy popup (`components/freshman-warning-modal.tsx`)
+  khi mở form, phải bấm xác nhận.
+- **Học viên cao học** (`is_graduate`): đăng ký tại trường xét hạn bằng `graduate_closes_at` qua
+  `insurance_editing.closes_at` (mở form, nộp, `status`/`end_date`, cửa sổ sửa); đợt khai nơi khác có cột
+  `graduate_closes_at` riêng (`api/external_insurance_views.py::closes_at`).
+- Xem minh chứng / ảnh: JWT + kiểm sở hữu, frontend tải blob qua header `Authorization` (không đưa token vào URL).
+- Detail API trả `config` hiện hành của đúng năm + đợt; slot đã chuyển năm thì trả `config_snapshot`.
 
-**Bổ sung và gửi lại** (multipart, cùng URL chi tiết): `request_key` + `row_version` +
-`hospital_code`/`province_code` hoặc nhiều file `evidences`. Bổ sung và gửi lại là
-**một transaction**. Lịch sử luôn giữ lại ảnh trước đó.
+## 2. Lịch đợt
 
-**Xem minh chứng:** xác thực JWT + kiểm tra sở hữu. Frontend tải blob qua header
-`Authorization`, **không** đưa token vào URL.
+Backend đọc `hub_insurance_configs` (4 slot) và kiểm cờ bật + khung giờ ở **cả GET form lẫn POST**. Frontend
+`lib/insurance-periods.ts` chỉ là type + hiển thị (đợt đang mở + kế tiếp). Phí và tài khoản nhận tiền sửa ở trang quản lý
+đợt của Dashboard (hoặc SQL); Hub không có UI sửa.
 
-**Khai BHYT nơi khác:** tạo mới và sửa trong cùng thời gian đợt đăng ký BHYT.
-Năm/đợt tiếp nhận lưu riêng với năm thẻ. Chỉnh sửa và gửi lại sau từ chối cập nhật
-chính bản khai cũ; không tạo snapshot thay thế. Chi tiết triển khai/backfill ở tài liệu trên.
+## 3. Lưu ảnh — chốt bảo mật
 
-**Ghi chú thông tin BHYT bị sai** (cột `note` có sẵn, không bắt buộc, ≤1000 ký tự): ô
-cuối thẻ Thông tin cá nhân của form đăng ký tại trường, dành cho SV có thẻ BHYT/BHXH lệch hồ
-sơ (đổi CCCD, đổi khai sinh, ngày sinh, họ tên…). Lưu khi nộp và sửa được như các trường khác
-(`insurance_editing.FIELDS`). Trước 07/10/2026 form không có ô nhập nên cột luôn rỗng.
-Khai ngoài trường không có ô này; yêu cầu đổi nơi KCB chép
-nguyên ghi chú của đơn gốc vào snapshot và chỉ hiển thị.
+- File mới dưới `MEDIA_ROOT/insurance_private/` (khai nơi khác: `insurance_private/external`); ảnh legacy ở `insurance_data/`.
+- CCCD 2 mặt + thẻ BHYT còn được lưu vào kho `student_images` (`dashboard_iuoss/docs/ARCHITECTURE.md` §10); cột
+  `cccd_image`/`cccd_image_back`/`bhyt_image` + JSON `images` của đơn vẫn ghi **cùng storage_key** (bản ghi lúc nộp).
+  Đơn cũ: `manage.py backfill_student_images` (mặc định chỉ xem trước).
+- SHA-256 + MIME **xác minh từ nội dung**; nhận JPEG/PNG/WebP/HEIC (`pillow-heif`); mỗi ảnh ≤ **5 MB**
+  (`insurance_files.MAX_BYTES`); bổ sung minh chứng **tối đa 1 ảnh mỗi lần gửi** (`insurance_workflow.supplement`).
 
-**Đổi nơi KCB ban đầu** (`core/api/hospital_change_views.py`): form đăng ký dùng chung ở
-chế độ `mode="hospital-change"`. Chỉ đổi được thẻ đã mua thuộc diện trường
-(`DHQT`/`DHQT_DN_SV`); mỗi yêu cầu gắn một thẻ (`card_id`): thẻ phát hành từ đơn tại trường
-mới nhất ở `issued`, không có thì thẻ còn hạn (`valid_until` ≥ hôm nay). Thông tin lấy từ
-đơn đã sinh thẻ; thẻ không có đơn Phát hành thì lấy hồ sơ SV + mã BHXH/nơi KCB của thẻ,
-không ảnh, `registration_id` NULL. Đơn đang xử lý không đủ điều kiện. Dashboard Phát hành
-chỉ sửa nơi KCB trên thẻ, đơn giữ nguyên. Form khóa hết, chỉ mở chọn bệnh viện. POST chỉ nhận `hospital_code`;
-server tự chép phần còn lại. Đợt nhận yêu cầu là bảng riêng
-`hub_insurance_hospital_change_configs` (4 slot, staff quản lý trên Dashboard). Nghiệp vụ
-duyệt: `dashboard_iuoss/docs/HEALTH_INSURANCE.md` §3b.
+## 4. File song sinh với Dashboard
 
-**Chỉnh sửa:** mỗi đơn/bản khai chỉ được sửa thông thường một lần. Detail API trả
-`edited_at`, `can_edit`, tên tỉnh/phường/bệnh viện và URL ảnh riêng tư để frontend
-hiển thị đúng hồ sơ đã nộp. Gửi form không có thay đổi thực tế bị từ chối.
+`core/insurance_contract.py` (**giống hệt**) · `core/insurance_history.py` (giống hệt trừ chú thích) · `core/insurance_history_models.py`
+(cố ý khác tên model FK). Sửa contract ⇒ chạy test **cả hai** app.
 
-## 2. Lịch đợt nằm ở hai nơi — nhớ kỹ
+## 5. SQL trong `docs/`
 
-Backend đọc `hub_insurance_configs` (4 slot `MAIN/Q2/Q3/Q4`) và kiểm lại cờ bật + khung
-giờ ở **cả GET form lẫn POST**, nên không truy cập thẳng hay nộp ngoài đợt được.
-
-Frontend còn `lib/insurance-periods.ts` để hiển thị: trang BHYT hiện **đợt đang mở +
-đợt kế tiếp**; không có đợt mở thì hiện đợt vừa hết hạn + kế tiếp. Đợt đang mở luôn
-hiện hạn cuối.
-
-**Học viên cao học có hạn đóng riêng.** Mỗi slot có cột `graduate_closes_at` (NULL = dùng
-chung `registration_closes_at`), staff nhập trên trang quản lý đợt của Dashboard. Với người
-`is_graduate` (MASTER/DOCTOR), mọi chỗ xét hạn đều dùng hạn riêng này qua
-`core/insurance_editing.py::closes_at` — mở form, nộp đơn, `status`/`end_date` trả về
-frontend, cửa sổ sửa đơn (`window`) và khai BHYT nơi khác (`active_config`). Hết hạn riêng là
-học viên không nộp và **không sửa đơn** được nữa. Giờ mở, cờ bật, phí, tài khoản và thời hạn
-thẻ vẫn dùng chung với sinh viên đại học.
-
-Nếu `academic_entry_year` của sinh viên trùng năm hiện tại (`timezone.localdate().year`), Hub hiển thị
-`freshman_warning` của slot trong popup đỏ nhạt cùng tông RejectionNotice (`components/freshman-warning-modal.tsx`,
-bottom sheet trên mobile) ngay khi mở form đăng ký; sinh viên phải bấm xác nhận để đóng.
-
-> ⚠️ Mức phí và tài khoản nhận tiền chỉ sửa được bằng **SQL trên
-> `hub_insurance_configs`** hoặc trang quản lý đợt của Dashboard — Hub không có UI sửa.
-> `hub_insurance_bank_accounts` trên prod đang **0 dòng**.
-
-## 3. File phải giữ đồng bộ với Dashboard
-
-| File Hub | Bản đối ứng |
-|---|---|
-| `core/insurance_contract.py` | `students/insurance_contract.py` — **hiện giống hệt, phải giữ vậy** |
-| `core/insurance_history.py` | `students/insurance_history.py` — chỉ lệch 2 dòng import |
-| `core/insurance_history_models.py` | `students/insurance_history_models.py` — cố ý khác tên model FK |
-
-Sửa contract là phải chạy test **cả hai** app.
-
-## 4. Lưu ảnh — chốt bảo mật
-
-- File mới nằm dưới `MEDIA_ROOT/insurance_private/` (khai ngoài trường:
-  `insurance_private/external`); ảnh legacy vẫn ở `insurance_data/`.
-- **Từ 04/10/2026, CCCD hai mặt + thẻ BHYT** (cả đơn đăng ký lẫn khai ngoài trường, lúc nộp
-  và lúc sửa) được lưu vào kho ảnh profile `student_images` (`insurance_private/student_images/…`,
-  xem `dashboard_iuoss/docs/ARCHITECTURE.md` §10) để các luồng khác dùng lại. Cột
-  `cccd_image`/`cccd_image_back`/`bhyt_image` và JSON `images` của đơn vẫn được ghi **cùng
-  storage_key** và là bản ghi lúc nộp của đơn — Dashboard đọc các cột này, không đổi gì.
-  Biên lai và minh chứng thanh toán vẫn lưu theo đơn. Ảnh của đơn cũ nạp vào kho bằng
-  `manage.py backfill_student_images` (mặc định chỉ xem trước).
-- Mỗi file lưu SHA-256 và MIME **xác minh từ nội dung**, không tin đuôi file. Nhận
-  JPEG/PNG/WebP và **HEIC của iPhone** (nhờ `Pillow` + `pillow-heif` trong
-  `requirements.txt`). Thiếu gói thì HEIC bị từ chối chứ không sập.
-- Giới hạn upload **8 file × 5 MB** (+ overhead multipart) — cấu hình giới hạn
-  request/proxy cho khớp, đừng nới toàn hệ thống.
-
-## 5. Các file SQL trong `docs/`
-
-Chạy **thủ công, trước khi deploy code**. Đều đã chạy trên prod + sandbox.
+Chạy **thủ công, trước khi deploy code**; DB dùng chung nên chạy **một lần** cho mỗi DB. Kiểm đã chạy chưa bằng
+`SHOW COLUMNS` / `SHOW TABLES` trên DB đó.
 
 | File | Việc |
 |---|---|
-| `insurance_config_upgrade.sql` | dựng 4 slot cấu hình. **Có `DELETE`** — đừng chạy lại. |
+| `insurance_config_upgrade.sql` | dựng 4 slot — **có `DELETE`, đừng chạy lại** |
 | `insurance_card_bank_upgrade.sql` | cột ngân hàng trên thẻ/cấu hình |
-| `insurance_workflow_preflight.sql` | kiểm kê trước khi nâng cấp v2 (chỉ đọc) |
-| `insurance_workflow_upgrade.sql` | expand schema v2 — kiểm tra trước khi thêm, chạy lại được |
-| `insurance_workflow_production.sql` | bản đã dùng cho prod |
-| `insurance_workflow_verify.sql` | đối chiếu sau khi chạy |
+| `insurance_workflow_{preflight,upgrade,production,verify}.sql` | schema workflow v2 (preflight/verify chỉ đọc) |
 | `insurance_status_hotfix.sql` | vá trạng thái |
-| `external_insurance_upgrade.sql` | tạo bảng khai ngoài trường |
-| `external_insurance_review_upgrade.sql` | dùng **thay** file tạo bảng nếu bảng đã có từ bản trước |
-| `external_insurance_validity_fix.sql` | sửa thời hạn |
-| `insurance_graduate_deadline_upgrade.sql` | cột `graduate_closes_at` (hạn riêng học viên cao học) — chạy lại được |
-| `insurance_hospital_change_status_upgrade.sql` | đổi trạng thái yêu cầu đổi nơi KCB `pending`→`iu_processing`, `confirmed`→`issued` (3 giai đoạn như đơn đăng ký) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
-| `insurance_hospital_change_card_source_upgrade.sql` | cho `registration_id` của yêu cầu đổi nơi KCB được NULL — nguồn là thẻ diện ĐHQT còn hạn không có đơn (`card_id`) — chạy lại được; chỉ cần nếu đã chạy bản cũ của file tạo bảng. |
-| `insurance_doi_noi_kcb_production.sql` | **gộp toàn bộ SQL nhánh đổi nơi KCB** (3 bảng + link tra cứu bệnh viện + 2 bước đồng bộ bản cũ) để chạy một lần trên production — chạy lại được. |
-| `insurance_hospital_lookup_url_upgrade.sql` | cột `hospital_lookup_url` (link "tra cứu bệnh viện") trên 2 bảng cấu hình đợt, nạp sẵn link cũ — chạy lại được, không phụ thuộc thứ tự. **Chưa chạy trên prod/sandbox (07/10/2026).** |
-| `insurance_hospital_change_upgrade.sql` | 3 bảng đổi nơi KCB ban đầu + 4 slot đợt (tắt sẵn) — chạy lại được. **Chưa chạy trên prod/sandbox (07/10/2026).** |
+| `external_insurance_upgrade.sql` · `_review_upgrade.sql` · `_validity_fix.sql` | bảng khai nơi khác (review dùng **thay** file tạo nếu bảng đã có) |
+| `insurance_external_config_upgrade.sql` | bảng đợt khai nơi khác riêng + seed từ `hub_insurance_configs` |
+| `insurance_edit_{preflight,upgrade,verify}.sql` | sửa tại chỗ + hàng đợi bổ sung + cột `intake_*` (backfill chỉ ánh xạ khi khớp **đúng một** cấu hình) |
+| `insurance_freshman_warning_upgrade.sql` · `insurance_graduate_deadline_upgrade.sql` · `insurance_hospital_lookup_url_upgrade.sql` | cột cấu hình đợt |
+| `insurance_hospital_change_upgrade.sql` (+ `_status_`, `_card_source_`) · `insurance_doi_noi_kcb_production.sql` (gộp cả nhánh) | đổi nơi KCB |
 
-`.gitignore` chặn `*.sql` (dump chứa dữ liệu thật) và **whitelist từng file** ở trên —
-thêm file SQL mới phải thêm một dòng `!docs/<tên>.sql`, nếu không git bỏ qua im lặng.
+`.gitignore` chặn `*.sql` và **whitelist từng file** — thêm SQL mới phải thêm `!docs/<tên>.sql`. `schema.sql` cho cài
+mới, không thay SQL upgrade. Cùng nội dung bảng đợt khai nơi khác còn có bản `dashboard_iuoss/docs/sql/20261113_external_insurance_config.sql`.
 
 ## 6. Backfill đơn cũ
 
 ```bash
-cd backend
-python manage.py backfill_insurance_workflow --after-id 0 --batch-size 200
+python manage.py backfill_insurance_workflow --after-id 0 --batch-size 200                          # xem trước
 python manage.py backfill_insurance_workflow --apply --database-name <DB> --after-id 0 --batch-size 200
-# Ánh xạ trạng thái cũ là opt-in riêng, chỉ chạy sau khi đã rà ý nghĩa:
-python manage.py backfill_insurance_workflow --apply --database-name <DB> --map-statuses …
 ```
 
-Mỗi lần xử lý một batch; lấy `checkpoint` làm `--after-id` lần sau, tới khi
-`processed=0`. Chạy lại từ 0 được. Mỗi đơn khóa và commit riêng. Tạo đúng một event
-`LEGACY_IMPORTED` ghi trạng thái quan sát được — **không dựng lịch sử giả**; ảnh cũ chỉ
-thêm làm evidence nếu file tồn tại và xác minh hợp lệ. Phí legacy giữ `NULL`.
+Lặp với `checkpoint` làm `--after-id` tới `processed=0`; chạy lại được. Tạo đúng một event `LEGACY_IMPORTED` — **không
+dựng lịch sử giả**. `--map-statuses` là opt-in riêng.
 
-## 7. Cờ và biến môi trường
+## 7. Cờ & rollback
 
-| Biến | Hiện trạng prod |
-|---|---|
-| `INSURANCE_WORKFLOW_V2` | **không khai** → mặc định `1` = bật. Đặt `0` ở **cả hai app** chỉ khi cần khóa mutation lúc bảo trì. |
-| `INSURANCE_PRIORITY_TYPE_CODE` | **không khai** → rỗng → không đánh dấu diện ưu tiên |
-| `HUB_MEDIA_ROOT` (Dashboard) | `/var/www/apps/hub_iuoss/backend/media` |
-
-Rollback: tắt cờ ở cả hai app trước. **Không drop bảng/cột mới**, không tự đổi
-`waiting_bhxh` về trạng thái cũ — không có ánh xạ ngược bảo toàn đầy đủ.
+`INSURANCE_WORKFLOW_V2` (mặc định bật; `0` ở **cả hai app** để khoá mutation) · `INSURANCE_PRIORITY_TYPE_CODE` (prod
+trống ⇒ không đánh dấu diện ưu tiên). Rollback: tắt cờ cả hai app trước; **không drop bảng/cột mới**, không tự đổi
+`waiting_bhxh` về trạng thái cũ.
 
 ## 8. Kiểm thử
 
 ```bash
 cd backend
-python manage.py test --settings=config.insurance_test_settings --noinput      # SQLite
-python manage.py test --settings=config.insurance_mysql_test_settings --noinput # MySQL cách ly
-cd ../frontend && npx tsc --noEmit
+python manage.py test core.test_insurance_workflow core.test_external_insurance core.test_insurance_editing \
+  --settings=config.insurance_test_settings --noinput          # MySQL: insurance_mysql_test_settings + INSURANCE_TEST_*
+cd ../frontend && npx tsc --noEmit && node scripts/test-insurance-periods.cjs && node scripts/test-insurance-editing.cjs
 ```
 
-Lần chạy gần nhất của tác giả: **26 test Hub pass trên SQLite** (nộp mới, retry,
-rollback file, timeline, QR, ownership/path traversal, backfill chạy lại, append-only).
-Bộ test Hub trên MySQL **chưa bao giờ chạy được** — lượt thực thi bị từ chối vì hết
-quota xét duyệt. Test runner chỉ tạo schema unmanaged trong DB test; MySQL test chỉ
-nhận biến `INSURANCE_TEST_*` và tên DB có tiền tố `test_insurance_`. **Đừng dùng test
-runner này thay migration, đừng trỏ vào `DB_*` của app.**
+Test runner chỉ tạo schema unmanaged trong DB test (tiền tố `test_insurance_`) — đừng trỏ vào `DB_*` của app.

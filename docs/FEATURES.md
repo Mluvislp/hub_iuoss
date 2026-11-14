@@ -1,441 +1,79 @@
-# IUOSS Hub — Tính năng đã implement
+# IUOSS Hub — tính năng & cờ
 
-> Tài liệu này mô tả chi tiết các tính năng đã có trong hệ thống, cách hoạt động và cách mở rộng.
+Nghiệp vụ chi tiết từng tính năng nằm ở `dashboard_iuoss/docs/` (một doc cho cả hai app). File này giữ phần **riêng
+của Hub**: cờ tính năng, trang chủ/BHYT xem thẻ, log, UI dùng chung.
 
----
+## 0. Cờ tính năng
 
-## 0. Cờ tính năng — "đang phát triển"
+Cờ tắt **không ẩn mục khỏi menu**: mục hiện kèm chấm nhỏ, bấm vào ra `<ComingSoon />`. **Nguồn sự thật là backend**
+(`config/settings.py`): view tắt **404 ngay ở `initial()`** và không truy vấn dữ liệu. Frontend đọc `GET /api/features/`
+qua `lib/features.ts::useFeatures()` (cache `sessionStorage`; chưa biết ⇒ coi như TẮT). Chặn ở **một chỗ**:
+`(dashboard)/layout.tsx` tra `featureForRoute(pathname)`.
 
-Cơ chế dùng chung cho mọi tính năng **chưa mở cho sinh viên**. Cờ tắt **không
-ẩn mục khỏi menu**: mục vẫn hiện (kèm một chấm nhỏ), bấm vào ra **trang chờ**
-`<ComingSoon />` với thông báo "Chức năng đang phát triển và sẽ sớm hoàn thiện…".
-
-Mặc định: **production → tắt (hiện trang chờ)**, **local/staging → bật (chạy đầy đủ)**.
-
-| Cờ | Chi phối |
-|---|---|
-| `FEATURE_DOCUMENT_REQUESTS` | Route `/dashboard/requests/*`, nút CTA ở hero + bảng "Yêu cầu giấy tờ gần đây" ở trang chủ, và toàn bộ `/api/requests/*` (404 khi tắt) |
-| `FEATURE_CIVIC_ACTIVITIES` | Route `/dashboard/sinh-hoat-cong-dan`, khối "Sinh hoạt công dân" ở trang chủ (BHYT chiếm trọn hàng); `civic_activities` trả mảng rỗng |
-| `FEATURE_HEALTH_CHECK` | Route `/dashboard/kham-suc-khoe` và toàn bộ `/api/health-check/*` (404 khi tắt). Trang quản lý bên Dashboard KHÔNG bị cờ này chặn — phòng tạo đợt sẵn được. **Đã mở 23/10/2026: mặc định BẬT cả trên production** |
-| `FEATURE_DIPLOMA` | Route `/dashboard/bang-tot-nghiep` và `/api/diploma/*` (404 khi tắt). Trang quản lý `/diplomas/` bên Dashboard không bị cờ chặn — tạo đợt trước rồi mới bật |
-| `FEATURE_TUITION_WAIVER` | Route `/dashboard/mien-giam-hoc-phi/*` và toàn bộ `/api/tuition-exemption/*` (404 khi tắt). Trang quản lý bên Dashboard (`/tuition/`) KHÔNG bị cờ này chặn — phòng cấu hình đợt/danh mục trước được |
-| `FEATURE_DIRECT_SUBMISSIONS` | Route `/dashboard/nap-giay-to/*`, mục menu "Nạp giấy tờ trực tiếp" và toàn bộ `/api/submissions/*` (404 khi tắt) |
-| `FEATURE_SUPPORT_TICKETS` | Route `/dashboard/hoi-dap/*`, badge tin mới ở sidebar và toàn bộ `/api/tickets/*` (404 khi tắt). Nghiệp vụ: `dashboard_iuoss/docs/SUPPORT_TICKETS.md` |
-
-**Nguồn sự thật là backend** — `config/settings.py`, mặc định `not IS_PRODUCTION`
-(suy từ `DJANGO_ENV`). Không phải flag phía frontend, nên sửa `sessionStorage`
-hay gọi thẳng API đều không lách được: view đã tắt **404 ngay ở `initial()`**, và
-dữ liệu chưa mở thì **không truy vấn**, không chỉ giấu ở giao diện.
-
-Frontend đọc qua `GET /api/features/` (không cần auth, chỉ trả true/false):
-- **Next.js** — hook `lib/features.ts::useFeatures()`, cache ở `sessionStorage`.
-  Chưa biết cờ thì coi như **TẮT** (hiện spinner rồi ra trang chờ), để prod không
-  chớp hiện tính năng chưa mở. Việc chặn nằm ở **một chỗ duy nhất**:
-  `(dashboard)/layout.tsx` tra `featureForRoute(pathname)` rồi thay nội dung bằng
-  `<ComingSoon />` — từng page KHÔNG tự kiểm tra.
-
-### Thêm một tính năng đang chờ phát triển
-
-1. Backend: thêm `FEATURE_X = env_bool("FEATURE_X", default=not IS_PRODUCTION)` vào
-   `settings.py`, thêm khoá vào `core/api/views.py::feature_flags()`.
-2. Frontend: thêm khoá vào `FeatureFlags` (`lib/types.ts`), rồi 1 dòng vào
-   `FEATURE_META` + `FEATURE_ROUTES` trong `lib/features.ts`.
-3. Xong — menu, chấm báo, trang chờ, tiêu đề topbar tự có. Không sửa gì thêm.
-
-### Bật một tính năng trên prod
-
-Thêm vào `backend/.env` rồi `sudo systemctl restart iuoss_hub`:
-
-```bash
-FEATURE_DOCUMENT_REQUESTS=True
-FEATURE_CIVIC_ACTIVITIES=True
-FEATURE_HEALTH_CHECK=True
-FEATURE_SUPPORT_TICKETS=True
-```
-
-**Không cần build lại frontend** — cờ đọc lúc chạy qua API chứ không nhúng vào
-bundle. Lưu ý: `useFeatures()` cache trong `sessionStorage`, nên SV đang mở sẵn
-tab chỉ thấy thay đổi sau khi đóng tab, đăng xuất, hoặc mở tab mới.
-
-### Xem thử trang chờ ở local
-
-Local mặc định bật hết nên không thấy trang chờ. Muốn xem thì chạy backend với
-biến môi trường tạm (không sửa `.env`):
-
-```bash
-cd backend
-FEATURE_DOCUMENT_REQUESTS=False FEATURE_CIVIC_ACTIVITIES=False \
-  ../.venv/Scripts/python.exe manage.py runserver 127.0.0.1:8002 --noreload
-```
-
----
-
-## 1. Authentication (LDAP)
-
-**URL:** `POST /api/auth/login/`, `POST /api/auth/microsoft/*`  
-**Files:** `core/auth.py`, `core/login_policy.py`, `core/api/views.py`
-
-Sinh viên đăng nhập bằng tài khoản mạng nội bộ trường (MSSV + mật khẩu IU).  
-Chi tiết luồng xác thực xem tại `docs/AUTH_FLOW.md`.
-
-**Tính năng:**
-- 2-bước LDAP bind (service account → user bind)
-- Session tự hết hạn sau 8 giờ, cookie `hub_sessionid`
-- Chống session fixation: `cycle_key()` sau login
-- Nút "Quên mật khẩu" trỏ đến `https://ldap.hcmiu.edu.vn/iupwd/?action=sendtoken`
-
----
-
-## 2. Dashboard (Trang chủ)
-
-**URL:** `/dashboard` (Next.js) ← `GET /api/me/`  
-**Files:** `core/api/views.py`, `frontend/app/(dashboard)/dashboard/page.tsx`
-
-### Thông tin sinh viên
-
-Lấy từ bảng `students` (shared DB, read-only) theo `student_id` lưu trong session.  
-Hiển thị dạng stat cards: MSSV, Khoa, Bậc đào tạo, Trạng thái học vụ.
-
-### Bảo hiểm y tế
-
-> Mục này mô tả phần **xem thẻ**. Đăng ký theo đợt, workflow duyệt đơn v2, bổ sung
-> minh chứng và **khai BHYT tại nơi khác** nằm ở [`INSURANCE.md`](INSURANCE.md); luật
-> nghiệp vụ chung ở `dashboard_iuoss/docs/HEALTH_INSURANCE.md`. Ba trang liên quan:
-> `/dashboard/bao-hiem-y-te` · `…/dang-ky` · `…/khai-noi-khac`.
-
-Lịch nhận đăng ký không còn hardcode trong frontend. Bảng `hub_insurance_configs`
-luôn có đúng bốn slot `MAIN/Q2/Q3/Q4`, staff cập nhật năm hưởng, thời gian mở/đóng,
-mô tả, mức phí và tài khoản trên Dashboard. Hub đọc cả bốn lịch để luôn hiện đúng
-cặp đợt gần nhất, nhưng chỉ slot `is_active=1` và đang nằm trong khung giờ mới có
-trạng thái `open`. Backend kiểm tra lại khi GET form và POST, nên không thể truy cập
-trực tiếp hoặc nộp ngoài đợt.
-
-Trang BHYT hiện hai đợt: đợt đang mở + kế tiếp; nếu không có đợt mở thì đợt vừa
-hết hạn + kế tiếp (chu kỳ mới chưa có đợt hết hạn thì hiện hai đợt sắp tới). Đợt
-đang mở luôn hiện hạn cuối đăng ký.
-
-Thời hạn sử dụng được suy ra từ năm hưởng: `MAIN` 01/01–31/12, `Q2`
-01/04–31/12, `Q3` 01/07–31/12, `Q4` 01/10–31/12. Đợt chính mở tháng 9 năm trước
-phải mang `registration_year` của năm hưởng kế tiếp. Mỗi đơn lưu `config_snapshot`
-để việc tái sử dụng slot không làm sai mức phí/tài khoản lịch sử.
-
-Nâng cấp DB hiện hữu: chạy `docs/insurance_config_upgrade.sql` thủ công **trước**
-khi deploy cả hai ứng dụng.
-
-**Model:** `students.HealthInsuranceCard` → bảng `student_health_insurance_cards`  
-Chỉ lấy bản ghi `is_current=True` của sinh viên (đây là **thẻ đang dùng**, không phải "thẻ còn hạn").  
-Hiển thị: Mã BHYT, Nơi đăng ký KCB, Hạn thẻ (`valid_until`).
-
-**Quy tắc "còn hiệu lực":** trạng thái còn hiệu lực hay đã hết hạn **được tính ở phía Hub dựa trên `valid_until` so với ngày hiện tại** — KHÔNG suy ra từ `is_current`:
-
-- `valid_until` là NULL → không xác định được hạn → coi là "Chưa có thông tin hạn" (không khẳng định còn hiệu lực).
-- `valid_until >= hôm nay` → **Còn hiệu lực**.
-- `valid_until < hôm nay` → **Hết hạn**.
-
-> Lý do: `is_current` chỉ đánh dấu đâu là thẻ hiện hành đang dùng, không phản ánh việc thẻ đó còn hạn. Xem thêm quy ước cột `is_current` ở `dashboard_iuoss/docs/ARCHITECTURE.md`.
-
-**Triển khai:** `components/health-insurance.tsx` — `validityState()` / `daysLeft()` /
-`<HealthValidityBadge>`, dùng CHUNG cho trang chủ và trang BHYT. Badge: neutral
-"Chưa có thông tin hạn" / success "Còn hiệu lực" / danger "Hết hạn". So sánh chuỗi
-`YYYY-MM-DD` (lexicographic = chronological) nên không lệch múi giờ.
-
-### Trang Bảo hiểm y tế (chi tiết)
-
-**URL:** `/dashboard/bao-hiem-y-te` · **API:** `GET /api/health-insurance/` →
-`{ current, history[] }` (`core/api/views.py::HealthInsuranceView`).
-Không bị cờ tính năng chi phối — luôn bật, kể cả production.
-
-Bố cục: panel "Thẻ bảo hiểm y tế" (badge hiệu lực ở header) → khối tint nổi bật
-**Mã thẻ BHYT** + khoảng "Giá trị sử dụng" → dòng nhắc khi còn ≤60 ngày → 3 dòng
-Mã số BHXH / Nơi đăng ký KCB / Diện đăng ký. Dưới là panel "Các thẻ trước đây"
-(chỉ hiện khi có thẻ `is_current=0`). Trang chủ có link "Xem chi tiết" trỏ sang.
-
-**Cột/bảng DB mà trang này ĐỌC** — `social_insurance_code`, `registration_type_id`,
-`valid_from` (ngoài các cột cũ), cộng 2 bảng danh mục
-`student_health_insurance_registration_types` và `hospitals`. Model `managed=False`
-nên các cột này vào MỌI câu SELECT thẻ BHYT: **thiếu một cột/bảng trên prod là
-hỏng cả trang chủ Hub**, không riêng trang BHYT. Kiểm tra trước khi deploy:
-
-```sql
-SHOW COLUMNS FROM student_health_insurance_cards
-  LIKE 'social_insurance_code';           -- phải có 1 dòng
-SHOW COLUMNS FROM student_health_insurance_cards
-  LIKE 'registration_type_id';            -- phải có 1 dòng
-SHOW COLUMNS FROM student_health_insurance_cards LIKE 'valid_from';
-SELECT COUNT(*) FROM student_health_insurance_registration_types;  -- phải > 0
-SELECT COUNT(*) FROM hospitals;                                    -- phải > 0
--- Bao nhiêu thẻ tra được TÊN cơ sở KCB (local: 12.120 khớp / 0 lệch):
-SELECT SUM(h.code IS NOT NULL) khop, SUM(c.hospital_code<>'' AND h.code IS NULL) lech
-FROM student_health_insurance_cards c
-LEFT JOIN hospitals h ON h.code = c.hospital_code
-WHERE c.hospital_code IS NOT NULL AND c.hospital_code <> '';
-```
-
-**Nơi đăng ký KCB hiển thị TÊN cơ sở, mã xuống dòng phụ.** Tên tra từ danh mục
-`hospitals` — **không có FK**, nối ở tầng hiển thị: view gom `{code: name}` bằng
-MỘT truy vấn rồi truyền qua serializer context (`hospital_names`), tránh N+1.
-Mã không có trong danh mục → `hospital_name = null` → frontend hiển thị **mã
-thô**, tuyệt đối không bịa tên. **Không bao giờ thêm dòng vào `hospitals`** để
-"cứu" mã lệch — đó là dữ liệu tham chiếu từ nguồn ngoài, xem `dashboard_iuoss/docs/CATALOGS.md`.
-
-**Độ phủ dữ liệu (đo trên local 2026-08-09, 21.428 thẻ)** — trang phải chịu được
-nhiều ô trống: thiếu mã số BHXH 74,7% · thiếu diện đăng ký 67,6% · thiếu
-`valid_from` 73,8% · thiếu nơi KCB 43,4% · thiếu `valid_until` 41,3%. Mã thẻ chỉ
-thiếu 2,3% nên khối tint phía trên gần như luôn có nội dung. Trong 56,6% thẻ CÓ
-mã nơi KCB thì **100% tra được tên** (12.120 khớp / 0 lệch) — nên nhánh "chỉ hiện
-mã thô" hiện chưa xảy ra ở local, vẫn giữ để phòng dữ liệu prod khác.
-
-> Con số trên đo **ngày 09/08/2026 trên bản sao local**, trước khi có workflow v2 và
-> khai ngoài trường. Prod 23/09/2026 đã có **20.811 thẻ** và nhiều đường sinh thẻ
-> `is_current=0` (import BHYT, phát hành từ đơn, xác nhận khai ngoài trường) — panel
-> "Các thẻ trước đây" nay hiện thật. Muốn số mới thì đo lại, đừng trích dẫn lại đoạn này.
-
-### Sinh hoạt công dân
-
-**Model:** `students.CivicActivity` → bảng `student_civic_activities`  
-Hiển thị tất cả hoạt động của sinh viên theo `activity_code` + `attempt_no`.  
-Kết quả: `YES` (Đạt) / `NO` (Không đạt) / `UNKNOWN` (Chưa có kết quả).
-
-> ⚠️ **Trên production đang hiện trang "đang phát triển"** — xem §0
-> (`FEATURE_CIVIC_ACTIVITIES`). Trang riêng: `/dashboard/sinh-hoat-cong-dan`.
-
----
-
-## 3. Yêu cầu giấy xác nhận
-
-> ⚠️ **Trên production đang hiện trang "đang phát triển"** — xem §0. Toàn bộ mục
-> này chỉ chạy khi `FEATURE_DOCUMENT_REQUESTS` bật (local/staging bật, prod tắt).
-
-**Kênh chuẩn (Next.js + DRF API):**
-- `GET /api/requests/other/form/` → `core/api/views.py::OtherRequestFormView` (prefill + purpose choices)
-- `POST /api/requests/` (`request_type="other"`) → `RequestsView._create_other` (dựng `payload` snapshot)
-- Frontend: `app/(dashboard)/dashboard/requests/other/page.tsx`, `lib/api.ts` (`otherForm`/`createOther`)
-- Registry loại giấy: `core/documents.py`; prefill niên khóa/đào tạo: `students/timeline.py`
-
-### Lịch sử yêu cầu + trao đổi (09/2026)
-
-- `GET /api/requests/` — danh sách của chính SV (kèm `comment_count`, `portal_code`).
-- `GET /api/requests/<id>/` — chi tiết + toàn bộ trao đổi. Lọc theo `ldap_uid` lấy từ
-  JWT nên không có IDOR dù URL có id.
-- `POST /api/requests/<id>/comments/` — SV gửi trao đổi. **Chỉ khi trạng thái là
-  `pending` hoặc `awaiting_info`**; trả lời lúc `awaiting_info` thì yêu cầu tự
-  chuyển về `processing`. Throttle dùng chung scope `create_request`.
-- Frontend: `dashboard/requests/page.tsx` (lịch sử) · `dashboard/requests/[id]/page.tsx`
-  (chi tiết + dòng trao đổi + ô trả lời).
-- `staff_note` **không còn** trong API: đó là ghi chú nội bộ của chuyên viên, trước
-  đây bị hiện cho sinh viên ở trang chủ.
-- Luật "SV được trao đổi ở trạng thái nào" **viết ở hai nơi** —
-  `ConfirmationRequest.STUDENT_CAN_COMMENT_STATUSES` bên Hub và
-  `DocumentRequest.STUDENT_CAN_COMMENT_STATUSES` bên Dashboard. Sửa thì sửa cả hai.
-
-Chi tiết luồng + DDL: `dashboard_iuoss/docs/DOCUMENT_REQUESTS.md`.
-
-**Model:** `core.ConfirmationRequest` → bảng `hub_confirmation_requests` (có cột `payload` JSON).
-
-### Loại giấy hỗ trợ
-
-| Giá trị | Nhãn hiển thị | Form động (payload) |
+| Cờ | Mặc định | Chi phối |
 |---|---|---|
-| `enrollment` | Xác nhận đang học | (legacy) |
-| `graduation` | Xác nhận tốt nghiệp | (legacy) |
-| `deferment` | Hoãn nghĩa vụ quân sự | ✅ form riêng — giấy Phòng CTSV tự tạo trên Dashboard (`ldap_uid` `staff:…`) không tính lượt |
-| `other` | Xác nhận (lý do khác) | ✅ đã có (10 mục đích cố định) |
+| `FEATURE_DOCUMENT_REQUESTS` | `not IS_PRODUCTION` | `/dashboard/requests/*`, `/api/requests/*`, khối yêu cầu gần đây ở trang chủ |
+| `FEATURE_CIVIC_ACTIVITIES` | `not IS_PRODUCTION` | `/dashboard/sinh-hoat-cong-dan`, khối SHCD trang chủ |
+| `FEATURE_HEALTH_CHECK` | **bật** mọi môi trường | `/dashboard/kham-suc-khoe`, `/api/health-check/*` |
+| `FEATURE_SUPPORT_TICKETS` | `not IS_PRODUCTION` (Dashboard có cờ cùng tên) | `/dashboard/hoi-dap/*`, `/api/tickets/*` |
+| `FEATURE_PERSONAL_INFO` | `not IS_PRODUCTION` | `/dashboard/thong-tin-ca-nhan`, `/api/personal-info/` |
+| `FEATURE_DIPLOMA` | `not IS_PRODUCTION` | `/dashboard/bang-tot-nghiep`, `/api/diploma/*` |
+| `FEATURE_TUITION_WAIVER` (nhánh sandbox) | `not IS_PRODUCTION` | `/dashboard/mien-giam-hoc-phi/*`, `/api/tuition-exemption/*` |
+| `FEATURE_DIRECT_SUBMISSIONS` | `not IS_PRODUCTION` | `/dashboard/nap-giay-to/*`, `/api/submissions/*` |
+| `FEATURE_OFFCAMPUS` | **tắt** | `/api/offcampus/*`; trang `/dashboard/khai-bao-ngoai-tru` tự đọc cờ (không qua `FEATURE_ROUTES`), tắt thì hiện thông báo + nút sang Khai báo địa chỉ, không có trong menu. Khám sức khỏe vẫn dùng form, không phụ thuộc cờ |
 
-> Loại `other` prefill từ hồ sơ (view-only) + cho sửa DOB/CCCD (staff duyệt). Chi
-> tiết contract `payload` + phía Dashboard: xem `dashboard_iuoss/docs/DOCUMENT_REQUESTS.md`.
+Giá trị thật trên prod/sandbox nằm ở `backend/.env` của từng môi trường — kiểm ở đó, đừng suy từ bảng này.
+Trang quản lý bên Dashboard không bị cờ Hub chặn (tạo đợt trước rồi mới bật).
 
-### Trạng thái yêu cầu
+- **Thêm cờ**: `FEATURE_X = env_bool(...)` ở `settings.py` + khoá trong `core/api/views.py::feature_flags()` →
+  `FeatureFlags` (`lib/types.ts`) + `FEATURE_META` / `FEATURE_ROUTES` (`lib/features.ts`).
+- **Bật trên prod**: thêm vào `backend/.env` → `sudo systemctl restart iuoss_hub`. Không cần build lại frontend; SV đang mở
+  tab thấy sau khi mở tab mới (cache `sessionStorage`).
+- Xem trang chờ ở local: chạy backend với biến tạm `FEATURE_X=False`.
 
-| Giá trị | Nhãn | Badge |
+## 1. Đăng nhập
+
+LDAP bind 2 bước hoặc Microsoft — chi tiết `docs/AUTH_FLOW.md`. JWT access 8 giờ / refresh 7 ngày (refresh **xét lại
+quyền vào cổng**). "Quên mật khẩu" trỏ `https://ldap.hcmiu.edu.vn/iupwd/?action=sendtoken`.
+
+## 2. Trang chủ & xem thẻ BHYT
+
+- Trang chủ (`GET /api/dashboard/`): stat card từ `students` (read-only), thẻ BHYT, SHCD, yêu cầu gần đây.
+- `/dashboard/bao-hiem-y-te` (`GET /api/health-insurance/` → `{current, history[]}`), luôn bật. Đăng ký theo đợt, workflow,
+  khai nơi khác, đổi nơi KCB: [`INSURANCE.md`](INSURANCE.md).
+- **"Còn hiệu lực" tính theo `valid_until`**, không theo `is_current` (= thẻ đang dùng): NULL ⇒ "Chưa có thông tin hạn" ·
+  ≥ hôm nay ⇒ Còn hiệu lực · < hôm nay ⇒ Hết hạn. Code: `components/health-insurance.tsx` (`validityState()`,
+  `<HealthValidityBadge>`), dùng chung trang chủ + trang BHYT; so chuỗi `YYYY-MM-DD`.
+- Lịch đợt đọc từ `hub_insurance_configs` (4 slot); `lib/insurance-periods.ts` chỉ là type + hàm hiển thị. Trang hiện đợt
+  đang mở + kế tiếp (không có đợt mở ⇒ đợt vừa hết + kế tiếp).
+- Nơi KCB hiển thị **tên** tra từ `hospitals` (gom `{code: name}` một truy vấn, không FK); không khớp ⇒ hiện mã thô,
+  **không bao giờ thêm dòng vào `hospitals`**.
+- ⚠️ Model `managed=False` đưa mọi cột thẻ (`social_insurance_code`, `registration_type_id`, `valid_from`…) vào mọi SELECT ⇒
+  thiếu cột trên prod là hỏng **cả trang chủ**. Dữ liệu thẻ nhiều ô trống — giao diện phải chịu được.
+
+## 3. Tính năng khác — tra ở Dashboard docs
+
+| Tính năng | Hub | Doc |
 |---|---|---|
-| `pending` | Chờ xử lý | warning (vàng) |
-| `processing` | Đang xử lý | info (xanh dương) |
-| `done` | Hoàn thành | success (xanh lá) |
-| `rejected` | Từ chối | danger (đỏ) |
+| Yêu cầu giấy tờ (6 loại, trao đổi, sửa lúc Chờ bổ sung, xem trước, hạn mức, mã `GT-`) | `core/documents.py`, `request_*.py` | `DOCUMENT_REQUESTS.md` |
+| Nạp giấy tờ trực tiếp (mã `NG-`) | `core/direct_submissions.py` | `DIRECT_SUBMISSIONS.md` |
+| Khai báo địa chỉ / ngoại trú · Thông tin cá nhân | `core/offcampus.py`, `core/personal_info.py` | `OFFCAMPUS.md` |
+| Khám sức khỏe | `core/health_check*.py` | `HEALTH_CHECK.md` |
+| Bằng THPT | `core/diploma.py` | `DIPLOMA.md` |
+| Lễ tốt nghiệp | `core/graduation.py` | `GRADUATION.md` |
+| Hỏi đáp | `core/tickets.py` | `SUPPORT_TICKETS.md` |
 
-### Luồng xử lý
+Luật "SV trao đổi được ở trạng thái nào" viết ở **hai nơi**: `ConfirmationRequest.STUDENT_CAN_COMMENT_STATUSES` (Hub) ↔
+`DocumentRequest.STUDENT_CAN_COMMENT_STATUSES` (Dashboard).
 
-```
-Sinh viên tạo yêu cầu (Hub)
-    │  POST /api/requests/  (payload snapshot cho loại 'other')
-    │  Ghi vào hub_confirmation_requests (status = 'pending')
-    ▼
-Nhân viên CTSV (Dashboard — app `documents`)
-    │  Xem/duyệt yêu cầu, duyệt sửa DOB/CCCD (ghi đè hồ sơ gốc)
-    │  Cập nhật status + staff_note, sinh DOCX/PDF
-    ▼
-Sinh viên theo dõi trạng thái trên Dashboard (Hub)
-```
+## 4. Log
 
-**Đã tích hợp:** Dashboard app `documents` đọc + duyệt + sinh giấy từ bảng này (loại `other`). Các loại còn lại theo khung registry.
+`logs/auth.log` (đăng nhập: `LOGIN_ATTEMPT/SUCCESS/FAIL`, `LOGOUT`, `LDAP_*`, `CONFIRMATION_REQUEST`) và `logs/app.log`
+(lỗi Django). Tự xoay 5 MB × 5 bản.
 
-### Schema bảng
+## 5. UI dùng chung
 
-```sql
-CREATE TABLE hub_confirmation_requests (
-  id           BIGINT        NOT NULL AUTO_INCREMENT,
-  student_id   BIGINT        NOT NULL,   -- soft ref → students.id
-  ldap_uid     VARCHAR(64)   NOT NULL,
-  request_type VARCHAR(64)   NOT NULL,
-  purpose      VARCHAR(255)  NOT NULL,
-  note         TEXT          NULL,
-  payload      JSON          NULL,       -- dữ liệu theo từng loại giấy (snapshot + field SV sửa)
-  status       VARCHAR(16)   NOT NULL DEFAULT 'pending',
-  staff_note   TEXT          NULL,       -- phản hồi từ nhân viên CTSV
-  created_at   DATETIME(6)   NOT NULL,
-  updated_at   DATETIME(6)   NOT NULL,
-  PRIMARY KEY (id),
-  KEY idx_hcr_student_id (student_id),
-  KEY idx_hcr_ldap_uid (ldap_uid),
-  KEY idx_hcr_status (status)
-);
-```
-
----
-
-## 3b. Khai báo thông tin ngoại trú
-
-`/dashboard/khai-bao-ngoai-tru` — SV tự khai địa chỉ **thường trú + tạm trú** theo
-danh mục hành chính 2025 (2 cấp: Tỉnh → Phường/Xã, **bỏ cấp quận/huyện**), đồng
-thời đề xuất sửa CCCD / email cá nhân / SĐT.
-
-| Thành phần | File |
-|---|---|
-| API `GET/POST /api/offcampus/` | `core/api/views.py::OffCampusDeclarationView` |
-| Nghiệp vụ | `core/offcampus.py` |
-| Ghi địa chỉ | `core/address_service.py` + `core/address_validators.py` |
-| Đề xuất sửa hồ sơ | `core/profile_changes.py` → bảng `hub_profile_change_requests` |
-| Giao diện | `frontend/app/(dashboard)/dashboard/khai-bao-ngoai-tru/` |
-
-Điểm cần nhớ:
-
-- **Tất cả ghi thẳng, không cần duyệt** — địa chỉ lẫn CCCD/email/SĐT. Mỗi lần sửa
-  ghi một dòng nhật ký `cũ → mới` vào `hub_profile_change_requests` (Hub không ghi
-  AuditLog nên đó là dấu vết duy nhất).
-- **CCCD gồm 3 phần** (số thẻ + nơi cấp + ngày cấp) đi cùng nhau; đổi CCCD ghi
-  **dòng mới** trong `student_identity_documents`, dòng cũ hạ `is_current=0`.
-- **Mỗi SV chỉ khai một lần.** Khai xong form khóa; màn hình xem lại có nút
-  *"Yêu cầu chỉnh sửa lại"* (`POST /api/offcampus/request-reopen/`) để xin phòng
-  CTSV mở lại. Nhân viên mở lại từng người hoặc cho toàn bộ trên Dashboard.
-- Nhánh "tạm trú tại TP.HCM" → **server tự ép `province_code='79'`**, không tin
-  giá trị client gửi lên.
-- `address_service.py` và `address_validators.py` **có bản sao ở Dashboard**
-  (`dashboard_iuoss/students/`). Sửa một bên phải sửa bên kia — chúng lệch đúng
-  một dòng lọc `VnWard` vì hai repo khai model khác nhau.
-- **Tài liệu đầy đủ (mô hình địa chỉ, rule validate, bẫy):**
-  `dashboard_iuoss/docs/OFFCAMPUS.md` — đọc file đó trước khi sửa.
-
----
-
-## 3d. Nạp giấy tờ trực tiếp — `/dashboard/nap-giay-to`
-
-Cờ `FEATURE_DIRECT_SUBMISSIONS`. SV khai thông tin (ngày sinh + CCCD xin sửa được), tên giấy tờ cần
-xét, số bản, SĐT, tải 1–10 ảnh/PDF, tích cam đoan → Phòng CTSV tiếp nhận / hoàn thành (mã trả hồ sơ) /
-trả giấy. Bảng riêng `hub_direct_submissions` (+ `_files`, `_comments`). API `GET/POST /api/submissions/`,
-`GET /api/submissions/form/`, `GET/PUT /api/submissions/<id>/` (PUT = sửa lúc "Chờ bổ sung", multipart,
-`remove_file_ids`), `POST …/comments/`, `GET …/files/<id>/`. Nghiệp vụ đầy đủ:
-`dashboard_iuoss/docs/DIRECT_SUBMISSIONS.md`.
-
----
-
-## 3c. Thông tin cá nhân — `/dashboard/thong-tin-ca-nhan`
-
-Cờ `FEATURE_PERSONAL_INFO`. API `GET/POST /api/personal-info/` (`core/personal_info.py`).
-6 ô chỉ đọc + 7 cụm gửi duyệt (email cá nhân, SĐT, CCCD, tài khoản ngân hàng, cha, mẹ,
-THPT). Cha/mẹ có 2 ô bấm Đã mất / Không có (`parent_status`); không chọn = còn sống. **Mọi cụm chờ duyệt kể cả khai lần đầu**; Hub không ghi gì vào hồ sơ — mỗi cụm
-là một dòng `hub_profile_change_requests` (`source = thong_tin_ca_nhan`), nhân viên
-duyệt bên Dashboard. Cụm đang chờ bị khóa; cụm bị từ chối mở sẵn với giá trị đã gửi (lý do chỉ gửi qua
-email, trang không hiện). Lỗi trả
-theo từng cụm (`errors: {key: message}`), có lỗi thì không cụm nào được ghi. Luật
-read/clean là bản song sinh của Dashboard — chi tiết ở `dashboard_iuoss/docs/OFFCAMPUS.md` §2.
-
-## 4. Logging
-
-**Files:** `config/settings.py` (LOGGING config), `core/auth.py`, `core/api/views.py`
-
-Hai file log riêng biệt, tự rotate khi đạt 5MB (giữ 5 bản backup):
-
-### `logs/auth.log` — Authentication actions
-
-Format: `YYYY-MM-DD HH:MM:SS | LEVEL | ACTION | uid=... | ...`
-
-| Action key | Mức | Ý nghĩa |
-|---|---|---|
-| `LOGIN_ATTEMPT` | INFO | Bắt đầu đăng nhập |
-| `LOGIN_SUCCESS` | INFO | Đăng nhập thành công (kèm student_id, linked, ip) |
-| `LOGIN_FAIL` | WARNING | Đăng nhập thất bại (sau LDAP trả về None) |
-| `LOGOUT` | INFO | Đăng xuất (kèm ip) |
-| `LDAP_START` | DEBUG | Bắt đầu gọi LDAP |
-| `LDAP_SVC_BIND_OK` | DEBUG | Service account bind thành công |
-| `LDAP_SVC_BIND_FAIL` | ERROR | Service account bind thất bại |
-| `LDAP_USER_FOUND` | DEBUG | Tìm thấy DN của user |
-| `LDAP_USER_NOTFOUND` | WARNING | Không tìm thấy uid trong LDAP |
-| `LDAP_AUTH_OK` | INFO | User bind xác minh password thành công |
-| `LDAP_WRONG_PASS` | WARNING | Sai mật khẩu |
-| `LDAP_AUTH_FAIL` | ERROR | Lỗi LDAP không xác định |
-| `CONFIRMATION_REQUEST` | INFO | Sinh viên tạo yêu cầu giấy xác nhận |
-
-### `logs/app.log` — Django errors
-
-Django warnings và errors (500, DB lỗi, template lỗi, v.v.).
-
----
-
-## 5. Layout & UI
-
-### Ô hỗ trợ kỹ thuật (nổi, mọi trang)
-
-`frontend/components/support-widget.tsx`, mount ở `app/layout.tsx` → có mặt trên
-**mọi trang, kể cả màn hình đăng nhập**. Nút tròn góc dưới-phải, bấm mới mở panel
-chứa thông tin liên hệ chuyên viên (điện thoại/Zalo + email, có nút chép).
-
-Sửa nội dung liên hệ: hằng `SUPPORT` ở đầu file đó (đổi số thì sửa cả `phone`
-hiển thị lẫn `phoneRaw` dùng cho link `tel:`/`zalo.me`).
-
-Ràng buộc UX cố ý — đừng "cải tiến" ngược lại: không tự bật, không đếm ngược,
-không nhắc lại; `z-30` để nằm DƯỚI overlay (z-40) và sidebar (z-50) nên menu
-mobile mở ra là nó bị che, không tranh chỗ. Số điện thoại chỉ render sau khi bấm
-nên không nằm trong HTML tĩnh.
-
-### Khung trang
-
-Layout do Next.js dựng: `frontend/app/(dashboard)/layout.tsx` (sidebar + topbar +
-chặn theo cờ tính năng). Quy ước trình bày và design token xem
-[`frontend/DESIGN.md`](../frontend/DESIGN.md).
-
-**Thêm trang mới:** tạo `app/(dashboard)/dashboard/<slug>/page.tsx`, thêm mục vào
-sidebar trong `layout.tsx`, và khai cờ trong `featureForRoute()` nếu tính năng
-chưa mở.
-
----
-
-## 6. URL routing
-
-> Django **chỉ phục vụ `/api/`**. Mọi URL giao diện (`/`, `/login`, `/dashboard/…`) do
-> Next.js đảm nhiệm; gọi thẳng vào Gunicorn `:8002` ở các đường đó sẽ trả **404**.
-
-Nguồn sự thật: `core/api/urls.py` — **27 endpoint**, tất cả dưới `/api/`.
-
-| URL | Auth | Mô tả |
-|---|---|---|
-| `health/` | ❌ | Health check cho monitor / load balancer |
-| `features/` | ❌ | Cờ tính năng cho frontend (§0) |
-| `auth/login/` | ❌ | Đăng nhập LDAP → cặp JWT |
-| `auth/logout/` | ✅ | Ghi log đăng xuất |
-| `auth/microsoft/start/` · `auth/microsoft/callback/` | ❌ | Entra ID (§1, `AUTH_FLOW.md`) |
-| `auth/token/refresh/` | refresh token | Gia hạn — **xét lại quyền vào cổng** |
-| `dashboard/` | ✅ | Dữ liệu trang chủ |
-| `health-insurance/` | ✅ | Thẻ hiện hành + lịch sử (§2) |
-| `health-insurance/registrations/` | ✅ | Danh sách + nộp đơn mới |
-| `health-insurance/registrations/<id>/` | ✅ | Chi tiết, timeline, bổ sung & gửi lại |
-| `health-insurance/registrations/<id>/evidence/<eid>/` | ✅ | Tải minh chứng, kiểm sở hữu |
-| `health-insurance/external/` | ✅ | Khai BHYT tại nơi khác |
-| `requests/` · `requests/<id>/` | ✅ | Yêu cầu giấy tờ — danh sách, chi tiết |
-| `requests/<id>/comments/` | ✅ | Trao đổi SV ↔ chuyên viên |
-| `requests/{other,deferment,thuong-binh,bank-loan,english}/form/` | ✅ | 5 biểu mẫu |
-| `offcampus/` · `offcampus/request-reopen/` | ✅ | Khai báo ngoại trú + xin mở lại |
-| `locations/{provinces,wards,ethnicities}` | ✅ | Danh mục hành chính 2025 |
-| `hospitals/` | ✅ | Danh mục cơ sở KCB |
-
-Nhóm `requests/*` trả **404** khi `FEATURE_DOCUMENT_REQUESTS` tắt — chặn ngay ở
-`initial()`, không chỉ giấu ở giao diện.
+- **Ô hỗ trợ kỹ thuật** `components/support-widget.tsx` (mount ở `app/layout.tsx`, mọi trang kể cả login): sửa liên hệ ở
+  hằng `SUPPORT` (`phone` + `phoneRaw`). Cố ý: không tự bật, `z-30` (dưới overlay/sidebar), SĐT chỉ render sau khi bấm.
+- Khung trang: `app/(dashboard)/layout.tsx`. Quy ước trình bày + design token: `frontend/DESIGN.md`.
+- Django **chỉ phục vụ `/api/`**; mọi URL giao diện do Next.js.

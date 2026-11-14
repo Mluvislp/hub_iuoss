@@ -1,11 +1,7 @@
 # Hệ sinh thái IUOSS — phần của Hub
 
-**Bản chính: [`dashboard_iuoss/docs/ECOSYSTEM.md`](../../dashboard_iuoss/docs/ECOSYSTEM.md)**
-— quyền sở hữu từng bảng, hai luồng dữ liệu chính, luật đổi schema, danh sách file
-tồn tại hai bản. Đọc file đó trước.
-
-File này chỉ giữ thứ riêng của Hub. (Trước 23/09/2026 đây là một bản chép 249 dòng đã
-lệch hẳn khỏi bản chính và còn bảng roadmap sai hiện trạng.)
+**Bản chính: [`dashboard_iuoss/docs/ECOSYSTEM.md`](../../dashboard_iuoss/docs/ECOSYSTEM.md)** — quyền sở hữu bảng, luật đổi
+schema, danh sách file song sinh. File này chỉ giữ thứ riêng của Hub.
 
 ## LDAP dùng chung với WordPress
 
@@ -13,32 +9,19 @@ lệch hẳn khỏi bản chính và còn bảng roadmap sai hiện trạng.)
 |---|---|
 | Server | `ldap://ldap.hcmiu.edu.vn:389` |
 | Service account | `cn=ctsv,dc=hcmiu,dc=edu,dc=vn` |
-| Username attribute | `uid` — thường bằng MSSV (vd `ITCSIU24092`) |
+| Username attribute | `uid` — thường bằng MSSV |
 
-**Dashboard KHÔNG dùng LDAP** — nhân viên OSS đăng nhập bằng Django auth nội bộ. Hai
-app không bao giờ dùng chung session hay auth backend; cookie cũng khác tên
-(`hub_sessionid` ↔ `sessionid`) vì chung domain cha `.iuoss.com`.
-
-Chi tiết luồng đăng nhập, Entra ID, chính sách vào cổng: [`AUTH_FLOW.md`](AUTH_FLOW.md).
+Dashboard **không** dùng LDAP (Django auth nội bộ); hai app không chung session, cookie khác tên (`hub_sessionid` ↔
+`sessionid`). Luồng đăng nhập: [`AUTH_FLOW.md`](AUTH_FLOW.md).
 
 ## Hub ghi được vào đâu
 
-Nguyên tắc: **Hub chỉ đọc bảng Dashboard sở hữu**, chỉ ghi bảng `hub_*` của mình.
-Hai ngoại lệ có chủ ý, đều đã chốt:
+Nguyên tắc: Hub chỉ đọc bảng Dashboard sở hữu. Ngoại lệ có chủ ý:
+1. **Khai báo địa chỉ / ngoại trú** — SV ghi thẳng `student_addresses`, `student_contact_points`,
+   `student_identity_documents` (không duyệt); `hub_profile_change_requests` làm nhật ký. **Thông tin cá nhân** thì chỉ
+   tạo dòng chờ duyệt. (`dashboard_iuoss/docs/OFFCAMPUS.md`)
+2. **BHYT workflow v2** — cùng ghi append-only 3 bảng event/assessment/evidence ([`INSURANCE.md`](INSURANCE.md)).
+3. Bảng của luồng SV tự nộp (khám sức khỏe, bằng THPT, lễ tốt nghiệp, nạp giấy, ticket, `student_images`) và
+   `email_messages` (Hub chỉ INSERT, Dashboard gửi).
 
-1. **Khai báo ngoại trú** — SV ghi thẳng `student_addresses`, `student_contact_points`,
-   `student_identity_documents`. CCCD / email cá nhân / SĐT **không cần duyệt**
-   (`approval: False`); dòng `hub_profile_change_requests` chỉ đóng vai nhật ký, vì Hub
-   không ghi AuditLog. Xem `dashboard_iuoss/docs/OFFCAMPUS.md`.
-2. **BHYT workflow v2** — Hub và Dashboard **cùng ghi** vào ba bảng event/assessment/
-   evidence theo kiểu append-only. Xem [`INSURANCE.md`](INSURANCE.md).
-
-## Đã ship, đừng ghi là "kế hoạch" nữa
-
-Bảng roadmap cũ liệt kê mấy mục dưới đây là chưa có. Tính tới 23/09/2026 **đã chạy
-trên production**: yêu cầu giấy tờ (5 loại) · đăng ký BHYT trực tuyến + duyệt đơn ·
-khai BHYT tại nơi khác · khai báo ngoại trú · SV tự sửa CCCD/email/SĐT ·
-**trao đổi hai chiều SV ↔ chuyên viên** trên yêu cầu giấy tờ
-(`hub_confirmation_request_comments`) · email thông báo tự động.
-
-Còn chưa có: thông báo chung từ phòng CTSV (`hub_announcements`), SSO WordPress ↔ Hub.
+Chưa có: thông báo chung từ Phòng CTSV, SSO WordPress ↔ Hub.
