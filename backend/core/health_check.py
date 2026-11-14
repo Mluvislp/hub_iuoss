@@ -1002,8 +1002,8 @@ def withdraw_cancel(student):
         return resp
 
 
-OPTION_NAMES = {"examined": "Đã tham khám sức khoẻ", "register": "Chưa tham gia khám sức khoẻ",
-                "other": "Dành cho đối tượng khác"}
+OPTION_NAMES = {"examined": "Đã khám theo chương trình khám sức khỏe toàn dân của TPHCM", "register": "Đăng ký khám sức khỏe miễn phí",
+                "other": "Đã khám ở địa phương"}
 
 
 def _closed_message(round_, choice=None):

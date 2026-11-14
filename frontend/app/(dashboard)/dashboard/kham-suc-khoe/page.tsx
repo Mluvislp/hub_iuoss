@@ -265,7 +265,7 @@ export default function HealthCheckPage() {
     setRedo(null); setChoice(null); setError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const previousChoiceLabel = response?.choice === 'other' ? 'dành cho đối tượng khác' : 'đã khám';
+  const previousChoiceLabel = response?.choice === 'other' ? 'đã khám ở địa phương' : 'đã khám';
   const phaseText = state.exam_slots?.phase_label ? ` ${state.exam_slots.phase_label.toLowerCase()}` : ' đợt mới';
   // Ngày khám (dd/mm/yyyy) của đăng ký đang có — dùng cho câu nhắc khi đăng ký lại đợt khám mới.
   const oldSlot = response?.exam_slot;
@@ -326,10 +326,10 @@ export default function HealthCheckPage() {
                 <div className="text-xs font-medium text-muted">Phản hồi đã gửi</div>
                 <div className="text-sm font-semibold text-ink mt-0.5">
                   {response.choice === 'register'
-                    ? 'Chưa khám — đăng ký khám tập trung tại trường'
+                    ? 'Đăng ký khám sức khỏe miễn phí — khám tập trung tại trường'
                     : response.choice === 'other'
-                      ? 'Dành cho đối tượng khác — sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP.HCM'
-                      : 'Đã khám theo chương trình của Thành phố'}
+                      ? 'Đã khám ở địa phương'
+                      : 'Đã khám theo chương trình khám sức khỏe toàn dân của TPHCM'}
                 </div>
               </div>
               <span className={cn(badge.base, STATUS_BADGE[response.status] ?? badge.neutral)}>
@@ -579,10 +579,10 @@ export default function HealthCheckPage() {
             </div>
             {cancelRegistration && (
               <div className="grid gap-3 sm:grid-cols-2">
-                <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã tham khám sức khoẻ"
+                <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã khám theo chương trình khám sức khỏe toàn dân của TPHCM"
                             desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
                             onClick={() => { setChoice('examined'); setError(''); }} />
-                <OptionTile option={round.options.other} active={choice === 'other'} title="Dành cho đối tượng khác"
+                <OptionTile option={round.options.other} active={choice === 'other'} title="Đã khám ở địa phương"
                             desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
                             onClick={() => { setChoice('other'); setError(''); }} />
               </div>
@@ -605,21 +605,22 @@ export default function HealthCheckPage() {
             </div>
           </div>
         ) : (
-          <div className="px-6 py-5">
-            <p className="text-section font-semibold text-ink mb-3">
-              Sinh viên đã khám sức khỏe định kỳ theo kế hoạch của Ủy ban Nhân dân Thành phố
-              Hồ Chí Minh hay chưa?<span className="text-danger-text"> *</span>
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã tham khám sức khoẻ"
-                          desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
-                          onClick={() => { setChoice('examined'); setError(''); }} />
-              <OptionTile option={round.options.register} active={choice === 'register'} title="Chưa tham gia khám sức khoẻ"
-                          desc="Đăng ký khám sức khỏe tập trung tại trường"
-                          onClick={() => { setChoice('register'); setError(''); }} />
-              <OptionTile option={round.options.other} active={choice === 'other'} title="Dành cho đối tượng khác"
-                          desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
-                          onClick={() => { setChoice('other'); setError(''); }} />
+          <div className="px-6 py-5 space-y-5">
+            <OptionTile option={round.options.register} active={choice === 'register'} title="Đăng ký khám sức khỏe miễn phí"
+                        desc="Đăng ký khám sức khỏe tập trung tại trường"
+                        onClick={() => { setChoice('register'); setError(''); }} />
+            <div>
+              <p className="text-section font-semibold text-ink mb-3">
+                Khai báo thông tin khám sức khỏe đối với các sinh viên đã thực hiện khám bên ngoài
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <OptionTile option={round.options.examined} active={choice === 'examined'} title="Đã khám theo chương trình khám sức khỏe toàn dân của TPHCM"
+                            desc="Khai kết quả khám theo phiếu và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('examined'); setError(''); }} />
+                <OptionTile option={round.options.other} active={choice === 'other'} title="Đã khám ở địa phương"
+                            desc="Sinh viên ngoại tỉnh chưa đăng ký tạm trú tại TP. Hồ Chí Minh — khai kết quả khám và nộp ảnh minh chứng"
+                            onClick={() => { setChoice('other'); setError(''); }} />
+              </div>
             </div>
           </div>
         )}
