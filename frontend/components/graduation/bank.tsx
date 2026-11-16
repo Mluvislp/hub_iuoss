@@ -150,10 +150,7 @@ export function BankSummary({ bank }: { bank: NonNullable<GradMember['bank']> })
 /** Ghi chú cho tài khoản ủy quyền — hiện ở form đăng ký và ở thẻ sau khi đăng ký. */
 export function ProxyNote() {
   return (
-    <p className="mt-3 text-sm text-muted">
-      Tài khoản nhận hoàn tiền cọc theo <b className="text-ink">ủy quyền</b>, do Phòng Công tác Sinh viên nhập sẵn.
-      Cần thay đổi, vui lòng liên hệ Phòng Công tác Sinh viên.
-    </p>
+    <p className="mt-3 text-sm text-muted">Tài khoản theo ủy quyền</p>
   );
 }
 
