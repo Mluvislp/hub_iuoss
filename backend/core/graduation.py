@@ -452,7 +452,17 @@ def parse_bank(bank_id, account_number, holder, owner_name=None):
 BANK_FIELDS = ["bank", "bank_account_number", "bank_account_holder"]
 
 
+PROXY_LOCKED = ("Tài khoản nhận hoàn tiền cọc do Phòng Công tác Sinh viên nhập theo ủy quyền — "
+                "liên hệ Phòng Công tác Sinh viên nếu cần thay đổi.")
+
+
 def _apply_bank(member, bank_info):
+    if member.bank_proxy:
+        # Tài khoản ủy quyền: giữ nguyên số Phòng CTSV đã nhập, bỏ qua dữ liệu gửi lên (kể cả luật trùng họ tên).
+        if not (member.bank_id and member.bank_account_number and member.bank_account_holder):
+            raise GraduationError("Tài khoản ủy quyền chưa được Phòng Công tác Sinh viên nhập đủ — vui lòng liên hệ "
+                                  "Phòng Công tác Sinh viên.")
+        return
     member.bank, member.bank_account_number, member.bank_account_holder = parse_bank(
         *bank_info, owner_name=member.student.full_name)
 
@@ -599,6 +609,8 @@ def replace_receipt(member_id, upload):
 def update_bank(member_id, bank_info):
     def change(member, written):
         _require_editable(member)
+        if member.bank_proxy:
+            raise GraduationError(PROXY_LOCKED)
         _apply_bank(member, bank_info)
         member.save(update_fields=BANK_FIELDS + ["updated_at"])
         logger.info("GRAD_BANK         | code=%-14s", member.student_code)
@@ -686,6 +698,7 @@ def member_payload(member):
             "bank_full_name": member.bank.full_name,
             "account_number": member.bank_account_number or "",
             "holder": member.bank_account_holder or "",
+            "proxy": bool(member.bank_proxy),
         } if member.bank_id else None,
         "bank_suggestion": None if member.bank_id else bank_suggestion(member),
         "deposit": deposit_payload(member),

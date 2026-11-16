@@ -90,6 +90,8 @@ export interface GradMember {
     bank_full_name: string;
     account_number: string;
     holder: string;
+    /** Tài khoản ủy quyền do Phòng CTSV nhập — chỉ xem, không sửa, không xét luật trùng họ tên. */
+    proxy: boolean;
   } | null;
   bank_suggestion: { bank_id: number | null; account_number: string; holder: string } | null;
   deposit: GradDeposit;
