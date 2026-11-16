@@ -263,7 +263,8 @@ def slot_options(round_, now=None):
             remaining = None if slot["capacity"] is None else max(0, slot["capacity"] - used[slot["key"]])
             started = slots.has_started(slot, now)
             closed = slots.is_closed(cfg, slot)
-            shifts.append({**slots.snapshot(slot), "remaining": remaining,
+            # Số chỗ còn trống KHÔNG gửi về Hub (16/11/2026) — chỉ dùng để tính `available`.
+            shifts.append({**slots.snapshot(slot), "remaining": None,
                            "available": not started and not closed and remaining != 0,
                            "reason": ("Ca đã bắt đầu" if started else "Đã khóa" if closed
                                       else "Đã đủ chỗ" if remaining == 0 else "")})
