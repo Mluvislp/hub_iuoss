@@ -236,7 +236,9 @@ class Phase2Tests(TestCase):
         s = self.student()
         self.resp(s, status=R.STATUS_CANCELLED, evidence={"exam_slot": {**OLD_SLOT, "key": "2099-11-17 07:30",
                                                                           "date": "2099-11-17"}})
-        self.assertEqual(hc.slot_options(self.round)["days"][0]["shifts"][0]["remaining"], 2)
+        self.assertEqual(hc._taken(self.round)["2099-11-17 07:30"], 0)
+        shift = hc.slot_options(self.round)["days"][0]["shifts"][0]
+        self.assertEqual((shift["remaining"], shift["available"]), (None, True))   # không gửi số chỗ còn trống về Hub
 
     def test_ngay_du_kien(self):
         self.round.exam_slots = {"phases": [EXAM_SLOTS["phases"][0], {**EXAM_SLOTS["phases"][1], "tentative": True}]}

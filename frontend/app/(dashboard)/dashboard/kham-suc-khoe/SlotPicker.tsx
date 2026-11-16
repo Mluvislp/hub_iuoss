@@ -50,10 +50,9 @@ export default function SlotPicker({ options, value, onChange, error }: {
                                        s.available ? 'text-muted' : 'text-slate-400')}>
                       <Clock size={12} /> {s.start} – {s.end}
                     </div>
-                    {(!s.available || s.remaining !== null) && (
-                      <div className={cn('text-[0.72rem] mt-0.5', s.available ? 'text-muted' : 'text-slate-400')}>
-                        {s.available ? `Còn ${s.remaining} chỗ` : s.reason}
-                      </div>
+                    {/* Không hiện số chỗ còn trống (Phòng CTSV, 16/11/2026) — chỉ báo lý do khi ca không chọn được. */}
+                    {!s.available && (
+                      <div className="text-[0.72rem] mt-0.5 text-slate-400">{s.reason}</div>
                     )}
                   </button>
                 );
