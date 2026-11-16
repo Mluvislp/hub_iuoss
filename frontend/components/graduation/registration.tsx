@@ -10,7 +10,7 @@ import {
   GradError, checkBank, checkPhoto, deadlineText, formatMB, gradApi, storedPhotoName, type BankInput, type GradBank,
   type GradMember,
 } from '@/lib/graduation';
-import { BankCard, BankFields, emptyBank } from './bank';
+import { BankCard, BankFields, BankSummary, ProxyNote, emptyBank } from './bank';
 import { DepositCard, DepositInfo, ReceiptPicker } from './deposit';
 import { g } from './styles';
 
@@ -199,6 +199,7 @@ export function RegisterForm({ member, banks, onRegistered }: {
   const [error, setError] = useState('');
   const reg = member.registration;
   const code = member.student.student_code;
+  const proxy = member.bank?.proxy ? member.bank : null;
 
   async function submit() {
     if (!receipt) {
@@ -206,7 +207,8 @@ export function RegisterForm({ member, banks, onRegistered }: {
       document.getElementById('the-chan')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    const problem = checkBank(bank, member.student.full_name);
+    // Tài khoản ủy quyền: máy chủ giữ nguyên số Phòng CTSV đã nhập — không kiểm ở đây.
+    const problem = proxy ? '' : checkBank(bank, member.student.full_name);
     if (problem) {
       setError(problem);
       document.getElementById('hoan-coc')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -258,8 +260,12 @@ export function RegisterForm({ member, banks, onRegistered }: {
               <h4 className="font-semibold text-ink">Tài khoản nhận hoàn tiền cọc lễ phục</h4>
               <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 whitespace-nowrap">Bắt buộc</span>
             </div>
-            <BankFields banks={banks} value={bank} onChange={setBank} disabled={busy}
-                        ownerName={member.student.full_name} />
+            {proxy ? (
+              <><BankSummary bank={proxy} /><ProxyNote /></>
+            ) : (
+              <BankFields banks={banks} value={bank} onChange={setBank} disabled={busy}
+                          ownerName={member.student.full_name} />
+            )}
           </div>
 
           <Alert message={error} />

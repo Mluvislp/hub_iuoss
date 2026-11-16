@@ -133,12 +133,36 @@ export function emptyBank(m: GradMember): BankInput {
 }
 
 
+/** Một tài khoản đã lưu (chỉ xem). `proxy` = tài khoản ủy quyền do Phòng CTSV nhập. */
+export function BankSummary({ bank }: { bank: NonNullable<GradMember['bank']> }) {
+  return (
+    <div className="flex items-start gap-3.5 rounded-xl border border-line bg-[#fbfcfe] p-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fdf6e3] text-[#a07d1c]"><Landmark size={18} /></span>
+      <dl className="min-w-0 space-y-1 text-sm">
+        <div><dt className="sr-only">Ngân hàng</dt><dd className="font-semibold text-ink">{bank.bank_short_name} <span className="font-normal text-muted">— {bank.bank_full_name}</span></dd></div>
+        <div className="flex gap-2"><dt className="w-24 shrink-0 text-muted">Số tài khoản</dt><dd className="font-mono font-semibold tracking-wide text-ink">{bank.account_number}</dd></div>
+        <div className="flex gap-2"><dt className="w-24 shrink-0 text-muted">{bank.proxy ? 'Người nhận' : 'Chủ tài khoản'}</dt><dd className="font-semibold text-ink">{bank.holder}</dd></div>
+      </dl>
+    </div>
+  );
+}
+
+/** Ghi chú cho tài khoản ủy quyền — hiện ở form đăng ký và ở thẻ sau khi đăng ký. */
+export function ProxyNote() {
+  return (
+    <p className="mt-3 text-sm text-muted">
+      Tài khoản nhận hoàn tiền cọc theo <b className="text-ink">ủy quyền</b>, do Phòng Công tác Sinh viên nhập sẵn.
+      Cần thay đổi, vui lòng liên hệ Phòng Công tác Sinh viên.
+    </p>
+  );
+}
+
 /** Sau khi đã đăng ký: xem / sửa tài khoản (khi còn hạn). Chưa có tài khoản (đăng ký trước khi có mục này) ⇒ mở form ngay. */
 export function BankCard({ member, banks, onChange }: {
   member: GradMember; banks: GradBank[]; onChange: (m: GradMember) => void;
 }) {
   const bank = member.bank;
-  const canEdit = member.registration.can_edit;
+  const canEdit = member.registration.can_edit && !bank?.proxy;
   const [editing, setEditing] = useState(!bank && canEdit);
   const [value, setValue] = useState<BankInput>(() => bank
     ? { bank_id: String(bank.bank_id), bank_account_number: bank.account_number, bank_account_holder: bank.holder }
@@ -187,13 +211,9 @@ export function BankCard({ member, banks, onChange }: {
           </div>
         </div>
       ) : bank ? (
-        <div className="mt-4 flex items-start gap-3.5 rounded-xl border border-line bg-[#fbfcfe] p-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fdf6e3] text-[#a07d1c]"><Landmark size={18} /></span>
-          <dl className="min-w-0 space-y-1 text-sm">
-            <div><dt className="sr-only">Ngân hàng</dt><dd className="font-semibold text-ink">{bank.bank_short_name} <span className="font-normal text-muted">— {bank.bank_full_name}</span></dd></div>
-            <div className="flex gap-2"><dt className="w-24 shrink-0 text-muted">Số tài khoản</dt><dd className="font-mono font-semibold tracking-wide text-ink">{bank.account_number}</dd></div>
-            <div className="flex gap-2"><dt className="w-24 shrink-0 text-muted">Chủ tài khoản</dt><dd className="font-semibold text-ink">{bank.holder}</dd></div>
-          </dl>
+        <div className="mt-4">
+          <BankSummary bank={bank} />
+          {bank.proxy && <ProxyNote />}
         </div>
       ) : null}
     </div>

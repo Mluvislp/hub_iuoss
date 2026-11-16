@@ -279,6 +279,31 @@ class GraduationTests(TestCase):
         res = self.client.post("/api/graduation/bank/", self.bank_data(), format="json")
         self.assertEqual(res.status_code, 400)
 
+    def test_proxy_account_skips_holder_rule_and_is_locked(self):
+        # SV nước ngoài: Phòng CTSV nhập sẵn tài khoản người thân (tên khác hẳn họ tên SV).
+        Member.objects.filter(pk=self.m_sv.pk).update(bank=self.vcb, bank_account_number="060296848381",
+                                                      bank_account_holder="MAI HA THU TRANG", bank_proxy=True)
+        data = self._login_sv()
+        self.assertEqual((data["bank"]["holder"], data["bank"]["proxy"]), ("MAI HA THU TRANG", True))
+        self.assertIsNone(data["bank_suggestion"])
+        # Gửi kèm dữ liệu khác (hoặc rỗng) — máy chủ giữ nguyên tài khoản ủy quyền, không chặn vì tên.
+        res = self.client.post("/api/graduation/register/", self.reg_data(bank_id="", bank_account_number="",
+                                                                          bank_account_holder=""), format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.m_sv.refresh_from_db()
+        self.assertEqual((self.m_sv.registration_status, self.m_sv.bank_account_number, self.m_sv.bank_account_holder),
+                         ("registered", "060296848381", "MAI HA THU TRANG"))
+        res = self.client.post("/api/graduation/bank/", self.bank_data(), format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("ủy quyền", res.json()["detail"])
+
+    def test_proxy_without_account_blocks_register(self):
+        Member.objects.filter(pk=self.m_sv.pk).update(bank_proxy=True)
+        self._login_sv()
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("ủy quyền", res.json()["detail"])
+
     def test_bank_suggestion_from_profile(self):
         StudentBankAccount.objects.create(student=self.sv, bank_name="vietcombank", account_number="0071-000-777")
         data = self._login_sv()
