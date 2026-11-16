@@ -96,10 +96,11 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
         {/* Điện thoại: QR lên đầu phiếu, to gần hết bề ngang để quét dễ; máy tính: cột phải 180px. */}
         <div className="order-first sm:order-none flex flex-col items-center gap-1.5 justify-self-center w-full sm:w-auto">
           <div className="rounded-lg border border-line bg-white p-3 w-full max-w-[260px] sm:w-[180px]">
-            <QRCode value={ticket.code} size={256} viewBox="0 0 256 256"
+            {/* QR = MSSV (16/11/2026) — bàn tiếp nhận quét ra đúng đăng ký của SV, kể cả khi chưa có mã phiếu. */}
+            <QRCode value={ticket.student.student_code || ticket.code} size={256} viewBox="0 0 256 256"
                     style={{ width: '100%', height: 'auto', display: 'block' }} />
           </div>
-          <div className="text-[0.75rem] text-muted text-center">Quét để tra mã phiếu</div>
+          <div className="text-[0.75rem] text-muted text-center">Xuất trình tại bàn tiếp nhận</div>
         </div>
       </div>
 
