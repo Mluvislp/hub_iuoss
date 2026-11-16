@@ -77,7 +77,7 @@ class Phase2Tests(TestCase):
         with self.assertRaises(hc.HealthCheckError) as ctx:
             hc.register(self.student(), {**REG, "exam_slot": "2099-11-17 07:30"})
         self.assertEqual(ctx.exception.code, "exam_slot")
-        self.assertEqual(hc.slot_options(self.round)["days"][0]["shifts"][0]["reason"], "Đã đủ chỗ")
+        self.assertEqual(hc.slot_options(self.round)["days"][0]["shifts"][0]["reason"], "Hết chỗ trống")
 
     def test_chi_dang_hoc_va_tam_dung(self):
         hc.register(self.student(self.suspended), {**REG, "exam_slot": "2099-11-18 13:30"})

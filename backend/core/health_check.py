@@ -241,6 +241,9 @@ def _taken(round_):
                        .exclude(status=Response_.STATUS_CANCELLED).values_list("evidence", flat=True))
 
 
+SLOT_FULL_LABEL = "Hết chỗ trống"
+
+
 def slot_options(round_, now=None):
     """Lựa chọn ngày + ca cho form đăng ký; None khi đợt không chia ca.
 
@@ -266,8 +269,9 @@ def slot_options(round_, now=None):
             # Số chỗ còn trống KHÔNG gửi về Hub (16/11/2026) — chỉ dùng để tính `available`.
             shifts.append({**slots.snapshot(slot), "remaining": None,
                            "available": not started and not closed and remaining != 0,
-                           "reason": ("Ca đã bắt đầu" if started else "Đã khóa" if closed
-                                      else "Đã đủ chỗ" if remaining == 0 else "")})
+                           # Ca khóa / ca đầy đều báo SV "Hết chỗ trống" (16/11/2026); khóa xét trước giờ bắt đầu.
+                           "reason": (SLOT_FULL_LABEL if closed else "Ca đã bắt đầu" if started
+                                      else SLOT_FULL_LABEL if remaining == 0 else "")})
         days.append({"date": day, "label": slots.day_label(cfg, day), "shifts": shifts})
     return {"capacity": phase["capacity"], "days": days,
             # Nhãn đợt khám chỉ có nghĩa khi năm học có từ hai đợt khám.
@@ -284,14 +288,14 @@ def _pick_slot(round_, key):
         raise HealthCheckError("Vui lòng chọn ngày và ca khám.",
                                errors={"exam_slot": "Chưa chọn ca khám."}, code="exam_slot")
     if slots.is_closed(cfg, slot):
-        raise HealthCheckError("Ca khám đã chọn đã ngừng nhận đăng ký. Vui lòng chọn ca khác.",
+        raise HealthCheckError("Ca khám đã chọn đã hết chỗ trống. Vui lòng chọn ca khác.",
                                errors={"exam_slot": "Ca này đã khóa."}, code="exam_slot")
     if slots.has_started(slot):
         raise HealthCheckError("Ca khám đã chọn đã bắt đầu. Vui lòng chọn ca khác.",
                                errors={"exam_slot": "Ca đã bắt đầu."}, code="exam_slot")
     if slot["capacity"] is not None:
         if _taken(round_)[slot["key"]] >= slot["capacity"]:
-            raise HealthCheckError("Ca khám đã chọn vừa đủ chỗ. Vui lòng chọn ca khác.",
+            raise HealthCheckError("Ca khám đã chọn đã hết chỗ trống. Vui lòng chọn ca khác.",
                                    errors={"exam_slot": "Ca đã đủ chỗ."}, code="exam_slot")
     return slots.snapshot(slot)
 

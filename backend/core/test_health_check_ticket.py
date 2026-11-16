@@ -74,7 +74,7 @@ class ClosedSlotTests(TestCase):
     def test_ca_khoa_khong_chon_duoc(self):
         shifts = {s["key"]: s for s in hc.slot_options(self.round)["days"][0]["shifts"]}
         self.assertEqual((shifts["2099-10-28 07:30"]["available"], shifts["2099-10-28 07:30"]["reason"]),
-                         (False, "Đã khóa"))
+                         (False, "Hết chỗ trống"))
         self.assertTrue(shifts["2099-10-28 13:00"]["available"])
         with self.assertRaises(hc.HealthCheckError):
             hc._pick_slot(self.round, "2099-10-28 07:30")
