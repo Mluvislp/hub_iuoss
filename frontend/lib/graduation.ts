@@ -112,8 +112,15 @@ export interface GradDeposit {
   has_receipt: boolean;
   receipt_is_pdf: boolean;
   receipt_uploaded_at: string | null;
+  /** Minh chứng bổ sung (không bắt buộc) — chuyển thiếu, chuyển thêm lần 2. */
+  has_receipt2: boolean;
+  receipt2_is_pdf: boolean;
+  receipt2_uploaded_at: string | null;
   can_upload: boolean;
 }
+
+/** 1 = minh chứng chính, 2 = minh chứng bổ sung. */
+export type ReceiptSlot = 1 | 2;
 
 export class GradError extends Error {
   constructor(public status: number, message: string) {
@@ -182,11 +189,12 @@ export const gradApi = {
     call<Session>('/graduation/verify/info/', { method: 'POST', body: JSON.stringify(body) }).then(keep),
   microsoftStart: () => call<{ authorize_url: string }>('/auth/microsoft/start/'),
   me: () => call<GradMember>('/graduation/me/', {}, true),
-  register: (photo: File | null, bank: BankInput, receipt: File) => {
+  register: (photo: File | null, bank: BankInput, receipt: File, receipt2: File | null = null) => {
     const fd = new FormData();
     Object.entries(bank).forEach(([k, v]) => fd.append(k, v));
     if (photo) fd.append('photo', photo, photo.name);
     fd.append('receipt', receipt, receipt.name);
+    if (receipt2) fd.append('receipt2', receipt2, receipt2.name);
     return call<GradMember>('/graduation/register/', { method: 'POST', body: fd }, true);
   },
   replacePhoto: (photo: File) => {
@@ -194,13 +202,14 @@ export const gradApi = {
     fd.append('photo', photo, photo.name);
     return call<GradMember>('/graduation/photo/', { method: 'POST', body: fd }, true);
   },
-  replaceReceipt: (receipt: File) => {
+  replaceReceipt: (receipt: File, slot: ReceiptSlot = 1) => {
     const fd = new FormData();
     fd.append('receipt', receipt, receipt.name);
-    return call<GradMember>('/graduation/receipt/', { method: 'POST', body: fd }, true);
+    return call<GradMember>(`/graduation/receipt/${slot === 2 ? '?slot=2' : ''}`, { method: 'POST', body: fd }, true);
   },
-  receiptBlob: async (): Promise<Blob> => {
-    const res = await fetch(`${API_BASE}/graduation/receipt/`, {
+  removeReceipt2: () => call<GradMember>('/graduation/receipt/', { method: 'DELETE' }, true),
+  receiptBlob: async (slot: ReceiptSlot = 1): Promise<Blob> => {
+    const res = await fetch(`${API_BASE}/graduation/receipt/${slot === 2 ? '?slot=2' : ''}`, {
       headers: { Authorization: `Bearer ${getGradToken() ?? ''}` },
     });
     if (!res.ok) throw new GradError(res.status, 'Không tải được minh chứng.');

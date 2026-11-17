@@ -456,6 +456,72 @@ class GraduationTests(TestCase):
         got = self.client.get("/api/graduation/receipt/")
         self.assertEqual((got.status_code, got["Content-Type"]), (200, "application/pdf"))
 
+    # ── Minh chứng bổ sung (slot 2) ──
+    def test_second_receipt_upload_view_replace_remove(self):
+        self._login_sv()
+        # Chưa có minh chứng chính ⇒ không nhận minh chứng bổ sung (kể cả khi chưa đăng ký).
+        res = self.client.post("/api/graduation/receipt/?slot=2", {"receipt": _receipt()}, format="multipart")
+        self.assertEqual(res.status_code, 400)
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        dep = res.json()["deposit"]
+        self.assertEqual((dep["has_receipt"], dep["has_receipt2"]), (True, False))
+        res = self.client.post("/api/graduation/receipt/?slot=2", {"receipt": _receipt("lan-2.png")}, format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        dep = res.json()["deposit"]
+        self.assertTrue(dep["has_receipt2"] and dep["receipt2_uploaded_at"])
+        self.m_sv.refresh_from_db()
+        main_key, first2 = self.m_sv.deposit_receipt_storage_key, grad.receipt_path(self.m_sv, 2)
+        self.assertIn("/receipts/ITITIU22001_bs_", self.m_sv.deposit_receipt2_storage_key)
+        self.assertTrue(first2.exists())
+        # Thay file bổ sung bằng PDF: file cũ bị xóa, minh chứng chính giữ nguyên.
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post("/api/graduation/receipt/?slot=2",
+                                   {"receipt": SimpleUploadedFile("lan-2.pdf", b"%PDF-1.4 bo sung")}, format="multipart")
+        self.assertTrue(res.json()["deposit"]["receipt2_is_pdf"])
+        self.assertFalse(first2.exists())
+        self.m_sv.refresh_from_db()
+        self.assertEqual(self.m_sv.deposit_receipt_storage_key, main_key)
+        got = self.client.get("/api/graduation/receipt/?slot=2")
+        self.assertEqual((got.status_code, got["Content-Type"]), (200, "application/pdf"))
+        got.close()                                      # đóng file (Windows không xóa được file đang mở)
+        got = self.client.get("/api/graduation/receipt/")
+        self.assertEqual(got["Content-Type"], "image/png")                         # slot 1 vẫn là ảnh
+        got.close()
+        # Gỡ file bổ sung: xóa file, ô về trống; gỡ lần nữa báo lỗi.
+        second = grad.receipt_path(self.m_sv, 2)
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.delete("/api/graduation/receipt/")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertFalse(res.json()["deposit"]["has_receipt2"])
+        self.assertFalse(second.exists())
+        self.assertEqual(self.client.get("/api/graduation/receipt/?slot=2").status_code, 404)
+        self.assertEqual(self.client.delete("/api/graduation/receipt/").status_code, 400)
+
+    def test_register_with_two_receipts_and_validation(self):
+        self._login_sv()
+        res = self.client.post("/api/graduation/register/", {**self.reg_data(), "receipt2": _receipt("lan-2.png")},
+                               format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(res.json()["deposit"]["has_receipt2"])
+        # File bổ sung cũng qua cùng luật kiểm (không phải ảnh / PDF ⇒ chặn).
+        res = self.client.post("/api/graduation/receipt/?slot=2",
+                               {"receipt": SimpleUploadedFile("x.txt", b"hello")}, format="multipart")
+        self.assertEqual(res.status_code, 400)
+
+    def test_second_receipt_locked_after_deadline_and_on_cancel_request(self):
+        self._login_sv()
+        self.client.post("/api/graduation/register/", {**self.reg_data(), "receipt2": _receipt("lan-2.png")},
+                         format="multipart")
+        self.client.post("/api/graduation/cancel/", {"reason": "Bận việc gia đình"}, format="json")
+        self.assertEqual(self.client.delete("/api/graduation/receipt/").status_code, 400)
+        Member.objects.filter(pk=self.m_sv.pk).update(registration_status="registered")
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(self.client.post("/api/graduation/receipt/?slot=2", {"receipt": _receipt()},
+                                          format="multipart").status_code, 400)
+        self.assertEqual(self.client.delete("/api/graduation/receipt/").status_code, 400)
+        self.m_sv.refresh_from_db()
+        self.assertTrue(self.m_sv.deposit_receipt2_storage_key)                 # vẫn còn — hết hạn không gỡ được
+
     def test_receipt_upload_needs_registration_and_open_window(self):
         self._login_sv()
         res = self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart")
