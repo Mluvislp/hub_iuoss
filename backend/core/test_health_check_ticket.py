@@ -51,6 +51,16 @@ class ExamTicketTests(TestCase):
         self.assertEqual((s["student_code"], s["date_of_birth"], s["citizen_id"], s["phone"]),
                          ("ITCSIU24092", "02/01/2006", "079206000001", "0911111111"))
         self.assertEqual(s["health_insurance_code"], "")
+        self.assertEqual(t["age"], 20)                                 # 02/01/2006 → 27/10/2026
+
+    def test_tuoi_tai_ngay_kham(self):
+        """Tuổi tính tại ngày của ca (18/11/2026): sinh 19/11/2008 khám 18/11 = 17, khám 19/11 = 18."""
+        self.assertEqual(hc.age_on(date(2008, 11, 19), date(2026, 11, 18)), 17)
+        self.assertEqual(hc.age_on(date(2008, 11, 19), date(2026, 11, 19)), 18)
+        self.assertIsNone(hc.age_on(None, date(2026, 11, 18)))
+        Student.objects.filter(pk=self.student.pk).update(date_of_birth=None)
+        self.student.refresh_from_db()
+        self.assertIsNone(hc.exam_ticket(self.student, self._resp(exam_code="7-27/10/2026"), self.round)["age"])
 
     def test_nhanh_da_kham_khong_co_phieu(self):
         resp = self._resp(choice=R.CHOICE_EXAMINED, status=R.STATUS_PENDING, exam_code="5-27/10/2026")

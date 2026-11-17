@@ -394,6 +394,13 @@ def _serialize_history(item, cfg=None):
     }
 
 
+def age_on(dob, day):
+    """Số tuổi tròn tại ngày `day` (date); None khi thiếu ngày sinh."""
+    if not dob or not day:
+        return None
+    return day.year - dob.year - ((day.month, day.day) < (dob.month, dob.day))
+
+
 def exam_ticket(student, resp, round_):
     """Phiếu khám của SV đăng ký khám tại trường — chỉ khi Phòng CTSV đã gán `exam_code`. Ca thuộc
     đợt khám TRƯỚC (đã khám hay chưa) thì phiếu hết tác dụng ⇒ không trả (Hub hiện một dòng thông báo)."""
@@ -409,8 +416,12 @@ def exam_ticket(student, resp, round_):
             .exclude(medical_insurance_code__isnull=True).exclude(medical_insurance_code="")
             .order_by("-updated_at").first())
     dept = student.current_department
+    from datetime import date as _date
+    exam_day = _date.fromisoformat(slot["date"]) if slot else timezone.localdate()
     return {
         "code": code,
+        # Tuổi tại NGÀY KHÁM (đủ 18 tuổi xét theo ngày khám) — hiện dưới mã phiếu.
+        "age": age_on(student.date_of_birth, exam_day),
         "number": code.split("-", 1)[0],        # số phiếu = phần STT trước dấu "-"
         "date_label": slots.day_label(slots.config(round_), slot["date"]) if slot else "",
         "slot_label": slot.get("label", "") if slot else "",

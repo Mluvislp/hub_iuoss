@@ -69,6 +69,11 @@ export default function ExamTicket({ ticket }: { ticket: HealthCheckTicket }) {
               <div className="font-mono text-[1.2rem] font-bold text-primary-text tracking-wide mt-0.5 break-all">{ticket.code}</div>
             </div>
           </div>
+          {ticket.age !== null && (
+            <div className={cn('text-sm font-semibold', ticket.age < 18 ? 'text-[#b45309]' : 'text-ink')}>
+              {ticket.age} tuổi tại ngày khám{ticket.age < 18 ? ' (chưa đủ 18 tuổi)' : ''}
+            </div>
+          )}
 
           <div className={cn(subtle, 'divide-y divide-line2 text-sm')}>
             <div className="flex items-start gap-2.5 px-3.5 py-2.5">
