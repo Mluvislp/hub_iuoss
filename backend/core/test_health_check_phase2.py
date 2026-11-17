@@ -79,6 +79,28 @@ class Phase2Tests(TestCase):
         self.assertEqual(ctx.exception.code, "exam_slot")
         self.assertEqual(hc.slot_options(self.round)["days"][0]["shifts"][0]["reason"], "Hết chỗ trống")
 
+    def test_so_cho_rieng_ca_cua_mot_ngay(self):
+        """`slot_capacity` (17/11/2026): ca sáng 18 được 3 chỗ, ca sáng 17 vẫn 2 chỗ của đợt khám."""
+        cfg = {"phases": [EXAM_SLOTS["phases"][0],
+                          {**EXAM_SLOTS["phases"][1], "slot_capacity": {"2099-11-18 07:30": 3}}]}
+        HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=cfg)
+        try:
+            self.round.refresh_from_db()
+            for _ in range(3):
+                hc.register(self.student(), {**REG, "exam_slot": "2099-11-18 07:30"})
+            with self.assertRaises(hc.HealthCheckError) as ctx:
+                hc.register(self.student(), {**REG, "exam_slot": "2099-11-18 07:30"})
+            self.assertEqual(ctx.exception.code, "exam_slot")
+            for _ in range(2):
+                hc.register(self.student(), {**REG, "exam_slot": "2099-11-17 07:30"})
+            with self.assertRaises(hc.HealthCheckError):
+                hc.register(self.student(), {**REG, "exam_slot": "2099-11-17 07:30"})
+            self.round.refresh_from_db()
+            shifts = {s["key"]: s for d in hc.slot_options(self.round)["days"] for s in d["shifts"]}
+            self.assertEqual((shifts["2099-11-18 07:30"]["available"], shifts["2099-11-18 13:30"]["available"]), (False, True))
+        finally:
+            HealthCheckRound.objects.filter(pk=self.round.pk).update(exam_slots=EXAM_SLOTS)
+
     def test_chi_dang_hoc_va_tam_dung(self):
         hc.register(self.student(self.suspended), {**REG, "exam_slot": "2099-11-18 13:30"})
         with self.assertRaises(hc.HealthCheckError) as ctx:

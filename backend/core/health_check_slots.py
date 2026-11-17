@@ -13,6 +13,7 @@ Dashboard. Từ 10/11/2026 lịch chia thành nhiều ĐỢT KHÁM, mỗi đợt
          "capacity": null | số chỗ tối đa MỖI ca (ca có "capacity" riêng thì dùng số của ca),
          "closed_dates": ["2026-10-27", ...],        ← ngày NGỪNG nhận đăng ký
          "closed_slots": ["2026-10-28 07:30", ...],  ← từng CA ngừng nhận đăng ký
+         "slot_capacity": {"2026-11-18 07:30": 800},  ← số chỗ riêng cho một CA CỦA MỘT NGÀY (ưu tiên nhất)
          "tentative": true,                          ← ngày DỰ KIẾN: mọi nhãn ngày thêm "(Ngày dự kiến)"
          "any_residence": true,                      ← nhận SV mọi nơi cư trú (không bắt buộc TP.HCM), chỉ ghi nhận địa chỉ
          "registration": {"opens_at": ..., "closes_at": ...}},   ← chỉ để lưu vết, không xét
@@ -77,6 +78,11 @@ def _phase(raw, taken_dates):
     closed_slots = sorted({str(k) for k in raw.get("closed_slots") or [] if str(k) in keys})
     phase = {"label": str(raw.get("label") or "").strip(), "dates": dates, "shifts": shifts,
              "capacity": capacity, "closed_dates": closed, "closed_slots": closed_slots}
+    # Số chỗ riêng cho một ca của một ngày (khóa ca → số); bỏ khóa không thuộc đợt khám / số không hợp lệ.
+    raw_caps = raw.get("slot_capacity") if isinstance(raw.get("slot_capacity"), dict) else {}
+    slot_caps = {str(k): _cap(v) for k, v in raw_caps.items() if str(k) in keys and _cap(v)}
+    if slot_caps:
+        phase["slot_capacity"] = dict(sorted(slot_caps.items()))
     if raw.get("tentative") is True:
         phase["tentative"] = True
     if raw.get("any_residence") is True:
@@ -120,6 +126,8 @@ def dump(phases):
             item["tentative"] = True
         if p.get("any_residence"):
             item["any_residence"] = True
+        if p.get("slot_capacity"):
+            item["slot_capacity"] = dict(p["slot_capacity"])
         if p.get("registration"):
             item["registration"] = p["registration"]
         out.append(item)
@@ -179,12 +187,14 @@ def describe_in(cfg, slot):
 
 def iter_slots(cfg, phase=None):
     """Mọi ca (của một đợt khám nếu truyền `phase`), kèm `phase` (index) của đợt và `capacity` = số chỗ
-    riêng của ca nếu có, không thì số chỗ chung của đợt."""
+    theo thứ tự ưu tiên: riêng ca của ngày đó (`slot_capacity`) → riêng ca (`shift.capacity`) → chung đợt."""
     for p in ([phase] if phase else cfg["phases"]):
+        caps = p.get("slot_capacity") or {}
         for day in p["dates"]:
             for shift in p["shifts"]:
-                yield {"key": slot_key(day, shift["start"]), "date": day, **shift,
-                       "capacity": shift.get("capacity") or p["capacity"], "phase": p["index"]}
+                key = slot_key(day, shift["start"])
+                yield {"key": key, "date": day, **shift,
+                       "capacity": caps.get(key) or shift.get("capacity") or p["capacity"], "phase": p["index"]}
 
 
 def find(cfg, key):
