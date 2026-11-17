@@ -180,7 +180,8 @@ class GraduationRegisterView(_Member):
         member = self.member(request)
         try:
             grad.register(member.pk, via=request.user.via, bank_info=_bank_info(request.data),
-                          upload=request.FILES.get("photo"), receipt=request.FILES.get("receipt"))
+                          upload=request.FILES.get("photo"), receipt=request.FILES.get("receipt"),
+                          receipt2=request.FILES.get("receipt2"))
         except grad.GraduationError as exc:
             return _error(str(exc))
         return self.respond(member.pk)
@@ -217,16 +218,22 @@ class GraduationPhotoView(_Member):
         return self.respond(member.pk)
 
 
+def _slot(request):
+    """?slot=2 = minh chứng bổ sung; mặc định 1 (minh chứng chính)."""
+    return 2 if str(request.query_params.get("slot") or request.data.get("slot") or "") == "2" else 1
+
+
 class GraduationReceiptView(_Member):
-    """Minh chứng chuyển khoản tiền thế chân: GET xem lại file đã nộp · POST nộp / thay."""
+    """Minh chứng chuyển khoản tiền thế chân (?slot=2 = bổ sung): GET xem · POST nộp / thay · DELETE gỡ bổ sung."""
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
         member = self.member(request)
-        path = grad.receipt_path(member)
+        slot = _slot(request)
+        path = grad.receipt_path(member, slot)
         if path is None or not path.exists():
             raise Http404
-        response = FileResponse(path.open("rb"), content_type=grad.receipt_mime(member))
+        response = FileResponse(path.open("rb"), content_type=grad.receipt_mime(member, slot))
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
@@ -234,7 +241,15 @@ class GraduationReceiptView(_Member):
     def post(self, request):
         member = self.member(request)
         try:
-            grad.replace_receipt(member.pk, request.FILES.get("receipt"))
+            grad.replace_receipt(member.pk, request.FILES.get("receipt"), slot=_slot(request))
+        except grad.GraduationError as exc:
+            return _error(str(exc))
+        return self.respond(member.pk)
+
+    def delete(self, request):
+        member = self.member(request)
+        try:
+            grad.remove_receipt2(member.pk)
         except grad.GraduationError as exc:
             return _error(str(exc))
         return self.respond(member.pk)

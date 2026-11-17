@@ -89,6 +89,9 @@ class GraduationRoundStudent(models.Model):
     # Minh chứng chuyển khoản tiền thế chân lễ phục — bắt buộc khi đăng ký (core/graduation.py::DEPOSIT_VND).
     deposit_receipt_storage_key = models.CharField(max_length=500, null=True, blank=True)
     deposit_receipt_uploaded_at = models.DateTimeField(null=True, blank=True)
+    # Minh chứng BỔ SUNG (không bắt buộc) — SV chuyển thiếu rồi chuyển thêm lần 2. Chỉ có khi đã có minh chứng chính.
+    deposit_receipt2_storage_key = models.CharField(max_length=500, null=True, blank=True)
+    deposit_receipt2_uploaded_at = models.DateTimeField(null=True, blank=True)
     cancel_reason = models.CharField(max_length=500, null=True, blank=True)
     cancel_requested_at = models.DateTimeField(null=True, blank=True)
     cancel_reviewed_at = models.DateTimeField(null=True, blank=True)

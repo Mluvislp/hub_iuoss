@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'react-qr-code';
-import { AlertCircle, Check, CheckCircle2, Copy, Eye, FileText, Loader2, ReceiptText, RefreshCw, Upload } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, Copy, Eye, FileText, Loader2, Plus, ReceiptText, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildVietQrPayload } from '@/lib/vietqr';
 import {
-  GradError, checkReceipt, deadlineText, formatMB, gradApi, type GradDeposit, type GradMember,
+  GradError, checkReceipt, deadlineText, formatMB, gradApi, type GradDeposit, type GradMember, type ReceiptSlot,
 } from '@/lib/graduation';
 import { g } from './styles';
 
@@ -170,10 +170,10 @@ export function ReceiptPicker({ file, onFile, disabled, compact }: {
   );
 }
 
-async function openReceipt() {
+async function openReceipt(slot: ReceiptSlot = 1) {
   const tab = window.open('', '_blank');
   try {
-    const url = URL.createObjectURL(await gradApi.receiptBlob());
+    const url = URL.createObjectURL(await gradApi.receiptBlob(slot));
     if (tab) tab.location.href = url; else window.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch {
@@ -185,23 +185,34 @@ async function openReceipt() {
 export function DepositCard({ member, onChange }: { member: GradMember; onChange: (m: GradMember) => void }) {
   const d = member.deposit;
   const [file, setFile] = useState<File | null>(null);
-  const [replacing, setReplacing] = useState(false);
+  // Ô đang tải lên: 1 = minh chứng chính (nộp / thay), 2 = bổ sung (thêm / thay); null = không mở ô chọn file.
+  const [target, setTarget] = useState<ReceiptSlot | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [showInfo, setShowInfo] = useState(!d.has_receipt);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const slot: ReceiptSlot | null = d.can_upload ? (d.has_receipt ? target : 1) : null;
+
+  function close() { setTarget(null); setFile(null); setError(''); }
+
   async function upload() {
-    if (!file) { setError('Vui lòng chọn file minh chứng.'); return; }
+    if (!file || !slot) { setError('Vui lòng chọn file minh chứng.'); return; }
     setBusy(true); setError('');
     try {
-      onChange(await gradApi.replaceReceipt(file));
-      setFile(null); setReplacing(false); setShowInfo(false);
+      onChange(await gradApi.replaceReceipt(file, slot));
+      close(); setShowInfo(false);
     } catch (err) {
       setError(err instanceof GradError ? err.message : 'Không gửi được minh chứng. Vui lòng thử lại.');
     } finally { setBusy(false); }
   }
 
-  const picking = d.can_upload && (!d.has_receipt || replacing);
+  async function remove2() {
+    setBusy(true); setError('');
+    try { onChange(await gradApi.removeReceipt2()); setConfirmRemove(false); } catch (err) {
+      setError(err instanceof GradError ? err.message : 'Không gỡ được minh chứng bổ sung.');
+    } finally { setBusy(false); }
+  }
   return (
     <div className={cn(g.card, 'p-6', !d.has_receipt && 'border-amber-300')}>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -228,19 +239,56 @@ export function DepositCard({ member, onChange }: { member: GradMember; onChange
       )}
 
       {d.has_receipt && (
-        <div className="mt-4 flex flex-wrap items-center gap-3.5 rounded-xl border border-line bg-[#fbfcfe] p-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fdf6e3] text-[#a07d1c]"><ReceiptText size={18} /></span>
-          <div className="min-w-0 flex-1 text-sm">
-            <div className="font-semibold text-ink">{d.amount ? `${vnd(d.amount)} đ · ` : ''}minh chứng {d.receipt_is_pdf ? 'PDF' : 'ảnh'}</div>
-            <div className="text-muted">Nộp lúc {dt(d.receipt_uploaded_at)}</div>
+        <div className="mt-4 divide-y divide-line2 rounded-xl border border-line bg-[#fbfcfe]">
+          <div className="flex flex-wrap items-center gap-3.5 p-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fdf6e3] text-[#a07d1c]"><ReceiptText size={18} /></span>
+            <div className="min-w-0 flex-1 text-sm">
+              <div className="font-semibold text-ink">{d.amount ? `${vnd(d.amount)} đ · ` : ''}minh chứng {d.receipt_is_pdf ? 'PDF' : 'ảnh'}</div>
+              <div className="text-muted">Nộp lúc {dt(d.receipt_uploaded_at)}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={g.btnOutline} onClick={() => openReceipt(1)}><Eye size={15} /> Xem</button>
+              {d.can_upload && target !== 1 && (
+                <button type="button" className={g.btnGhost} onClick={() => { close(); setTarget(1); }}><RefreshCw size={14} /> Thay minh chứng</button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={g.btnOutline} onClick={openReceipt}><Eye size={15} /> Xem</button>
-            {d.can_upload && !replacing && (
-              <button type="button" className={g.btnGhost} onClick={() => setReplacing(true)}><RefreshCw size={14} /> Thay minh chứng</button>
-            )}
-          </div>
+          {d.has_receipt2 && (
+            <div className="flex flex-wrap items-center gap-3.5 p-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef4ff] text-[#0f2a5c]"><Plus size={18} /></span>
+              <div className="min-w-0 flex-1 text-sm">
+                <div className="font-semibold text-ink">Minh chứng bổ sung · {d.receipt2_is_pdf ? 'PDF' : 'ảnh'}</div>
+                <div className="text-muted">Nộp lúc {dt(d.receipt2_uploaded_at)}</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className={g.btnOutline} onClick={() => openReceipt(2)}><Eye size={15} /> Xem</button>
+                {d.can_upload && target !== 2 && !confirmRemove && (
+                  <>
+                    <button type="button" className={g.btnGhost} onClick={() => { close(); setTarget(2); }}><RefreshCw size={14} /> Thay</button>
+                    <button type="button" className={cn(g.btnGhost, 'text-danger-text')} onClick={() => { close(); setConfirmRemove(true); }}><Trash2 size={14} /> Gỡ</button>
+                  </>
+                )}
+                {confirmRemove && (
+                  <span className="inline-flex items-center gap-2 text-sm">
+                    Gỡ minh chứng bổ sung?
+                    <button type="button" className={cn(g.btnOutline, 'text-danger-text')} onClick={remove2} disabled={busy}>
+                      {busy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Gỡ
+                    </button>
+                    <button type="button" className={g.btnGhost} onClick={() => setConfirmRemove(false)} disabled={busy}>Thôi</button>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {d.has_receipt && !d.has_receipt2 && d.can_upload && target === null && (
+        <button type="button" onClick={() => setTarget(2)}
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[#a07d1c] hover:underline">
+          <Plus size={15} /> Tải thêm minh chứng bổ sung
+          <span className="font-normal text-muted">(chuyển khoản thiếu, đã chuyển thêm)</span>
+        </button>
       )}
 
       {d.has_receipt && !showInfo && !d.overdue && (
@@ -250,14 +298,19 @@ export function DepositCard({ member, onChange }: { member: GradMember; onChange
       )}
       {showInfo && !d.overdue && <div className="mt-4"><DepositInfo deposit={d} /></div>}
 
-      {picking && (
+      {error && !slot && <p role="alert" className="mt-3 text-sm text-danger-text">{error}</p>}
+      {slot && (
         <div className="mt-4 space-y-3">
+          {d.has_receipt && (
+            <div className="text-sm font-medium text-ink">
+              {slot === 1 ? 'Thay minh chứng chuyển khoản' : d.has_receipt2 ? 'Thay minh chứng bổ sung' : 'Minh chứng bổ sung'}
+            </div>
+          )}
           <ReceiptPicker file={file} onFile={setFile} disabled={busy} compact />
           {error && <p role="alert" className="text-sm text-danger-text">{error}</p>}
           <div className="flex justify-end gap-2">
-            {replacing && (
-              <button type="button" className={g.btnGhost} disabled={busy}
-                      onClick={() => { setReplacing(false); setFile(null); setError(''); }}>Thôi</button>
+            {d.has_receipt && (
+              <button type="button" className={g.btnGhost} disabled={busy} onClick={close}>Thôi</button>
             )}
             <button type="button" className={cn(g.btnPrimary, 'h-11')} onClick={upload} disabled={busy || !file}>
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Gửi minh chứng

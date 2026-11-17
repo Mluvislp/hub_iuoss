@@ -305,6 +305,9 @@ DEPOSIT_TAG = "LPTN2026"
 RECEIPT_MAX_BYTES = 10 * 1024 * 1024
 RECEIPT_EXT_MIME = {"jpg": "image/jpeg", "png": "image/png", "pdf": "application/pdf"}
 RECEIPT_FIELDS = ["deposit_receipt_storage_key", "deposit_receipt_uploaded_at"]
+# Minh chứng bổ sung (slot 2): SV chuyển thiếu, chuyển thêm lần nữa. Không bắt buộc, cần có minh chứng chính trước.
+RECEIPT2_FIELDS = ["deposit_receipt2_storage_key", "deposit_receipt2_uploaded_at"]
+RECEIPT_SLOTS = {1: RECEIPT_FIELDS, 2: RECEIPT2_FIELDS}
 
 
 def deposit_reference(member):
@@ -342,28 +345,34 @@ def validate_receipt(upload):
     return data, ("png" if is_png else "jpg")
 
 
-def _apply_receipt(member, upload, written):
-    """Ghi minh chứng mới lên dòng (chưa save). Trả key CŨ để xóa sau commit."""
+def _apply_receipt(member, upload, written, slot=1):
+    """Ghi minh chứng mới vào ô `slot` (1 = chính, 2 = bổ sung) trên dòng (chưa save). Trả key CŨ để xóa sau commit."""
+    key_field, at_field = RECEIPT_SLOTS[slot]
     data, ext = validate_receipt(upload)
-    key = f"{PHOTO_PREFIX}/{member.round_id}/receipts/{member.student_code.upper()}_{uuid4().hex[:12]}.{ext}"
+    suffix = "" if slot == 1 else "_bs"
+    key = f"{PHOTO_PREFIX}/{member.round_id}/receipts/{member.student_code.upper()}{suffix}_{uuid4().hex[:12]}.{ext}"
     target = Path(settings.MEDIA_ROOT).resolve() / key
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("xb") as stream:          # tên ngẫu nhiên + 'xb' — không bao giờ ghi đè
         written.append(target)
         stream.write(data)
-    stale = member.deposit_receipt_storage_key
-    member.deposit_receipt_storage_key = key
-    member.deposit_receipt_uploaded_at = timezone.now()
+    stale = getattr(member, key_field)
+    setattr(member, key_field, key)
+    setattr(member, at_field, timezone.now())
     return stale
 
 
-def receipt_path(member):
-    key = member.deposit_receipt_storage_key
+def receipt_key(member, slot=1):
+    return getattr(member, RECEIPT_SLOTS[slot][0]) if slot in RECEIPT_SLOTS else None
+
+
+def receipt_path(member, slot=1):
+    key = receipt_key(member, slot)
     return safe_path(settings.MEDIA_ROOT, key) if key else None
 
 
-def receipt_mime(member):
-    ext = (member.deposit_receipt_storage_key or "").rsplit(".", 1)[-1].lower()
+def receipt_mime(member, slot=1):
+    ext = (receipt_key(member, slot) or "").rsplit(".", 1)[-1].lower()
     return RECEIPT_EXT_MIME.get(ext, "application/octet-stream")
 
 
@@ -375,6 +384,8 @@ def can_upload_receipt(member):
 def deposit_payload(member):
     key = member.deposit_receipt_storage_key or ""
     uploaded = member.deposit_receipt_uploaded_at
+    key2 = member.deposit_receipt2_storage_key or ""
+    uploaded2 = member.deposit_receipt2_uploaded_at
     closes = member.round.registration_closes_at
     overdue = bool(closes and timezone.now() > closes)
     account = {k: None for k in DEPOSIT_ACCOUNT} if overdue else DEPOSIT_ACCOUNT
@@ -387,6 +398,9 @@ def deposit_payload(member):
         "has_receipt": bool(key),
         "receipt_is_pdf": key.lower().endswith(".pdf"),
         "receipt_uploaded_at": timezone.localtime(uploaded).isoformat() if uploaded else None,
+        "has_receipt2": bool(key2),
+        "receipt2_is_pdf": key2.lower().endswith(".pdf"),
+        "receipt2_uploaded_at": timezone.localtime(uploaded2).isoformat() if uploaded2 else None,
         "can_upload": can_upload_receipt(member),
     }
 
@@ -515,13 +529,19 @@ def _run(member_id, change):
         raise
 
 
-def register(member_id, *, via, bank_info, upload=None, receipt=None):
+def register(member_id, *, via, bank_info, upload=None, receipt=None, receipt2=None):
     def change(member, written):
         _require_open(member)
         if member.is_registered:
             raise GraduationError("Đã đăng ký tham dự rồi.")
         _apply_bank(member, bank_info)          # bắt buộc — kiểm trước khi ghi file
         stale = [_apply_receipt(member, receipt, written)]                      # bắt buộc
+        # Bổ sung (không bắt buộc). Đăng ký lại sau khi hủy mà không gửi kèm ⇒ bỏ file bổ sung của lần trước.
+        if receipt2 is not None:
+            stale.append(_apply_receipt(member, receipt2, written, slot=2))
+        elif member.deposit_receipt2_storage_key:
+            stale.append(member.deposit_receipt2_storage_key)
+            member.deposit_receipt2_storage_key = member.deposit_receipt2_uploaded_at = None
         stale += _apply_photo(member, upload, written) if upload is not None else []
         member.registration_status = Member.STATUS_REGISTERED
         member.registered_at = timezone.now()
@@ -531,7 +551,7 @@ def register(member_id, *, via, bank_info, upload=None, receipt=None):
         member.cancel_reviewed_at = member.cancel_review_note = None
         fields = ["registration_status", "registered_at", "verified_via", "checkin_token", "cancel_reason",
                   "cancel_requested_at", "cancel_reviewed_at", "cancel_review_note", "updated_at"]
-        member.save(update_fields=fields + BANK_FIELDS + RECEIPT_FIELDS
+        member.save(update_fields=fields + BANK_FIELDS + RECEIPT_FIELDS + RECEIPT2_FIELDS
                     + (PHOTO_FIELDS if upload is not None else []))
         logger.info("GRAD_REGISTER     | code=%-14s | via=%s | photo=%s", member.student_code, via,
                     "yes" if upload is not None else "no")
@@ -595,13 +615,34 @@ def remove_photo(member_id):
     return _run(member_id, change)
 
 
-def replace_receipt(member_id, upload):
+def replace_receipt(member_id, upload, slot=1):
+    """Nộp / thay minh chứng chính (slot 1) hoặc bổ sung (slot 2)."""
+    if slot not in RECEIPT_SLOTS:
+        raise GraduationError("Minh chứng không hợp lệ.")
+
     def change(member, written):
         if not can_upload_receipt(member):
             _require_editable(member)                     # ném đúng câu lỗi
-        stale = _apply_receipt(member, upload, written)
-        member.save(update_fields=RECEIPT_FIELDS + ["updated_at"])
-        logger.info("GRAD_RECEIPT      | code=%-14s | replaced=%s", member.student_code, bool(stale))
+        if slot == 2 and not member.deposit_receipt_storage_key:
+            raise GraduationError("Vui lòng nộp minh chứng chuyển khoản chính trước, rồi mới tải minh chứng bổ sung.")
+        stale = _apply_receipt(member, upload, written, slot=slot)
+        member.save(update_fields=RECEIPT_SLOTS[slot] + ["updated_at"])
+        logger.info("GRAD_RECEIPT      | code=%-14s | slot=%s | replaced=%s", member.student_code, slot, bool(stale))
+        return stale
+    return _run(member_id, change)
+
+
+def remove_receipt2(member_id):
+    """Gỡ minh chứng bổ sung (nộp nhầm). Minh chứng chính không gỡ được — chỉ thay."""
+    def change(member, written):
+        if not can_upload_receipt(member):
+            _require_editable(member)
+        stale = member.deposit_receipt2_storage_key
+        if not stale:
+            raise GraduationError("Chưa có minh chứng bổ sung.")
+        member.deposit_receipt2_storage_key = member.deposit_receipt2_uploaded_at = None
+        member.save(update_fields=RECEIPT2_FIELDS + ["updated_at"])
+        logger.info("GRAD_RECEIPT2_DEL | code=%-14s", member.student_code)
         return stale
     return _run(member_id, change)
 
