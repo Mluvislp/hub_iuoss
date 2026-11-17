@@ -709,6 +709,8 @@ export interface HealthCheckTicket {
   code: string;
   /** Số phiếu — phần STT trước dấu "-" của mã. */
   number: string;
+  /** Tuổi tròn tại ngày khám; null khi hồ sơ thiếu ngày sinh. */
+  age: number | null;
   date_label: string;
   slot_label: string;
   slot_time: string;
