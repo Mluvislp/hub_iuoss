@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  AlertCircle, Camera, Check, CheckCircle2, Clock, ImagePlus, Info, Loader2, RefreshCw, Shirt, Sparkles,
+  AlertCircle, Camera, Check, CheckCircle2, Clock, ImagePlus, Info, Loader2, Plus, RefreshCw, Shirt, Sparkles,
   Trash2, Upload, X, XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -194,6 +194,8 @@ export function RegisterForm({ member, banks, onRegistered }: {
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [receipt, setReceipt] = useState<File | null>(null);
+  const [receipt2, setReceipt2] = useState<File | null>(null);
+  const [withReceipt2, setWithReceipt2] = useState(false);
   const [bank, setBank] = useState<BankInput>(() => emptyBank(member));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -215,7 +217,7 @@ export function RegisterForm({ member, banks, onRegistered }: {
       return;
     }
     setBusy(true); setError('');
-    try { onRegistered(await gradApi.register(file, bank, receipt)); } catch (err) {
+    try { onRegistered(await gradApi.register(file, bank, receipt, withReceipt2 ? receipt2 : null)); } catch (err) {
       setError(err instanceof GradError ? err.message : 'Không đăng ký được. Vui lòng thử lại.');
     } finally { setBusy(false); }
   }
@@ -252,6 +254,23 @@ export function RegisterForm({ member, banks, onRegistered }: {
             <div>
               <div className="mb-2 text-sm font-medium text-ink">Minh chứng đã chuyển khoản</div>
               <ReceiptPicker file={receipt} onFile={setReceipt} disabled={busy} />
+              {receipt && !withReceipt2 && (
+                <button type="button" onClick={() => setWithReceipt2(true)} disabled={busy}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-[#a07d1c] hover:underline">
+                  <Plus size={15} /> Thêm minh chứng bổ sung
+                  <span className="font-normal text-muted">(chuyển khoản 2 lần)</span>
+                </button>
+              )}
+              {withReceipt2 && (
+                <div className="mt-3">
+                  <div className="mb-2 flex items-baseline justify-between gap-3 text-sm">
+                    <span className="font-medium text-ink">Minh chứng bổ sung <span className="font-normal text-muted">(không bắt buộc)</span></span>
+                    <button type="button" className="text-muted hover:underline" disabled={busy}
+                            onClick={() => { setWithReceipt2(false); setReceipt2(null); }}>Bỏ</button>
+                  </div>
+                  <ReceiptPicker file={receipt2} onFile={setReceipt2} disabled={busy} compact />
+                </div>
+              )}
             </div>
           </div>
 
@@ -272,7 +291,8 @@ export function RegisterForm({ member, banks, onRegistered }: {
           <div className="rounded-xl bg-[#0f2a5c] p-4 sm:p-5 text-white flex flex-col gap-3.5">
             {(file || receipt) && (
               <div className="text-sm text-white/80">
-                {[file && 'ảnh trình chiếu', receipt && 'minh chứng chuyển khoản'].filter(Boolean).join(' và ')
+                {[file && 'ảnh trình chiếu', receipt && (withReceipt2 && receipt2 ? '2 minh chứng chuyển khoản' : 'minh chứng chuyển khoản')]
+                  .filter(Boolean).join(' và ')
                   .replace(/^./, (c) => c.toUpperCase())} sẽ được gửi cùng đăng ký.
               </div>
             )}
