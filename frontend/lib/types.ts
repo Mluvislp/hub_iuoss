@@ -591,6 +591,7 @@ export type HealthCheckStatus =
   | 'registered' | 'attended' | 'absent'       // choice = register
   | 'not_examined'                             // register: bệnh viện ghi nhận chưa khám
   | 'outside_exam' | 'enterprise'             // register: theo DS lỗi bệnh viện (khám ngoài / diện DN)
+  | 'card_ineligible'                          // register: thẻ BHYT DQ, HC, TK… bệnh viện trả về
   | 'cancelled';                               // đã hủy (Hub coi như chưa trả lời, không trả về)
 
 export interface HealthCheckResponse {

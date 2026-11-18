@@ -33,6 +33,7 @@ const STATUS_BADGE: Record<string, string> = {
   not_examined: badge.danger,
   outside_exam: badge.success,
   enterprise: badge.warning,
+  card_ineligible: badge.warning,
 };
 
 function fmtDateTime(iso: string) {
