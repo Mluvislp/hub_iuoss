@@ -62,6 +62,7 @@ class HealthCheckResponse(models.Model):
     # Theo DS lỗi bệnh viện (12/11/2026) — KHÔNG được đăng ký lại đợt khám sau.
     STATUS_OUTSIDE_EXAM = "outside_exam"    # đã khám nơi khác trong năm
     STATUS_ENTERPRISE = "enterprise"        # thẻ BHYT mã DN — khám theo diện doanh nghiệp
+    STATUS_CARD_INELIGIBLE = "card_ineligible"   # thẻ BHYT DQ, HC, TK… — bệnh viện trả về (18/11/2026)
     # Phản hồi đã hủy (Phòng CTSV duyệt yêu cầu hủy / xoá để trả lời lại) — dòng GIỮ LẠI, dữ liệu cũ
     # cất trong evidence["history"]; coi như SV chưa trả lời đợt (10/11/2026).
     STATUS_CANCELLED = "cancelled"
@@ -76,6 +77,7 @@ class HealthCheckResponse(models.Model):
         STATUS_NOT_EXAMINED: "Bệnh viện ghi nhận chưa khám",
         STATUS_OUTSIDE_EXAM: "Đã khám ở ngoài",
         STATUS_ENTERPRISE: "Khám theo diện doanh nghiệp",
+        STATUS_CARD_INELIGIBLE: "Thẻ BHYT không thuộc diện khám",
         STATUS_CANCELLED: "Đã hủy",
     }
 
