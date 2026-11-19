@@ -4,8 +4,19 @@ Schema: dashboard_iuoss/docs/sql/20261104_graduation_rounds.sql + 20261104_gradu
 Hub CHỈ ghi phần đăng ký (registration_status registered / cancel_requested, ảnh, checkin_token,
 xin hủy). Duyệt hủy, check-in, log ra/vào là việc của Dashboard. Ghi qua `core.graduation`.
 """
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from django.db import models
 from django.utils import timezone
+
+_VN = ZoneInfo("Asia/Ho_Chi_Minh")
+# Gia hạn NGẦM (Phòng CTSV yêu cầu 19/11/2026): {hạn đăng ký đang đặt ở Dashboard: hạn thật}. Máy chủ cho đăng ký /
+# nộp minh chứng tới hạn thật, nhưng mọi chỗ HIỂN THỊ vẫn là `registration_closes_at` (18/11). Chỉ ăn đúng mốc
+# khóa ⇒ Phòng CTSV đổi hạn ở Dashboard là gia hạn này tự thôi; qua hạn thật thì tự đóng — gỡ dòng sau đợt.
+HIDDEN_EXTENSIONS = {
+    datetime(2026, 11, 18, 23, 59, 59, tzinfo=_VN): datetime(2026, 11, 20, 23, 59, 59, tzinfo=_VN),
+}
 
 
 class GraduationRound(models.Model):
@@ -22,11 +33,16 @@ class GraduationRound(models.Model):
         managed = False
         db_table = "graduation_rounds"
 
+    def effective_closes_at(self):
+        """Hạn máy chủ thực thi = hạn đặt ở Dashboard, hoặc hạn gia hạn ngầm (`HIDDEN_EXTENSIONS`) nếu có."""
+        closes = self.registration_closes_at
+        return max(closes, HIDDEN_EXTENSIONS.get(closes, closes)) if closes else None
+
     def registration_open(self, now=None):
-        """Mở ⇔ đã đặt CẢ HAI mốc và đang ở giữa. Chưa đặt hạn = đóng (Phòng CTSV đặt ở Dashboard)."""
+        """Mở ⇔ đã đặt CẢ HAI mốc và đang ở giữa (tính theo hạn thực thi). Chưa đặt hạn = đóng."""
         now = now or timezone.now()
-        return bool(self.registration_opens_at and self.registration_closes_at
-                    and self.registration_opens_at <= now <= self.registration_closes_at)
+        closes = self.effective_closes_at()
+        return bool(self.registration_opens_at and closes and self.registration_opens_at <= now <= closes)
 
 
 class Bank(models.Model):
