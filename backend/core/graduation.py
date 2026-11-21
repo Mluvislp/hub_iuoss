@@ -387,7 +387,8 @@ def deposit_payload(member):
     key2 = member.deposit_receipt2_storage_key or ""
     uploaded2 = member.deposit_receipt2_uploaded_at
     closes = member.round.registration_closes_at
-    overdue = bool(closes and timezone.now() > closes)
+    # Quá hạn theo hạn THỰC THI (có gia hạn ngầm); "deadline" vẫn trả hạn hiển thị.
+    overdue = bool(closes and timezone.now() > member.round.effective_closes_at())
     account = {k: None for k in DEPOSIT_ACCOUNT} if overdue else DEPOSIT_ACCOUNT
     return {
         **account,

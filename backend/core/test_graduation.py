@@ -571,6 +571,28 @@ class GraduationTests(TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("Chưa đăng ký", res.json()["detail"])
 
+    def test_hidden_extension_reopens_registration_but_keeps_displayed_deadline(self):
+        from core import graduation_models
+        now = timezone.now()
+        shown = (now - timedelta(minutes=1)).replace(microsecond=0)
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=shown)
+        self._login_sv()
+        # Không gia hạn: đóng.
+        self.assertEqual(self.client.post("/api/graduation/register/", self.reg_data(), format="multipart").status_code, 400)
+        # Gia hạn ngầm đúng mốc đang đặt ⇒ đăng ký được, thấy thông tin chuyển khoản, hạn hiển thị KHÔNG đổi.
+        self.enterContext(patch.dict(graduation_models.HIDDEN_EXTENSIONS, {shown: now + timedelta(days=1)}))
+        me = self.client.get("/api/graduation/me/").json()
+        self.assertTrue(me["round"]["registration_open"])
+        self.assertTrue(me["registration"]["can_register"])
+        self.assertEqual(timezone.datetime.fromisoformat(me["round"]["registration_closes_at"]), shown)
+        self.assertFalse(me["deposit"]["overdue"])
+        self.assertIsNotNone(me["deposit"]["account_number"])
+        self.assertEqual(timezone.datetime.fromisoformat(me["deposit"]["deadline"]), shown)
+        self.assertEqual(self.client.post("/api/graduation/register/", self.reg_data(), format="multipart").status_code, 200)
+        # Gia hạn đã qua ⇒ đóng lại.
+        self.enterContext(patch.dict(graduation_models.HIDDEN_EXTENSIONS, {shown: now - timedelta(seconds=1)}))
+        self.assertFalse(self.client.get("/api/graduation/me/").json()["round"]["registration_open"])
+
     def test_photo_locked_after_photo_deadline(self):
         self._login_sv()
         self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")

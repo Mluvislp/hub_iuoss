@@ -40,8 +40,12 @@ class EditingTests(TestCase):
         return self.client.post(url, data, format='multipart')
 
     def close(self):
-        self.cfg.registration_closes_at = timezone.now() - timedelta(seconds=1)
+        # Đóng cả đợt đăng ký BHYT lẫn đợt khai nơi khác (tách riêng từ 13/11/2026, 6d8aee0).
+        past = timezone.now() - timedelta(seconds=1)
+        self.cfg.registration_closes_at = past
         self.cfg.save()
+        self.ext_cfg.closes_at = past
+        self.ext_cfg.save()
 
     def test_legacy_view_edit_identity_status_and_version(self):
         row = self.registration()
