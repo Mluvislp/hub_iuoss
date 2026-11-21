@@ -198,6 +198,25 @@ class Phase2Tests(TestCase):
         hc.register(s, {**REG, "exam_slot": "2099-11-19 07:30", "reregister": True})
         self.assertEqual(hc.history(R.objects.get(student_id=s.pk).evidence)[0]["status"], R.STATUS_ABSENT)
 
+    def test_bv_ghi_nhan_chua_kham_dang_ky_lai_duoc(self):
+        s = self.student()
+        self.resp(s, status=R.STATUS_NOT_EXAMINED)
+        self.assertTrue(hc.build_state(s)["can_reregister"])
+        hc.register(s, {**REG, "exam_slot": "2099-11-19 07:30", "reregister": True})
+        self.assertEqual(hc.history(R.objects.get(student_id=s.pk).evidence)[0]["status"], R.STATUS_NOT_EXAMINED)
+
+    def test_ds_loi_benh_vien_khong_dang_ky_lai(self):
+        # Đã khám ở ngoài / diện doanh nghiệp / thẻ không thuộc diện: KHÔNG đăng ký lại đợt sau.
+        for status in (R.STATUS_OUTSIDE_EXAM, R.STATUS_ENTERPRISE, R.STATUS_CARD_INELIGIBLE):
+            with self.subTest(status=status):
+                s = self.student()
+                r = self.resp(s, status=status)
+                self.assertFalse(hc.build_state(s)["can_reregister"])
+                with self.assertRaises(hc.HealthCheckError):
+                    hc.register(s, {**REG, "exam_slot": "2099-11-19 07:30", "reregister": True})
+                r.refresh_from_db()
+                self.assertEqual(r.status, status)
+
     def test_da_kham_dot_1_khong_dang_ky_lai(self):
         s = self.student()
         self.resp(s, status=R.STATUS_ATTENDED)
