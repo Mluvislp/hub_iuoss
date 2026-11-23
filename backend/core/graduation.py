@@ -379,7 +379,8 @@ def receipt_mime(member, slot=1):
 # Mở bổ sung nộp minh chứng (Phòng CTSV, 23/11/2026): sau hạn đăng ký, người ĐÃ đăng ký mà CHƯA có minh chứng chính
 # được nộp tới mốc này. Ai nộp trong đợt bổ sung (minh chứng nộp sau hạn đăng ký) vẫn thay / thêm minh chứng phụ được
 # tới hết mốc (lỡ nộp nhầm). Đăng ký mới, tài khoản hoàn cọc, xin hủy, ảnh: KHÔNG mở. None = không có đợt bổ sung.
-RECEIPT_LATE_CLOSES_AT = datetime(2026, 11, 23, 23, 59, 59, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
+# Đợt 2026 (định mở tới hết 23/11) đã đóng sớm theo yêu cầu Phòng CTSV lúc 23/11/2026 — 1 người nộp trong đợt.
+RECEIPT_LATE_CLOSES_AT = None
 
 
 def late_receipt_open(member, now=None):
