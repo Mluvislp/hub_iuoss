@@ -142,9 +142,6 @@ export default function VolunteerEventPage() {
       }
       const empty = Array.isArray(v) ? !v.length : !String(v ?? '').trim();
       if (q.required && empty) { e[q.id] = ['multi', 'single', 'dropdown', 'yes_no'].includes(q.type) ? 'Vui lòng chọn.' : 'Vui lòng trả lời câu hỏi này.'; continue; }
-      if (q.type === 'yes_no' && v === 'no' && !String(values[`${q.id}:reason`] ?? '').trim()) {
-        e[q.id] = `Vui lòng ghi ${(q.reason_label || 'lý do không tham gia').toLowerCase()}.`; continue;
-      }
       if (empty) continue;
       const picked = Array.isArray(v) ? v : [String(v)];
       if (picked.includes(OTHER) && !String(values[`${q.id}:other`] ?? '').trim()) e[q.id] = 'Vui lòng ghi rõ lựa chọn Khác.';
@@ -269,8 +266,8 @@ export default function VolunteerEventPage() {
           </div>
           {v === 'no' && (
             <div>
-              <label className={ui.fieldLabel}>{reasonLabel}<span className="ml-0.5 text-danger-text">*</span></label>
-              <textarea className={cn(ui.textarea, err && 'border-danger-text')} rows={3} maxLength={5000} autoFocus
+              <label className={ui.fieldLabel}>{reasonLabel} <span className="font-normal text-muted">(không bắt buộc)</span></label>
+              <textarea className={ui.textarea} rows={3} maxLength={5000}
                 value={String(values[`${q.id}:reason`] ?? '')} onChange={(e) => set(`${q.id}:reason`, e.target.value)} />
             </div>
           )}

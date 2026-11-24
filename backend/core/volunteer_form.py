@@ -154,7 +154,7 @@ def clean_question(raw, used_ids):
             if q["max"] and q["min"] > q["max"]:
                 return q, f"Câu \"{title}\": số lựa chọn tối thiểu lớn hơn tối đa."
     elif qtype == "yes_no":
-        # Hai lựa chọn cố định; chọn "Không" thì BẮT BUỘC ghi lý do (nhãn ô lý do staff sửa được).
+        # Hai lựa chọn cố định; chọn "Không" thì hiện ô lý do — KHÔNG bắt buộc (nhãn ô staff sửa được).
         q["reason_label"] = _text(raw.get("reason_label"), MAX_OPTION) or DEFAULT_REASON_LABEL
     elif qtype == "short_text":
         q["format"] = raw.get("format") if raw.get("format") in TEXT_FORMATS else "text"
@@ -205,7 +205,7 @@ def _blank(value):
 def clean_answer(q, value, other_text=""):
     """Một câu trả lời → (giá trị lưu, lỗi | None). File kiểm riêng ở Hub (`files` đã lưu).
 
-    `other_text`: chữ lựa chọn "Khác" (chọn một / nhiều) hoặc lý do khi chọn "Không" (Có / Không)."""
+    `other_text`: chữ lựa chọn "Khác" (chọn một / nhiều); lý do khi chọn "Không" (Có / Không) xử lý ở `clean_answers`."""
     qtype = q.get("type")
     required = q.get("required")
     if qtype == "yes_no":
@@ -214,8 +214,6 @@ def clean_answer(q, value, other_text=""):
             return "", "Vui lòng chọn Có hoặc Không." if required else None
         if v not in YES_NO_LABELS:
             return "", "Lựa chọn không hợp lệ."
-        if v == NO and not str(other_text or "").strip():
-            return v, f"Vui lòng ghi {(q.get('reason_label') or DEFAULT_REASON_LABEL).lower()}."
         return v, None
     if qtype == "file":
         files = value if isinstance(value, list) else []
@@ -334,7 +332,7 @@ def clean_answers(schema, data, files):
             answers[qid] = cleaned
             if q["type"] in ("single", "multi") and OTHER in (cleaned if isinstance(cleaned, list) else [cleaned]):
                 answers[f"{qid}:other"] = str(other).strip()[:MAX_SHORT]
-            if q["type"] == "yes_no" and cleaned == NO:
+            if q["type"] == "yes_no" and cleaned == NO and str(other).strip():
                 answers[f"{qid}:reason"] = str(other).strip()[:MAX_LONG]
     return answers, errors
 
