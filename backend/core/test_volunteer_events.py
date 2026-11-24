@@ -146,8 +146,7 @@ class VolunteerHubTests(TestCase):
             {'id': 'q_000000aa', 'type': 'yes_no', 'title': 'Tham gia cả 2 ngày?', 'required': True, 'reason_label': 'Lý do'}]}
         self.event.save()
         r = self.client.post(self.url('register/'), {'answers': json.dumps({'q_000000aa': 'no'})}, format='multipart')
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('q_000000aa', r.data['errors'])
+        self.assertEqual(r.status_code, 200, r.data)                                    # lý do không bắt buộc
         r = self.client.post(self.url('register/'), {'answers': json.dumps({'q_000000aa': 'no', 'q_000000aa:reason': 'Trùng lịch thi'})},
                              format='multipart')
         self.assertEqual(r.status_code, 200, r.data)

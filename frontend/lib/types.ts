@@ -1252,7 +1252,7 @@ export interface VolunteerQuestion {
   format?: 'text' | 'email' | 'phone';
   accept?: 'image' | 'pdf' | 'any';
   max_files?: number;
-  /** Có / Không: nhãn ô lý do bắt buộc khi chọn Không. */
+  /** Có / Không: nhãn ô lý do (không bắt buộc) hiện khi chọn Không. */
   reason_label?: string;
 }
 
