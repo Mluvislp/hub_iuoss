@@ -376,9 +376,29 @@ def receipt_mime(member, slot=1):
     return RECEIPT_EXT_MIME.get(ext, "application/octet-stream")
 
 
+# Mở bổ sung nộp minh chứng (Phòng CTSV, 23/11/2026): sau hạn đăng ký, người ĐÃ đăng ký mà CHƯA có minh chứng chính
+# được nộp tới mốc này. Ai nộp trong đợt bổ sung (minh chứng nộp sau hạn đăng ký) vẫn thay / thêm minh chứng phụ được
+# tới hết mốc (lỡ nộp nhầm). Đăng ký mới, tài khoản hoàn cọc, xin hủy, ảnh: KHÔNG mở. None = không có đợt bổ sung.
+# Đợt 2026 (định mở tới hết 23/11) đã đóng sớm theo yêu cầu Phòng CTSV lúc 23/11/2026 — 1 người nộp trong đợt.
+RECEIPT_LATE_CLOSES_AT = None
+
+
+def late_receipt_open(member, now=None):
+    """Đang trong đợt bổ sung minh chứng và người này thuộc diện được nộp."""
+    late = RECEIPT_LATE_CLOSES_AT
+    closes = member.round.effective_closes_at()
+    if not (late and closes) or member.registration_status != Member.STATUS_REGISTERED:
+        return False
+    if not closes < (now or timezone.now()) <= late:
+        return False
+    uploaded = member.deposit_receipt_uploaded_at
+    return not member.deposit_receipt_storage_key or bool(uploaded and uploaded > closes)
+
+
 def can_upload_receipt(member):
-    """Nộp / thay minh chứng: đang đăng ký (registered) và còn hạn đăng ký — như đổi tài khoản hoàn cọc."""
-    return member.round.registration_open() and member.registration_status == Member.STATUS_REGISTERED
+    """Nộp / thay minh chứng: đang đăng ký (registered) và còn hạn đăng ký — như đổi tài khoản hoàn cọc — hoặc thuộc
+    diện đợt bổ sung minh chứng (`late_receipt_open`)."""
+    return (member.round.registration_open() and member.registration_status == Member.STATUS_REGISTERED)         or late_receipt_open(member)
 
 
 def deposit_payload(member):
@@ -387,8 +407,12 @@ def deposit_payload(member):
     key2 = member.deposit_receipt2_storage_key or ""
     uploaded2 = member.deposit_receipt2_uploaded_at
     closes = member.round.registration_closes_at
-    # Quá hạn theo hạn THỰC THI (có gia hạn ngầm); "deadline" vẫn trả hạn hiển thị.
-    overdue = bool(closes and timezone.now() > member.round.effective_closes_at())
+    # Quá hạn theo hạn THỰC THI (có gia hạn ngầm); "deadline" vẫn trả hạn hiển thị. Thuộc diện đợt bổ sung minh chứng
+    # ⇒ chưa quá hạn (vẫn thấy thông tin chuyển khoản — có người chưa chuyển) và hạn = hạn bổ sung.
+    late = late_receipt_open(member)
+    overdue = bool(closes and timezone.now() > member.round.effective_closes_at()) and not late
+    if late:
+        closes = RECEIPT_LATE_CLOSES_AT
     account = {k: None for k in DEPOSIT_ACCOUNT} if overdue else DEPOSIT_ACCOUNT
     return {
         **account,

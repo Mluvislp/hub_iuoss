@@ -89,6 +89,8 @@ class GraduationTests(TestCase):
         override.enable()
         self.addCleanup(override.disable)
         self.client = APIClient()
+        # Đợt bổ sung minh chứng có mốc thật theo ngày ⇒ tắt mặc định để test không đổi kết quả theo ngày chạy.
+        self.enterContext(patch.object(grad, "RECEIPT_LATE_CLOSES_AT", None))
 
     # ── helpers ──
     def _verify_hv(self, **over):
@@ -560,6 +562,59 @@ class GraduationTests(TestCase):
         self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart").status_code, 400)
         self.assertEqual(self.client.post("/api/graduation/bank/", self.bank_data(), format="json").status_code, 400)
         self.assertEqual(self.client.post("/api/graduation/cancel/", {"reason": "Bận việc gia đình"}, format="json").status_code, 400)
+
+    def test_late_receipt_window_only_for_registered_without_receipt(self):
+        self._login_sv()
+        self.assertEqual(self.client.post("/api/graduation/register/", self.bank_data(), format="multipart").status_code,
+                         400)                                                   # đăng ký vẫn bắt buộc minh chứng
+        self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        now = timezone.now()
+        closes = now - timedelta(hours=1)
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=closes)
+        # Giả lập người đăng ký thời chưa bắt buộc minh chứng: đã đăng ký, chưa có minh chứng.
+        Member.objects.filter(pk=self.m_sv.pk).update(deposit_receipt_storage_key=None, deposit_receipt_uploaded_at=None)
+        self.enterContext(patch.object(grad, "RECEIPT_LATE_CLOSES_AT", now + timedelta(hours=1)))
+
+        dep = self.client.get("/api/graduation/me/").json()["deposit"]
+        self.assertEqual((dep["overdue"], dep["can_upload"], dep["has_receipt"]), (False, True, False))
+        self.assertIsNotNone(dep["account_number"])                             # còn thấy thông tin chuyển khoản
+        self.assertEqual(timezone.datetime.fromisoformat(dep["deadline"]), grad.RECEIPT_LATE_CLOSES_AT)
+        res = self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        # Nộp trong đợt bổ sung ⇒ vẫn thay / thêm minh chứng phụ được tới hết mốc.
+        self.assertTrue(res.json()["deposit"]["can_upload"])
+        self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt("lan-2.png")},
+                                          format="multipart").status_code, 200)
+        self.assertEqual(self.client.post("/api/graduation/receipt/?slot=2", {"receipt": _receipt()},
+                                          format="multipart").status_code, 200)
+        # Những thứ khác vẫn khóa.
+        self.assertEqual(self.client.post("/api/graduation/bank/", self.bank_data(), format="json").status_code, 400)
+        self.assertEqual(self.client.post("/api/graduation/cancel/", {"reason": "Bận việc gia đình"}, format="json").status_code, 400)
+        self.assertFalse(self.client.get("/api/graduation/me/").json()["registration"]["can_edit"])
+
+        # Người đã có minh chứng TỪ TRƯỚC hạn: không được thay.
+        Member.objects.filter(pk=self.m_sv.pk).update(deposit_receipt_uploaded_at=closes - timedelta(minutes=5))
+        dep = self.client.get("/api/graduation/me/").json()["deposit"]
+        self.assertEqual((dep["overdue"], dep["can_upload"]), (True, False))
+        self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart").status_code, 400)
+        # Hết đợt bổ sung: khóa lại với cả người chưa nộp.
+        Member.objects.filter(pk=self.m_sv.pk).update(deposit_receipt_storage_key=None, deposit_receipt_uploaded_at=None)
+        self.enterContext(patch.object(grad, "RECEIPT_LATE_CLOSES_AT", now - timedelta(minutes=1)))
+        dep = self.client.get("/api/graduation/me/").json()["deposit"]
+        self.assertEqual((dep["overdue"], dep["can_upload"]), (True, False))
+        self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart").status_code, 400)
+
+    def test_late_receipt_window_excludes_unregistered_and_cancel_requested(self):
+        now = timezone.now()
+        self.enterContext(patch.object(grad, "RECEIPT_LATE_CLOSES_AT", now + timedelta(hours=1)))
+        self.round.registration_closes_at = now - timedelta(hours=1)
+        self.round.save()
+        self.m_sv.refresh_from_db()
+        self.assertFalse(grad.late_receipt_open(self.m_sv))                     # chưa đăng ký
+        for status, expected in ((Member.STATUS_REGISTERED, True), (Member.STATUS_CANCEL_REQUESTED, False),
+                                 (Member.STATUS_CANCELLED, False)):
+            self.m_sv.registration_status = status
+            self.assertEqual(grad.late_receipt_open(self.m_sv), expected, status)
 
     def test_unregistered_cannot_register_or_upload_photo_after_registration_deadline(self):
         self._login_hv()

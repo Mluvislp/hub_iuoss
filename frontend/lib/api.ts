@@ -572,6 +572,29 @@ export const api = {
       return res.blob();
     },
   },
+  volunteer: {
+    list(): Promise<{ events: import('./types').VolunteerEventSummary[] }> {
+      return request('/volunteer-events/');
+    },
+    detail(id: number): Promise<import('./types').VolunteerEventDetail> {
+      return request(`/volunteer-events/${id}/`);
+    },
+    register(id: number, body: FormData): Promise<import('./types').VolunteerEventDetail> {
+      return requestMultipart(`/volunteer-events/${id}/register/`, body);
+    },
+    cancel(id: number): Promise<import('./types').VolunteerEventDetail> {
+      return request(`/volunteer-events/${id}/cancel/`, { method: 'POST' });
+    },
+    /** Ảnh bìa / ảnh ghi chú / file đã nộp — cần token nên tải qua fetch rồi dựng blob URL. */
+    async media(path: string): Promise<Blob> {
+      if (!/^\/api\/volunteer-events\/\d+\/media\/\?key=volunteer_events\/[\w./-]+$/.test(path)) {
+        throw new Error('Đường dẫn file không hợp lệ.');
+      }
+      const res = await fetch(`${API_BASE}${path.slice(4)}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (!res.ok) throw new Error('Không tải được file.');
+      return res.blob();
+    },
+  },
   hospitalChange: {
     detail(id: number): Promise<import('./types').SubmittedInsurance> { return request('/health-insurance/hospital-change/' + id + '/'); },
     update(id: number, body: FormData): Promise<{ id: number; status: string }> { return requestMultipart('/health-insurance/hospital-change/' + id + '/', body); },

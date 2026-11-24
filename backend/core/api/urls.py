@@ -1,4 +1,5 @@
 from django.urls import path
+from . import volunteer_views
 from . import graduation_views as gv
 from . import diploma_views, health_check_views, submission_views, ticket_views, tuition_exemption_views, views
 from .student_image_views import StudentImageFileView, StudentImagesView
@@ -94,6 +95,13 @@ urlpatterns = [
          name="api_health_check_citizen_id"),
     path("health-check/cancel/", health_check_views.HealthCheckCancelView.as_view(),
          name="api_health_check_cancel"),
+
+    # Sự kiện cộng tác viên — core/volunteer_events.py
+    path("volunteer-events/", volunteer_views.VolunteerEventListView.as_view(), name="api_volunteer_events"),
+    path("volunteer-events/<int:pk>/", volunteer_views.VolunteerEventDetailView.as_view(), name="api_volunteer_event"),
+    path("volunteer-events/<int:pk>/register/", volunteer_views.VolunteerRegisterView.as_view(), name="api_volunteer_register"),
+    path("volunteer-events/<int:pk>/cancel/", volunteer_views.VolunteerCancelView.as_view(), name="api_volunteer_cancel"),
+    path("volunteer-events/<int:pk>/media/", volunteer_views.VolunteerMediaView.as_view(), name="api_volunteer_media"),
 
     # Nộp bằng tốt nghiệp THPT — core/diploma.py
     path("diploma/", diploma_views.DiplomaView.as_view(), name="api_diploma"),

@@ -29,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/requests/english': 'Yêu cầu giấy tờ',
   '/dashboard/hoi-dap': 'Hỏi đáp',
   '/dashboard/hoi-dap/new': 'Hỏi đáp',
+  '/dashboard/su-kien': 'Sự kiện cộng tác viên',
 };
 
 /** Trang con có id động (/hoi-dap/123, /mien-giam-hoc-phi/ho-so/12) không nằm trong bảng trên → tên tính năng. */

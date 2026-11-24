@@ -20,6 +20,7 @@ qua `lib/features.ts::useFeatures()` (cache `sessionStorage`; chưa biết ⇒ c
 | `FEATURE_DIPLOMA` | `not IS_PRODUCTION` | `/dashboard/bang-tot-nghiep`, `/api/diploma/*` |
 | `FEATURE_TUITION_WAIVER` (nhánh sandbox) | `not IS_PRODUCTION` | `/dashboard/mien-giam-hoc-phi/*`, `/api/tuition-exemption/*` |
 | `FEATURE_DIRECT_SUBMISSIONS` | `not IS_PRODUCTION` | `/dashboard/nap-giay-to/*`, `/api/submissions/*` |
+| `FEATURE_VOLUNTEER_EVENTS` | `not IS_PRODUCTION` | `/dashboard/su-kien/*`, `/api/volunteer-events/*` |
 | `FEATURE_OFFCAMPUS` | **tắt** | `/api/offcampus/*`; trang `/dashboard/khai-bao-ngoai-tru` tự đọc cờ (không qua `FEATURE_ROUTES`), tắt thì hiện thông báo + nút sang Khai báo địa chỉ, không có trong menu. Khám sức khỏe vẫn dùng form, không phụ thuộc cờ |
 
 Giá trị thật trên prod/sandbox nằm ở `backend/.env` của từng môi trường — kiểm ở đó, đừng suy từ bảng này.
@@ -62,6 +63,7 @@ quyền vào cổng**). "Quên mật khẩu" trỏ `https://ldap.hcmiu.edu.vn/iu
 | Bằng THPT | `core/diploma.py` | `DIPLOMA.md` |
 | Lễ tốt nghiệp | `core/graduation.py` | `GRADUATION.md` |
 | Hỏi đáp | `core/tickets.py` | `SUPPORT_TICKETS.md` |
+| Sự kiện cộng tác viên | `core/volunteer_events.py` | `VOLUNTEER_EVENTS.md` |
 
 Luật "SV trao đổi được ở trạng thái nào" viết ở **hai nơi**: `ConfirmationRequest.STUDENT_CAN_COMMENT_STATUSES` (Hub) ↔
 `DocumentRequest.STUDENT_CAN_COMMENT_STATUSES` (Dashboard).
