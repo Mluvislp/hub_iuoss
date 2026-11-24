@@ -450,6 +450,7 @@ export interface FeatureFlags {
   personal_info: boolean;
   diploma: boolean;
   direct_submissions: boolean;
+  volunteer_events: boolean;
 }
 
 /**
@@ -1028,4 +1029,67 @@ export interface SubmissionDetail extends SubmissionSummary {
   student_can_comment: boolean;
   student_can_edit: boolean;
   returned_at: string | null;
+}
+
+// ── Sự kiện cộng tác viên — backend `core/volunteer_events.py` ──────────────────
+export type VolunteerRegState = 'unset' | 'upcoming' | 'open' | 'closed';
+export type VolunteerStatus = 'pending' | 'approved' | 'waitlist' | 'rejected' | 'cancelled';
+export type VolunteerQuestionType = 'short_text' | 'long_text' | 'single' | 'multi' | 'dropdown' | 'date' | 'number' | 'file';
+
+export interface VolunteerEventSummary {
+  id: number;
+  title: string;
+  location: string;
+  starts_at: string;
+  ends_at: string;
+  day_count: number;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+  registration_state: VolunteerRegState;
+  ended: boolean;
+  capacity: number | null;
+  cover_url: string | null;
+  my_status: VolunteerStatus | null;
+  my_status_label: string | null;
+}
+
+export interface VolunteerQuestion {
+  id: string;
+  type: VolunteerQuestionType;
+  title: string;
+  required: boolean;
+  note: string;
+  note_image_url: string | null;
+  options?: { id: string; label: string }[];
+  other?: boolean;
+  min?: number | null;
+  max?: number | null;
+  integer?: boolean;
+  format?: 'text' | 'email' | 'phone';
+  accept?: 'image' | 'pdf' | 'any';
+  max_files?: number;
+}
+
+export interface VolunteerFile { idx: number; name: string; size: number; mime: string }
+
+export interface VolunteerRegistration {
+  status: VolunteerStatus;
+  status_label: string;
+  review_note: string;
+  submitted_at: string;
+  answers: Record<string, unknown>;
+  can_edit: boolean;
+  can_cancel: boolean;
+  can_reregister: boolean;
+}
+
+export interface VolunteerEventDetail extends VolunteerEventSummary {
+  description: string;
+  eligible: boolean;
+  form: {
+    profile: { key: string; label: string; value: string; editable: boolean }[];
+    questions: VolunteerQuestion[];
+    max_file_bytes: number;
+  };
+  registration: VolunteerRegistration | null;
 }

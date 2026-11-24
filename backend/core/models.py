@@ -430,3 +430,4 @@ from .student_image_models import StudentImage  # noqa: E402,F401
 from .hospital_change_models import HospitalChangeConfig, HospitalChangeRequest  # noqa: E402,F401
 from .diploma_models import DiplomaEvent, DiplomaRound, DiplomaSubmission  # noqa: E402,F401
 from .graduation_models import Bank, GraduationRound, GraduationRoundStudent  # noqa: E402,F401
+from .volunteer_models import VolunteerEvent, VolunteerEventStudent, VolunteerRegistration  # noqa: E402,F401

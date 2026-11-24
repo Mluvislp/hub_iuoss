@@ -43,6 +43,8 @@ FEATURE_DIRECT_SUBMISSIONS = env_bool("FEATURE_DIRECT_SUBMISSIONS", default=not 
 # Khai báo ngoại trú TẠM ĐÓNG (11/2026), thay bằng "Khai báo địa chỉ" (luôn mở). Mở lại
 # bằng FEATURE_OFFCAMPUS=1. Trang Khám sức khỏe vẫn khai theo luật ngoại trú, không phụ thuộc cờ.
 FEATURE_OFFCAMPUS = env_bool("FEATURE_OFFCAMPUS", default=False)
+# Sự kiện cộng tác viên (core/volunteer_events.py) — production bật bằng FEATURE_VOLUNTEER_EVENTS=1.
+FEATURE_VOLUNTEER_EVENTS = env_bool("FEATURE_VOLUNTEER_EVENTS", default=not IS_PRODUCTION)
 
 # Địa chỉ Dashboard — link "mở ticket" trong thư gửi người phụ trách.
 # Sandbox khai `DASHBOARD_PUBLIC_URL=https://dashboard-sandbox.iuoss.com`.

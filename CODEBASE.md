@@ -31,6 +31,7 @@ trước giấy tờ (`core/document_preview.py` → Dashboard `/documents/inter
 | Bằng THPT | `diploma.py` · `diploma_models.py` |
 | Lễ tốt nghiệp | `graduation.py` · `graduation_models.py` · `api/graduation_views.py` · `api/graduation_auth.py` (phiên riêng) |
 | Hỏi đáp | `tickets.py` · `ticket_models.py` · `richtext.py` ⇄ · `templates/emails/ticket_staff.html` |
+| Sự kiện cộng tác viên | `volunteer_events.py` · `volunteer_models.py` · `volunteer_form.py` ⇄ · `api/volunteer_views.py` |
 | Kho ảnh SV | `student_images.py` · `student_image_models.py` — luồng mới lấy/lưu ảnh ở đây |
 | `students/` | `models.py` (read-only) · `timeline.py` ⇄ (3 luật tính mốc) |
 
@@ -39,7 +40,7 @@ Lệnh quản trị: `backfill_insurance_workflow`, `backfill_student_images` (m
 
 **API** — `core/api/urls.py` (~70 route), nhóm: `health/` · `features/` · `auth/…` · `dashboard/` · `health-insurance/…`
 (registrations, external, hospital-change) · `requests/…` (+ `availability/`, `preview/`, `<id>/comments|soft-copy/`,
-`<loại>/form/` ×6) · `submissions/…` · `personal-info/` · `offcampus/…` · `address-declaration/…` · `graduation/…` ·
+`<loại>/form/` ×6) · `submissions/…` · `personal-info/` · `offcampus/…` · `address-declaration/…` · `graduation/…` · `volunteer-events/…` ·
 `health-check/…` · `diploma/…` · `tickets/…` · `student-images/…` · `locations/…` · `hospitals/`.
 
 ## Frontend
@@ -61,6 +62,7 @@ insurance-periods,vietqr,graduation,…}.ts` · `ecosystem.config.js` = PM2 **c�
 | `sinh-hoat-cong-dan` | kết quả SHCD (`FEATURE_CIVIC_ACTIVITIES`) |
 | `requests` · `/new` · `/[id]` · `/{other,deferment,thuong-binh,bank-loan,english,conduct-score}` | yêu cầu giấy tờ (`FEATURE_DOCUMENT_REQUESTS`) |
 | `nap-giay-to` · `/new` · `/[id]` | nạp giấy tờ trực tiếp (`FEATURE_DIRECT_SUBMISSIONS`) |
+| `su-kien` · `/[id]` | sự kiện cộng tác viên — xem, đăng ký, sửa, hủy (`FEATURE_VOLUNTEER_EVENTS`) |
 
 ## Tra tài liệu
 

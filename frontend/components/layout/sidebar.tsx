@@ -70,6 +70,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       featureItem('direct_submissions'),
       featureItem('health_check'),
       featureItem('diploma'),
+      featureItem('volunteer_events'),
       featureItem('support_tickets'),
     ],
   },

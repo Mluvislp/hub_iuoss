@@ -691,3 +691,7 @@ CREATE TABLE IF NOT EXISTS hub_direct_submission_comments (
   PRIMARY KEY (id),
   KEY idx_hdsc_submission (submission_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Sự kiện cộng tác viên (24/11/2026) — nguồn: dashboard_iuoss/docs/sql/20261124_volunteer_events.sql
+-- 4 bảng volunteer_events · volunteer_event_staff · volunteer_event_students · volunteer_registrations.
+-- Hub chỉ ghi volunteer_registrations. DDL đầy đủ ở file nguồn (không chép lại để khỏi lệch).

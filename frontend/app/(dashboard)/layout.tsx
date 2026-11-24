@@ -27,12 +27,14 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard/requests/english': 'Yêu cầu giấy tờ',
   '/dashboard/hoi-dap': 'Hỏi đáp',
   '/dashboard/hoi-dap/new': 'Hỏi đáp',
+  '/dashboard/su-kien': 'Sự kiện cộng tác viên',
 };
 
 /** Trang con có id động (/hoi-dap/123) không nằm trong bảng trên. */
 function titleFor(pathname: string): string {
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
   if (pathname.startsWith('/dashboard/hoi-dap/')) return 'Hỏi đáp';
+  if (pathname.startsWith('/dashboard/su-kien/')) return 'Sự kiện cộng tác viên';
   return 'IUOSS Hub';
 }
 
