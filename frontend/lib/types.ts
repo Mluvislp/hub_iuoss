@@ -1218,7 +1218,7 @@ export interface SubmissionDetail extends SubmissionSummary {
 // ── Sự kiện cộng tác viên — backend `core/volunteer_events.py` ──────────────────
 export type VolunteerRegState = 'unset' | 'upcoming' | 'open' | 'closed';
 export type VolunteerStatus = 'pending' | 'approved' | 'waitlist' | 'rejected' | 'cancelled';
-export type VolunteerQuestionType = 'short_text' | 'long_text' | 'single' | 'multi' | 'dropdown' | 'date' | 'number' | 'file';
+export type VolunteerQuestionType = 'short_text' | 'long_text' | 'yes_no' | 'single' | 'multi' | 'dropdown' | 'date' | 'number' | 'file';
 
 export interface VolunteerEventSummary {
   id: number;
@@ -1252,6 +1252,8 @@ export interface VolunteerQuestion {
   format?: 'text' | 'email' | 'phone';
   accept?: 'image' | 'pdf' | 'any';
   max_files?: number;
+  /** Có / Không: nhãn ô lý do bắt buộc khi chọn Không. */
+  reason_label?: string;
 }
 
 export interface VolunteerFile { idx: number; name: string; size: number; mime: string }

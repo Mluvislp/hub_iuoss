@@ -141,6 +141,18 @@ class VolunteerHubTests(TestCase):
         reg.save()
         self.assertEqual(self.register(**{'keep:q_00000003': '[0]'}).status_code, 409)
 
+    def test_yes_no_reason_saved(self):
+        self.event.form_schema = {'profile': {'fields': [], 'editable': []}, 'questions': [
+            {'id': 'q_000000aa', 'type': 'yes_no', 'title': 'Tham gia cả 2 ngày?', 'required': True, 'reason_label': 'Lý do'}]}
+        self.event.save()
+        r = self.client.post(self.url('register/'), {'answers': json.dumps({'q_000000aa': 'no'})}, format='multipart')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('q_000000aa', r.data['errors'])
+        r = self.client.post(self.url('register/'), {'answers': json.dumps({'q_000000aa': 'no', 'q_000000aa:reason': 'Trùng lịch thi'})},
+                             format='multipart')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(R.objects.get(event=self.event).answers['q_000000aa:reason'], 'Trùng lịch thi')
+
     def test_pdf_rejected_for_image_question(self):
         pdf = SimpleUploadedFile('cv.pdf', b'%PDF-1.4 test', content_type='application/pdf')
         r = self.register(**{'file:q_00000003': pdf})
