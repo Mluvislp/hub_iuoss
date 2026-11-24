@@ -50,10 +50,7 @@ export default function VolunteerEventsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold text-ink">Sự kiện cộng tác viên</h1>
-        <p className="mt-1 text-sm text-muted">Sự kiện Phòng Công tác Sinh viên mời sinh viên tham gia hỗ trợ.</p>
-      </div>
+      <h1 className="text-xl font-semibold text-ink">Sự kiện cộng tác viên</h1>
 
       {error && (
         <div className="flex items-start gap-2.5 rounded-lg border border-danger-line bg-danger-soft px-4 py-3">
