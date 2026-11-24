@@ -17,7 +17,8 @@ câu trả lời cũ vẫn nằm đó, chỉ không hiện nữa.
 
     {"profile": {"phone": "...", "email": "..."},
      "q_..": "chữ" | "o_.." | ["o_..", "__other__"] | "2026-11-24" | "12.5" | [{"key", "name", "size", "mime"}],
-     "q_..:other": "chữ của lựa chọn Khác"}
+     "q_..:other": "chữ của lựa chọn Khác",
+     "q_..": "yes" | "no", "q_..:reason": "lý do khi chọn Không"}
 """
 import re
 import secrets
@@ -26,6 +27,7 @@ from datetime import date
 QUESTION_TYPES = {
     "short_text": "Trả lời ngắn",
     "long_text": "Đoạn văn",
+    "yes_no": "Có / Không",
     "single": "Chọn một",
     "multi": "Chọn nhiều",
     "dropdown": "Danh sách thả xuống",
@@ -37,6 +39,9 @@ CHOICE_TYPES = ("single", "multi", "dropdown")
 TEXT_FORMATS = {"text": "Chữ tự do", "email": "Email", "phone": "Số điện thoại"}
 FILE_ACCEPT = {"image": "Ảnh", "pdf": "PDF", "any": "Ảnh hoặc PDF"}
 OTHER = "__other__"
+YES, NO = "yes", "no"
+YES_NO_LABELS = {YES: "Có", NO: "Không"}
+DEFAULT_REASON_LABEL = "Lý do không tham gia"
 
 # Thông tin lấy sẵn từ hồ sơ — MSSV + họ tên luôn hiện; SV chỉ sửa được ô trong EDITABLE_PROFILE
 # và giá trị sửa chỉ lưu vào câu trả lời, KHÔNG ghi ngược hồ sơ.
@@ -148,6 +153,9 @@ def clean_question(raw, used_ids):
             q["max"] = _int(raw.get("max"), 0, len(options), 0)
             if q["max"] and q["min"] > q["max"]:
                 return q, f"Câu \"{title}\": số lựa chọn tối thiểu lớn hơn tối đa."
+    elif qtype == "yes_no":
+        # Hai lựa chọn cố định; chọn "Không" thì BẮT BUỘC ghi lý do (nhãn ô lý do staff sửa được).
+        q["reason_label"] = _text(raw.get("reason_label"), MAX_OPTION) or DEFAULT_REASON_LABEL
     elif qtype == "short_text":
         q["format"] = raw.get("format") if raw.get("format") in TEXT_FORMATS else "text"
     elif qtype == "number":
@@ -195,9 +203,20 @@ def _blank(value):
 
 
 def clean_answer(q, value, other_text=""):
-    """Một câu trả lời → (giá trị lưu, lỗi | None). File kiểm riêng ở Hub (`files` đã lưu)."""
+    """Một câu trả lời → (giá trị lưu, lỗi | None). File kiểm riêng ở Hub (`files` đã lưu).
+
+    `other_text`: chữ lựa chọn "Khác" (chọn một / nhiều) hoặc lý do khi chọn "Không" (Có / Không)."""
     qtype = q.get("type")
     required = q.get("required")
+    if qtype == "yes_no":
+        v = str(value or "").strip()
+        if not v:
+            return "", "Vui lòng chọn Có hoặc Không." if required else None
+        if v not in YES_NO_LABELS:
+            return "", "Lựa chọn không hợp lệ."
+        if v == NO and not str(other_text or "").strip():
+            return v, f"Vui lòng ghi {(q.get('reason_label') or DEFAULT_REASON_LABEL).lower()}."
+        return v, None
     if qtype == "file":
         files = value if isinstance(value, list) else []
         if required and not files:
@@ -306,7 +325,7 @@ def clean_answers(schema, data, files):
     answers, errors = {}, {}
     for q in questions_of(schema):
         qid = q["id"]
-        other = data.get(f"{qid}:other", "")
+        other = data.get(f"{qid}:reason" if q["type"] == "yes_no" else f"{qid}:other", "")
         value = files.get(qid, []) if q["type"] == "file" else data.get(qid)
         cleaned, err = clean_answer(q, value, other)
         if err:
@@ -315,6 +334,8 @@ def clean_answers(schema, data, files):
             answers[qid] = cleaned
             if q["type"] in ("single", "multi") and OTHER in (cleaned if isinstance(cleaned, list) else [cleaned]):
                 answers[f"{qid}:other"] = str(other).strip()[:MAX_SHORT]
+            if q["type"] == "yes_no" and cleaned == NO:
+                answers[f"{qid}:reason"] = str(other).strip()[:MAX_LONG]
     return answers, errors
 
 
@@ -332,6 +353,9 @@ def format_answer(q, answers):
     labels = {o["id"]: o["label"] for o in q.get("options") or []}
     other = (answers or {}).get(f"{q['id']}:other", "")
     qtype = q.get("type")
+    if qtype == "yes_no":
+        reason = (answers or {}).get(f"{q['id']}:reason", "")
+        return f"Không — {reason}" if value == NO and reason else YES_NO_LABELS.get(value, str(value))
     if qtype in ("single", "dropdown"):
         return f"Khác: {other}" if value == OTHER else labels.get(value, "(lựa chọn đã xoá)")
     if qtype == "multi":

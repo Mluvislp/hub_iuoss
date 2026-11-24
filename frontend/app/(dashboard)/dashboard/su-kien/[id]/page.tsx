@@ -40,6 +40,10 @@ function answerText(q: VolunteerQuestion, answers: Record<string, unknown>): str
   const v = answers[q.id];
   if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return '';
   const label = (id: string) => (id === OTHER ? `Khác: ${answers[`${q.id}:other`] ?? ''}` : q.options?.find((o) => o.id === id)?.label ?? '');
+  if (q.type === 'yes_no') {
+    const reason = String(answers[`${q.id}:reason`] ?? '');
+    return v === 'no' ? (reason ? `Không — ${reason}` : 'Không') : 'Có';
+  }
   if (q.type === 'single' || q.type === 'dropdown') return label(String(v));
   if (q.type === 'multi') return (v as string[]).map(label).join('; ');
   if (q.type === 'date') { const [y, m, d] = String(v).split('-'); return `${d}/${m}/${y}`; }
@@ -83,6 +87,7 @@ export default function VolunteerEventPage() {
       else if (q.type === 'multi') v[q.id] = (a as string[]) ?? [];
       else v[q.id] = a == null ? '' : String(a);
       if (q.other) v[`${q.id}:other`] = String(answers[`${q.id}:other`] ?? '');
+      if (q.type === 'yes_no') v[`${q.id}:reason`] = String(answers[`${q.id}:reason`] ?? '');
     }
     const saved = (answers.profile ?? {}) as Record<string, string>;
     setValues(v);
@@ -136,7 +141,10 @@ export default function VolunteerEventPage() {
         continue;
       }
       const empty = Array.isArray(v) ? !v.length : !String(v ?? '').trim();
-      if (q.required && empty) { e[q.id] = q.type === 'multi' || q.type === 'single' || q.type === 'dropdown' ? 'Vui lòng chọn.' : 'Vui lòng trả lời câu hỏi này.'; continue; }
+      if (q.required && empty) { e[q.id] = ['multi', 'single', 'dropdown', 'yes_no'].includes(q.type) ? 'Vui lòng chọn.' : 'Vui lòng trả lời câu hỏi này.'; continue; }
+      if (q.type === 'yes_no' && v === 'no' && !String(values[`${q.id}:reason`] ?? '').trim()) {
+        e[q.id] = `Vui lòng ghi ${(q.reason_label || 'lý do không tham gia').toLowerCase()}.`; continue;
+      }
       if (empty) continue;
       const picked = Array.isArray(v) ? v : [String(v)];
       if (picked.includes(OTHER) && !String(values[`${q.id}:other`] ?? '').trim()) e[q.id] = 'Vui lòng ghi rõ lựa chọn Khác.';
@@ -178,6 +186,7 @@ export default function VolunteerEventPage() {
       }
       answers[q.id] = values[q.id];
       if (q.other) answers[`${q.id}:other`] = values[`${q.id}:other`] ?? '';
+      if (q.type === 'yes_no' && values[q.id] === 'no') answers[`${q.id}:reason`] = values[`${q.id}:reason`] ?? '';
     }
     fd.set('answers', JSON.stringify(answers));
     fd.set('profile', JSON.stringify(profile));
@@ -243,6 +252,30 @@ export default function VolunteerEventPage() {
     if (q.type === 'number') {
       return <input type="number" inputMode="decimal" className={cn(inputCls, 'sm:max-w-[14rem]')} value={String(v ?? '')}
         step={q.integer ? 1 : 'any'} min={q.min ?? undefined} max={q.max ?? undefined} onChange={(e) => set(q.id, e.target.value)} />;
+    }
+    if (q.type === 'yes_no') {
+      const reasonLabel = q.reason_label || 'Lý do không tham gia';
+      return (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 sm:max-w-sm">
+            {([['yes', 'Có'], ['no', 'Không']] as const).map(([val, label]) => (
+              <label key={val} className={cn('flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors',
+                v === val ? 'border-primary bg-primary-soft text-primary-text' : 'border-line bg-white text-ink hover:bg-slate-50',
+                err && !v && 'border-danger-text')}>
+                <input type="radio" name={q.id} className="h-4 w-4 accent-[#2563eb]" checked={v === val} onChange={() => set(q.id, val)} />
+                {label}
+              </label>
+            ))}
+          </div>
+          {v === 'no' && (
+            <div>
+              <label className={ui.fieldLabel}>{reasonLabel}<span className="ml-0.5 text-danger-text">*</span></label>
+              <textarea className={cn(ui.textarea, err && 'border-danger-text')} rows={3} maxLength={5000} autoFocus
+                value={String(values[`${q.id}:reason`] ?? '')} onChange={(e) => set(`${q.id}:reason`, e.target.value)} />
+            </div>
+          )}
+        </div>
+      );
     }
     if (q.type === 'dropdown') {
       return (
