@@ -40,6 +40,15 @@ function toLogin() {
   window.location.href = here.startsWith('/dashboard') ? `/login?next=${encodeURIComponent(here)}` : '/login';
 }
 
+/**
+ * Phiên hỏng / hết hạn. Backend báo token sai bằng 403 (AuthenticationFailed không khai
+ * `authenticate_header`) với câu chứa "Token" — coi như 401, nếu không trang chỉ hiện lỗi chung.
+ * 403 vì thiếu quyền (học viên cao học…) có câu tiếng Việt khác, không chứa "Token".
+ */
+function sessionExpired(status: number, data: Record<string, unknown>): boolean {
+  return status === 401 || (status === 403 && /token/i.test(String(data?.detail ?? '')));
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -74,15 +83,15 @@ async function request<T>(
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
-  if (res.status === 401 && !opts.skipAuthRedirect) {
+  const data = res.headers.get('Content-Type')?.includes('application/json')
+    ? await res.json()
+    : {};
+
+  if (sessionExpired(res.status, data) && !opts.skipAuthRedirect) {
     clearAuth();
     toLogin();
     throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
   }
-
-  const data = res.headers.get('Content-Type')?.includes('application/json')
-    ? await res.json()
-    : {};
 
   if (!res.ok) throw new ApiError(res.status, data as Record<string, unknown>);
   return data as T;
@@ -105,15 +114,15 @@ async function requestMultipart<T>(
     body: formData,
   });
 
-  if (res.status === 401 && !opts.skipAuthRedirect) {
+  const data = res.headers.get('Content-Type')?.includes('application/json')
+    ? await res.json()
+    : {};
+
+  if (sessionExpired(res.status, data) && !opts.skipAuthRedirect) {
     clearAuth();
     toLogin();
     throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
   }
-
-  const data = res.headers.get('Content-Type')?.includes('application/json')
-    ? await res.json()
-    : {};
 
   if (!res.ok) throw new ApiError(res.status, data as Record<string, unknown>);
   return data as T;
