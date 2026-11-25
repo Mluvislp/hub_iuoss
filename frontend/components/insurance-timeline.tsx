@@ -46,6 +46,7 @@ const EVENT_LABELS: Record<HistoryKind, Record<string, string>> = {
     SUBMITTED: 'Sinh viên gửi bản khai', STUDENT_UPDATED: 'Sinh viên chỉnh sửa bản khai',
     RESUBMITTED: 'Sinh viên gửi lại sau từ chối', CONFIRMED: 'Đã xác nhận bản khai',
     REJECTED: 'Từ chối bản khai', SUPPLEMENT_REVIEWED: 'Chuyên viên đã kiểm tra phần bổ sung',
+    STAFF_EDITED: 'Chuyên viên chỉnh sửa bản khai',
   },
   'hospital-change': {
     SUBMITTED: 'Sinh viên gửi yêu cầu', STUDENT_UPDATED: 'Sinh viên chỉnh sửa yêu cầu',
