@@ -782,7 +782,7 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
     { name: "cccd_image", label: "Ảnh VNeID/CCCD mặt trước", emptyText: "Tải lên mặt trước", Icon: Plus, tone: "bg-slate-100 text-slate-500" },
     { name: "cccd_image_back", label: "Ảnh VNeID/CCCD mặt sau", emptyText: "Tải lên mặt sau", Icon: Plus, tone: "bg-slate-100 text-slate-500" },
     { name: "payment_receipt_image", label: "Bill chuyển khoản", emptyText: "Tải lên biên lai", Icon: CreditCard, tone: "bg-slate-100 text-slate-500" },
-    { name: "bhyt_image", label: "Ảnh thẻ BHYT", hint: "(VssID/VNeID)", emptyText: "Tải lên ảnh thẻ BHYT", Icon: FileText, tone: "bg-slate-100 text-slate-500" },
+    { name: "bhyt_image", label: "Ảnh BHYT tại VssID/VNeID", emptyText: "Tải lên ảnh BHYT", Icon: FileText, tone: "bg-slate-100 text-slate-500" },
   ] as const).filter((slot) => hospitalChange
     // Ảnh chép từ đơn tại trường: chỉ hiện ảnh đơn đó thực sự có.
     ? !!submittedImages[slot.name]
@@ -1447,7 +1447,6 @@ function InsuranceRegistrationForm({ mode }: { mode: InsuranceFormMode }) {
                     <ImageField
                       key={slot.name}
                       label={slot.label}
-                      hint={"hint" in slot ? slot.hint : undefined}
                       emptyText={slot.emptyText}
                       Icon={slot.Icon}
                       tone={slot.tone}
