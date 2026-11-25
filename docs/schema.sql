@@ -834,3 +834,6 @@ CREATE TABLE IF NOT EXISTS hub_direct_submission_comments (
 -- ── Sự kiện cộng tác viên (24/11/2026) — nguồn: dashboard_iuoss/docs/sql/20261124_volunteer_events.sql
 -- 4 bảng volunteer_events · volunteer_event_staff · volunteer_event_students · volunteer_registrations.
 -- Hub chỉ ghi volunteer_registrations. DDL đầy đủ ở file nguồn (không chép lại để khỏi lệch).
+
+-- ── Link rút gọn (25/11/2026) — nguồn: dashboard_iuoss/docs/sql/20261125_short_links.sql
+-- Bảng short_links: Dashboard ghi; Hub chỉ đọc + tăng click_count / last_clicked_at.

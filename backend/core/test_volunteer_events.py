@@ -234,3 +234,31 @@ class VolunteerHubTests(TestCase):
         dash = Path(__file__).resolve().parents[3] / 'dashboard_iuoss' / 'volunteers' / 'form_schema.py'
         if dash.exists():
             self.assertEqual(dash.read_text(encoding='utf-8'), Path(fs.__file__).read_text(encoding='utf-8'))
+
+
+class ShortLinkApiTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+        from core.short_link_models import ShortLink
+        now = timezone.now()
+        self.link = ShortLink.objects.create(slug='hcmiu-run-2026', target_url='https://hub.iuoss.com/su-kien/2',
+                                             created_by_id=1, created_at=now, updated_at=now)
+        self.client = APIClient()
+
+    def test_resolves_and_counts(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer hong')     # token hỏng vẫn không chặn
+        r = self.client.get('/api/short-links/HCMIU-Run-2026/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['target'], 'https://hub.iuoss.com/su-kien/2')
+        self.client.get('/api/short-links/hcmiu-run-2026/')
+        self.link.refresh_from_db()
+        self.assertEqual(self.link.click_count, 2)
+        self.assertIsNotNone(self.link.last_clicked_at)
+
+    def test_inactive_and_missing(self):
+        self.link.is_active = False
+        self.link.save()
+        self.assertEqual(self.client.get('/api/short-links/hcmiu-run-2026/').status_code, 410)
+        self.link.refresh_from_db()
+        self.assertEqual(self.link.click_count, 0)
+        self.assertEqual(self.client.get('/api/short-links/khong-co/').status_code, 404)
