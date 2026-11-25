@@ -35,6 +35,15 @@ export function clearAuth(): void {
   );
 }
 
+/**
+ * Đích sau đăng nhập (`?next=`): chỉ nhận đường dẫn NỘI BỘ bắt đầu bằng một "/" —
+ * chặn "//evil.com" hay "/\evil.com" (trình duyệt hiểu là tên miền khác ⇒ chuyển hướng ra ngoài).
+ */
+export function safeNext(raw: string | null | undefined, fallback = '/dashboard'): string {
+  const s = (raw || '').trim();
+  return s.startsWith('/') && !s.startsWith('//') && !s.startsWith('/\\') ? s : fallback;
+}
+
 // ── Session — decode từ JWT, không dùng sessionStorage ───────────────────────
 // Ưu điểm: sống qua page refresh, tab mới, không cần lưu riêng.
 

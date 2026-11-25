@@ -34,6 +34,12 @@ import type {
 // Prod: không set env → '/api' → Nginx định tuyến /api/ → Gunicorn :8002
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
+/** Hết phiên ⇒ về /login, nhớ trang đang ở để đăng nhập xong quay lại đúng chỗ. */
+function toLogin() {
+  const here = window.location.pathname + window.location.search;
+  window.location.href = here.startsWith('/dashboard') ? `/login?next=${encodeURIComponent(here)}` : '/login';
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -84,7 +90,7 @@ async function request<T>(
 
   if (res.status === 401 && !opts.skipAuthRedirect) {
     clearAuth();
-    window.location.href = '/login';
+    toLogin();
     throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
   }
 
@@ -124,7 +130,7 @@ async function requestMultipart<T>(
 
   if (res.status === 401 && !opts.skipAuthRedirect) {
     clearAuth();
-    window.location.href = '/login';
+    toLogin();
     throw new ApiError(401, { detail: 'Phiên đăng nhập hết hạn' });
   }
 
@@ -570,6 +576,18 @@ export const api = {
       const res = await fetch(`${API_BASE}${path.slice(4)}`, { headers: { Authorization: `Bearer ${getToken()}` } });
       if (!res.ok) throw new Error('Không tải được file.');
       return res.blob();
+    },
+  },
+  /** Trang công khai của link / QR chia sẻ — KHÔNG gửi token, không chuyển về /login. */
+  volunteerPublic: {
+    async get(id: number): Promise<import('./types').VolunteerEventPublic> {
+      const res = await fetch(`${API_BASE}/public/volunteer-events/${id}/`);
+      const data = res.headers.get('Content-Type')?.includes('application/json') ? await res.json() : {};
+      if (!res.ok) throw new ApiError(res.status, data as Record<string, unknown>);
+      return data as import('./types').VolunteerEventPublic;
+    },
+    coverUrl(path: string): string {
+      return `${API_BASE}${path.slice(4)}`;   // path dạng /api/public/… — ảnh công khai, dùng thẳng trong <img>
     },
   },
   volunteer: {

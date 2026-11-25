@@ -60,7 +60,7 @@ export const dmy = (iso: string) => { const d = new Date(iso); return `${pad(d.g
 export const hmdmy = (iso: string | null) => (iso ? `${hm(iso)} ${dmy(iso)}` : '—');
 
 /** "08:00 – 17:00, 24/11/2026" (một ngày) hoặc "08:00 24/11 – 17:00 25/11/2026". */
-export function eventRange(e: VolunteerEventSummary) {
+export function eventRange(e: Pick<VolunteerEventSummary, 'starts_at' | 'ends_at' | 'day_count'>) {
   if (e.day_count === 1) return `${hm(e.starts_at)} – ${hm(e.ends_at)}, ${dmy(e.starts_at)}`;
   const s = new Date(e.starts_at);
   return `${hm(e.starts_at)} ${pad(s.getDate())}/${pad(s.getMonth() + 1)} – ${hm(e.ends_at)} ${dmy(e.ends_at)}`;

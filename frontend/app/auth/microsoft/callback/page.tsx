@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, GraduationCap, Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { setToken } from '@/lib/auth';
+import { setToken, safeNext } from '@/lib/auth';
 import { MS_PURPOSE_KEY, gradApi, gradHomePath } from '@/lib/graduation';
 
 // Trang Microsoft chuyển hướng về sau khi sinh viên đăng nhập. Nhiệm vụ duy nhất:
@@ -60,9 +60,9 @@ function CallbackHandler() {
       .microsoftCallback(code, state)
       .then((res) => {
         setToken(res.access);
-        const next = sessionStorage.getItem('hub_ms_next') || '/dashboard';
+        const next = safeNext(sessionStorage.getItem('hub_ms_next'));
         sessionStorage.removeItem('hub_ms_next');
-        router.replace(next.startsWith('/') ? next : '/dashboard');
+        router.replace(next);
       })
       .catch((err) => {
         setError(

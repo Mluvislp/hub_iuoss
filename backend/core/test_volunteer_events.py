@@ -177,6 +177,48 @@ class VolunteerHubTests(TestCase):
                                  answers={'q_00000003': [{'key': f'volunteer_events/{self.event.pk}/reg/9/a.jpg'}]})
         self.assertEqual(self.client.get(self.url('media/'), {'key': other.answers['q_00000003'][0]['key']}).status_code, 404)
 
+    # ── Trang công khai (link / QR) ──
+    def test_public_event_without_login(self):
+        anon = APIClient()
+        anon.credentials(HTTP_AUTHORIZATION='Bearer hong')         # token hỏng vẫn không 401
+        r = anon.get(f'/api/public/volunteer-events/{self.event.pk}/')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data['title'], 'Ngày hội việc làm')
+        self.assertEqual(r.data['audience'], 'all')
+        for leaked in ('form', 'registration', 'my_status', 'eligible'):
+            self.assertNotIn(leaked, r.data)
+        self.assertNotIn('script', r.data['description'])
+        self.assertIsNone(r.data['cover_url'])
+        self.assertEqual(anon.get(f'/api/public/volunteer-events/{self.event.pk}/cover/').status_code, 404)
+
+    def test_public_event_hidden_when_unpublished_or_flag_off(self):
+        anon = APIClient()
+        with override_settings(FEATURE_VOLUNTEER_EVENTS=False):
+            self.assertEqual(anon.get(f'/api/public/volunteer-events/{self.event.pk}/').status_code, 404)
+        self.event.published_at = None
+        self.event.save()
+        self.assertEqual(anon.get(f'/api/public/volunteer-events/{self.event.pk}/').status_code, 404)
+        self.assertEqual(anon.get('/api/public/volunteer-events/999/').status_code, 404)
+
+    def test_public_cover(self):
+        from pathlib import Path
+        key = f'volunteer_events/{self.event.pk}/cover-x.jpg'
+        target = Path(self.temp.name) / key
+        target.parent.mkdir(parents=True)
+        target.write_bytes(bytes([0xFF, 0xD8]) + b"jpg")
+        self.event.cover_image_key = key
+        self.event.save()
+        anon = APIClient()
+        self.assertEqual(anon.get(f'/api/public/volunteer-events/{self.event.pk}/').data['cover_url'],
+                         f'/api/public/volunteer-events/{self.event.pk}/cover/')
+        r = anon.get(f'/api/public/volunteer-events/{self.event.pk}/cover/')
+        self.assertEqual(r.status_code, 200)
+        r.close()
+        # Key ngoài thư mục sự kiện ⇒ không phục vụ.
+        self.event.cover_image_key = 'insurance_private/x.jpg'
+        self.event.save()
+        self.assertEqual(anon.get(f'/api/public/volunteer-events/{self.event.pk}/cover/').status_code, 404)
+
     def test_twin_module_matches_dashboard(self):
         from pathlib import Path
         dash = Path(__file__).resolve().parents[3] / 'dashboard_iuoss' / 'volunteers' / 'form_schema.py'

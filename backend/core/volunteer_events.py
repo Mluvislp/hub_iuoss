@@ -210,6 +210,28 @@ def list_for(student, now=None):
     return out
 
 
+# ── Trang công khai (link / QR chia sẻ, chưa đăng nhập) ───────────────────────
+# Chỉ sự kiện ĐÃ CÔNG BỐ; chỉ thông tin chung — không câu hỏi, không danh sách SV, không trạng thái của ai.
+
+def public_event(pk):
+    return E.objects.filter(pk=pk, published_at__isnull=False).first()
+
+
+def serialize_public(event, now=None):
+    data = serialize_summary(event, None, now)
+    for key in ('my_status', 'my_status_label'):
+        data.pop(key)
+    data['cover_url'] = f'/api/public/volunteer-events/{event.pk}/cover/' if event.cover_image_key else None
+    data['description'] = sanitize(event.description or '')
+    data['audience'] = event.audience_mode
+    return data
+
+
+def public_cover_path(event):
+    key = event.cover_image_key or ''
+    return safe_path(settings.MEDIA_ROOT, key) if key.startswith(f'{MEDIA_DIR}/{event.pk}/') else None
+
+
 # ── File SV nộp ──────────────────────────────────────────────────────────────
 
 def _store(event, student, data, ext, written):

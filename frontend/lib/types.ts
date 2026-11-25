@@ -1279,3 +1279,9 @@ export interface VolunteerEventDetail extends VolunteerEventSummary {
   };
   registration: VolunteerRegistration | null;
 }
+
+/** Trang công khai (chưa đăng nhập): thông tin chung, không câu hỏi, không trạng thái của SV. */
+export interface VolunteerEventPublic extends Omit<VolunteerEventSummary, 'my_status' | 'my_status_label'> {
+  description: string;
+  audience: 'all' | 'list' | null;
+}

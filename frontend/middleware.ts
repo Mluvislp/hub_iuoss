@@ -10,6 +10,15 @@ const PUBLIC_PATHS = ['/login'];
 // Trang Lễ tốt nghiệp: công khai, có phiên xác minh RIÊNG (lib/graduation.ts) — không xét
 // hub_token, cũng không đá người đã đăng nhập Hub sang /dashboard.
 const ALWAYS_ALLOW = ['/auth/microsoft/callback', '/le-tot-nghiep'];
+// Trang công khai của sự kiện cộng tác viên (link / QR staff chia sẻ): ai cũng xem được thông tin, không
+// có câu hỏi; bấm Đăng ký mới sang /login?next=/dashboard/su-kien/<id>. Không xét hub_token.
+const PUBLIC_PREFIXES = ['/su-kien/'];
+
+/** Cùng luật `lib/auth.ts::safeNext` (middleware chạy ở edge, không import được file 'use client'). */
+function safeNext(raw: string | null): string {
+  const s = (raw || '').trim();
+  return s.startsWith('/') && !s.startsWith('//') && !s.startsWith('/\\') ? s : '/dashboard';
+}
 
 // ── Tên miền riêng của Lễ tốt nghiệp ───────────────────────────────────────────
 // graduation.iuoss.com ↔ hub.iuoss.com, graduation-sandbox.iuoss.com ↔ hub-sandbox.iuoss.com:
@@ -62,6 +71,7 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/')) return NextResponse.next();
 
   if (ALWAYS_ALLOW.includes(pathname)) return NextResponse.next();
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   const token = request.cookies.get('hub_token')?.value;
 
@@ -71,14 +81,14 @@ export function middleware(request: NextRequest) {
   );
 
   if (isPublic) {
-    // Đã login → về thẳng dashboard, không qua '/' để tránh double-redirect
-    if (token) return NextResponse.redirect(new URL('/dashboard', request.url));
+    // Đã login → về thẳng trang đích (`next`, mặc định dashboard), không qua '/' để tránh double-redirect
+    if (token) return NextResponse.redirect(new URL(safeNext(request.nextUrl.searchParams.get('next')), request.url));
     return NextResponse.next();
   }
 
   if (!token) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
+    loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 
