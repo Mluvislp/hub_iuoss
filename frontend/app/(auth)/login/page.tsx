@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, GraduationCap, Loader2, ArrowRight } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { setToken, getToken } from '@/lib/auth';
+import { setToken, getToken, safeNext } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
 /** Logo 4 ô của Microsoft — inline để không phải tải ảnh ngoài. */
@@ -22,7 +22,7 @@ function MicrosoftLogo() {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') || '/dashboard';
+  const next = safeNext(params.get('next'));
 
   const [uid, setUid] = useState('');
   const [password, setPassword] = useState('');
@@ -33,8 +33,8 @@ function LoginForm() {
   const [msLoading, setMsLoading] = useState(false);
 
   useEffect(() => {
-    if (getToken()) router.replace('/dashboard');
-  }, [router]);
+    if (getToken()) router.replace(next);
+  }, [router, next]);
 
   // Chỉ hiện nút Microsoft khi backend đã cấu hình app registration — tránh dẫn
   // người dùng tới một endpoint trả 404.
@@ -79,7 +79,7 @@ function LoginForm() {
     try {
       const res = await api.auth.login(uid.trim(), password);
       setToken(res.access);  // session tự decode từ JWT qua getSession()
-      router.replace(next.startsWith('/') ? next : '/dashboard');
+      router.replace(next);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || 'Tài khoản hoặc mật khẩu không đúng.');

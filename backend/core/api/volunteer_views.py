@@ -7,6 +7,7 @@ from django.http import FileResponse, Http404
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -48,6 +49,40 @@ def _error(exc):
         body['errors'] = exc.errors
     code = status.HTTP_409_CONFLICT if exc.code in ('closed', 'conflict') else status.HTTP_400_BAD_REQUEST
     return Response(body, status=code)
+
+
+class PublicVolunteerMixin:
+    """Trang công khai của link / QR chia sẻ: không cần đăng nhập, không đọc token (token hỏng không làm 401)."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def initial(self, request, *args, **kwargs):
+        if not settings.FEATURE_VOLUNTEER_EVENTS:
+            raise NotFound('Không tìm thấy sự kiện.')
+        super().initial(request, *args, **kwargs)
+
+    def event(self, pk):
+        e = ve.public_event(pk)
+        if e is None:
+            raise Http404
+        return e
+
+
+class PublicVolunteerEventView(PublicVolunteerMixin, APIView):
+    def get(self, request, pk):
+        return Response(ve.serialize_public(self.event(pk)))
+
+
+class PublicVolunteerCoverView(PublicVolunteerMixin, APIView):
+    def get(self, request, pk):
+        path = ve.public_cover_path(self.event(pk))
+        if path is None:
+            raise Http404
+        response = FileResponse(path.open('rb'), content_type=mimetypes.guess_type(path.name)[0] or 'image/jpeg')
+        response['Cache-Control'] = 'public, max-age=3600'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
 
 
 class VolunteerEventListView(VolunteerRequiredMixin, APIView):

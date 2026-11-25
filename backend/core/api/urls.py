@@ -102,6 +102,9 @@ urlpatterns = [
     path("volunteer-events/<int:pk>/register/", volunteer_views.VolunteerRegisterView.as_view(), name="api_volunteer_register"),
     path("volunteer-events/<int:pk>/cancel/", volunteer_views.VolunteerCancelView.as_view(), name="api_volunteer_cancel"),
     path("volunteer-events/<int:pk>/media/", volunteer_views.VolunteerMediaView.as_view(), name="api_volunteer_media"),
+    # Công khai (link / QR chia sẻ) — không cần đăng nhập, chỉ sự kiện đã công bố, không có câu hỏi.
+    path("public/volunteer-events/<int:pk>/", volunteer_views.PublicVolunteerEventView.as_view(), name="api_public_volunteer_event"),
+    path("public/volunteer-events/<int:pk>/cover/", volunteer_views.PublicVolunteerCoverView.as_view(), name="api_public_volunteer_cover"),
 
     # Nộp bằng tốt nghiệp THPT — core/diploma.py
     path("diploma/", diploma_views.DiplomaView.as_view(), name="api_diploma"),
