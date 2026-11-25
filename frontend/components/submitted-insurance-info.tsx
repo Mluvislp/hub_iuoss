@@ -16,7 +16,7 @@ export const INSURANCE_FIELD_LABELS: Record<string,string> = {
   hospital_code:'Nơi khám chữa bệnh', note:'Ghi chú thông tin BHYT bị sai',
   medical_insurance_code:'Mã thẻ BHYT',
   valid_from:'Thẻ có hiệu lực từ', valid_until:'Thẻ có hiệu lực đến',
-  cccd_image:'CCCD mặt trước', cccd_image_back:'CCCD mặt sau', bhyt_image:'Thẻ BHYT cũ',
+  cccd_image:'CCCD mặt trước', cccd_image_back:'CCCD mặt sau', bhyt_image:'Ảnh BHYT tại VssID/VNeID',
   payment_receipt_image:'Biên lai chuyển khoản',
 };
 const labels = INSURANCE_FIELD_LABELS;
