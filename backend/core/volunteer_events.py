@@ -14,7 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 
@@ -319,6 +319,19 @@ def _json(data, key):
     return value if isinstance(value, dict) else {}
 
 
+def _lock_event_shared(pk):
+    """Đọc lại sự kiện bằng khoá CHIA SẺ (MySQL `FOR SHARE`, đọc bản đã commit mới nhất).
+
+    Dashboard đổi loại câu hỏi + chuyển câu trả lời cũ dưới khoá ĐỘC QUYỀN cùng dòng ⇒ không lượt gửi nào chen
+    giữa lúc chuyển, và câu trả lời luôn được kiểm theo form mới nhất. Khoá chia sẻ nên nhiều SV gửi song song
+    không phải xếp hàng (không dùng select_for_update — xem diploma.submit)."""
+    if connection.vendor == 'mysql':
+        found = list(E.objects.raw('SELECT * FROM volunteer_events WHERE id = %s FOR SHARE', [pk]))
+        if found:
+            return found[0]
+    return E.objects.get(pk=pk)
+
+
 def submit(student, event, data, files, now=None):
     """Gửi mới / sửa (khi Chờ duyệt) / đăng ký lại (sau khi tự hủy). Lỗi ⇒ VolunteerError (errors theo ô)."""
     now = now or timezone.now()
@@ -326,10 +339,13 @@ def submit(student, event, data, files, now=None):
         raise VolunteerError('Sự kiện không trong thời gian nhận đăng ký.', code='closed')
     if not eligible(student, event):
         raise VolunteerError('Sinh viên không thuộc đối tượng được đăng ký sự kiện này.', code='closed')
-    schema = event.form_schema or {}
     written = []
     try:
         with transaction.atomic():
+            event = _lock_event_shared(event.pk)
+            if registration_state(event, now) != 'open':
+                raise VolunteerError('Sự kiện không trong thời gian nhận đăng ký.', code='closed')
+            schema = event.form_schema or {}
             reg = R.objects.select_for_update().filter(event_id=event.pk, student_id=student.pk).first()
             if reg and reg.status not in (R.PENDING, R.CANCELLED):
                 raise VolunteerError('Đăng ký đã được Phòng CTSV xét, không sửa được.', code='closed')

@@ -152,6 +152,16 @@ class VolunteerHubTests(TestCase):
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(R.objects.get(event=self.event).answers['q_000000aa:reason'], 'Trùng lịch thi')
 
+    def test_submit_checks_latest_form_after_type_change(self):
+        # Tab SV mở lúc câu còn "Chọn một" (gửi 1 giá trị), staff đã đổi sang "Chọn nhiều" ⇒ lưu đúng dạng mới.
+        schema = json.loads(json.dumps(SCHEMA))
+        schema['questions'][0]['type'] = 'multi'
+        self.event.form_schema = schema
+        self.event.save()
+        r = self.register(**{'file:q_00000003': png()})          # answers: {'q_00000001': 'o_00000002'}
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(R.objects.get(event=self.event).answers['q_00000001'], ['o_00000002'])
+
     def test_pdf_rejected_for_image_question(self):
         pdf = SimpleUploadedFile('cv.pdf', b'%PDF-1.4 test', content_type='application/pdf')
         r = self.register(**{'file:q_00000003': pdf})
