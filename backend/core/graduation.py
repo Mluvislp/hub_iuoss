@@ -395,10 +395,33 @@ def late_receipt_open(member, now=None):
     return not member.deposit_receipt_storage_key or bool(uploaded and uploaded > closes)
 
 
+# Mở lại đăng ký RIÊNG từng người (Phòng CTSV yêu cầu): {MSSV: hạn}. Tới hạn này người đó đăng ký / nộp minh chứng /
+# sửa tài khoản hoàn cọc / xin hủy như còn trong hạn đăng ký. Ảnh trình chiếu KHÔNG mở (vẫn theo `photo_window_open`).
+# Gỡ dòng sau đợt.
+MEMBER_EXTENSIONS = {
+    "MPMAG22001": datetime(2026, 11, 26, 23, 59, 59, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh")),   # 25/11/2026
+}
+
+
+def member_extension(member, now=None):
+    """Hạn mở lại riêng của người này nếu đang còn hiệu lực, không thì None."""
+    closes = MEMBER_EXTENSIONS.get(member.student_code)
+    opens = member.round.registration_opens_at
+    if closes and opens and opens <= (now or timezone.now()) <= closes:
+        return closes
+    return None
+
+
+def registration_open_for(member):
+    """Còn hạn đăng ký với người này: đợt đang mở, hoặc được mở lại riêng (`MEMBER_EXTENSIONS`)."""
+    return member.round.registration_open() or bool(member_extension(member))
+
+
 def can_upload_receipt(member):
     """Nộp / thay minh chứng: đang đăng ký (registered) và còn hạn đăng ký — như đổi tài khoản hoàn cọc — hoặc thuộc
     diện đợt bổ sung minh chứng (`late_receipt_open`)."""
-    return (member.round.registration_open() and member.registration_status == Member.STATUS_REGISTERED)         or late_receipt_open(member)
+    return ((registration_open_for(member) and member.registration_status == Member.STATUS_REGISTERED)
+            or late_receipt_open(member))
 
 
 def deposit_payload(member):
@@ -410,9 +433,12 @@ def deposit_payload(member):
     # Quá hạn theo hạn THỰC THI (có gia hạn ngầm); "deadline" vẫn trả hạn hiển thị. Thuộc diện đợt bổ sung minh chứng
     # ⇒ chưa quá hạn (vẫn thấy thông tin chuyển khoản — có người chưa chuyển) và hạn = hạn bổ sung.
     late = late_receipt_open(member)
-    overdue = bool(closes and timezone.now() > member.round.effective_closes_at()) and not late
+    personal = member_extension(member)
+    overdue = bool(closes and timezone.now() > member.round.effective_closes_at()) and not late and not personal
     if late:
         closes = RECEIPT_LATE_CLOSES_AT
+    if personal:
+        closes = personal
     account = {k: None for k in DEPOSIT_ACCOUNT} if overdue else DEPOSIT_ACCOUNT
     return {
         **account,
@@ -530,7 +556,7 @@ def _locked(member_id):
 
 
 def _require_open(member):
-    if not member.round.registration_open():
+    if not registration_open_for(member):
         raise GraduationError("Ngoài thời gian đăng ký — không thay đổi được đăng ký.")
 
 
@@ -559,6 +585,8 @@ def register(member_id, *, via, bank_info, upload=None, receipt=None, receipt2=N
         _require_open(member)
         if member.is_registered:
             raise GraduationError("Đã đăng ký tham dự rồi.")
+        if upload is not None and not photo_window_open(member.round):
+            raise GraduationError("Đã hết hạn tải ảnh trình chiếu — đăng ký không kèm ảnh.")
         _apply_bank(member, bank_info)          # bắt buộc — kiểm trước khi ghi file
         stale = [_apply_receipt(member, receipt, written)]                      # bắt buộc
         # Bổ sung (không bắt buộc). Đăng ký lại sau khi hủy mà không gửi kèm ⇒ bỏ file bổ sung của lần trước.
@@ -720,7 +748,7 @@ def degree_class_label(value):
 def member_payload(member):
     s = member.student
     round_ = member.round
-    can_edit = round_.registration_open() and member.registration_status == Member.STATUS_REGISTERED
+    can_edit = registration_open_for(member) and member.registration_status == Member.STATUS_REGISTERED
     local = lambda v: timezone.localtime(v).isoformat() if v else None  # noqa: E731
     return {
         "student": {
@@ -756,7 +784,8 @@ def member_payload(member):
             "checked_in": bool(member.checked_in_at),
             "can_edit": can_edit,
             "can_remove_photo": bool(member.photo_storage_key) and can_edit_photo(member),
-            "can_register": round_.registration_open() and not member.is_registered,
+            "can_register": registration_open_for(member) and not member.is_registered,
+            "photo_open": photo_window_open(round_),
         },
         "bank": {
             "bank_id": member.bank_id,

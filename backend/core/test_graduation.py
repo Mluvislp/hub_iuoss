@@ -91,6 +91,7 @@ class GraduationTests(TestCase):
         self.client = APIClient()
         # Đợt bổ sung minh chứng có mốc thật theo ngày ⇒ tắt mặc định để test không đổi kết quả theo ngày chạy.
         self.enterContext(patch.object(grad, "RECEIPT_LATE_CLOSES_AT", None))
+        self.enterContext(patch.object(grad, "MEMBER_EXTENSIONS", {}))
 
     # ── helpers ──
     def _verify_hv(self, **over):
@@ -603,6 +604,37 @@ class GraduationTests(TestCase):
         dep = self.client.get("/api/graduation/me/").json()["deposit"]
         self.assertEqual((dep["overdue"], dep["can_upload"]), (True, False))
         self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt()}, format="multipart").status_code, 400)
+
+    def test_member_extension_reopens_registration_and_receipt_but_not_photo(self):
+        self._login_sv()
+        now = timezone.now()
+        GraduationRound.objects.filter(pk=self.round.pk).update(registration_closes_at=now - timedelta(hours=1))
+        self.enterContext(patch.object(grad, "PHOTO_CLOSES_AT", now - timedelta(hours=1)))
+        self.assertFalse(self.client.get("/api/graduation/me/").json()["registration"]["can_register"])
+        self.enterContext(patch.object(grad, "MEMBER_EXTENSIONS", {"ITITIU22001": now + timedelta(hours=2)}))
+
+        me = self.client.get("/api/graduation/me/").json()
+        self.assertEqual((me["registration"]["can_register"], me["registration"]["photo_open"]), (True, False))
+        self.assertEqual((me["deposit"]["overdue"], me["deposit"]["can_upload"]), (False, False))
+        self.assertIsNotNone(me["deposit"]["account_number"])                  # thấy thông tin chuyển khoản
+        self.assertEqual(timezone.datetime.fromisoformat(me["deposit"]["deadline"]), now + timedelta(hours=2))
+        # Kèm ảnh ⇒ từ chối; không ảnh ⇒ đăng ký được, rồi thay minh chứng / tài khoản được.
+        self.assertEqual(self.client.post("/api/graduation/register/", {**self.reg_data(), "photo": _jpeg("a.jpg")},
+                                          format="multipart").status_code, 400)
+        res = self.client.post("/api/graduation/register/", self.reg_data(), format="multipart")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["registration"]["status"], Member.STATUS_REGISTERED)
+        self.assertTrue(res.json()["deposit"]["can_upload"])
+        self.assertEqual(self.client.post("/api/graduation/receipt/", {"receipt": _receipt("lan-2.png")},
+                                          format="multipart").status_code, 200)
+        self.assertEqual(self.client.post("/api/graduation/bank/", self.bank_data(), format="json").status_code, 200)
+        self.assertEqual(self.client.post("/api/graduation/photo/", {"photo": _jpeg("a.jpg")},
+                                          format="multipart").status_code, 400)
+        # Hết hạn riêng ⇒ khóa lại; người khác không được hưởng.
+        self.enterContext(patch.object(grad, "MEMBER_EXTENSIONS", {"ITITIU22001": now - timedelta(minutes=1)}))
+        self.assertFalse(self.client.get("/api/graduation/me/").json()["deposit"]["can_upload"])
+        self.m_hv.refresh_from_db()
+        self.assertIsNone(grad.member_extension(self.m_hv))
 
     def test_late_receipt_window_excludes_unregistered_and_cancel_requested(self):
         now = timezone.now()

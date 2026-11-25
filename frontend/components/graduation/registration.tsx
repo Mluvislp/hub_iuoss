@@ -202,6 +202,8 @@ export function RegisterForm({ member, banks, onRegistered }: {
   const reg = member.registration;
   const code = member.student.student_code;
   const proxy = member.bank?.proxy ? member.bank : null;
+  // Mở lại đăng ký riêng sau hạn ảnh ⇒ đăng ký không kèm ảnh.
+  const photoOpen = reg.photo_open !== false;
 
   async function submit() {
     if (!receipt) {
@@ -229,23 +231,27 @@ export function RegisterForm({ member, banks, onRegistered }: {
         <h3 className="mt-1 font-display text-[1.9rem] font-semibold leading-tight text-[#0f2a5c]">Đăng ký tham dự</h3>
       </div>
 
-      <div className="grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div className={cn('grid', photoOpen && 'lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]')}>
         <div className="space-y-5 px-6 py-6 sm:px-8">
           {reg.status === 'cancelled' && (
             <Callout tone="slate">
               Đăng ký trước đó đã được hủy{reg.cancel_reviewed_at ? ` lúc ${dt(reg.cancel_reviewed_at)}` : ''}. Có thể đăng ký lại.
             </Callout>
           )}
-          <div>
-            <div className="flex items-baseline justify-between gap-3">
-              <h4 className="font-semibold text-ink">Ảnh trình chiếu trên màn hình LED</h4>
-              <span className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs font-medium text-muted whitespace-nowrap">Không bắt buộc</span>
-            </div>
-            <div className="mt-3"><Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
-          </div>
-          <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
+          {photoOpen && (
+            <>
+              <div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <h4 className="font-semibold text-ink">Ảnh trình chiếu trên màn hình LED</h4>
+                  <span className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs font-medium text-muted whitespace-nowrap">Không bắt buộc</span>
+                </div>
+                <div className="mt-3"><Callout>{SCHOOL_PHOTO_NOTE}</Callout></div>
+              </div>
+              <PhotoPicker code={code} file={file} onFile={setFile} disabled={busy} />
+            </>
+          )}
 
-          <div id="the-chan" className="scroll-mt-24 border-t border-line pt-5 space-y-4">
+          <div id="the-chan" className={cn('scroll-mt-24 space-y-4', photoOpen && 'border-t border-line pt-5')}>
             <div className="flex items-baseline justify-between gap-3">
               <h4 className="font-semibold text-ink">Tiền thế chân lễ phục</h4>
               <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 whitespace-nowrap">Bắt buộc</span>
@@ -306,10 +312,12 @@ export function RegisterForm({ member, banks, onRegistered }: {
           </div>
         </div>
 
-        <aside className="border-t lg:border-t-0 lg:border-l border-line bg-[#fbfcfe] px-6 py-6 sm:px-8">
-          <p className={g.eyebrow}>Yêu cầu về ảnh</p>
-          <div className="mt-4"><PhotoGuidelines /></div>
-        </aside>
+        {photoOpen && (
+          <aside className="border-t lg:border-t-0 lg:border-l border-line bg-[#fbfcfe] px-6 py-6 sm:px-8">
+            <p className={g.eyebrow}>Yêu cầu về ảnh</p>
+            <div className="mt-4"><PhotoGuidelines /></div>
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -83,6 +83,7 @@ export interface GradMember {
     can_edit: boolean;
     can_remove_photo: boolean;
     can_register: boolean;
+    photo_open?: boolean;
   };
   bank: {
     bank_id: number;
