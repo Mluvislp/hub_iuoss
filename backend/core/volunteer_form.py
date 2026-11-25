@@ -337,6 +337,16 @@ def clean_answers(schema, data, files):
     return answers, errors
 
 
+# ── Đổi loại câu hỏi đã có câu trả lời ───────────────────────────────────────
+# Chỉ các cặp KHÔNG mất dữ liệu; Dashboard chuyển câu trả lời cũ khi lưu form (volunteers/services.py).
+LOSSLESS_CONVERSIONS = {
+    "single": ("multi", "dropdown"),       # → dropdown: chặn nếu có người chọn "Khác"
+    "dropdown": ("single", "multi"),
+    "yes_no": ("single",),                 # cần 2 lựa chọn đúng chữ "Có" / "Không"
+    "short_text": ("long_text",),
+}
+
+
 # ── Hiển thị ─────────────────────────────────────────────────────────────────
 
 def _fmt_num(n):
@@ -355,10 +365,15 @@ def format_answer(q, answers):
         reason = (answers or {}).get(f"{q['id']}:reason", "")
         return f"Không — {reason}" if value == NO and reason else YES_NO_LABELS.get(value, str(value))
     if qtype in ("single", "dropdown"):
-        return f"Khác: {other}" if value == OTHER else labels.get(value, "(lựa chọn đã xoá)")
+        if isinstance(value, list):                     # đọc mềm: câu từng là "Chọn nhiều"
+            value = value[0] if value else ""
+        text = f"Khác: {other}" if value == OTHER else labels.get(value, "(lựa chọn đã xoá)")
+        reason = (answers or {}).get(f"{q['id']}:reason", "")   # câu từng là "Có / Không"
+        return f"{text} — {reason}" if reason else text
     if qtype == "multi":
+        picked = value if isinstance(value, list) else [value]   # đọc mềm: câu từng là "Chọn một"
         return "; ".join(f"Khác: {other}" if v == OTHER else labels.get(v, "(lựa chọn đã xoá)")
-                         for v in value)
+                         for v in picked)
     if qtype == "date":
         try:
             return date.fromisoformat(value).strftime("%d/%m/%Y")
