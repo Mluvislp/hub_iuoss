@@ -31,6 +31,7 @@ trước giấy tờ (`core/document_preview.py` → Dashboard `/documents/inter
 | Bằng THPT | `diploma.py` · `diploma_models.py` |
 | Lễ tốt nghiệp | `graduation.py` · `graduation_models.py` · `api/graduation_views.py` · `api/graduation_auth.py` (phiên riêng) |
 | Hỏi đáp | `tickets.py` · `ticket_models.py` · `richtext.py` ⇄ · `templates/emails/ticket_staff.html` |
+| Link rút gọn `/<slug>` | `short_link_models.py` (chỉ đọc + tăng lượt) · API `short-links/<slug>/` · `frontend/app/[slug]` |
 | Sự kiện cộng tác viên | `volunteer_events.py` · `volunteer_models.py` · `volunteer_form.py` ⇄ · `api/volunteer_views.py` |
 | Kho ảnh SV | `student_images.py` · `student_image_models.py` — luồng mới lấy/lưu ảnh ở đây |
 | `students/` | `models.py` (read-only) · `timeline.py` ⇄ (3 luật tính mốc) |

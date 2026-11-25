@@ -138,3 +138,26 @@ class VolunteerMediaView(VolunteerRequiredMixin, APIView):
         response['Cache-Control'] = 'private, max-age=3600'
         response['X-Content-Type-Options'] = 'nosniff'
         return response
+
+
+# ── Link rút gọn hub.iuoss.com/<slug> (trang frontend app/[slug]) ─────────────────────────────────────────────
+
+class ShortLinkView(APIView):
+    """Tra slug ⇒ đích + đếm 1 lượt mở. Công khai, không đọc token. Không gắn với cờ tính năng nào."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        from django.db.models import F
+        from django.utils import timezone
+        from core.short_link_models import ShortLink
+        link = ShortLink.objects.filter(slug=(slug or '').lower()).first()
+        if link is None:
+            raise Http404
+        if not link.is_active:
+            return Response({'detail': 'Link không còn hoạt động.'}, status=status.HTTP_410_GONE)
+        ShortLink.objects.filter(pk=link.pk).update(click_count=F('click_count') + 1, last_clicked_at=timezone.now())
+        response = Response({'target': link.target_url})
+        response['Cache-Control'] = 'no-store'
+        return response

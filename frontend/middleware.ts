@@ -14,6 +14,15 @@ const ALWAYS_ALLOW = ['/auth/microsoft/callback', '/le-tot-nghiep'];
 // có câu hỏi; bấm Đăng ký mới sang /login?next=/dashboard/su-kien/<id>. Không xét hub_token.
 const PUBLIC_PREFIXES = ['/su-kien/'];
 
+// Link rút gọn hub.iuoss.com/<slug> (trang app/[slug]): công khai, không xét hub_token. Route có sẵn vẫn thắng
+// trong Next.js; danh sách dưới giữ cho /dashboard, /login… đi đúng luồng đăng nhập.
+// Bản đối ứng: dashboard shortlinks/services.py::RESERVED — thêm route cấp 1 ở Hub phải thêm vào cả hai.
+const SLUG_PATH = /^\/[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const RESERVED_SLUGS = new Set([
+  'api', 'auth', 'dashboard', 'login', 'logout', 'le-tot-nghiep', 'su-kien', 'admin', 'static', 'media',
+  'img', 'icons', 'health', 'hub', 'graduation', 's', 'go', 'l',
+]);
+
 /** Cùng luật `lib/auth.ts::safeNext` (middleware chạy ở edge, không import được file 'use client'). */
 function safeNext(raw: string | null): string {
   const s = (raw || '').trim();
@@ -72,6 +81,7 @@ export function middleware(request: NextRequest) {
 
   if (ALWAYS_ALLOW.includes(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
+  if (SLUG_PATH.test(pathname) && !RESERVED_SLUGS.has(pathname.slice(1).toLowerCase())) return NextResponse.next();
 
   const token = request.cookies.get('hub_token')?.value;
 
